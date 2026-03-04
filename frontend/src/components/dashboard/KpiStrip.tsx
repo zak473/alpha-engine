@@ -2,109 +2,118 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
-import type { LucideIcon } from "lucide-react";
-import { Calendar, Zap, Cpu, Activity, Trophy, RefreshCw, X } from "lucide-react";
+import { Calendar, Zap, Cpu, Activity, Trophy, X } from "lucide-react";
 import type { MvpPrediction, Challenge, MvpPerformance } from "@/lib/types";
 
 // ── System drawer ─────────────────────────────────────────────────────────────
 
-function SystemDrawer({
-  apiOk,
-  dbOk,
-  onClose,
-}: {
-  apiOk: boolean;
-  dbOk: boolean;
-  onClose: () => void;
-}) {
+function SystemDrawer({ apiOk, dbOk, onClose }: { apiOk: boolean; dbOk: boolean; onClose: () => void }) {
   const checks = [
-    { label: "API",         ok: apiOk, detail: apiOk ? "Responding normally" : "Not reachable"    },
-    { label: "Database",    ok: dbOk,  detail: dbOk  ? "Connected"           : "Connection failed" },
-    { label: "ML Pipeline", ok: true,  detail: "Last run: 2 hours ago"                             },
-    { label: "Data Feed",   ok: true,  detail: "Live — 14 sources active"                          },
+    { label: "API endpoint",  ok: apiOk, detail: apiOk ? "Responding · p50 42ms"  : "Unreachable"       },
+    { label: "Database",      ok: dbOk,  detail: dbOk  ? "Connected · 12 active"  : "Connection refused" },
+    { label: "ML pipeline",   ok: true,  detail: "Last run 2h ago · OK"                                  },
+    { label: "Data ingest",   ok: true,  detail: "14 sources · live"                                     },
   ];
 
   return (
-    <div className="card p-4 mt-3 space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-text-primary">System Status</p>
-        <button onClick={onClose} className="text-text-subtle hover:text-text-muted transition-colors">
-          <X size={13} />
+    <div style={{
+      position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50,
+      width: 260, background: "var(--bg2)", border: "1px solid var(--border1)",
+      borderRadius: "var(--radius-md)", boxShadow: "0 8px 24px rgba(0,0,0,0.5)", padding: 12,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <span className="label">System Status</span>
+        <button onClick={onClose} style={{ color: "var(--text1)", background: "none", border: "none", cursor: "pointer", display: "flex" }}>
+          <X size={12} />
         </button>
       </div>
-      <div className="space-y-2">
-        {checks.map((c) => (
-          <div key={c.label} className="flex items-center gap-2">
-            <div className={cn("w-2 h-2 rounded-full shrink-0", c.ok ? "bg-accent-green" : "bg-accent-red")} />
-            <span className="text-xs text-text-muted w-24 shrink-0">{c.label}</span>
-            <span className="text-xs text-text-subtle">{c.detail}</span>
-          </div>
-        ))}
-      </div>
+      {checks.map((c) => (
+        <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <span style={{
+            width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+            background: c.ok ? "var(--positive)" : "var(--negative)",
+            boxShadow: c.ok ? "0 0 5px rgba(16,185,129,0.6)" : "0 0 5px rgba(244,63,94,0.6)",
+          }} />
+          <span style={{ fontSize: 11, color: "var(--text1)", width: 88, flexShrink: 0 }}>{c.label}</span>
+          <span style={{ fontSize: 11, color: "var(--text2)" }}>{c.detail}</span>
+        </div>
+      ))}
     </div>
   );
 }
 
-// ── KPI chip ─────────────────────────────────────────────────────────────────
+// ── KPI Tile ─────────────────────────────────────────────────────────────────
 
-interface KpiChipProps {
-  icon: LucideIcon;
-  iconColor: string;
-  label: string;
-  value: string;
-  sub?: string;
-  status?: "ok" | "warn" | "error" | "neutral";
-  onClick?: () => void;
-  href?: string;
-  active?: boolean;
+interface KpiTileProps {
+  label: string; value: string | number; sub?: string;
+  icon: React.ElementType; iconColor: string;
+  status?: "ok" | "warn" | "error";
+  href?: string; onClick?: () => void; active?: boolean;
 }
 
-function KpiChip({ icon: Icon, iconColor, label, value, sub, status, onClick, href, active }: KpiChipProps) {
-  const statusColors = {
-    ok:      "bg-accent-green",
-    warn:    "bg-accent-amber",
-    error:   "bg-accent-red",
-    neutral: "bg-text-subtle",
-  };
+function KpiTile({ label, value, sub, icon: Icon, iconColor, status, href, onClick, active }: KpiTileProps) {
+  const statusColor = { ok: "var(--positive)", warn: "var(--warning)", error: "var(--negative)" }[status ?? "ok"];
 
   const inner = (
-    <>
-      <div
-        className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center"
-        style={{ backgroundColor: `${iconColor}15` }}
-      >
-        <Icon size={15} style={{ color: iconColor }} />
+    <div style={{ padding: "10px 14px", position: "relative", height: "100%" }}>
+      {/* Header row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+        <div style={{
+          width: 20, height: 20, borderRadius: "var(--radius-sm)",
+          background: "color-mix(in srgb, " + iconColor + " 12%, transparent)",
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>
+          <Icon size={10} style={{ color: iconColor }} strokeWidth={2.5} />
+        </div>
+        <span className="label" style={{ flex: 1 }}>{label}</span>
+        {status && (
+          <span style={{
+            width: 5, height: 5, borderRadius: "50%", flexShrink: 0,
+            background: statusColor,
+            boxShadow: `0 0 5px ${statusColor}80`,
+          }} />
+        )}
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="label truncate">{label}</p>
-        <p className="text-sm font-semibold text-text-primary num truncate mt-0.5">{value}</p>
-        {sub && <p className="text-2xs text-text-muted truncate mt-0.5">{sub}</p>}
+
+      {/* Value */}
+      <div className="num" style={{
+        fontSize: 22, fontWeight: 700, color: "var(--text0)",
+        lineHeight: 1, letterSpacing: "-0.035em", marginBottom: 4,
+      }}>
+        {value}
       </div>
-      {status && (
-        <div className={cn("shrink-0 w-2 h-2 rounded-full", statusColors[status])} />
-      )}
-    </>
+
+      {/* Sub */}
+      {sub && <div style={{ fontSize: 10, color: "var(--text2)", lineHeight: 1.3 }}>{sub}</div>}
+
+      {/* Active bottom bar */}
+      {active && <div style={{
+        position: "absolute", bottom: 0, left: 0, right: 0, height: 2,
+        background: "var(--accent)", borderRadius: "0 0 var(--radius-md) var(--radius-md)",
+      }} />}
+    </div>
   );
 
-  const classes = cn(
-    "card px-3.5 py-3 flex items-center gap-3 min-w-0 w-full text-left transition-colors",
-    (onClick || href) && "hover:bg-white/[0.04] cursor-pointer",
-    active && "ring-1 ring-accent-blue/40 bg-accent-blue/5"
-  );
+  const s: React.CSSProperties = {
+    background:   active ? "var(--accent-muted)" : "var(--bg2)",
+    border:       `1px solid ${active ? "rgba(0,212,255,0.2)" : "var(--border0)"}`,
+    borderRadius: "var(--radius-md)",
+    transition:   "all 140ms",
+    display:      "block",
+    width:        "100%",
+    textAlign:    "left",
+    textDecoration: "none",
+    color:        "inherit",
+    cursor:       href || onClick ? "pointer" : "default",
+    position:     "relative",
+  };
 
-  if (href) {
-    return <Link href={href} className={classes}>{inner}</Link>;
-  }
-
-  return (
-    <button onClick={onClick} className={classes}>
-      {inner}
-    </button>
-  );
+  if (href)    return <Link href={href} style={s}>{inner}</Link>;
+  if (onClick) return <button style={{ ...s, font: "inherit" }} onClick={onClick}>{inner}</button>;
+  return <div style={s}>{inner}</div>;
 }
 
-// ── KPI Strip ─────────────────────────────────────────────────────────────────
+// ── KpiStrip ─────────────────────────────────────────────────────────────────
 
 interface KpiStripProps {
   predictions: MvpPrediction[];
@@ -116,106 +125,56 @@ interface KpiStripProps {
 
 export function KpiStrip({ predictions, myChallenges, performance, apiOk, dbOk }: KpiStripProps) {
   const [systemOpen, setSystemOpen] = useState(false);
-  const [lastRefresh] = useState(() => new Date());
+  const [refreshTime] = useState(() => new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }));
 
   const now = Date.now();
-  const todayEnd = new Date();
-  todayEnd.setHours(23, 59, 59, 999);
+  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
 
-  // Events today — count by sport
   const todayEvents = predictions.filter(
-    (p) => new Date(p.start_time).getTime() <= todayEnd.getTime() && new Date(p.start_time).getTime() >= now
+    (p) => new Date(p.start_time).getTime() >= now && new Date(p.start_time).getTime() <= todayEnd.getTime()
   );
-  const soccerCount  = todayEvents.filter((p) => p.sport === "soccer").length;
-  const tennisCount  = todayEvents.filter((p) => p.sport === "tennis").length;
-  const esportsCount = todayEvents.filter((p) => p.sport === "esports").length;
-  const eventSub = [
-    soccerCount  > 0 && `⚽ ${soccerCount}`,
-    tennisCount  > 0 && `🎾 ${tennisCount}`,
-    esportsCount > 0 && `🎮 ${esportsCount}`,
-  ].filter(Boolean).join(" · ") || "No events today";
+  const soccerN  = todayEvents.filter((p) => p.sport === "soccer").length;
+  const tennisN  = todayEvents.filter((p) => p.sport === "tennis").length;
+  const esportsN = todayEvents.filter((p) => p.sport === "esports").length;
+  const sportSub = [soccerN && `⚽ ${soccerN}`, tennisN && `🎾 ${tennisN}`, esportsN && `🎮 ${esportsN}`]
+    .filter(Boolean).join(" · ") || "No events today";
 
-  // Open predictions (all scheduled)
-  const openCount = predictions.filter((p) => p.status === "scheduled").length;
-
-  // Live model
-  const liveModel = performance?.models.find((m) => m.is_live);
-  const modelLabel = liveModel ? liveModel.model_name : "No live model";
-  const modelSub   = liveModel?.trained_at
+  const openCount       = predictions.filter((p) => p.status === "scheduled").length;
+  const liveModel       = performance?.models.find((m) => m.is_live);
+  const modelSub        = liveModel?.trained_at
     ? `Trained ${new Date(liveModel.trained_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
     : "Not trained";
-
-  // Pipeline status
-  const pipelineOk = apiOk && dbOk;
-
-  // Challenges
+  const pipelineOk      = apiOk && dbOk;
   const activeChallenges = myChallenges.filter((c) => new Date(c.end_at).getTime() > now);
-
-  // Last refresh label
-  const refreshLabel = lastRefresh.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 
   return (
     <div>
-      {/* Refresh timestamp */}
-      <div className="flex items-center justify-end gap-1.5 mb-2">
-        <RefreshCw size={10} className="text-text-subtle" />
-        <span className="text-2xs text-text-subtle">Updated {refreshLabel}</span>
+      {/* Live indicator row */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 5, marginBottom: 8 }}>
+        <span style={{
+          width: 5, height: 5, borderRadius: "50%",
+          background: "var(--positive)",
+          boxShadow: "0 0 5px rgba(16,185,129,0.7)",
+        }} />
+        <span style={{ fontSize: 10, color: "var(--text2)", fontFamily: "'JetBrains Mono', monospace" }}>
+          Updated {refreshTime}
+        </span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        <KpiChip
-          icon={Calendar}
-          iconColor="#3b82f6"
-          label="Events Today"
-          value={String(todayEvents.length)}
-          sub={eventSub}
-          href="/matches"
-        />
-        <KpiChip
-          icon={Zap}
-          iconColor="#f59e0b"
-          label="Open Predictions"
-          value={String(openCount)}
-          sub={`${predictions.length} total loaded`}
-          href="/matches?status=scheduled"
-        />
-        <KpiChip
-          icon={Cpu}
-          iconColor={liveModel ? "#22c55e" : "#f59e0b"}
-          label="Model Status"
-          value={modelLabel}
-          sub={liveModel ? modelSub : "No live model — train one →"}
-          status={liveModel ? "ok" : "warn"}
-          href="/models"
-        />
-        <KpiChip
-          icon={Activity}
-          iconColor={pipelineOk ? "#22c55e" : "#ef4444"}
-          label="Pipeline"
-          value={pipelineOk ? "Operational" : "Degraded"}
-          sub={pipelineOk ? "All systems OK" : "Check logs"}
-          status={pipelineOk ? "ok" : "error"}
-          onClick={() => setSystemOpen((v) => !v)}
-          active={systemOpen}
-        />
-        <KpiChip
-          icon={Trophy}
-          iconColor="#a855f7"
-          label="Challenges"
-          value={activeChallenges.length === 0 ? "None active" : `${activeChallenges.length} active`}
-          sub={activeChallenges[0]?.name.slice(0, 24) ?? "Join a challenge →"}
-          href="/challenges"
-        />
-      </div>
+      {/* Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, position: "relative" }}>
+        <KpiTile icon={Calendar}  iconColor="var(--info)"     label="Events Today"   value={todayEvents.length} sub={sportSub}                             href="/matches" />
+        <KpiTile icon={Zap}       iconColor="var(--warning)"  label="Open Signals"   value={openCount}          sub={`${predictions.length} total`}        href="/matches?status=scheduled" />
+        <KpiTile icon={Cpu}       iconColor={liveModel ? "var(--positive)" : "var(--warning)"} label="Active Model" value={liveModel ? liveModel.model_name.replace("soccer_","").toUpperCase() : "None"} sub={modelSub} status={liveModel ? "ok" : "warn"} href="/performance" />
+        <KpiTile icon={Activity}  iconColor={pipelineOk ? "var(--positive)" : "var(--negative)"} label="Pipeline" value={pipelineOk ? "Operational" : "Degraded"} sub={pipelineOk ? "All systems OK" : "Check logs →"} status={pipelineOk ? "ok" : "error"} onClick={() => setSystemOpen((v) => !v)} active={systemOpen} />
+        <KpiTile icon={Trophy}    iconColor="var(--info)"     label="Challenges"     value={activeChallenges.length || "—"} sub={activeChallenges[0]?.name.slice(0,22) ?? "Join a challenge →"} href="/challenges" />
 
-      {/* System drawer (under Pipeline chip) */}
-      {systemOpen && (
-        <div className="lg:grid lg:grid-cols-5 gap-3">
-          <div className="lg:col-start-4">
+        {systemOpen && (
+          <div style={{ position: "absolute", left: "calc(60% + 8px)", top: "100%", zIndex: 50 }}>
             <SystemDrawer apiOk={apiOk} dbOk={dbOk} onClose={() => setSystemOpen(false)} />
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

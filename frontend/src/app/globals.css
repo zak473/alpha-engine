@@ -6,66 +6,91 @@
 
 /* ─────────────────────────────────────────────────────────────────────────────
    QUANT TERMINAL — Design Token System
-   All components must reference these variables. No raw Tailwind color classes.
 ───────────────────────────────────────────────────────────────────────────── */
 
 @layer base {
   :root {
     color-scheme: dark;
 
-    /* ── Surface layers (exactly 3) ─────────────────────────────────── */
-    --bg0: #0c0c10;          /* app background — near-void graphite     */
-    --bg1: #111116;          /* sidebar / topbar / rail panels          */
-    --bg2: #16161d;          /* cards / tables / drawers                */
+    /* ── Surface layers ─────────────────────────────────────────────── */
+    --bg0: #080810;          /* page — deep void                        */
+    --bg1: #0e0e18;          /* sidebar / topbar / rails                */
+    --bg2: #13131f;          /* cards / table bodies / drawers          */
+    --bg3: #1a1a28;          /* elevated: hover rows, active cells      */
 
-    /* ── Text hierarchy ─────────────────────────────────────────────── */
-    --text0: #e2e2ea;        /* primary — cool near-white               */
-    --text1: #72728a;        /* muted — blue-grey mid                   */
-    --text2: #36364a;        /* subtle — very dark, placeholder         */
+    /* ── Text ───────────────────────────────────────────────────────── */
+    --text0: #eaeaf4;        /* primary — near white, cool tint         */
+    --text1: #6b6b85;        /* muted — blue-grey                       */
+    --text2: #32324a;        /* subtle — very dark, placeholder         */
 
-    /* ── Borders (2 levels) ─────────────────────────────────────────── */
-    --border0: #1e1e2c;      /* default dividers                        */
-    --border1: #2c2c3f;      /* hover / active elevation                */
+    /* ── Borders ────────────────────────────────────────────────────── */
+    --border0: #1c1c2e;      /* default divider                         */
+    --border1: #2a2a40;      /* hover / focus elevation                 */
 
-    /* ── Accent — electric cyan (ONE accent only) ───────────────────── */
-    --accent:      #00d4ff;
-    --accent-muted: rgba(0, 212, 255, 0.10);
-    --accent-ring:  rgba(0, 212, 255, 0.25);
+    /* ── Accent — electric cyan ─────────────────────────────────────── */
+    --accent:        #00d4ff;
+    --accent-dim:    #00d4ff18;
+    --accent-muted:  rgba(0, 212, 255, 0.08);
+    --accent-ring:   rgba(0, 212, 255, 0.20);
+    --accent-glow:   0 0 12px rgba(0, 212, 255, 0.15);
 
-    /* ── Status colors ──────────────────────────────────────────────── */
-    --positive: #10b981;     /* emerald green                           */
-    --negative: #f43f5e;     /* rose red                                */
-    --warning:  #f59e0b;     /* amber                                   */
-    --info:     #818cf8;     /* indigo                                  */
+    /* ── Status ─────────────────────────────────────────────────────── */
+    --positive:      #10b981;
+    --positive-dim:  rgba(16, 185, 129, 0.10);
+    --negative:      #f43f5e;
+    --negative-dim:  rgba(244, 63, 94, 0.10);
+    --warning:       #f59e0b;
+    --warning-dim:   rgba(245, 158, 11, 0.10);
+    --info:          #818cf8;
+    --info-dim:      rgba(129, 140, 248, 0.10);
 
-    /* ── Focus ──────────────────────────────────────────────────────── */
-    --focus-ring: rgba(0, 212, 255, 0.30);
+    /* ── Focus ───────────────────────────────────────────────────────── */
+    --focus-ring: rgba(0, 212, 255, 0.28);
 
-    /* ── Radius ─────────────────────────────────────────────────────── */
+    /* ── Radius (small, consistent) ──────────────────────────────────── */
     --radius-sm: 2px;
     --radius-md: 4px;
+    --radius-lg: 6px;
 
-    /* ── Shadows ────────────────────────────────────────────────────── */
+    /* ── Shadows (near-none — rely on borders + surface contrast) ────── */
     --shadow-0: none;
-    --shadow-1: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --shadow-1: 0 1px 4px rgba(0, 0, 0, 0.5);
+    --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.6);
 
-    /* ── Spacing scale ──────────────────────────────────────────────── */
-    --space-8:  8px;
-    --space-12: 12px;
-    --space-16: 16px;
-    --space-24: 24px;
-    --space-32: 32px;
+    /* ── Spacing (8-point grid only) ─────────────────────────────────── */
+    --sp-8:  8px;
+    --sp-12: 12px;
+    --sp-16: 16px;
+    --sp-24: 24px;
+    --sp-32: 32px;
 
-    /* ── Layout ─────────────────────────────────────────────────────── */
+    /* ── Layout ──────────────────────────────────────────────────────── */
     --sidebar-width:   13rem;
-    --topbar-height:   2.75rem;
+    --topbar-height:   2.625rem;   /* 42px */
     --left-rail-width: 13rem;
     --slip-rail-width: 16rem;
 
-    /* ── Legacy sport colors (sport-specific accents, not main accent) ─ */
+    /* ── Sport ───────────────────────────────────────────────────────── */
     --sport-soccer:  #3b82f6;
     --sport-tennis:  #10b981;
     --sport-esports: #a855f7;
+
+    /* ── Legacy compat (so old Tailwind class names don't break) ─────── */
+    --color-surface-base:    var(--bg0);
+    --color-surface-raised:  var(--bg1);
+    --color-surface-overlay: var(--bg2);
+    --color-surface-border:  var(--border0);
+    --color-surface-border1: var(--border1);
+    --color-text-primary:    var(--text0);
+    --color-text-muted:      var(--text1);
+    --color-text-subtle:     var(--text2);
+    --color-accent-green:    var(--positive);
+    --color-accent-red:      var(--negative);
+    --color-accent-amber:    var(--warning);
+    --color-accent-blue:     var(--info);
+    --color-accent-teal:     var(--accent);
+    --color-accent-purple:   #a855f7;
+    --color-accent-gold:     #b45309;
   }
 
   /* ── Reset ────────────────────────────────────────────────────────── */
@@ -81,7 +106,7 @@
     color: var(--text0);
     font-family: Inter, system-ui, sans-serif;
     font-size: 13px;
-    line-height: 1.45;
+    line-height: 1.4;
     font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -89,159 +114,209 @@
   }
 
   /* ── Scrollbars ───────────────────────────────────────────────────── */
-  ::-webkit-scrollbar         { width: 4px; height: 4px; }
-  ::-webkit-scrollbar-track   { background: transparent; }
-  ::-webkit-scrollbar-thumb   { background: var(--border1); border-radius: 2px; }
+  ::-webkit-scrollbar       { width: 3px; height: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border1); border-radius: 2px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
 
-  /* ── Focus ring ───────────────────────────────────────────────────── */
+  /* ── Focus ────────────────────────────────────────────────────────── */
   :focus-visible {
     outline: 1px solid var(--accent);
     outline-offset: 2px;
   }
-
-  /* ── Mono number spans ────────────────────────────────────────────── */
-  .num, .mono {
-    font-family: 'JetBrains Mono', 'Menlo', monospace;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.01em;
-  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   COMPONENT LAYER — All classes use CSS vars, never raw colors
+   UTILITIES
+───────────────────────────────────────────────────────────────────────────── */
+
+/* Monospace metrics — applied globally to numbers */
+.num, .mono {
+  font-family: 'JetBrains Mono', 'Menlo', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
+}
+
+/* Gradient text for hero KPI numbers */
+.metric-hero {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--text0) 0%, rgba(234,234,244,0.6) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.metric-accent {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent) 0%, #60efff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.metric-positive {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--positive) 0%, #34d399 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.metric-negative {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--negative) 0%, #fb7185 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   COMPONENT LAYER
 ───────────────────────────────────────────────────────────────────────────── */
 
 @layer components {
 
-  /* ── Surfaces ─────────────────────────────────────────────────────── */
-  .bg-bg0  { background-color: var(--bg0);  }
-  .bg-bg1  { background-color: var(--bg1);  }
-  .bg-bg2  { background-color: var(--bg2);  }
-
-  /* ── Cards / Panels ───────────────────────────────────────────────── */
+  /* ── Cards ────────────────────────────────────────────────────────── */
   .card {
     background-color: var(--bg2);
     border: 1px solid var(--border0);
     border-radius: var(--radius-md);
   }
 
-  /* ── Panel header ─────────────────────────────────────────────────── */
+  /* Featured card — cyan top accent bar */
+  .card-accent {
+    background-color: var(--bg2);
+    border: 1px solid var(--border0);
+    border-radius: var(--radius-md);
+    border-top: 2px solid var(--accent);
+  }
+
+  /* ── Panel chrome ─────────────────────────────────────────────────── */
   .panel-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--space-8) var(--space-12);
+    padding: 8px var(--sp-12);
     border-bottom: 1px solid var(--border0);
+    min-height: 36px;
   }
 
   .panel-title {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--text1);
   }
 
-  .panel-content       { padding: var(--space-12); }
-  .panel-content-tight { padding: var(--space-8) var(--space-12); }
+  .panel-content       { padding: var(--sp-12); }
+  .panel-content-tight { padding: 8px var(--sp-12); }
 
-  /* ── Rail headers ─────────────────────────────────────────────────── */
+  /* ── Rail chrome ──────────────────────────────────────────────────── */
   .rail-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--space-8) var(--space-12);
+    padding: 0 var(--sp-12);
     border-bottom: 1px solid var(--border0);
     background-color: var(--bg1);
     height: var(--topbar-height);
+    flex-shrink: 0;
   }
 
   /* ── Compact KPI bar ──────────────────────────────────────────────── */
   .kpi-bar {
     display: flex;
     align-items: center;
-    height: 2rem;
-    padding: 0 var(--space-12);
+    height: 30px;
+    padding: 0 var(--sp-12);
     border-bottom: 1px solid var(--border0);
     background-color: var(--bg1);
     overflow-x: auto;
     flex-shrink: 0;
+    gap: 0;
   }
 
   .kpi-bar-item {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 0 var(--space-12);
+    padding: 0 var(--sp-12);
     border-right: 1px solid var(--border0);
     font-size: 11px;
     color: var(--text1);
     white-space: nowrap;
     flex-shrink: 0;
+    height: 100%;
   }
 
   .kpi-bar-item:first-child { padding-left: 0; }
   .kpi-bar-item:last-child  { border-right: none; }
 
   /* ── Buttons ──────────────────────────────────────────────────────── */
-
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    font-size: 12px;
+    gap: 5px;
+    font-size: 11px;
     font-weight: 500;
     border-radius: var(--radius-md);
     border: 1px solid transparent;
     cursor: pointer;
-    transition: background 120ms, border-color 120ms, color 120ms, opacity 120ms;
+    transition: all 120ms;
     user-select: none;
     white-space: nowrap;
+    letter-spacing: 0.01em;
   }
 
-  .btn:disabled  { opacity: 0.4; pointer-events: none; }
+  .btn:disabled  { opacity: 0.35; pointer-events: none; }
+  .btn:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
 
-  .btn-sm  { padding: 3px 10px; font-size: 11px; }
+  .btn-sm  { padding: 3px 9px;  font-size: 10px; }
   .btn-md  { padding: 5px 12px; }
-  .btn-lg  { padding: 7px 16px; font-size: 13px; }
+  .btn-lg  { padding: 7px 16px; font-size: 12px; }
 
   .btn-primary {
-    background-color: var(--accent);
+    background: var(--accent);
     color: #000;
     border-color: var(--accent);
+    font-weight: 600;
   }
-  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-primary:hover { filter: brightness(1.12); box-shadow: var(--accent-glow); }
 
   .btn-secondary {
-    background-color: var(--bg2);
+    background: transparent;
     color: var(--text0);
     border-color: var(--border1);
   }
-  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-muted); }
 
   .btn-ghost {
-    background-color: transparent;
+    background: transparent;
     color: var(--text1);
     border-color: transparent;
   }
-  .btn-ghost:hover { background-color: rgba(255,255,255,0.04); color: var(--text0); }
+  .btn-ghost:hover { background: rgba(255,255,255,0.05); color: var(--text0); }
 
   .btn-destructive {
-    background-color: transparent;
+    background: transparent;
     color: var(--negative);
     border-color: var(--border0);
   }
-  .btn-destructive:hover { background-color: rgba(244,63,94,0.08); border-color: var(--negative); }
-
-  /* ── Legacy aliases (for existing code) ──────────────────────────── */
-  .btn-cta {
-    @apply btn btn-md btn-primary;
-  }
-  .btn-danger {
-    @apply btn btn-md btn-destructive;
-  }
+  .btn-destructive:hover { background: var(--negative-dim); border-color: var(--negative); }
 
   /* ── Badges ───────────────────────────────────────────────────────── */
   .badge {
@@ -251,18 +326,19 @@
     padding: 1px 6px;
     border-radius: var(--radius-sm);
     font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
+    font-weight: 700;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
     border: 1px solid transparent;
+    line-height: 1.6;
   }
 
-  .badge-muted    { background: rgba(114,114,138,0.12); color: var(--text1); border-color: var(--border0); }
-  .badge-positive { background: rgba(16,185,129,0.12);  color: var(--positive); border-color: rgba(16,185,129,0.2); }
-  .badge-negative { background: rgba(244,63,94,0.12);   color: var(--negative); border-color: rgba(244,63,94,0.2); }
-  .badge-warning  { background: rgba(245,158,11,0.12);  color: var(--warning);  border-color: rgba(245,158,11,0.2); }
-  .badge-info     { background: rgba(129,140,248,0.12); color: var(--info);     border-color: rgba(129,140,248,0.2); }
-  .badge-accent   { background: var(--accent-muted);    color: var(--accent);   border-color: rgba(0,212,255,0.2); }
+  .badge-muted    { background: rgba(107,107,133,0.12); color: var(--text1);    border-color: var(--border0); }
+  .badge-positive { background: var(--positive-dim);    color: var(--positive); border-color: rgba(16,185,129,0.2); }
+  .badge-negative { background: var(--negative-dim);    color: var(--negative); border-color: rgba(244,63,94,0.2); }
+  .badge-warning  { background: var(--warning-dim);     color: var(--warning);  border-color: rgba(245,158,11,0.2); }
+  .badge-info     { background: var(--info-dim);        color: var(--info);     border-color: rgba(129,140,248,0.2); }
+  .badge-accent   { background: var(--accent-dim);      color: var(--accent);   border-color: rgba(0,212,255,0.2); }
 
   /* ── Sportsbook odds button ───────────────────────────────────────── */
   .btn-odds {
@@ -270,20 +346,21 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: 56px;
-    height: 40px;
+    width: 54px;
+    height: 38px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border0);
-    background-color: var(--bg2);
+    background: var(--bg2);
     cursor: pointer;
     flex-shrink: 0;
-    transition: border-color 120ms, background 120ms;
+    transition: all 120ms;
+    position: relative;
   }
-  .btn-odds:hover       { border-color: var(--border1); background: rgba(255,255,255,0.03); }
-  .btn-odds-lean        { border-color: var(--border1); background: var(--bg1); }
-  .btn-odds-queued      { background: var(--accent-muted); border-color: rgba(0,212,255,0.3); }
+  .btn-odds:hover       { border-color: var(--border1); background: var(--bg3); }
+  .btn-odds-lean        { border-color: var(--border1); background: var(--bg3); }
+  .btn-odds-queued      { background: var(--accent-dim); border-color: rgba(0,212,255,0.3); box-shadow: 0 0 8px rgba(0,212,255,0.08); }
 
-  /* ── Table ────────────────────────────────────────────────────────── */
+  /* ── Data table ───────────────────────────────────────────────────── */
   .data-table {
     width: 100%;
     border-collapse: collapse;
@@ -291,17 +368,24 @@
   }
 
   .data-table th {
-    padding: 6px var(--space-12);
+    padding: 0 var(--sp-12);
+    height: 30px;
     text-align: left;
     font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
+    font-weight: 700;
+    letter-spacing: 0.07em;
     text-transform: uppercase;
-    color: var(--text1);
+    color: var(--text2);
     border-bottom: 1px solid var(--border0);
     white-space: nowrap;
     user-select: none;
+    background: var(--bg2);
+    position: sticky;
+    top: 0;
+    z-index: 1;
   }
+
+  .data-table th:hover { color: var(--text1); cursor: pointer; }
 
   .data-table th.col-right,
   .data-table td.col-right {
@@ -309,7 +393,8 @@
   }
 
   .data-table td {
-    padding: 7px var(--space-12);
+    padding: 0 var(--sp-12);
+    height: 38px;
     border-bottom: 1px solid var(--border0);
     color: var(--text0);
     vertical-align: middle;
@@ -317,31 +402,43 @@
 
   .data-table tr:last-child td { border-bottom: none; }
 
+  /* Subtle alternating rows */
+  .data-table tbody tr:nth-child(even) td {
+    background: rgba(255,255,255,0.008);
+  }
+
+  /* Hover: cyan left accent + bg lift */
   .data-table tbody tr {
-    transition: background 100ms;
     cursor: pointer;
+    transition: background 80ms;
+    border-left: 2px solid transparent;
+  }
+
+  .data-table tbody tr:hover td {
+    background: var(--bg3) !important;
   }
 
   .data-table tbody tr:hover {
-    background: rgba(255,255,255,0.025);
+    border-left-color: var(--accent);
   }
 
-  .data-table tbody tr:hover td { border-color: transparent; }
-
-  .data-table.compact th { padding: 4px var(--space-8); }
-  .data-table.compact td { padding: 5px var(--space-8); }
+  .data-table.compact th { height: 26px; padding: 0 8px; }
+  .data-table.compact td { height: 30px; padding: 0 8px; }
 
   /* ── Tabs ─────────────────────────────────────────────────────────── */
-
-  /* Underline style (default) */
   .tabs-underline {
     display: flex;
     gap: 0;
     border-bottom: 1px solid var(--border0);
   }
+
   .tab-item {
-    padding: 6px 12px;
-    font-size: 12px;
+    padding: 0 12px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
     font-weight: 500;
     color: var(--text1);
     border-bottom: 2px solid transparent;
@@ -354,91 +451,77 @@
     border-left: none;
     border-right: none;
     text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+    letter-spacing: 0.01em;
   }
   .tab-item:hover             { color: var(--text0); }
   .tab-item[data-active=true] { color: var(--text0); border-bottom-color: var(--accent); }
 
-  /* Segmented style */
   .tabs-segmented {
     display: inline-flex;
-    background: var(--bg2);
+    background: var(--bg0);
     border: 1px solid var(--border0);
     border-radius: var(--radius-md);
     padding: 2px;
-    gap: 2px;
+    gap: 1px;
   }
+
   .tab-seg-item {
-    padding: 4px 12px;
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--text1);
+    padding: 3px 10px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--text2);
     border-radius: 3px;
     cursor: pointer;
-    transition: background 120ms, color 120ms;
+    transition: all 120ms;
     background: none;
     border: none;
     white-space: nowrap;
+    text-transform: uppercase;
   }
-  .tab-seg-item:hover             { color: var(--text0); background: rgba(255,255,255,0.04); }
-  .tab-seg-item[data-active=true] { background: var(--bg1); color: var(--text0); }
+  .tab-seg-item:hover             { color: var(--text1); background: rgba(255,255,255,0.04); }
+  .tab-seg-item[data-active=true] { background: var(--bg2); color: var(--text0); box-shadow: var(--shadow-1); }
 
   /* Legacy aliases */
-  .tab-underline-root { @apply tabs-underline; }
+  .tab-underline-root { display: flex; gap: 0; border-bottom: 1px solid var(--border0); }
   .tab-underline-item { @apply tab-item; }
 
   /* ── Input ────────────────────────────────────────────────────────── */
   .input-field {
     width: 100%;
-    padding: 5px var(--space-8);
-    background: var(--bg2);
+    padding: 5px var(--sp-8);
+    background: var(--bg0);
     border: 1px solid var(--border0);
     border-radius: var(--radius-md);
     color: var(--text0);
     font-size: 12px;
     font-family: Inter, system-ui, sans-serif;
-    transition: border-color 120ms;
+    transition: border-color 120ms, box-shadow 120ms;
     outline: none;
   }
   .input-field::placeholder { color: var(--text2); }
   .input-field:hover        { border-color: var(--border1); }
   .input-field:focus        { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring); }
 
-  /* ── Tooltip ──────────────────────────────────────────────────────── */
-  .tooltip-box {
-    position: absolute;
-    z-index: 50;
-    background: var(--bg2);
-    border: 1px solid var(--border1);
-    border-radius: var(--radius-md);
-    padding: 4px 8px;
-    font-size: 11px;
-    color: var(--text0);
-    white-space: nowrap;
-    box-shadow: var(--shadow-1);
-    pointer-events: none;
-  }
-
-  /* ── Sportsbook market rows ───────────────────────────────────────── */
+  /* ── Sportsbook rows ──────────────────────────────────────────────── */
   .sb-row {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: var(--space-8) var(--space-12);
-    min-height: 48px;
+    padding: 8px var(--sp-12);
+    min-height: 46px;
     border-bottom: 1px solid var(--border0);
-    transition: background 100ms;
+    transition: background 80ms;
     cursor: pointer;
+    border-left: 2px solid transparent;
   }
-  .sb-row:hover { background: rgba(255,255,255,0.018); }
+  .sb-row:hover { background: var(--bg3); border-left-color: var(--accent); }
 
   .sb-section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 5px var(--space-12);
+    padding: 4px var(--sp-12);
     background: var(--bg1);
     border-top: 1px solid var(--border0);
     border-bottom: 1px solid var(--border0);
@@ -446,42 +529,32 @@
     z-index: 10;
   }
 
-  /* ── Dividers ─────────────────────────────────────────────────────── */
-  .divider   { border-top: 1px solid var(--border0); }
-  .label {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: var(--text1);
-  }
-
-  /* ── Positive/Negative ────────────────────────────────────────────── */
-  .positive { color: var(--positive); }
-  .negative { color: var(--negative); }
-  .neutral  { color: var(--warning); }
-
-  /* ── Shimmer skeleton ─────────────────────────────────────────────── */
-  .shimmer {
-    background: linear-gradient(90deg, var(--bg2) 25%, var(--border0) 50%, var(--bg2) 75%);
-    background-size: 800px 100%;
-    animation: shimmer 1.4s ease-in-out infinite;
-    border-radius: var(--radius-sm);
-  }
-
-  /* ── Row hover language (all interactive rows) ────────────────────── */
-  .tr-hover {
-    transition: background 100ms;
-    cursor: pointer;
-  }
-  .tr-hover:hover { background: rgba(255,255,255,0.025); }
-
   /* ── Stat card ────────────────────────────────────────────────────── */
   .stat-card {
     background: var(--bg2);
     border: 1px solid var(--border0);
     border-radius: var(--radius-md);
-    padding: var(--space-12) var(--space-16);
+    padding: var(--sp-12) var(--sp-16);
+    position: relative;
+    overflow: hidden;
+    transition: border-color 150ms;
+  }
+
+  .stat-card:hover {
+    border-color: var(--border1);
+  }
+
+  /* Subtle left accent bar on stat cards */
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 20%;
+    bottom: 20%;
+    width: 2px;
+    background: var(--accent);
+    opacity: 0.3;
+    border-radius: 0 2px 2px 0;
   }
 
   /* ── Chart container ──────────────────────────────────────────────── */
@@ -489,10 +562,10 @@
     background: var(--bg2);
     border: 1px solid var(--border0);
     border-radius: var(--radius-md);
-    padding: var(--space-12);
+    padding: var(--sp-12);
   }
 
-  /* ── Nav link (sidebar) ───────────────────────────────────────────── */
+  /* ── Nav link ─────────────────────────────────────────────────────── */
   .nav-link {
     display: flex;
     align-items: center;
@@ -502,7 +575,7 @@
     font-size: 12px;
     font-weight: 500;
     color: var(--text1);
-    transition: background 100ms, color 100ms;
+    transition: all 100ms;
     text-decoration: none;
     border-left: 2px solid transparent;
   }
@@ -511,15 +584,109 @@
     background: var(--accent-muted);
     color: var(--accent);
     border-left-color: var(--accent);
+    box-shadow: inset 0 0 12px rgba(0,212,255,0.04);
   }
+
+  /* ── Typography utils ─────────────────────────────────────────────── */
+  .label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text1);
+  }
+
+  .positive { color: var(--positive); }
+  .negative { color: var(--negative); }
+  .neutral  { color: var(--warning); }
+
+  /* ── Row hover generic ────────────────────────────────────────────── */
+  .tr-hover {
+    transition: background 80ms;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+  }
+  .tr-hover:hover { background: var(--bg3) !important; border-left-color: var(--accent); }
+
+  /* ── Divider ──────────────────────────────────────────────────────── */
+  .divider { border-top: 1px solid var(--border0); }
+
+  /* ── Shimmer skeleton ─────────────────────────────────────────────── */
+  .shimmer {
+    background: linear-gradient(90deg, var(--bg2) 25%, var(--bg3) 50%, var(--bg2) 75%);
+    background-size: 800px 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+    border-radius: var(--radius-sm);
+  }
+
+  /* ── Sportsbook: CTA button ───────────────────────────────────────── */
+  .btn-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: var(--accent);
+    color: #000;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: var(--radius-md);
+    border: none;
+    cursor: pointer;
+    transition: all 120ms;
+    letter-spacing: 0.01em;
+  }
+  .btn-cta:hover { filter: brightness(1.1); box-shadow: var(--accent-glow); }
+
+  .btn-danger {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    background: transparent;
+    color: var(--negative);
+    font-size: 11px;
+    font-weight: 500;
+    border: 1px solid var(--border0);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 120ms;
+  }
+  .btn-danger:hover { background: var(--negative-dim); border-color: var(--negative); }
 }
 
-/* ── Animations ──────────────────────────────────────────────────────── */
+/* ── Keyframes ────────────────────────────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -400px 0; }
   100% { background-position:  400px 0; }
 }
 
 @keyframes ping {
-  75%, 100% { transform: scale(2); opacity: 0; }
+  75%, 100% { transform: scale(2.2); opacity: 0; }
 }
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 4px rgba(0,212,255,0.3); }
+  50%       { box-shadow: 0 0 12px rgba(0,212,255,0.6); }
+}
+
+/* ── Legacy Tailwind compat (old surface-* / text-* / accent-* classes) ─── */
+/* These route through CSS vars so old components still render correctly    */
+.text-text-primary    { color: var(--text0) !important; }
+.text-text-muted      { color: var(--text1) !important; }
+.text-text-subtle     { color: var(--text2) !important; }
+.bg-surface-base      { background-color: var(--bg0) !important; }
+.bg-surface-raised    { background-color: var(--bg1) !important; }
+.bg-surface-overlay   { background-color: var(--bg2) !important; }
+.border-surface-border { border-color: var(--border0) !important; }
+.text-accent-green    { color: var(--positive) !important; }
+.text-accent-red      { color: var(--negative) !important; }
+.text-accent-amber    { color: var(--warning) !important; }
+.text-accent-blue     { color: var(--info) !important; }
+.text-accent-teal     { color: var(--accent) !important; }
+.bg-accent-green\/10  { background-color: var(--positive-dim) !important; }
+.bg-accent-red\/10    { background-color: var(--negative-dim) !important; }
+.bg-accent-green      { background-color: var(--positive) !important; }
+.bg-accent-red        { background-color: var(--negative) !important; }
+.bg-accent-amber      { background-color: var(--warning) !important; }
+.divide-surface-border\/50 > * + * { border-color: var(--border0) !important; }

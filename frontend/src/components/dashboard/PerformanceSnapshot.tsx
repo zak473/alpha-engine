@@ -11,9 +11,9 @@ import type { MvpPerformance } from "@/lib/types";
 import { AlertTriangle, Info, ChevronDown } from "lucide-react";
 
 const CALIBRATION_STYLES = {
-  good: { label: "Well-calibrated", color: "#22c55e", bg: "bg-accent-green/10", border: "border-accent-green/20" },
-  ok:   { label: "Acceptable",      color: "#f59e0b", bg: "bg-accent-amber/10", border: "border-accent-amber/20" },
-  poor: { label: "Needs review",    color: "#ef4444", bg: "bg-accent-red/10",   border: "border-accent-red/20"   },
+  good: { label: "Well-calibrated", color: "var(--positive)", bgColor: "var(--positive-dim)", borderColor: "var(--positive)" },
+  ok:   { label: "Acceptable",      color: "var(--warning)",  bgColor: "var(--warning-dim)",  borderColor: "var(--warning)"  },
+  poor: { label: "Needs review",    color: "var(--negative)", bgColor: "var(--negative-dim)", borderColor: "var(--negative)" },
 };
 
 type ChartMetric = "winrate" | "brier" | "calibration";
@@ -43,26 +43,58 @@ type DrillMode = "sport" | "confidence";
 
 function DrillTable({ rows }: { rows: { label: string; win: number; brier: number; count: number }[] }) {
   return (
-    <table className="w-full text-xs">
+    <table className="data-table w-full text-xs">
       <thead>
-        <tr className="text-text-subtle border-b border-surface-border">
-          <th className="text-left py-1.5 font-medium">Segment</th>
-          <th className="text-right py-1.5 font-medium num">Win %</th>
-          <th className="text-right py-1.5 font-medium num">Brier</th>
-          <th className="text-right py-1.5 font-medium num">N</th>
+        <tr style={{ borderBottom: "1px solid var(--border0)" }}>
+          <th
+            className="text-left py-1.5 font-medium"
+            style={{ color: "var(--text2)" }}
+          >
+            Segment
+          </th>
+          <th
+            className="text-right py-1.5 font-medium num"
+            style={{ color: "var(--text2)" }}
+          >
+            Win %
+          </th>
+          <th
+            className="text-right py-1.5 font-medium num"
+            style={{ color: "var(--text2)" }}
+          >
+            Brier
+          </th>
+          <th
+            className="text-right py-1.5 font-medium num"
+            style={{ color: "var(--text2)" }}
+          >
+            N
+          </th>
         </tr>
       </thead>
       <tbody>
         {rows.map((r) => (
-          <tr key={r.label} className="border-b border-surface-border/40 hover:bg-white/[0.02] transition-colors">
-            <td className="py-1.5 text-text-muted">{r.label}</td>
-            <td className={cn("py-1.5 text-right num font-medium", r.win >= 0.6 ? "text-accent-green" : r.win >= 0.55 ? "text-accent-amber" : "text-accent-red")}>
+          <tr
+            key={r.label}
+            className="transition-colors"
+            style={{ borderBottom: "1px solid var(--border0)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg3)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "")}
+          >
+            <td className="py-1.5" style={{ color: "var(--text1)" }}>{r.label}</td>
+            <td
+              className="py-1.5 text-right num font-medium"
+              style={{ color: r.win >= 0.6 ? "var(--positive)" : r.win >= 0.55 ? "var(--warning)" : "var(--negative)" }}
+            >
               {formatPercent(r.win)}
             </td>
-            <td className={cn("py-1.5 text-right num", r.brier < 0.21 ? "text-accent-green" : r.brier < 0.24 ? "text-accent-amber" : "text-accent-red")}>
+            <td
+              className="py-1.5 text-right num"
+              style={{ color: r.brier < 0.21 ? "var(--positive)" : r.brier < 0.24 ? "var(--warning)" : "var(--negative)" }}
+            >
               {r.brier.toFixed(3)}
             </td>
-            <td className="py-1.5 text-right num text-text-muted">{r.count}</td>
+            <td className="py-1.5 text-right num" style={{ color: "var(--text1)" }}>{r.count}</td>
           </tr>
         ))}
       </tbody>
@@ -135,16 +167,26 @@ export function PerformanceSnapshot({ performance, loading }: PerformanceSnapsho
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div>
           <p className="label mb-1">Win Rate</p>
-          <p className="num text-xl font-semibold text-text-primary">{formatPercent(winRate)}</p>
+          <p className="num text-xl font-semibold" style={{ color: "var(--text0)" }}>{formatPercent(winRate)}</p>
         </div>
         <div>
           <div className="flex items-center gap-1 mb-1">
             <p className="label">Avg Brier</p>
-            <button onClick={() => setShowBrierInfo((v) => !v)} className="text-text-subtle hover:text-text-muted transition-colors" title="What is Brier score?">
+            <button
+              onClick={() => setShowBrierInfo((v) => !v)}
+              className="transition-colors"
+              style={{ color: "var(--text2)" }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text1)")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text2)")}
+              title="What is Brier score?"
+            >
               <Info size={11} />
             </button>
           </div>
-          <p className={cn("num text-xl font-semibold", brierScore < 0.21 ? "text-accent-green" : brierScore < 0.24 ? "text-accent-amber" : "text-accent-red")}>
+          <p
+            className="num text-xl font-semibold"
+            style={{ color: brierScore < 0.21 ? "var(--positive)" : brierScore < 0.24 ? "var(--warning)" : "var(--negative)" }}
+          >
             {brierScore.toFixed(3)}
           </p>
         </div>
@@ -152,23 +194,43 @@ export function PerformanceSnapshot({ performance, loading }: PerformanceSnapsho
 
       {/* Brier info */}
       {showBrierInfo && (
-        <div className="mb-4 p-3 rounded-lg bg-surface-overlay border border-surface-border text-xs text-text-muted leading-relaxed">
-          <strong className="text-text-primary">Brier Score</strong> = mean squared error between predicted probabilities and outcomes.{" "}
-          <span className="text-accent-green">Lower is better.</span> 0.0 = perfect, 0.25 = no skill, 1.0 = worst.
+        <div
+          className="mb-4 p-3 rounded-lg text-xs leading-relaxed"
+          style={{
+            background: "var(--bg2)",
+            border: "1px solid var(--border0)",
+            color: "var(--text1)",
+          }}
+        >
+          <strong style={{ color: "var(--text0)" }}>Brier Score</strong> = mean squared error between predicted probabilities and outcomes.{" "}
+          <span style={{ color: "var(--positive)" }}>Lower is better.</span> 0.0 = perfect, 0.25 = no skill, 1.0 = worst.
         </div>
       )}
 
       {/* Calibration badge */}
-      <div className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border mb-4", calStyle.bg, calStyle.border)} style={{ color: calStyle.color }}>
+      <div
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium mb-4"
+        style={{
+          color: calStyle.color,
+          background: calStyle.bgColor,
+          border: `1px solid ${calStyle.borderColor}`,
+        }}
+      >
         <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: calStyle.color }} />
         {calStyle.label}
       </div>
 
       {/* Calibration drift callout */}
       {calibration === "poor" && (
-        <div className="flex items-start gap-2 mb-4 p-2.5 rounded-lg bg-accent-red/8 border border-accent-red/20">
-          <AlertTriangle size={13} className="text-accent-red shrink-0 mt-0.5" />
-          <p className="text-xs text-accent-red/90">
+        <div
+          className="flex items-start gap-2 mb-4 p-2.5 rounded-lg"
+          style={{
+            background: "var(--negative-dim)",
+            border: "1px solid var(--negative)",
+          }}
+        >
+          <AlertTriangle size={13} className="shrink-0 mt-0.5" style={{ color: "var(--negative)" }} />
+          <p className="text-xs" style={{ color: "var(--negative)" }}>
             Calibration drift detected. Consider retraining or recalibrating model outputs.
           </p>
         </div>
@@ -185,7 +247,22 @@ export function PerformanceSnapshot({ performance, loading }: PerformanceSnapsho
               <button
                 key={opt.value}
                 onClick={() => setChartMetric(opt.value)}
-                className={cn("text-2xs px-2 py-0.5 rounded transition-colors", chartMetric === opt.value ? "bg-surface-overlay text-text-primary border border-surface-border" : "text-text-muted hover:text-text-primary")}
+                className="text-2xs px-2 py-0.5 rounded transition-colors"
+                style={
+                  chartMetric === opt.value
+                    ? {
+                        background: "var(--bg2)",
+                        color: "var(--text0)",
+                        border: "1px solid var(--border0)",
+                      }
+                    : { color: "var(--text1)", border: "1px solid transparent" }
+                }
+                onMouseEnter={(e) => {
+                  if (chartMetric !== opt.value) e.currentTarget.style.color = "var(--text0)";
+                }}
+                onMouseLeave={(e) => {
+                  if (chartMetric !== opt.value) e.currentTarget.style.color = "var(--text1)";
+                }}
               >
                 {opt.label}
               </button>
@@ -198,7 +275,10 @@ export function PerformanceSnapshot({ performance, loading }: PerformanceSnapsho
       {/* Drill-down toggle */}
       <button
         onClick={() => setShowDrill((v) => !v)}
-        className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors w-full"
+        className="flex items-center gap-1.5 text-xs transition-colors w-full"
+        style={{ color: "var(--text1)" }}
+        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text0)")}
+        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text1)")}
       >
         <ChevronDown size={12} className={cn("transition-transform", showDrill && "rotate-180")} />
         {showDrill ? "Hide breakdown" : "Breakdown by sport / confidence"}
@@ -212,7 +292,25 @@ export function PerformanceSnapshot({ performance, loading }: PerformanceSnapsho
               <button
                 key={m}
                 onClick={() => setDrillMode(m)}
-                className={cn("text-2xs px-2.5 py-1 rounded-md border transition-colors capitalize", drillMode === m ? "bg-surface-overlay border-surface-border text-text-primary" : "border-transparent text-text-muted hover:text-text-primary")}
+                className="text-2xs px-2.5 py-1 rounded-md transition-colors capitalize"
+                style={
+                  drillMode === m
+                    ? {
+                        background: "var(--bg2)",
+                        border: "1px solid var(--border0)",
+                        color: "var(--text0)",
+                      }
+                    : {
+                        border: "1px solid transparent",
+                        color: "var(--text1)",
+                      }
+                }
+                onMouseEnter={(e) => {
+                  if (drillMode !== m) e.currentTarget.style.color = "var(--text0)";
+                }}
+                onMouseLeave={(e) => {
+                  if (drillMode !== m) e.currentTarget.style.color = "var(--text1)";
+                }}
               >
                 By {m}
               </button>

@@ -171,36 +171,33 @@ export function DashboardShell({
         {/* Compact inline KPI bar */}
         <div className="kpi-bar shrink-0">
           <span className="kpi-bar-item">
-            <span className="text-text-subtle">Showing</span>
-            <span className="num font-semibold text-text-primary">{filtered.length}</span>
-            <span className="text-text-subtle">markets</span>
+            <span style={{ color: "var(--text2)" }}>Showing</span>
+            <span className="num" style={{ fontWeight: 600, color: "var(--text0)" }}>{filtered.length}</span>
+            <span style={{ color: "var(--text2)" }}>markets</span>
           </span>
-          <span className="w-px h-3 bg-surface-border shrink-0" />
           <span className="kpi-bar-item">
-            <span className="text-text-subtle">Avg edge</span>
-            <span className={`num font-semibold ${Number(avgEdge) >= 0 ? "text-accent-teal" : "text-accent-red"}`}>
+            <span style={{ color: "var(--text2)" }}>Avg edge</span>
+            <span className="num" style={{ fontWeight: 600, color: Number(avgEdge) >= 0 ? "var(--positive)" : "var(--negative)" }}>
               {Number(avgEdge) >= 0 ? "+" : ""}{avgEdge}%
             </span>
           </span>
-          <span className="w-px h-3 bg-surface-border shrink-0" />
           <span className="kpi-bar-item">
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${systemStatus.api && systemStatus.db ? "bg-accent-green" : "bg-accent-red animate-pulse"}`}
-            />
-            <span className="text-text-subtle">{systemStatus.api && systemStatus.db ? "Live" : "Degraded"}</span>
+            <span style={{
+              width: 5, height: 5, borderRadius: "50%",
+              background: systemStatus.api && systemStatus.db ? "var(--positive)" : "var(--negative)",
+              boxShadow:  systemStatus.api && systemStatus.db ? "0 0 5px rgba(16,185,129,0.7)" : "0 0 5px rgba(244,63,94,0.7)",
+            }} />
+            <span style={{ color: "var(--text2)" }}>{systemStatus.api && systemStatus.db ? "Live" : "Degraded"}</span>
           </span>
           {queueItems.length > 0 && (
-            <>
-              <span className="w-px h-3 bg-surface-border shrink-0" />
-              <span className="kpi-bar-item">
-                <span className="text-text-subtle">Queue</span>
-                <span className="num font-semibold text-accent-teal">{queueItems.length}</span>
-              </span>
-            </>
+            <span className="kpi-bar-item">
+              <span style={{ color: "var(--text2)" }}>Queue</span>
+              <span className="num" style={{ fontWeight: 600, color: "var(--accent)" }}>{queueItems.length}</span>
+            </span>
           )}
-          <span className="flex-1" />
-          <span className="text-[10px] text-text-subtle hidden sm:inline">
-            S — slip · L — left rail
+          <span style={{ flex: 1 }} />
+          <span style={{ fontSize: 10, color: "var(--text2)", fontFamily: "'JetBrains Mono', monospace" }} className="hidden sm:inline">
+            S · L — toggle rails
           </span>
         </div>
 
