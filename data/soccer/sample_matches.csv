@@ -1,0 +1,51 @@
+provider_id,league_provider_id,league_name,season,home_team_provider_id,home_team_name,away_team_provider_id,away_team_name,kickoff_utc,status,home_score,away_score,outcome,venue
+pl_2324_001,pl_2324,Premier League,2023-24,arsenal,Arsenal,nott_forest,Nottingham Forest,2023-08-12 11:30:00,finished,2,1,home_win,Emirates Stadium
+pl_2324_002,pl_2324,Premier League,2023-24,burnley,Burnley,man_city,Manchester City,2023-08-11 17:30:00,finished,0,3,away_win,Turf Moor
+pl_2324_003,pl_2324,Premier League,2023-24,chelsea,Chelsea,liverpool,Liverpool,2023-08-13 16:30:00,finished,1,1,draw,Stamford Bridge
+pl_2324_004,pl_2324,Premier League,2023-24,man_utd,Manchester United,wolves,Wolverhampton,2023-08-14 20:00:00,finished,1,0,home_win,Old Trafford
+pl_2324_005,pl_2324,Premier League,2023-24,newcastle,Newcastle United,aston_villa,Aston Villa,2023-08-12 14:00:00,finished,5,1,home_win,St. James Park
+pl_2324_006,pl_2324,Premier League,2023-24,spurs,Tottenham Hotspur,brentford,Brentford,2023-08-13 14:00:00,finished,2,2,draw,Tottenham Hotspur Stadium
+pl_2324_007,pl_2324,Premier League,2023-24,west_ham,West Ham United,chelsea,Chelsea,2023-08-20 16:30:00,finished,3,1,home_win,London Stadium
+pl_2324_008,pl_2324,Premier League,2023-24,man_city,Manchester City,newcastle,Newcastle United,2023-08-19 16:30:00,finished,1,0,home_win,Etihad Stadium
+pl_2324_009,pl_2324,Premier League,2023-24,liverpool,Liverpool,bournemouth,Bournemouth,2023-08-19 12:30:00,finished,3,1,home_win,Anfield
+pl_2324_010,pl_2324,Premier League,2023-24,arsenal,Arsenal,crystal_palace,Crystal Palace,2023-08-21 20:00:00,finished,1,0,home_win,Emirates Stadium
+pl_2324_011,pl_2324,Premier League,2023-24,everton,Everton,wolves,Wolverhampton,2023-08-26 15:00:00,finished,0,1,away_win,Goodison Park
+pl_2324_012,pl_2324,Premier League,2023-24,man_city,Manchester City,fulham,Fulham,2023-09-02 15:00:00,finished,5,1,home_win,Etihad Stadium
+pl_2324_013,pl_2324,Premier League,2023-24,liverpool,Liverpool,aston_villa,Aston Villa,2023-09-03 16:30:00,finished,3,0,home_win,Anfield
+pl_2324_014,pl_2324,Premier League,2023-24,arsenal,Arsenal,man_utd,Manchester United,2023-09-03 16:30:00,finished,3,1,home_win,Emirates Stadium
+pl_2324_015,pl_2324,Premier League,2023-24,chelsea,Chelsea,nottm_forest,Nottingham Forest,2023-09-02 15:00:00,finished,0,1,away_win,Stamford Bridge
+pl_2324_016,pl_2324,Premier League,2023-24,spurs,Tottenham Hotspur,arsenal,Arsenal,2023-09-24 16:30:00,finished,2,2,draw,Tottenham Hotspur Stadium
+pl_2324_017,pl_2324,Premier League,2023-24,man_city,Manchester City,wolves,Wolverhampton,2023-09-30 15:00:00,finished,2,1,home_win,Etihad Stadium
+pl_2324_018,pl_2324,Premier League,2023-24,liverpool,Liverpool,spurs,Tottenham Hotspur,2023-09-30 16:30:00,finished,2,1,home_win,Anfield
+pl_2324_019,pl_2324,Premier League,2023-24,arsenal,Arsenal,brentford,Brentford,2023-09-30 15:00:00,finished,1,0,home_win,Emirates Stadium
+pl_2324_020,pl_2324,Premier League,2023-24,chelsea,Chelsea,aston_villa,Aston Villa,2023-10-06 17:30:00,finished,0,0,draw,Stamford Bridge
+pl_2324_021,pl_2324,Premier League,2023-24,man_city,Manchester City,arsenal,Arsenal,2023-10-08 16:30:00,finished,0,1,away_win,Etihad Stadium
+pl_2324_022,pl_2324,Premier League,2023-24,newcastle,Newcastle United,crystal_palace,Crystal Palace,2023-10-21 15:00:00,finished,4,0,home_win,St. James Park
+pl_2324_023,pl_2324,Premier League,2023-24,aston_villa,Aston Villa,west_ham,West Ham United,2023-10-22 14:00:00,finished,4,1,home_win,Villa Park
+pl_2324_024,pl_2324,Premier League,2023-24,liverpool,Liverpool,everton,Everton,2023-10-21 12:30:00,finished,2,0,home_win,Anfield
+pl_2324_025,pl_2324,Premier League,2023-24,brentford,Brentford,man_utd,Manchester United,2023-10-07 15:00:00,finished,2,1,home_win,Gtech Community Stadium
+pl_2324_026,pl_2324,Premier League,2023-24,man_utd,Manchester United,man_city,Manchester City,2023-10-29 16:30:00,finished,0,3,away_win,Old Trafford
+pl_2324_027,pl_2324,Premier League,2023-24,arsenal,Arsenal,chelsea,Chelsea,2023-11-04 17:30:00,finished,5,0,home_win,Emirates Stadium
+pl_2324_028,pl_2324,Premier League,2023-24,newcastle,Newcastle United,arsenal,Arsenal,2023-11-04 12:30:00,finished,1,0,home_win,St. James Park
+pl_2324_029,pl_2324,Premier League,2023-24,spurs,Tottenham Hotspur,chelsea,Chelsea,2023-11-06 20:00:00,finished,1,4,away_win,Tottenham Hotspur Stadium
+pl_2324_030,pl_2324,Premier League,2023-24,man_city,Manchester City,bournemouth,Bournemouth,2023-11-04 15:00:00,finished,6,1,home_win,Etihad Stadium
+pl_2324_031,pl_2324,Premier League,2023-24,liverpool,Liverpool,brentford,Brentford,2023-11-12 16:30:00,finished,3,0,home_win,Anfield
+pl_2324_032,pl_2324,Premier League,2023-24,aston_villa,Aston Villa,chelsea,Chelsea,2023-11-12 15:00:00,finished,2,3,away_win,Villa Park
+pl_2324_033,pl_2324,Premier League,2023-24,arsenal,Arsenal,brentford,Brentford,2023-11-25 15:00:00,finished,1,0,home_win,Emirates Stadium
+pl_2324_034,pl_2324,Premier League,2023-24,man_city,Manchester City,liverpool,Liverpool,2023-11-25 17:30:00,finished,1,1,draw,Etihad Stadium
+pl_2324_035,pl_2324,Premier League,2023-24,newcastle,Newcastle United,chelsea,Chelsea,2023-11-25 15:00:00,finished,1,1,draw,St. James Park
+pl_2324_036,pl_2324,Premier League,2023-24,spurs,Tottenham Hotspur,west_ham,West Ham United,2023-12-02 12:30:00,finished,1,1,draw,Tottenham Hotspur Stadium
+pl_2324_037,pl_2324,Premier League,2023-24,aston_villa,Aston Villa,man_city,Manchester City,2023-12-06 20:15:00,finished,1,3,away_win,Villa Park
+pl_2324_038,pl_2324,Premier League,2023-24,man_utd,Manchester United,chelsea,Chelsea,2023-12-06 19:30:00,finished,2,1,home_win,Old Trafford
+pl_2324_039,pl_2324,Premier League,2023-24,liverpool,Liverpool,fulham,Fulham,2023-12-03 16:30:00,finished,4,3,home_win,Anfield
+pl_2324_040,pl_2324,Premier League,2023-24,crystal_palace,Crystal Palace,arsenal,Arsenal,2023-12-04 20:00:00,finished,0,5,away_win,Selhurst Park
+pl_2324_041,pl_2324,Premier League,2023-24,chelsea,Chelsea,sheff_utd,Sheffield United,2023-12-16 17:30:00,finished,2,0,home_win,Stamford Bridge
+pl_2324_042,pl_2324,Premier League,2023-24,arsenal,Arsenal,west_ham,West Ham United,2023-12-28 20:00:00,finished,2,0,home_win,Emirates Stadium
+pl_2324_043,pl_2324,Premier League,2023-24,man_city,Manchester City,everton,Everton,2023-12-27 20:15:00,finished,3,1,home_win,Etihad Stadium
+pl_2324_044,pl_2324,Premier League,2023-24,liverpool,Liverpool,newcastle,Newcastle United,2024-01-01 17:30:00,finished,4,2,home_win,Anfield
+pl_2324_045,pl_2324,Premier League,2023-24,aston_villa,Aston Villa,newcastle,Newcastle United,2024-01-01 14:00:00,finished,3,3,draw,Villa Park
+pl_2324_046,pl_2324,Premier League,2023-24,man_city,Manchester City,chelsea,Chelsea,2024-02-17 17:30:00,finished,1,1,draw,Etihad Stadium
+pl_2324_047,pl_2324,Premier League,2023-24,arsenal,Arsenal,newcastle,Newcastle United,2024-01-20 14:00:00,finished,4,1,home_win,Emirates Stadium
+pl_2324_048,pl_2324,Premier League,2023-24,liverpool,Liverpool,arsenal,Arsenal,2024-02-04 16:30:00,finished,1,2,away_win,Anfield
+pl_2324_049,pl_2324,Premier League,2023-24,man_city,Manchester City,man_utd,Manchester United,2024-03-03 16:30:00,finished,3,1,home_win,Etihad Stadium
+pl_2324_050,pl_2324,Premier League,2023-24,arsenal,Arsenal,man_city,Manchester City,2024-03-31 16:30:00,scheduled,,,

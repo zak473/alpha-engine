@@ -1,0 +1,26 @@
+# Web framework
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+pydantic==2.9.0
+pydantic-settings==2.5.0
+
+# Database
+sqlalchemy==2.0.35
+alembic==1.13.3
+psycopg2-binary==2.9.9
+
+# Data / ML
+pandas==2.2.3
+numpy==1.26.4
+scikit-learn==1.5.2
+joblib==1.4.2
+scipy==1.14.1
+xgboost==2.1.1
+
+# Utilities
+python-dotenv==1.0.1
+pyyaml==6.0.2
+
+# Dev tooling
+ruff==0.4.0
+pytest==8.3.3

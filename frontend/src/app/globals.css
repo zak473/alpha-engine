@@ -1,0 +1,200 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+
+    /* Design tokens — sportsbook-grade dark (mirrored in src/lib/tokens.ts) */
+    --color-surface-base:    #06060a;
+    --color-surface-raised:  #0a0a0e;
+    --color-surface-overlay: #0f0f15;
+    --color-surface-border:  #1c1c26;
+    --color-surface-border1: #2a2a38;
+    --color-text-primary:    #f0f0f6;
+    --color-text-muted:      #8888a0;
+    --color-text-subtle:     #3a3a4a;
+    --color-accent-green:    #22c55e;
+    --color-accent-red:      #ef4444;
+    --color-accent-blue:     #3b82f6;
+    --color-accent-amber:    #f59e0b;
+    --color-accent-purple:   #a855f7;
+    --color-accent-teal:     #0d9488;
+    --color-accent-gold:     #b45309;
+    --sidebar-width:         14rem;
+    --topbar-height:         3rem;
+    /* Sportsbook layout */
+    --left-rail-width:       13rem;
+    --slip-rail-width:       16.5rem;
+  }
+
+  * {
+    border-color: #1c1c26;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: #06060a;
+    color: #f0f0f6;
+    font-family: Inter, system-ui, sans-serif;
+    font-size: 13px;                 /* sportsbook density */
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 3px; height: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2a2a38; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3a3a50; }
+}
+
+@layer components {
+  /* ── Base card ─────────────────────────────────────────────────────── */
+  .card {
+    @apply bg-surface-overlay border border-surface-border rounded-lg;
+  }
+
+  /* ── Monospace numbers ────────────────────────────────────────────── */
+  .num {
+    @apply font-mono tabular-nums;
+  }
+
+  /* ── Metric label ─────────────────────────────────────────────────── */
+  .label {
+    font-size: 10px;
+    @apply text-text-muted uppercase tracking-widest font-semibold;
+  }
+
+  /* ── Positive / Negative ──────────────────────────────────────────── */
+  .positive { @apply text-accent-green; }
+  .negative { @apply text-accent-red; }
+  .neutral  { @apply text-accent-amber; }
+
+  /* ── Subtle divider ───────────────────────────────────────────────── */
+  .divider {
+    @apply border-t border-surface-border;
+  }
+
+  /* ── Table row hover ──────────────────────────────────────────────── */
+  .tr-hover {
+    @apply hover:bg-white/[0.025] transition-colors cursor-pointer;
+  }
+
+  /* ── Ghost button ─────────────────────────────────────────────────── */
+  .btn-ghost {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[13px]
+           text-text-muted hover:text-text-primary hover:bg-white/[0.05]
+           transition-colors disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  /* ── Primary button ───────────────────────────────────────────────── */
+  .btn-primary {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px]
+           font-medium bg-accent-blue/90 text-white hover:bg-accent-blue
+           transition-colors disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  /* ── Teal CTA (sportsbook primary) ───────────────────────────────── */
+  .btn-cta {
+    @apply inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-md
+           text-[13px] font-semibold bg-accent-teal text-white
+           hover:bg-teal-500 transition-colors
+           disabled:opacity-40 disabled:pointer-events-none;
+  }
+
+  /* ── Danger button ────────────────────────────────────────────────── */
+  .btn-danger {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px]
+           font-medium bg-accent-red/90 text-white hover:bg-accent-red
+           transition-colors disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  /* ── PanelCard chrome ─────────────────────────────────────────────── */
+  .panel-header {
+    @apply px-3 py-2.5 border-b border-surface-border flex items-center justify-between;
+  }
+  .panel-content       { @apply px-3 py-3; }
+  .panel-content-tight { @apply px-3 py-2; }
+
+  /* ── Form input ───────────────────────────────────────────────────── */
+  .input-field {
+    @apply w-full px-3 py-2 rounded-md text-[13px] bg-surface-base border border-surface-border
+           text-text-primary placeholder:text-text-subtle
+           focus:outline-none focus:border-accent-teal/50 focus:ring-1 focus:ring-accent-teal/20
+           transition-colors disabled:opacity-50;
+  }
+
+  /* ── Underline tabs ───────────────────────────────────────────────── */
+  .tab-underline-root { @apply flex gap-0 border-b border-surface-border; }
+  .tab-underline-item {
+    @apply px-3 py-2 text-[13px] text-text-muted border-b-2 border-transparent -mb-px
+           transition-colors hover:text-text-primary whitespace-nowrap;
+  }
+  .tab-underline-item[data-active="true"] {
+    @apply text-text-primary border-accent-teal;
+  }
+
+  /* ── Sportsbook: market row ───────────────────────────────────────── */
+  .sb-row {
+    @apply flex items-center gap-2.5 px-3 min-h-[52px] border-b border-surface-border/60
+           hover:bg-white/[0.02] transition-colors cursor-pointer;
+  }
+
+  /* ── Sportsbook: odds/probability button ──────────────────────────── */
+  .btn-odds {
+    @apply flex flex-col items-center justify-center rounded border
+           w-[58px] h-[42px] shrink-0 transition-all duration-150
+           bg-surface-raised border-surface-border
+           hover:bg-white/[0.04] hover:border-surface-border1;
+  }
+
+  .btn-odds-lean {
+    @apply btn-odds border-surface-border1 bg-surface-overlay;
+  }
+
+  .btn-odds-queued {
+    @apply btn-odds bg-accent-teal/15 border-accent-teal/40;
+  }
+
+  /* ── Sportsbook: group section header ─────────────────────────────── */
+  .sb-section-header {
+    @apply flex items-center justify-between px-3 py-2
+           bg-surface-raised border-y border-surface-border
+           sticky z-10;
+  }
+
+  /* ── Sportsbook: rail header ──────────────────────────────────────── */
+  .rail-header {
+    @apply px-3 py-2.5 border-b border-surface-border flex items-center justify-between
+           bg-surface-raised;
+  }
+
+  /* ── Compact KPI bar (single row) ─────────────────────────────────── */
+  .kpi-bar {
+    @apply flex items-center gap-0 h-8 px-3 border-b border-surface-border
+           bg-surface-raised sticky top-0 z-20 overflow-x-auto;
+  }
+  .kpi-bar-item {
+    @apply flex items-center gap-1.5 px-3 border-r border-surface-border/50
+           text-[11px] text-text-muted whitespace-nowrap shrink-0;
+  }
+  .kpi-bar-item:last-child { @apply border-r-0; }
+}
+
+/* Shimmer skeleton animation */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, #0f0f15 25%, #16161e 50%, #0f0f15 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}

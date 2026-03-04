@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose up --build -d 2>&1)",
+      "Bash(alembic upgrade head 2>&1)",
+      "Bash(which python3 && pip show alembic 2>&1 | head -5)",
+      "Bash(docker compose exec api alembic upgrade head 2>&1)",
+      "Bash(docker compose exec api alembic -x sqlalchemy.url=postgresql://alpha:alpha@postgres:5432/alpha_engine upgrade head 2>&1)",
+      "Bash(docker compose exec api python scripts/seed.py 2>&1)",
+      "Bash(docker compose up --build -d api 2>&1 | tail -20)",
+      "Bash(sleep 2 && curl -s http://localhost:8000/api/v1/challenges | python3 -m json.tool 2>&1 | head -40)",
+      "Bash(curl -s \"http://localhost:8000/api/v1/challenges/2f91dd6b-202c-4583-a4b1-a6d41c2a51b1/leaderboard\" | python3 -m json.tool 2>&1)",
+      "Bash(cd /Users/wilding/Documents/alpha-engine/frontend && npx tsc --noEmit 2>&1)",
+      "Bash(docker compose up --build -d frontend 2>&1 | tail -10)",
+      "Bash(npx tsc --noEmit 2>&1)",
+      "Bash(cd /Users/wilding/Documents/alpha-engine && docker compose up --build -d frontend 2>&1 | tail -12)",
+      "Bash(npx tsc --noEmit 2>&1 && echo \"✓ clean\")",
+      "Bash(lsof -ti :3000 2>/dev/null | head -3)",
+      "Bash(git add . && git status --short | wc -l)"
+    ]
+  }
+}
