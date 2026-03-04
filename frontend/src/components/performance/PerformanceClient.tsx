@@ -1,10 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { StatCard } from "@/components/ui/StatCard";
-import { StateTabs } from "@/components/ui/Tabs";
-import { PanelCard } from "@/components/ui/PanelCard";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
 import { ROIChart } from "@/components/charts/ROIChart";
 import { CalibrationChart } from "@/components/charts/CalibrationChart";
 import type { RoiPoint } from "@/lib/types";
@@ -12,9 +8,9 @@ import type { RoiPoint } from "@/lib/types";
 type Range = "7d" | "30d" | "90d" | "all";
 
 const RANGE_ITEMS: { label: string; value: Range }[] = [
-  { label: "7d",  value: "7d" },
-  { label: "30d", value: "30d" },
-  { label: "90d", value: "90d" },
+  { label: "7D",  value: "7d" },
+  { label: "30D", value: "30d" },
+  { label: "90D", value: "90d" },
   { label: "All", value: "all" },
 ];
 
@@ -52,58 +48,112 @@ export function PerformanceClient({ roiData, kpis, sportStats }: PerformanceClie
   }, [roiData, range]);
 
   return (
-    <div className="space-y-4">
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
       {/* KPI strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-        {kpis.map((k) => (
-          <StatCard key={k.label} {...k} compact />
-        ))}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+        gap: 12,
+      }}>
+        {kpis.map((k) => {
+          const isPositive = typeof k.delta === "number" && k.delta > 0;
+          const isNegative = typeof k.delta === "number" && k.delta < 0;
+          return (
+            <div key={k.label} className="stat-card">
+              <div className="label" style={{ marginBottom: 6 }}>{k.label}</div>
+              <div className="num" style={{ fontSize: 22, fontWeight: 700, color: "var(--text0)", lineHeight: 1 }}>
+                {k.value}
+              </div>
+              {typeof k.delta === "number" && (
+                <div className="num" style={{
+                  fontSize: 11,
+                  marginTop: 4,
+                  color: isPositive ? "var(--positive)" : isNegative ? "var(--negative)" : "var(--text2)",
+                }}>
+                  {k.delta > 0 ? "+" : ""}{k.delta}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Time range + chart */}
-      <PanelCard
-        title="Cumulative PnL"
-        subtitle="Units"
-        action={<StateTabs items={RANGE_ITEMS} value={range} onChange={setRange} />}
-      >
-        <ROIChart data={filteredRoi} />
-      </PanelCard>
+      {/* Time range selector + ROI chart */}
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="panel-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div className="panel-title">Cumulative PnL</div>
+            <div style={{ fontSize: 11, color: "var(--text2)", marginTop: 2 }}>Units</div>
+          </div>
+          {/* Segmented range tabs */}
+          <div className="tabs-segmented">
+            {RANGE_ITEMS.map((item) => (
+              <button
+                key={item.value}
+                className={`tab-seg-item${range === item.value ? " active" : ""}`}
+                onClick={() => setRange(item.value)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{ padding: "0 20px 20px" }}>
+          <ROIChart data={filteredRoi} />
+        </div>
+      </div>
 
-      {/* Calibration */}
-      <PanelCard title="Calibration Curve" subtitle="Predicted vs actual win rate">
-        <CalibrationChart />
-      </PanelCard>
+      {/* Calibration chart */}
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="panel-header">
+          <div className="panel-title">Calibration Curve</div>
+          <div style={{ fontSize: 11, color: "var(--text2)", marginTop: 2 }}>Predicted vs actual win rate</div>
+        </div>
+        <div style={{ padding: "0 20px 20px" }}>
+          <CalibrationChart />
+        </div>
+      </div>
 
       {/* Per-sport table */}
-      <PanelCard title="Performance by Sport" padding="flush">
-        <Table>
-          <TableHead>
-            <tr>
-              <TableHeader>Sport</TableHeader>
-              <TableHeader numeric>Predictions</TableHeader>
-              <TableHeader numeric>Accuracy</TableHeader>
-              <TableHeader numeric>ROI</TableHeader>
-              <TableHeader numeric>Sharpe</TableHeader>
-            </tr>
-          </TableHead>
-          <TableBody>
-            {sportStats.map((row) => (
-              <TableRow key={row.sport}>
-                <TableCell className="font-medium">{row.sport}</TableCell>
-                <TableCell numeric>{row.n}</TableCell>
-                <TableCell numeric>{row.accuracy}</TableCell>
-                <TableCell
-                  numeric
-                  className={row.roi.startsWith("+") ? "text-accent-green font-medium" : "text-accent-red font-medium"}
-                >
-                  {row.roi}
-                </TableCell>
-                <TableCell numeric>{row.sharpe}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </PanelCard>
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="panel-header">
+          <div className="panel-title">Performance by Sport</div>
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Sport</th>
+                <th className="col-right">Predictions</th>
+                <th className="col-right">Accuracy</th>
+                <th className="col-right">ROI</th>
+                <th className="col-right">Sharpe</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sportStats.map((row) => {
+                const roiPositive = row.roi.startsWith("+");
+                return (
+                  <tr key={row.sport} className="tr-hover">
+                    <td style={{ color: "var(--text0)", fontWeight: 500 }}>{row.sport}</td>
+                    <td className="col-right num">{row.n}</td>
+                    <td className="col-right num">{row.accuracy}</td>
+                    <td className="col-right num" style={{
+                      color: roiPositive ? "var(--positive)" : "var(--negative)",
+                      fontWeight: 600,
+                    }}>
+                      {row.roi}
+                    </td>
+                    <td className="col-right num">{row.sharpe}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   );
 }

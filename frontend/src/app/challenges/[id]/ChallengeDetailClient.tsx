@@ -2,9 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { StateTabs } from "@/components/ui/Tabs";
-import { PanelCard } from "@/components/ui/PanelCard";
-import { Badge } from "@/components/ui/Badge";
 import { LeaderboardTable } from "@/components/challenges/LeaderboardTable";
 import { EntryFeed } from "@/components/challenges/EntryFeed";
 import { joinChallenge, leaveChallenge } from "@/lib/api";
@@ -37,153 +34,177 @@ function challengeStatus(c: Challenge) {
   const now = Date.now();
   const start = new Date(c.start_at).getTime();
   const end = new Date(c.end_at).getTime();
-  if (now < start) return { label: "Upcoming", color: "#3b82f6" };
-  if (now > end)   return { label: "Ended",    color: "#71717a" };
-  return { label: "Active", color: "#22c55e" };
-}
-
-function OverviewTab({ challenge, leaderboard }: { challenge: Challenge; leaderboard: LeaderboardOut }) {
-  const topThree = leaderboard.rows.slice(0, 3);
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Stats */}
-      <div className="lg:col-span-2 space-y-4">
-        <PanelCard title="Details">
-          <dl className="space-y-3">
-            <Row label="Status">
-              {(() => {
-                const s = challengeStatus(challenge);
-                return (
-                  <span className="text-sm font-medium" style={{ color: s.color }}>
-                    {s.label}
-                  </span>
-                );
-              })()}
-            </Row>
-            <Row label="Scoring">
-              <span className="text-sm text-text-primary capitalize">{challenge.scoring_type}</span>
-              <span className="text-xs text-text-muted ml-2">
-                {challenge.scoring_type === "points"
-                  ? "+1 per correct pick"
-                  : "Brier score (probability accuracy)"}
-              </span>
-            </Row>
-            <Row label="Sports">
-              <span className="text-sm text-text-primary">
-                {challenge.sport_scope.length === 0
-                  ? "All sports"
-                  : challenge.sport_scope.map((s) => (
-                      <Badge key={s} sport={s} className="mr-1 capitalize">{s}</Badge>
-                    ))}
-              </span>
-            </Row>
-            <Row label="Members">
-              <span className="text-sm font-mono text-text-primary">
-                {challenge.member_count}
-                {challenge.max_members ? ` / ${challenge.max_members}` : ""}
-              </span>
-            </Row>
-            {challenge.entry_limit_per_day && (
-              <Row label="Entry limit">
-                <span className="text-sm text-text-primary">{challenge.entry_limit_per_day} picks/day</span>
-              </Row>
-            )}
-            <Row label="Starts">
-              <span className="text-sm text-text-muted">{formatDate(challenge.start_at)}</span>
-            </Row>
-            <Row label="Ends">
-              <span className="text-sm text-text-muted">{formatDate(challenge.end_at)}</span>
-            </Row>
-          </dl>
-        </PanelCard>
-
-        {challenge.description && (
-          <PanelCard title="About">
-            <p className="text-sm text-text-muted leading-relaxed">{challenge.description}</p>
-          </PanelCard>
-        )}
-      </div>
-
-      {/* Mini leaderboard */}
-      <div>
-        <PanelCard title="Top 3">
-          {topThree.length === 0 ? (
-            <p className="text-xs text-text-muted py-4 text-center">No scores yet</p>
-          ) : (
-            <div className="space-y-3">
-              {topThree.map((row) => (
-                <div key={row.user_id} className="flex items-center gap-3">
-                  <span className="text-lg font-bold text-text-subtle w-5 text-center">
-                    {row.rank === 1 ? "🥇" : row.rank === 2 ? "🥈" : "🥉"}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-text-primary truncate">
-                      {row.user_id.startsWith("user-") ? row.user_id.slice(5) : row.user_id}
-                    </p>
-                    <p className="text-xs text-text-muted">{row.entry_count} entries</p>
-                  </div>
-                  <span className="font-mono text-sm text-accent-blue font-semibold">
-                    {challenge.scoring_type === "brier"
-                      ? row.score.toFixed(4)
-                      : row.score.toFixed(0)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </PanelCard>
-      </div>
-    </div>
-  );
+  if (now < start) return { label: "Upcoming", color: "var(--info)",     badgeClass: "badge badge-accent" };
+  if (now > end)   return { label: "Ended",    color: "var(--text2)",    badgeClass: "badge badge-muted" };
+  return             { label: "Active",   color: "var(--positive)", badgeClass: "badge badge-positive" };
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2">
-      <dt className="label w-28 shrink-0">{label}</dt>
-      <dd className="flex items-center gap-1 flex-wrap">{children}</dd>
+    <div style={{ display: "flex", alignItems: "baseline", gap: 8, paddingTop: 8, paddingBottom: 8, borderBottom: "1px solid var(--border0)" }}>
+      <dt className="label" style={{ width: 110, flexShrink: 0 }}>{label}</dt>
+      <dd style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", margin: 0 }}>{children}</dd>
+    </div>
+  );
+}
+
+const RANK_MEDALS = ["", "🥇", "🥈", "🥉"] as const;
+const RANK_COLORS = ["", "var(--accent)", "var(--positive)", "var(--warning)"] as const;
+
+function OverviewTab({ challenge, leaderboard }: { challenge: Challenge; leaderboard: LeaderboardOut }) {
+  const topThree = leaderboard.rows.slice(0, 3);
+  const status = challengeStatus(challenge);
+
+  return (
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: "1fr",
+      gap: 16,
+    }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr)", gap: 16, alignItems: "start" }}>
+        {/* Details card */}
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <div className="panel-header">
+            <div className="panel-title">Details</div>
+          </div>
+          <div style={{ padding: "4px 20px 16px" }}>
+            <dl style={{ margin: 0 }}>
+              <Row label="Status">
+                <span className={status.badgeClass}>{status.label}</span>
+              </Row>
+              <Row label="Scoring">
+                <span style={{ fontSize: 12, color: "var(--text0)", textTransform: "capitalize" }}>{challenge.scoring_type}</span>
+                <span style={{ fontSize: 11, color: "var(--text2)" }}>
+                  {challenge.scoring_type === "points"
+                    ? "+1 per correct pick"
+                    : "Brier score (probability accuracy)"}
+                </span>
+              </Row>
+              <Row label="Sports">
+                <span style={{ fontSize: 12, color: "var(--text0)" }}>
+                  {challenge.sport_scope.length === 0
+                    ? "All sports"
+                    : challenge.sport_scope.map((s) => (
+                        <span key={s} className="badge badge-muted" style={{ marginRight: 4, textTransform: "capitalize" }}>{s}</span>
+                      ))}
+                </span>
+              </Row>
+              <Row label="Members">
+                <span className="num" style={{ fontSize: 12, color: "var(--text0)" }}>
+                  {challenge.member_count}
+                  {challenge.max_members ? ` / ${challenge.max_members}` : ""}
+                </span>
+              </Row>
+              {challenge.entry_limit_per_day && (
+                <Row label="Entry limit">
+                  <span style={{ fontSize: 12, color: "var(--text0)" }}>{challenge.entry_limit_per_day} picks/day</span>
+                </Row>
+              )}
+              <Row label="Starts">
+                <span style={{ fontSize: 11, color: "var(--text2)" }}>{formatDate(challenge.start_at)}</span>
+              </Row>
+              <Row label="Ends">
+                <span style={{ fontSize: 11, color: "var(--text2)" }}>{formatDate(challenge.end_at)}</span>
+              </Row>
+            </dl>
+          </div>
+        </div>
+
+        {/* Top 3 mini leaderboard */}
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <div className="panel-header">
+            <div className="panel-title">Top 3</div>
+          </div>
+          <div style={{ padding: "8px 16px 16px" }}>
+            {topThree.length === 0 ? (
+              <p style={{ fontSize: 11, color: "var(--text2)", textAlign: "center", padding: "16px 0" }}>No scores yet</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {topThree.map((row) => (
+                  <div key={row.user_id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 18, width: 24, textAlign: "center", flexShrink: 0 }}>
+                      {RANK_MEDALS[row.rank] ?? row.rank}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text0)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {row.user_id.startsWith("user-") ? row.user_id.slice(5) : row.user_id}
+                      </p>
+                      <p style={{ fontSize: 10, color: "var(--text2)", margin: "2px 0 0" }}>{row.entry_count} entries</p>
+                    </div>
+                    <span className="num" style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: RANK_COLORS[row.rank] ?? "var(--text1)",
+                    }}>
+                      {challenge.scoring_type === "brier"
+                        ? row.score.toFixed(4)
+                        : row.score.toFixed(0)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Description */}
+      {challenge.description && (
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <div className="panel-header">
+            <div className="panel-title">About</div>
+          </div>
+          <div style={{ padding: "4px 20px 16px" }}>
+            <p style={{ fontSize: 12, color: "var(--text2)", lineHeight: 1.65, margin: 0 }}>{challenge.description}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function RulesTab({ challenge }: { challenge: Challenge }) {
   return (
-    <PanelCard title="Challenge Rules">
-      <div className="space-y-4 text-sm text-text-muted leading-relaxed">
-        <p>
-          <strong className="text-text-primary">Eligibility:</strong>{" "}
-          You must be a member of this challenge to submit picks.
-        </p>
-        <p>
-          <strong className="text-text-primary">Submission window:</strong>{" "}
-          Picks must be submitted before the event starts. Once an event kicks off, entries are locked.
-        </p>
-        {challenge.entry_limit_per_day && (
-          <p>
-            <strong className="text-text-primary">Daily limit:</strong>{" "}
-            A maximum of {challenge.entry_limit_per_day} pick
-            {challenge.entry_limit_per_day > 1 ? "s" : ""} per day.
-          </p>
-        )}
-        {challenge.max_members && (
-          <p>
-            <strong className="text-text-primary">Capacity:</strong>{" "}
-            This challenge is capped at {challenge.max_members} members. First come, first served.
-          </p>
-        )}
-        <p>
-          <strong className="text-text-primary">Scoring ({challenge.scoring_type}):</strong>{" "}
-          {challenge.scoring_type === "points"
-            ? "Each correct pick earns 1 point. The member with the most points at the end wins."
-            : "Each pick is scored using the Brier metric: score = 1 − (p − outcome)². A perfect prediction scores 1.0. The leaderboard ranks by average score (higher is better)."}
-        </p>
-        <p>
-          <strong className="text-text-primary">Settlement:</strong>{" "}
-          Picks are settled automatically once the event outcome is recorded. Scores update on the leaderboard in real time.
-        </p>
+    <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+      <div className="panel-header">
+        <div className="panel-title">Challenge Rules</div>
       </div>
-    </PanelCard>
+      <div style={{ padding: "8px 20px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+        {[
+          {
+            heading: "Eligibility",
+            body: "You must be a member of this challenge to submit picks.",
+          },
+          {
+            heading: "Submission window",
+            body: "Picks must be submitted before the event starts. Once an event kicks off, entries are locked.",
+          },
+          ...(challenge.entry_limit_per_day ? [{
+            heading: "Daily limit",
+            body: `A maximum of ${challenge.entry_limit_per_day} pick${challenge.entry_limit_per_day > 1 ? "s" : ""} per day.`,
+          }] : []),
+          ...(challenge.max_members ? [{
+            heading: "Capacity",
+            body: `This challenge is capped at ${challenge.max_members} members. First come, first served.`,
+          }] : []),
+          {
+            heading: `Scoring (${challenge.scoring_type})`,
+            body: challenge.scoring_type === "points"
+              ? "Each correct pick earns 1 point. The member with the most points at the end wins."
+              : "Each pick is scored using the Brier metric: score = 1 − (p − outcome)². A perfect prediction scores 1.0. The leaderboard ranks by average score (higher is better).",
+          },
+          {
+            heading: "Settlement",
+            body: "Picks are settled automatically once the event outcome is recorded. Scores update on the leaderboard in real time.",
+          },
+        ].map(({ heading, body }) => (
+          <p key={heading} style={{ fontSize: 12, color: "var(--text2)", lineHeight: 1.65, margin: 0 }}>
+            <strong style={{ color: "var(--text0)", fontWeight: 600 }}>{heading}: </strong>
+            {body}
+          </p>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -223,53 +244,69 @@ export function ChallengeDetailClient({ challenge, leaderboard, feedData }: Prop
   const status = challengeStatus(challenge);
   const isOwner = challenge.user_role === "owner";
 
+  const TABS: { label: string; value: Tab }[] = [
+    { label: "Overview",    value: "overview" },
+    { label: "Leaderboard", value: "leaderboard" },
+    { label: "Feed",        value: "feed" },
+    { label: "Rules",       value: "rules" },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+
       {/* Page header */}
       <div>
-        <Link href="/challenges" className="btn-ghost text-xs mb-3 inline-flex">
+        <Link href="/challenges" style={{
+          display: "inline-flex", alignItems: "center", gap: 5,
+          fontSize: 11, color: "var(--text2)", textDecoration: "none",
+          marginBottom: 12,
+        }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text1)")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text2)")}
+        >
           <ArrowLeft size={12} /> Challenges
         </Link>
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <span
-                className="inline-flex items-center px-2 py-0.5 rounded text-2xs font-medium uppercase tracking-wide"
-                style={{ color: status.color, backgroundColor: `${status.color}18`, border: `1px solid ${status.color}30` }}
-              >
+
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+              <span className={status.badgeClass} style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 {status.label}
               </span>
               {challenge.visibility === "private" ? (
-                <span className="inline-flex items-center gap-1 text-xs text-text-muted">
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--text2)" }}>
                   <Lock size={11} /> Private
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 text-xs text-text-muted">
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--text2)" }}>
                   <Globe size={11} /> Public
                 </span>
               )}
-              <span className="inline-flex items-center gap-1 text-xs text-text-muted">
-                <Users size={11} /> {memberCount}{challenge.max_members ? `/${challenge.max_members}` : ""}
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--text2)" }}>
+                <Users size={11} />
+                <span className="num">{memberCount}{challenge.max_members ? `/${challenge.max_members}` : ""}</span>
               </span>
             </div>
-            <h1 className="text-xl font-semibold text-text-primary">{challenge.name}</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: "var(--text0)", margin: 0 }}>{challenge.name}</h1>
           </div>
 
           {/* Join / Leave */}
           {!isOwner && (
             isMember ? (
               <button
-                className="btn-ghost text-xs"
+                className="btn btn-md btn-ghost"
                 onClick={handleLeave}
                 disabled={actionLoading}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}
               >
                 <LogOut size={13} /> Leave
               </button>
             ) : (
               <button
-                className="btn-primary"
+                className="btn btn-md btn-primary"
                 onClick={handleJoin}
                 disabled={actionLoading}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
               >
                 <LogIn size={14} /> {actionLoading ? "Joining…" : "Join challenge"}
               </button>
@@ -278,17 +315,18 @@ export function ChallengeDetailClient({ challenge, leaderboard, feedData }: Prop
         </div>
       </div>
 
-      {/* Tabs */}
-      <StateTabs<Tab>
-        items={[
-          { label: "Overview",    value: "overview" },
-          { label: "Leaderboard", value: "leaderboard" },
-          { label: "Feed",        value: "feed" },
-          { label: "Rules",       value: "rules" },
-        ]}
-        value={tab}
-        onChange={setTab}
-      />
+      {/* Underline tabs */}
+      <div className="tabs-underline">
+        {TABS.map((t) => (
+          <button
+            key={t.value}
+            className={`tab-item${tab === t.value ? " active" : ""}`}
+            onClick={() => setTab(t.value)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
       {/* Tab content */}
       <div>
@@ -297,19 +335,25 @@ export function ChallengeDetailClient({ challenge, leaderboard, feedData }: Prop
         )}
 
         {tab === "leaderboard" && (
-          <PanelCard title="Leaderboard" padding="flush">
+          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+            <div className="panel-header">
+              <div className="panel-title">Leaderboard</div>
+            </div>
             <LeaderboardTable data={leaderboard} />
-          </PanelCard>
+          </div>
         )}
 
         {tab === "feed" && (
-          <PanelCard title="Recent picks" padding="flush">
+          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+            <div className="panel-header">
+              <div className="panel-title">Recent Picks</div>
+            </div>
             <EntryFeed
               challengeId={challenge.id}
               scope="feed"
               initialData={feedData}
             />
-          </PanelCard>
+          </div>
         )}
 
         {tab === "rules" && <RulesTab challenge={challenge} />}

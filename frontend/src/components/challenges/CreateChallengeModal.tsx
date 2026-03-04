@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { createChallenge } from "@/lib/api";
 import type { Challenge, ChallengeCreate } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 interface Props {
   open: boolean;
@@ -85,7 +84,8 @@ export function CreateChallengeModal({ open, onClose, onCreated }: Props) {
 
   return (
     <Modal open={open} onClose={handleClose} title="Create Challenge" className="max-w-xl">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
         {/* Name */}
         <Field label="Name" error={errors.name}>
           <input
@@ -100,7 +100,8 @@ export function CreateChallengeModal({ open, onClose, onCreated }: Props) {
         {/* Description */}
         <Field label="Description">
           <textarea
-            className="input-field resize-none"
+            className="input-field"
+            style={{ resize: "none" }}
             placeholder="Optional — what's this challenge about?"
             rows={2}
             value={form.description ?? ""}
@@ -109,13 +110,13 @@ export function CreateChallengeModal({ open, onClose, onCreated }: Props) {
         </Field>
 
         {/* Visibility + Scoring */}
-        <div className="grid grid-cols-2 gap-3">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <Field label="Visibility">
             <Select
               value={form.visibility}
               onChange={(v) => set("visibility", v as "public" | "private")}
               options={[
-                { value: "public", label: "Public" },
+                { value: "public",  label: "Public" },
                 { value: "private", label: "Private" },
               ]}
             />
@@ -126,7 +127,7 @@ export function CreateChallengeModal({ open, onClose, onCreated }: Props) {
               onChange={(v) => set("scoring_type", v as "points" | "brier")}
               options={[
                 { value: "points", label: "Points (+1 correct)" },
-                { value: "brier", label: "Brier score" },
+                { value: "brier",  label: "Brier score" },
               ]}
             />
           </Field>
@@ -134,27 +135,36 @@ export function CreateChallengeModal({ open, onClose, onCreated }: Props) {
 
         {/* Sport scope */}
         <Field label="Sports (leave empty for all)">
-          <div className="flex gap-2">
-            {SPORTS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => toggleSport(s)}
-                className={cn(
-                  "px-3 py-1.5 rounded-md text-xs font-medium border transition-colors capitalize",
-                  form.sport_scope.includes(s)
-                    ? "border-accent-blue bg-accent-blue/10 text-accent-blue"
-                    : "border-surface-border text-text-muted hover:border-zinc-600"
-                )}
-              >
-                {s}
-              </button>
-            ))}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {SPORTS.map((s) => {
+              const active = form.sport_scope.includes(s);
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => toggleSport(s)}
+                  style={{
+                    padding: "5px 12px",
+                    borderRadius: 6,
+                    fontSize: 11,
+                    fontWeight: 500,
+                    textTransform: "capitalize",
+                    cursor: "pointer",
+                    transition: "all 0.12s",
+                    border: `1px solid ${active ? "var(--accent)" : "var(--border0)"}`,
+                    background: active ? "color-mix(in srgb, var(--accent) 12%, var(--bg1))" : "var(--bg1)",
+                    color: active ? "var(--accent)" : "var(--text2)",
+                  }}
+                >
+                  {s}
+                </button>
+              );
+            })}
           </div>
         </Field>
 
         {/* Dates */}
-        <div className="grid grid-cols-2 gap-3">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <Field label="Start" error={errors.start_at}>
             <input
               type="datetime-local"
@@ -174,7 +184,7 @@ export function CreateChallengeModal({ open, onClose, onCreated }: Props) {
         </div>
 
         {/* Limits */}
-        <div className="grid grid-cols-2 gap-3">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <Field label="Max members">
             <input
               type="number"
@@ -201,17 +211,35 @@ export function CreateChallengeModal({ open, onClose, onCreated }: Props) {
           </Field>
         </div>
 
+        {/* Server error */}
         {serverError && (
-          <p className="text-xs text-accent-red bg-accent-red/10 border border-accent-red/20 rounded px-3 py-2">
+          <div style={{
+            fontSize: 11,
+            color: "var(--negative)",
+            background: "color-mix(in srgb, var(--negative) 10%, var(--bg1))",
+            border: "1px solid color-mix(in srgb, var(--negative) 25%, transparent)",
+            borderRadius: 6,
+            padding: "8px 12px",
+          }}>
             {serverError}
-          </p>
+          </div>
         )}
 
-        <div className="flex justify-end gap-2 pt-1">
-          <button type="button" className="btn-ghost" onClick={handleClose} disabled={loading}>
+        {/* Actions */}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, paddingTop: 4 }}>
+          <button
+            type="button"
+            className="btn btn-md btn-ghost"
+            onClick={handleClose}
+            disabled={loading}
+          >
             Cancel
           </button>
-          <button type="submit" className="btn-primary" disabled={loading}>
+          <button
+            type="submit"
+            className="btn btn-md btn-primary"
+            disabled={loading}
+          >
             {loading ? "Creating…" : "Create challenge"}
           </button>
         </div>
@@ -220,7 +248,7 @@ export function CreateChallengeModal({ open, onClose, onCreated }: Props) {
   );
 }
 
-// ── Small helpers ────────────────────────────────────────────────────────────
+// ── Small helpers ─────────────────────────────────────────────────────────────
 
 function Field({
   label,
@@ -232,10 +260,12 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1">
+    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
       <label className="label">{label}</label>
       {children}
-      {error && <p className="text-xs text-accent-red mt-0.5">{error}</p>}
+      {error && (
+        <p style={{ margin: 0, fontSize: 11, color: "var(--negative)" }}>{error}</p>
+      )}
     </div>
   );
 }

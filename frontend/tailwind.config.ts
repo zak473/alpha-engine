@@ -1,32 +1,58 @@
 import type { Config } from "tailwindcss";
 
+/**
+ * QUANT TERMINAL — Tailwind config
+ * All color utilities map to CSS vars defined in globals.css.
+ * Never use raw Tailwind color classes (blue-500, etc.) in components.
+ */
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
   darkMode: "class",
   theme: {
     extend: {
       colors: {
-        // Design system — sportsbook-grade dark
+        // ── Surface layers ──────────────────────────────────────────
+        bg0: "var(--bg0)",
+        bg1: "var(--bg1)",
+        bg2: "var(--bg2)",
+
+        // ── Text ────────────────────────────────────────────────────
+        t0: "var(--text0)",
+        t1: "var(--text1)",
+        t2: "var(--text2)",
+
+        // ── Borders ─────────────────────────────────────────────────
+        b0: "var(--border0)",
+        b1: "var(--border1)",
+
+        // ── Accent & status ─────────────────────────────────────────
+        positive: "var(--positive)",
+        negative: "var(--negative)",
+        warning:  "var(--warning)",
+        info:     "var(--info)",
+
+        // ── Legacy aliases (for existing components) ─────────────────
         surface: {
-          base:    "#06060a",   // page bg — near-void (was #09090b)
-          raised:  "#0a0a0e",   // sidebar, rails (was #111113)
-          overlay: "#0f0f15",   // cards, panels (was #18181b)
-          border:  "#1c1c26",   // default dividers (was #27272a)
-          border1: "#2a2a38",   // hover/active border elevation
+          base:    "var(--bg0)",
+          raised:  "var(--bg1)",
+          overlay: "var(--bg2)",
+          border:  "var(--border0)",
+          border1: "var(--border1)",
         },
         text: {
-          primary: "#f0f0f6",   // slightly cooler white (was #f4f4f5)
-          muted:   "#8888a0",   // blue-grey tint (was #71717a)
-          subtle:  "#3a3a4a",   // (was #3f3f46)
+          primary: "var(--text0)",
+          muted:   "var(--text1)",
+          subtle:  "var(--text2)",
         },
         accent: {
-          green:  "#22c55e",
-          red:    "#ef4444",
-          blue:   "#3b82f6",
-          amber:  "#f59e0b",
-          purple: "#a855f7",
-          teal:   "#0d9488",   // Alpha Engine primary CTA
-          gold:   "#b45309",   // highlights — use sparingly
+          DEFAULT: "var(--accent)",
+          green:   "var(--positive)",
+          red:     "var(--negative)",
+          amber:   "var(--warning)",
+          blue:    "var(--info)",
+          teal:    "var(--accent)",
+          purple:  "#a855f7",
+          gold:    "#b45309",
         },
       },
       fontFamily: {
@@ -34,14 +60,34 @@ const config: Config = {
         mono: ["JetBrains Mono", "Menlo", "monospace"],
       },
       fontSize: {
-        "2xs": ["0.625rem", { lineHeight: "1rem" }],
-        "3xs": ["0.5625rem", { lineHeight: "0.875rem" }],
+        "2xs": ["0.625rem", { lineHeight: "1rem" }],   // 10px
+        "3xs": ["0.5625rem", { lineHeight: "0.875rem" }], // 9px
       },
       borderRadius: {
-        sm: "3px",
-        md: "5px",
-        lg: "7px",
-        xl: "10px",
+        sm: "var(--radius-sm)",   // 2px
+        md: "var(--radius-md)",   // 4px
+        lg: "6px",
+        xl: "8px",
+      },
+      spacing: {
+        "8":  "8px",
+        "12": "12px",
+        "16": "16px",
+        "24": "24px",
+        "32": "32px",
+      },
+      boxShadow: {
+        "0": "none",
+        "1": "0 1px 3px rgba(0,0,0,0.4)",
+      },
+      keyframes: {
+        shimmer: {
+          "0%":   { backgroundPosition: "-400px 0" },
+          "100%": { backgroundPosition: "400px 0" },
+        },
+      },
+      animation: {
+        shimmer: "shimmer 1.4s ease-in-out infinite",
       },
     },
   },

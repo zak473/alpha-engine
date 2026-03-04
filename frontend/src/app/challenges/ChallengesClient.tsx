@@ -3,15 +3,10 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { StateTabs } from "@/components/ui/Tabs";
-import { PanelCard } from "@/components/ui/PanelCard";
-import { Badge } from "@/components/ui/Badge";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { CreateChallengeModal } from "@/components/challenges/CreateChallengeModal";
 import { joinChallenge } from "@/lib/api";
 import type { Challenge } from "@/lib/types";
 import { Trophy, Plus, Users, Calendar, Lock } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 type Tab = "all" | "mine";
 
@@ -28,13 +23,13 @@ function formatDate(iso: string) {
   });
 }
 
-function challengeStatus(c: Challenge): { label: string; color: string } {
+function challengeStatus(c: Challenge): { label: string; cssColor: string; badgeClass: string } {
   const now = Date.now();
   const start = new Date(c.start_at).getTime();
   const end = new Date(c.end_at).getTime();
-  if (now < start) return { label: "Upcoming", color: "#3b82f6" };
-  if (now > end)   return { label: "Ended",    color: "#71717a" };
-  return { label: "Active", color: "#22c55e" };
+  if (now < start) return { label: "Upcoming", cssColor: "var(--info)",     badgeClass: "badge badge-accent" };
+  if (now > end)   return { label: "Ended",    cssColor: "var(--text2)",    badgeClass: "badge badge-muted" };
+  return             { label: "Active",   cssColor: "var(--positive)", badgeClass: "badge badge-positive" };
 }
 
 function ChallengeCard({ challenge, onJoined }: { challenge: Challenge; onJoined?: () => void }) {
@@ -60,65 +55,99 @@ function ChallengeCard({ challenge, onJoined }: { challenge: Challenge; onJoined
   }
 
   return (
-    <Link href={`/challenges/${challenge.id}`} className="block group">
-      <div className="card p-4 hover:border-zinc-600 transition-colors h-full flex flex-col gap-3">
+    <Link href={`/challenges/${challenge.id}`} style={{ display: "block", textDecoration: "none" }}>
+      <div className="card" style={{
+        padding: 16,
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        height: "100%",
+        cursor: "pointer",
+        transition: "border-color 0.15s",
+      }}
+        onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--border1)")}
+        onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border0)")}
+      >
         {/* Header */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap mb-1">
-              <span
-                className="inline-flex items-center px-2 py-0.5 rounded text-2xs font-medium uppercase tracking-wide"
-                style={{ color: status.color, backgroundColor: `${status.color}18`, border: `1px solid ${status.color}30` }}
-              >
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+              <span className={status.badgeClass} style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 {status.label}
               </span>
               {challenge.visibility === "private" && (
-                <span className="inline-flex items-center gap-1 text-2xs text-text-muted">
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, color: "var(--text2)" }}>
                   <Lock size={10} /> Private
                 </span>
               )}
-              <Badge sport={challenge.sport_scope[0] || "soccer"} className="capitalize">
+              <span className="badge badge-muted" style={{ textTransform: "capitalize" }}>
                 {challenge.sport_scope.length === 0
                   ? "All sports"
                   : challenge.sport_scope.join(", ")}
-              </Badge>
+              </span>
             </div>
-            <h3 className="text-sm font-semibold text-text-primary leading-snug truncate">
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text0)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {challenge.name}
-            </h3>
+            </div>
           </div>
         </div>
 
         {/* Description */}
         {challenge.description && (
-          <p className="text-xs text-text-muted line-clamp-2">{challenge.description}</p>
+          <p style={{
+            fontSize: 11,
+            color: "var(--text2)",
+            lineHeight: 1.5,
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+            margin: 0,
+          }}>
+            {challenge.description}
+          </p>
         )}
 
         {/* Meta */}
-        <div className="flex items-center gap-4 text-xs text-text-muted mt-auto">
-          <span className="flex items-center gap-1">
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          fontSize: 11,
+          color: "var(--text2)",
+          marginTop: "auto",
+        }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <Users size={11} />
-            {challenge.member_count}
-            {challenge.max_members ? `/${challenge.max_members}` : ""}
+            <span className="num">
+              {challenge.member_count}
+              {challenge.max_members ? `/${challenge.max_members}` : ""}
+            </span>
           </span>
-          <span className="flex items-center gap-1">
+          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <Calendar size={11} />
             {formatDate(challenge.end_at)}
           </span>
-          <span className="capitalize">{challenge.scoring_type}</span>
+          <span style={{ textTransform: "capitalize" }}>{challenge.scoring_type}</span>
         </div>
 
         {/* Join / View */}
-        <div className="flex justify-end">
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
           {joined ? (
-            <span className="btn-ghost text-xs text-accent-blue pointer-events-none">
+            <span style={{
+              fontSize: 11,
+              color: "var(--positive)",
+              fontWeight: 500,
+              pointerEvents: "none",
+            }}>
               Joined ✓
             </span>
           ) : (
             <button
-              className="btn-primary text-xs py-1 px-2.5"
+              className="btn btn-md btn-primary"
               onClick={handleJoin}
               disabled={joining}
+              style={{ fontSize: 11 }}
             >
               {joining ? "Joining…" : "Join"}
             </button>
@@ -151,38 +180,74 @@ export function ChallengesClient({ allChallenges, myChallenges }: Props) {
   return (
     <>
       {/* Toolbar */}
-      <div className="flex items-center justify-between mb-6">
-        <StateTabs<Tab>
-          items={[
-            { label: "All challenges", value: "all" },
-            { label: `My challenges (${mine.length})`, value: "mine" },
-          ]}
-          value={tab}
-          onChange={setTab}
-        />
-        <button className="btn-primary" onClick={() => setModalOpen(true)}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+        {/* Segmented tabs */}
+        <div className="tabs-segmented">
+          <button
+            className={`tab-seg-item${tab === "all" ? " active" : ""}`}
+            onClick={() => setTab("all")}
+          >
+            All Challenges
+          </button>
+          <button
+            className={`tab-seg-item${tab === "mine" ? " active" : ""}`}
+            onClick={() => setTab("mine")}
+          >
+            My Challenges
+            <span className="num" style={{
+              marginLeft: 6,
+              fontSize: 10,
+              background: "var(--bg2)",
+              borderRadius: 8,
+              padding: "1px 6px",
+              color: "var(--text2)",
+            }}>
+              {mine.length}
+            </span>
+          </button>
+        </div>
+
+        <button className="btn btn-md btn-primary" onClick={() => setModalOpen(true)}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
           <Plus size={14} /> Create
         </button>
       </div>
 
-      {/* Grid */}
+      {/* Grid or empty state */}
       {displayed.length === 0 ? (
-        <EmptyState
-          icon={Trophy}
-          title={tab === "mine" ? "No challenges joined yet" : "No challenges available"}
-          description={
-            tab === "mine"
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 12,
+          padding: "60px 20px",
+          color: "var(--text2)",
+          textAlign: "center",
+        }}>
+          <Trophy size={32} style={{ opacity: 0.3 }} />
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text1)" }}>
+            {tab === "mine" ? "No challenges joined yet" : "No challenges available"}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--text2)", maxWidth: 280 }}>
+            {tab === "mine"
               ? "Join a public challenge or create your own."
-              : "Be the first to create a challenge."
-          }
-          action={
-            <button className="btn-primary" onClick={() => setModalOpen(true)}>
-              <Plus size={14} /> Create challenge
-            </button>
-          }
-        />
+              : "Be the first to create a challenge."}
+          </div>
+          <button
+            className="btn btn-md btn-primary"
+            onClick={() => setModalOpen(true)}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 4 }}
+          >
+            <Plus size={14} /> Create challenge
+          </button>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+          gap: 16,
+        }}>
           {displayed.map((c) => (
             <ChallengeCard key={c.id} challenge={c} onJoined={onJoined} />
           ))}

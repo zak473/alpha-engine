@@ -20,6 +20,7 @@ interface FeatureDriver {
 
 interface FeatureDriverChartProps {
   drivers: FeatureDriver[];
+  title?: string;
 }
 
 interface TooltipPayload {
@@ -41,7 +42,7 @@ function CustomTooltip({
       <p style={chartDefaults.tooltip.labelStyle}>{d.feature}</p>
       <p style={chartDefaults.tooltip.itemStyle}>
         Importance:{" "}
-        <span style={{ color: colors.accentBlue, fontVariantNumeric: "tabular-nums" }}>
+        <span style={{ color: colors.accent, fontVariantNumeric: "tabular-nums" }}>
           {(d.importance * 100).toFixed(1)}%
         </span>
       </p>
@@ -49,7 +50,7 @@ function CustomTooltip({
   );
 }
 
-export function FeatureDriverChart({ drivers }: FeatureDriverChartProps) {
+export function FeatureDriverChart({ drivers, title }: FeatureDriverChartProps) {
   // Sort descending by importance
   const data = [...drivers]
     .sort((a, b) => b.importance - a.importance)
@@ -57,40 +58,47 @@ export function FeatureDriverChart({ drivers }: FeatureDriverChartProps) {
     .map((d) => ({ ...d, pct: parseFloat((d.importance * 100).toFixed(1)) }));
 
   return (
-    <ResponsiveContainer width="100%" height={Math.max(120, data.length * 36)}>
-      <BarChart
-        data={data}
-        layout="vertical"
-        margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
-      >
-        <CartesianGrid horizontal={false} stroke={chartDefaults.grid.stroke} strokeDasharray={chartDefaults.grid.strokeDasharray} />
-        <XAxis
-          type="number"
-          domain={[0, 100]}
-          tickFormatter={(v) => `${v}%`}
-          tick={chartDefaults.axis.tick}
-          axisLine={chartDefaults.axis.axisLine}
-          tickLine={chartDefaults.axis.tickLine}
-        />
-        <YAxis
-          type="category"
-          dataKey="feature"
-          width={130}
-          tick={chartDefaults.axis.tick}
-          axisLine={chartDefaults.axis.axisLine}
-          tickLine={chartDefaults.axis.tickLine}
-        />
-        <Tooltip content={<CustomTooltip />} cursor={chartDefaults.cursor} />
-        <Bar dataKey="pct" radius={[0, 3, 3, 0]} maxBarSize={14}>
-          {data.map((_, i) => (
-            <Cell
-              key={i}
-              fill={colors.accentBlue}
-              fillOpacity={0.75 - i * 0.05}
-            />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="chart-container">
+      {title && (
+        <div className="chart-header">
+          <span className="chart-title">{title}</span>
+        </div>
+      )}
+      <ResponsiveContainer width="100%" height={Math.max(120, data.length * 36)}>
+        <BarChart
+          data={data}
+          layout="vertical"
+          margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
+        >
+          <CartesianGrid
+            horizontal={false}
+            stroke={chartDefaults.grid.stroke}
+            strokeDasharray={chartDefaults.grid.strokeDasharray}
+          />
+          <XAxis
+            type="number"
+            domain={[0, 100]}
+            tickFormatter={(v) => `${v}%`}
+            {...chartDefaults.axis}
+          />
+          <YAxis
+            type="category"
+            dataKey="feature"
+            width={130}
+            {...chartDefaults.axis}
+          />
+          <Tooltip content={<CustomTooltip />} cursor={chartDefaults.cursor} />
+          <Bar dataKey="pct" radius={[0, 3, 3, 0]} maxBarSize={14}>
+            {data.map((_, i) => (
+              <Cell
+                key={i}
+                fill={colors.accent}
+                fillOpacity={0.75 - i * 0.05}
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

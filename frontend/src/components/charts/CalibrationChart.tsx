@@ -20,6 +20,7 @@ interface CalibrationBin {
 
 interface CalibrationChartProps {
   data?: CalibrationBin[];
+  title?: string;
 }
 
 // Deterministic mock calibration bins (no Math.random)
@@ -36,46 +37,52 @@ const MOCK_BINS: CalibrationBin[] = [
   { bin: "1.0", predicted: 1.0, actual: 0.96 },
 ];
 
-export function CalibrationChart({ data = MOCK_BINS }: CalibrationChartProps) {
+export function CalibrationChart({ data = MOCK_BINS, title }: CalibrationChartProps) {
   return (
-    <ResponsiveContainer width="100%" height={200}>
-      <ComposedChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid stroke={chartDefaults.grid.stroke} strokeDasharray={chartDefaults.grid.strokeDasharray} />
-        <XAxis
-          dataKey="bin"
-          tick={chartDefaults.axis.tick}
-          axisLine={chartDefaults.axis.axisLine}
-          tickLine={chartDefaults.axis.tickLine}
-        />
-        <YAxis
-          domain={[0, 1]}
-          tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
-          tick={chartDefaults.axis.tick}
-          axisLine={chartDefaults.axis.axisLine}
-          tickLine={chartDefaults.axis.tickLine}
-          width={36}
-        />
-        <Tooltip
-          contentStyle={chartDefaults.tooltip.contentStyle}
-          labelStyle={chartDefaults.tooltip.labelStyle}
-          itemStyle={chartDefaults.tooltip.itemStyle}
-          formatter={(value: number, name: string) => [
-            `${(value * 100).toFixed(1)}%`,
-            name === "actual" ? "Actual" : "Perfect",
-          ]}
-        />
-        {/* Perfect calibration line */}
-        <Line
-          type="linear"
-          dataKey="predicted"
-          stroke={colors.textSubtle}
-          strokeDasharray="4 4"
-          dot={false}
-          name="perfect"
-        />
-        {/* Actual calibration bars */}
-        <Bar dataKey="actual" fill={colors.accentBlue} fillOpacity={0.6} radius={[2, 2, 0, 0]} maxBarSize={20} />
-      </ComposedChart>
-    </ResponsiveContainer>
+    <div className="chart-container">
+      {title && (
+        <div className="chart-header">
+          <span className="chart-title">{title}</span>
+        </div>
+      )}
+      <ResponsiveContainer width="100%" height={200}>
+        <ComposedChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid
+            stroke={chartDefaults.grid.stroke}
+            strokeDasharray={chartDefaults.grid.strokeDasharray}
+          />
+          <XAxis
+            dataKey="bin"
+            {...chartDefaults.axis}
+          />
+          <YAxis
+            domain={[0, 1]}
+            tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
+            {...chartDefaults.axis}
+            width={36}
+          />
+          <Tooltip
+            contentStyle={chartDefaults.tooltip.contentStyle}
+            labelStyle={chartDefaults.tooltip.labelStyle}
+            itemStyle={chartDefaults.tooltip.itemStyle}
+            formatter={(value: number, name: string) => [
+              `${(value * 100).toFixed(1)}%`,
+              name === "actual" ? "Actual" : "Perfect",
+            ]}
+          />
+          {/* Perfect calibration line */}
+          <Line
+            type="linear"
+            dataKey="predicted"
+            stroke={colors.text2}
+            strokeDasharray="4 4"
+            dot={false}
+            name="perfect"
+          />
+          {/* Actual calibration bars */}
+          <Bar dataKey="actual" fill={colors.accent} fillOpacity={0.6} radius={[2, 2, 0, 0]} maxBarSize={20} />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

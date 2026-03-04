@@ -1,24 +1,19 @@
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
-import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { LeaderboardOut } from "@/lib/types";
 import { Trophy } from "lucide-react";
-import { cn } from "@/lib/utils";
-
-type BadgeVariant = "muted" | "positive" | "negative" | "warning";
 
 interface Props {
   data: LeaderboardOut;
 }
 
-const RANK_COLORS: Record<number, string> = {
-  1: "text-accent-amber",
-  2: "text-zinc-300",
-  3: "text-amber-700",
+// rank → color token
+const RANK_COLOR: Record<number, string> = {
+  1: "var(--accent)",
+  2: "var(--positive)",
+  3: "var(--warning)",
 };
 
 function shortId(userId: string) {
-  // Display friendly label: strip "user-" prefix if present
   return userId.startsWith("user-") ? userId.slice(5) : userId;
 }
 
@@ -35,72 +30,103 @@ function formatDate(iso: string | null) {
 export function LeaderboardTable({ data }: Props) {
   if (data.rows.length === 0) {
     return (
-      <EmptyState
-        icon={Trophy}
-        title="No scores yet"
-        description="Entries will appear here once events are settled."
-      />
+      <div style={{ padding: "40px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, color: "var(--text2)" }}>
+        <Trophy size={28} style={{ opacity: 0.3 }} />
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text1)" }}>No scores yet</div>
+        <div style={{ fontSize: 11 }}>Entries will appear here once events are settled.</div>
+      </div>
     );
   }
 
   const isBrier = data.scoring_type === "brier";
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader className="sticky top-0 z-10 bg-surface-overlay">
-          <TableRow>
-            <TableHead className="w-14 text-right">#</TableHead>
-            <TableHead>User</TableHead>
-            <TableHead className="text-right tabular-nums">
-              {isBrier ? "Avg score" : "Points"}
-            </TableHead>
-            {isBrier && (
-              <TableHead className="text-right tabular-nums">Accuracy</TableHead>
-            )}
-            <TableHead className="text-right tabular-nums">Entries</TableHead>
-            <TableHead className="text-right">Last pick</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.rows.map((row) => (
-            <TableRow key={row.user_id} className="tr-hover">
-              <TableCell className="text-right">
-                <span className={cn("font-mono font-semibold text-sm", RANK_COLORS[row.rank] ?? "text-text-muted")}>
-                  {row.rank}
-                </span>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <span className="w-7 h-7 rounded-full bg-accent-blue/10 border border-accent-blue/20 flex items-center justify-center text-xs font-medium text-accent-blue uppercase">
-                    {shortId(row.user_id).charAt(0)}
+    <div style={{ overflowX: "auto" }}>
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th className="col-right" style={{ width: 48 }}>#</th>
+            <th>User</th>
+            <th className="col-right">{isBrier ? "Avg Score" : "Points"}</th>
+            {isBrier && <th className="col-right">Accuracy</th>}
+            <th className="col-right">Entries</th>
+            <th className="col-right">Last Pick</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.rows.map((row) => {
+            const rankColor = RANK_COLOR[row.rank] ?? "var(--text2)";
+            const initial = shortId(row.user_id).charAt(0).toUpperCase();
+            return (
+              <tr key={row.user_id} className="tr-hover">
+                {/* Rank */}
+                <td className="col-right">
+                  <span className="num" style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: rankColor,
+                  }}>
+                    {row.rank}
                   </span>
-                  <span className="text-sm font-medium text-text-primary">{shortId(row.user_id)}</span>
-                  {row.rank === 1 && (
-                    <Badge variant="warning">Leader</Badge>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell className="text-right tabular-nums font-mono text-sm">
-                {formatScore(row.score, data.scoring_type)}
-              </TableCell>
-              {isBrier && (
-                <TableCell className="text-right tabular-nums font-mono text-sm">
-                  {row.accuracy_score != null
-                    ? `${(row.accuracy_score * 100).toFixed(1)}%`
-                    : "—"}
-                </TableCell>
-              )}
-              <TableCell className="text-right tabular-nums text-sm text-text-muted">
-                {row.entry_count}
-              </TableCell>
-              <TableCell className="text-right text-sm text-text-muted">
-                {formatDate(row.last_activity)}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                </td>
+
+                {/* User */}
+                <td>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {/* Avatar circle */}
+                    <span style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: "50%",
+                      background: `color-mix(in srgb, ${rankColor} 12%, var(--bg2))`,
+                      border: `1px solid color-mix(in srgb, ${rankColor} 30%, transparent)`,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: rankColor,
+                      flexShrink: 0,
+                    }}>
+                      {initial}
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text0)" }}>
+                      {shortId(row.user_id)}
+                    </span>
+                    {row.rank === 1 && (
+                      <span className="badge badge-warning" style={{ fontSize: 10 }}>Leader</span>
+                    )}
+                  </div>
+                </td>
+
+                {/* Score */}
+                <td className="col-right num" style={{ fontSize: 12, color: "var(--text0)", fontWeight: 600 }}>
+                  {formatScore(row.score, data.scoring_type)}
+                </td>
+
+                {/* Accuracy (brier only) */}
+                {isBrier && (
+                  <td className="col-right num" style={{ fontSize: 12, color: "var(--text1)" }}>
+                    {row.accuracy_score != null
+                      ? `${(row.accuracy_score * 100).toFixed(1)}%`
+                      : "—"}
+                  </td>
+                )}
+
+                {/* Entries */}
+                <td className="col-right num" style={{ fontSize: 12, color: "var(--text2)" }}>
+                  {row.entry_count}
+                </td>
+
+                {/* Last pick */}
+                <td className="col-right" style={{ fontSize: 11, color: "var(--text2)" }}>
+                  {formatDate(row.last_activity)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

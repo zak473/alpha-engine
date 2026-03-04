@@ -16,7 +16,9 @@
       "Bash(cd /Users/wilding/Documents/alpha-engine && docker compose up --build -d frontend 2>&1 | tail -12)",
       "Bash(npx tsc --noEmit 2>&1 && echo \"✓ clean\")",
       "Bash(lsof -ti :3000 2>/dev/null | head -3)",
-      "Bash(git add . && git status --short | wc -l)"
+      "Bash(git add . && git status --short | wc -l)",
+      "Bash(git commit -m \"$\\(cat <<'EOF'\nInitial commit — Alpha Engine sports prediction platform\n\nFull-stack sports prediction app with Next.js 14 frontend and Python backend.\n\nFrontend:\n- Sportsbook-grade 3-column dashboard \\(left rail + markets + slip rail\\)\n- MarketsTable with odds buttons, Decision Queue, CompareModal\n- DashboardLeftRail \\(sport/league tree\\), SlipRail \\(queue + watchlist + alerts\\)\n- Dark design tokens, 13px density, teal accent system\n- Challenges, leaderboards, ELO movers, performance snapshots\n\nBackend:\n- FastAPI prediction pipeline\n- Alembic migrations, PostgreSQL, Docker Compose\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git remote add origin https://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@github.com/zak473/alpha-engine.git && git push -u origin main 2>&1)"
     ]
   }
 }

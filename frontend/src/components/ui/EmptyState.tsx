@@ -3,37 +3,30 @@ import { LucideIcon } from "lucide-react";
 import { ReactNode } from "react";
 
 interface EmptyStateProps {
-  title: string;
+  title:        string;
   description?: string;
-  icon?: LucideIcon;
-  action?: ReactNode;
-  className?: string;
+  icon?:        LucideIcon;
+  action?:      ReactNode;
+  className?:   string;
 }
 
-export function EmptyState({
-  title,
-  description,
-  icon: Icon,
-  action,
-  className,
-}: EmptyStateProps) {
+export function EmptyState({ title, description, icon: Icon, action, className }: EmptyStateProps) {
   return (
     <div
-      className={cn(
-        "flex flex-col items-center justify-center py-16 px-6 text-center",
-        className
-      )}
+      className={cn("flex flex-col items-center justify-center py-16 px-6 text-center", className)}
     >
       {Icon && (
-        <div className="mb-4 text-text-subtle">
-          <Icon size={36} strokeWidth={1.5} />
+        <div style={{ color: "var(--text2)", marginBottom: 12 }}>
+          <Icon size={28} strokeWidth={1.5} />
         </div>
       )}
-      <p className="text-sm font-medium text-text-muted">{title}</p>
+      <p style={{ fontSize: 12, fontWeight: 500, color: "var(--text1)" }}>{title}</p>
       {description && (
-        <p className="mt-1 text-xs text-text-subtle max-w-xs">{description}</p>
+        <p style={{ fontSize: 11, color: "var(--text2)", marginTop: 4, maxWidth: 280 }}>
+          {description}
+        </p>
       )}
-      {action && <div className="mt-4">{action}</div>}
+      {action && <div style={{ marginTop: 16 }}>{action}</div>}
     </div>
   );
 }

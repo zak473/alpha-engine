@@ -19,6 +19,7 @@ interface EloComparisonChartProps {
   awayLabel: string;
   homeColor?: string;
   awayColor?: string;
+  title?: string;
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -41,8 +42,9 @@ export function EloComparisonChart({
   data,
   homeLabel,
   awayLabel,
-  homeColor = colors.accentGreen,
-  awayColor = colors.accentRed,
+  homeColor = colors.positive,
+  awayColor = colors.negative,
+  title,
 }: EloComparisonChartProps) {
   if (!data.length) {
     return (
@@ -57,44 +59,47 @@ export function EloComparisonChart({
   const maxR = Math.max(...allRatings) + 30;
 
   return (
-    <ResponsiveContainer width="100%" height={200}>
-      <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-        <XAxis
-          dataKey="date"
-          tick={chartDefaults.axis.tick}
-          tickLine={chartDefaults.axis.tickLine}
-          axisLine={chartDefaults.axis.axisLine}
-          tickFormatter={(v) => v.slice(5)}
-        />
-        <YAxis
-          domain={[minR, maxR]}
-          tick={chartDefaults.axis.tick}
-          tickLine={chartDefaults.axis.tickLine}
-          axisLine={chartDefaults.axis.axisLine}
-          width={chartDefaults.yAxisWidth}
-          tickFormatter={(v) => String(Math.round(v))}
-        />
-        <Tooltip content={<CustomTooltip />} cursor={chartDefaults.cursor} />
-        <ReferenceLine y={1500} stroke={colors.surfaceBorder} strokeDasharray="4 4" />
-        <Line
-          type="monotone"
-          dataKey="home"
-          name={homeLabel}
-          stroke={homeColor}
-          strokeWidth={1.5}
-          dot={false}
-          activeDot={{ r: 3, fill: homeColor }}
-        />
-        <Line
-          type="monotone"
-          dataKey="away"
-          name={awayLabel}
-          stroke={awayColor}
-          strokeWidth={1.5}
-          dot={false}
-          activeDot={{ r: 3, fill: awayColor }}
-        />
-      </LineChart>
-    </ResponsiveContainer>
+    <div className="chart-container">
+      {title && (
+        <div className="chart-header">
+          <span className="chart-title">{title}</span>
+        </div>
+      )}
+      <ResponsiveContainer width="100%" height={200}>
+        <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+          <XAxis
+            dataKey="date"
+            {...chartDefaults.axis}
+            tickFormatter={(v) => v.slice(5)}
+          />
+          <YAxis
+            domain={[minR, maxR]}
+            {...chartDefaults.axis}
+            width={chartDefaults.yAxisWidth}
+            tickFormatter={(v) => String(Math.round(v))}
+          />
+          <Tooltip content={<CustomTooltip />} cursor={chartDefaults.cursor} />
+          <ReferenceLine y={1500} stroke={colors.border1} strokeDasharray="4 4" />
+          <Line
+            type="monotone"
+            dataKey="home"
+            name={homeLabel}
+            stroke={homeColor}
+            strokeWidth={1.5}
+            dot={false}
+            activeDot={{ r: 3, fill: homeColor }}
+          />
+          <Line
+            type="monotone"
+            dataKey="away"
+            name={awayLabel}
+            stroke={awayColor}
+            strokeWidth={1.5}
+            dot={false}
+            activeDot={{ r: 3, fill: awayColor }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

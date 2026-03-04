@@ -1,13 +1,9 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Badge } from "@/components/ui/Badge";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { getChallengeEntries } from "@/lib/api";
 import type { ChallengeEntry, EntryFeedPage } from "@/lib/types";
 import { Inbox } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface Props {
   challengeId: string;
@@ -15,12 +11,11 @@ interface Props {
   initialData: EntryFeedPage;
 }
 
-type BadgeVariant = "muted" | "positive" | "negative" | "warning";
-const STATUS_BADGE: Record<ChallengeEntry["status"], { label: string; variant: BadgeVariant }> = {
-  open:     { label: "Open",     variant: "muted" },
-  locked:   { label: "Locked",   variant: "warning" },
-  settled:  { label: "Settled",  variant: "positive" },
-  void:     { label: "Void",     variant: "negative" },
+const STATUS_BADGE: Record<ChallengeEntry["status"], { label: string; cls: string }> = {
+  open:    { label: "Open",    cls: "badge badge-muted" },
+  locked:  { label: "Locked", cls: "badge badge-warning" },
+  settled: { label: "Settled",cls: "badge badge-positive" },
+  void:    { label: "Void",   cls: "badge badge-negative" },
 };
 
 function formatPick(pick: string) {
@@ -60,9 +55,13 @@ export function EntryFeed({ challengeId, scope, initialData }: Props) {
 
   if (loading) {
     return (
-      <div className="space-y-2 p-4">
+      <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
         {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-14 w-full" />
+          <div
+            key={i}
+            className="shimmer"
+            style={{ height: 52, borderRadius: 6 }}
+          />
         ))}
       </div>
     );
@@ -70,53 +69,91 @@ export function EntryFeed({ challengeId, scope, initialData }: Props) {
 
   if (data.items.length === 0) {
     return (
-      <EmptyState
-        icon={Inbox}
-        title="No entries yet"
-        description={scope === "mine" ? "You haven't submitted any picks yet." : "No picks have been submitted yet."}
-      />
+      <div style={{ padding: "40px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, color: "var(--text2)" }}>
+        <Inbox size={28} style={{ opacity: 0.3 }} />
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text1)" }}>No entries yet</div>
+        <div style={{ fontSize: 11 }}>
+          {scope === "mine" ? "You haven't submitted any picks yet." : "No picks have been submitted yet."}
+        </div>
+      </div>
     );
   }
 
   return (
     <div>
-      <div className="divide-y divide-surface-border">
+      <div>
         {data.items.map((entry) => {
           const badge = STATUS_BADGE[entry.status];
+          const initial = shortId(entry.user_id).charAt(0).toUpperCase();
+          const hasScore = entry.score_value != null;
+          const scorePositive = hasScore && entry.score_value! > 0;
+
           return (
-            <div key={entry.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors">
+            <div
+              key={entry.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: "10px 16px",
+                borderBottom: "1px solid var(--border0)",
+                transition: "background 0.1s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            >
               {/* Avatar */}
-              <span className="shrink-0 w-8 h-8 rounded-full bg-accent-purple/10 border border-accent-purple/20 flex items-center justify-center text-xs font-medium text-accent-purple uppercase">
-                {shortId(entry.user_id).charAt(0)}
+              <span style={{
+                flexShrink: 0,
+                width: 30,
+                height: 30,
+                borderRadius: "50%",
+                background: "color-mix(in srgb, var(--accent) 10%, var(--bg2))",
+                border: "1px solid color-mix(in srgb, var(--accent) 20%, transparent)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 10,
+                fontWeight: 700,
+                color: "var(--accent)",
+              }}>
+                {initial}
               </span>
 
-              {/* Main */}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-sm font-medium text-text-primary">{shortId(entry.user_id)}</span>
-                  <span className="text-text-muted text-xs">picked</span>
-                  <span className="text-sm font-semibold text-accent-blue">{formatPick(entry.pick_type)}</span>
-                  <span className="text-text-muted text-xs">on</span>
-                  <span className="text-xs text-text-muted font-mono truncate">{entry.event_id.slice(0, 8)}…</span>
+              {/* Main content */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text0)" }}>
+                    {shortId(entry.user_id)}
+                  </span>
+                  <span style={{ fontSize: 11, color: "var(--text2)" }}>picked</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)" }}>
+                    {formatPick(entry.pick_type)}
+                  </span>
+                  <span style={{ fontSize: 11, color: "var(--text2)" }}>on</span>
+                  <span className="num" style={{ fontSize: 10, color: "var(--text2)" }}>
+                    {entry.event_id.slice(0, 8)}…
+                  </span>
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs text-text-muted capitalize">{entry.sport}</span>
-                  <span className="text-text-subtle text-xs">·</span>
-                  <span className="text-xs text-text-muted">{timeAgo(entry.submitted_at)}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3 }}>
+                  <span style={{ fontSize: 10, color: "var(--text2)", textTransform: "capitalize" }}>{entry.sport}</span>
+                  <span style={{ color: "var(--border1)", fontSize: 10 }}>·</span>
+                  <span style={{ fontSize: 10, color: "var(--text2)" }}>{timeAgo(entry.submitted_at)}</span>
                 </div>
               </div>
 
-              {/* Right side */}
-              <div className="shrink-0 flex items-center gap-3">
-                {entry.score_value != null && (
-                  <span className={cn(
-                    "font-mono text-sm font-medium",
-                    entry.score_value > 0 ? "text-accent-green" : "text-text-muted"
-                  )}>
-                    {entry.score_value > 0 ? "+" : ""}{entry.score_value.toFixed(2)}
+              {/* Right side: score + badge */}
+              <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 10 }}>
+                {hasScore && (
+                  <span className="num" style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: scorePositive ? "var(--positive)" : "var(--text2)",
+                  }}>
+                    {scorePositive ? "+" : ""}{entry.score_value!.toFixed(2)}
                   </span>
                 )}
-                <Badge variant={badge.variant}>{badge.label}</Badge>
+                <span className={badge.cls}>{badge.label}</span>
               </div>
             </div>
           );
@@ -125,21 +162,29 @@ export function EntryFeed({ challengeId, scope, initialData }: Props) {
 
       {/* Pagination */}
       {(data.has_next || page > 1) && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-surface-border">
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "10px 16px",
+          borderTop: "1px solid var(--border0)",
+        }}>
           <button
-            className="btn-ghost text-xs"
+            className="btn btn-md btn-ghost"
             disabled={page === 1}
             onClick={() => loadPage(page - 1)}
+            style={{ fontSize: 11 }}
           >
             Previous
           </button>
-          <span className="text-xs text-text-muted">
+          <span className="num" style={{ fontSize: 11, color: "var(--text2)" }}>
             Page {page} · {data.total} entries
           </span>
           <button
-            className="btn-ghost text-xs"
+            className="btn btn-md btn-ghost"
             disabled={!data.has_next}
             onClick={() => loadPage(page + 1)}
+            style={{ fontSize: 11 }}
           >
             Next
           </button>

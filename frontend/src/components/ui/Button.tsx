@@ -1,49 +1,43 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { forwardRef, ButtonHTMLAttributes } from "react";
 import { Loader2 } from "lucide-react";
-import { ButtonHTMLAttributes, forwardRef } from "react";
+import { cn } from "@/lib/utils";
+
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive" | "danger";
+export type ButtonSize    = "sm" | "md" | "lg";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "ghost" | "danger";
-  size?: "sm" | "md";
+  variant?: ButtonVariant;
+  size?:    ButtonSize;
   loading?: boolean;
 }
 
+const variantClass: Record<ButtonVariant, string> = {
+  primary:     "btn-primary",
+  secondary:   "btn-secondary",
+  ghost:       "btn-ghost",
+  destructive: "btn-destructive",
+  danger:      "btn-destructive",  // alias
+};
+
+const sizeClass: Record<ButtonSize, string> = {
+  sm: "btn-sm",
+  md: "btn-md",
+  lg: "btn-lg",
+};
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  (
-    {
-      variant = "ghost",
-      size = "md",
-      loading = false,
-      disabled,
-      className,
-      children,
-      ...props
-    },
-    ref
-  ) => {
-    const base =
-      variant === "primary"
-        ? "btn-primary"
-        : variant === "danger"
-        ? "btn-danger"
-        : "btn-ghost";
-
-    const sizeClass = size === "sm" ? "px-2.5 py-1 text-xs" : "";
-
-    return (
-      <button
-        ref={ref}
-        disabled={disabled || loading}
-        className={cn(base, sizeClass, className)}
-        {...props}
-      >
-        {loading && <Loader2 size={14} className="animate-spin" />}
-        {children}
-      </button>
-    );
-  }
+  ({ variant = "secondary", size = "md", loading, disabled, className, children, ...props }, ref) => (
+    <button
+      ref={ref}
+      className={cn("btn", variantClass[variant], sizeClass[size], className)}
+      disabled={disabled || loading}
+      {...props}
+    >
+      {loading && <Loader2 size={11} className="animate-spin shrink-0" />}
+      {children}
+    </button>
+  )
 );
-
 Button.displayName = "Button";

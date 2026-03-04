@@ -1,200 +1,525 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   QUANT TERMINAL — Design Token System
+   All components must reference these variables. No raw Tailwind color classes.
+───────────────────────────────────────────────────────────────────────────── */
+
 @layer base {
   :root {
     color-scheme: dark;
 
-    /* Design tokens — sportsbook-grade dark (mirrored in src/lib/tokens.ts) */
-    --color-surface-base:    #06060a;
-    --color-surface-raised:  #0a0a0e;
-    --color-surface-overlay: #0f0f15;
-    --color-surface-border:  #1c1c26;
-    --color-surface-border1: #2a2a38;
-    --color-text-primary:    #f0f0f6;
-    --color-text-muted:      #8888a0;
-    --color-text-subtle:     #3a3a4a;
-    --color-accent-green:    #22c55e;
-    --color-accent-red:      #ef4444;
-    --color-accent-blue:     #3b82f6;
-    --color-accent-amber:    #f59e0b;
-    --color-accent-purple:   #a855f7;
-    --color-accent-teal:     #0d9488;
-    --color-accent-gold:     #b45309;
-    --sidebar-width:         14rem;
-    --topbar-height:         3rem;
-    /* Sportsbook layout */
-    --left-rail-width:       13rem;
-    --slip-rail-width:       16.5rem;
+    /* ── Surface layers (exactly 3) ─────────────────────────────────── */
+    --bg0: #0c0c10;          /* app background — near-void graphite     */
+    --bg1: #111116;          /* sidebar / topbar / rail panels          */
+    --bg2: #16161d;          /* cards / tables / drawers                */
+
+    /* ── Text hierarchy ─────────────────────────────────────────────── */
+    --text0: #e2e2ea;        /* primary — cool near-white               */
+    --text1: #72728a;        /* muted — blue-grey mid                   */
+    --text2: #36364a;        /* subtle — very dark, placeholder         */
+
+    /* ── Borders (2 levels) ─────────────────────────────────────────── */
+    --border0: #1e1e2c;      /* default dividers                        */
+    --border1: #2c2c3f;      /* hover / active elevation                */
+
+    /* ── Accent — electric cyan (ONE accent only) ───────────────────── */
+    --accent:      #00d4ff;
+    --accent-muted: rgba(0, 212, 255, 0.10);
+    --accent-ring:  rgba(0, 212, 255, 0.25);
+
+    /* ── Status colors ──────────────────────────────────────────────── */
+    --positive: #10b981;     /* emerald green                           */
+    --negative: #f43f5e;     /* rose red                                */
+    --warning:  #f59e0b;     /* amber                                   */
+    --info:     #818cf8;     /* indigo                                  */
+
+    /* ── Focus ──────────────────────────────────────────────────────── */
+    --focus-ring: rgba(0, 212, 255, 0.30);
+
+    /* ── Radius ─────────────────────────────────────────────────────── */
+    --radius-sm: 2px;
+    --radius-md: 4px;
+
+    /* ── Shadows ────────────────────────────────────────────────────── */
+    --shadow-0: none;
+    --shadow-1: 0 1px 3px rgba(0, 0, 0, 0.4);
+
+    /* ── Spacing scale ──────────────────────────────────────────────── */
+    --space-8:  8px;
+    --space-12: 12px;
+    --space-16: 16px;
+    --space-24: 24px;
+    --space-32: 32px;
+
+    /* ── Layout ─────────────────────────────────────────────────────── */
+    --sidebar-width:   13rem;
+    --topbar-height:   2.75rem;
+    --left-rail-width: 13rem;
+    --slip-rail-width: 16rem;
+
+    /* ── Legacy sport colors (sport-specific accents, not main accent) ─ */
+    --sport-soccer:  #3b82f6;
+    --sport-tennis:  #10b981;
+    --sport-esports: #a855f7;
   }
 
-  * {
-    border-color: #1c1c26;
+  /* ── Reset ────────────────────────────────────────────────────────── */
+  *, *::before, *::after {
     box-sizing: border-box;
+    border-color: var(--border0);
   }
+
+  html { height: 100%; }
 
   body {
-    background-color: #06060a;
-    color: #f0f0f6;
+    background-color: var(--bg0);
+    color: var(--text0);
     font-family: Inter, system-ui, sans-serif;
-    font-size: 13px;                 /* sportsbook density */
-    line-height: 1.4;
+    font-size: 13px;
+    line-height: 1.45;
     font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    min-height: 100%;
   }
 
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 3px; height: 3px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #2a2a38; border-radius: 2px; }
-  ::-webkit-scrollbar-thumb:hover { background: #3a3a50; }
+  /* ── Scrollbars ───────────────────────────────────────────────────── */
+  ::-webkit-scrollbar         { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track   { background: transparent; }
+  ::-webkit-scrollbar-thumb   { background: var(--border1); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+
+  /* ── Focus ring ───────────────────────────────────────────────────── */
+  :focus-visible {
+    outline: 1px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* ── Mono number spans ────────────────────────────────────────────── */
+  .num, .mono {
+    font-family: 'JetBrains Mono', 'Menlo', monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   COMPONENT LAYER — All classes use CSS vars, never raw colors
+───────────────────────────────────────────────────────────────────────────── */
 
 @layer components {
-  /* ── Base card ─────────────────────────────────────────────────────── */
+
+  /* ── Surfaces ─────────────────────────────────────────────────────── */
+  .bg-bg0  { background-color: var(--bg0);  }
+  .bg-bg1  { background-color: var(--bg1);  }
+  .bg-bg2  { background-color: var(--bg2);  }
+
+  /* ── Cards / Panels ───────────────────────────────────────────────── */
   .card {
-    @apply bg-surface-overlay border border-surface-border rounded-lg;
+    background-color: var(--bg2);
+    border: 1px solid var(--border0);
+    border-radius: var(--radius-md);
   }
 
-  /* ── Monospace numbers ────────────────────────────────────────────── */
-  .num {
-    @apply font-mono tabular-nums;
+  /* ── Panel header ─────────────────────────────────────────────────── */
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-8) var(--space-12);
+    border-bottom: 1px solid var(--border0);
   }
 
-  /* ── Metric label ─────────────────────────────────────────────────── */
+  .panel-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text1);
+  }
+
+  .panel-content       { padding: var(--space-12); }
+  .panel-content-tight { padding: var(--space-8) var(--space-12); }
+
+  /* ── Rail headers ─────────────────────────────────────────────────── */
+  .rail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-8) var(--space-12);
+    border-bottom: 1px solid var(--border0);
+    background-color: var(--bg1);
+    height: var(--topbar-height);
+  }
+
+  /* ── Compact KPI bar ──────────────────────────────────────────────── */
+  .kpi-bar {
+    display: flex;
+    align-items: center;
+    height: 2rem;
+    padding: 0 var(--space-12);
+    border-bottom: 1px solid var(--border0);
+    background-color: var(--bg1);
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+
+  .kpi-bar-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 var(--space-12);
+    border-right: 1px solid var(--border0);
+    font-size: 11px;
+    color: var(--text1);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .kpi-bar-item:first-child { padding-left: 0; }
+  .kpi-bar-item:last-child  { border-right: none; }
+
+  /* ── Buttons ──────────────────────────────────────────────────────── */
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 120ms, border-color 120ms, color 120ms, opacity 120ms;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  .btn:disabled  { opacity: 0.4; pointer-events: none; }
+
+  .btn-sm  { padding: 3px 10px; font-size: 11px; }
+  .btn-md  { padding: 5px 12px; }
+  .btn-lg  { padding: 7px 16px; font-size: 13px; }
+
+  .btn-primary {
+    background-color: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+  }
+  .btn-primary:hover { filter: brightness(1.1); }
+
+  .btn-secondary {
+    background-color: var(--bg2);
+    color: var(--text0);
+    border-color: var(--border1);
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-ghost {
+    background-color: transparent;
+    color: var(--text1);
+    border-color: transparent;
+  }
+  .btn-ghost:hover { background-color: rgba(255,255,255,0.04); color: var(--text0); }
+
+  .btn-destructive {
+    background-color: transparent;
+    color: var(--negative);
+    border-color: var(--border0);
+  }
+  .btn-destructive:hover { background-color: rgba(244,63,94,0.08); border-color: var(--negative); }
+
+  /* ── Legacy aliases (for existing code) ──────────────────────────── */
+  .btn-cta {
+    @apply btn btn-md btn-primary;
+  }
+  .btn-danger {
+    @apply btn btn-md btn-destructive;
+  }
+
+  /* ── Badges ───────────────────────────────────────────────────────── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border: 1px solid transparent;
+  }
+
+  .badge-muted    { background: rgba(114,114,138,0.12); color: var(--text1); border-color: var(--border0); }
+  .badge-positive { background: rgba(16,185,129,0.12);  color: var(--positive); border-color: rgba(16,185,129,0.2); }
+  .badge-negative { background: rgba(244,63,94,0.12);   color: var(--negative); border-color: rgba(244,63,94,0.2); }
+  .badge-warning  { background: rgba(245,158,11,0.12);  color: var(--warning);  border-color: rgba(245,158,11,0.2); }
+  .badge-info     { background: rgba(129,140,248,0.12); color: var(--info);     border-color: rgba(129,140,248,0.2); }
+  .badge-accent   { background: var(--accent-muted);    color: var(--accent);   border-color: rgba(0,212,255,0.2); }
+
+  /* ── Sportsbook odds button ───────────────────────────────────────── */
+  .btn-odds {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 40px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border0);
+    background-color: var(--bg2);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: border-color 120ms, background 120ms;
+  }
+  .btn-odds:hover       { border-color: var(--border1); background: rgba(255,255,255,0.03); }
+  .btn-odds-lean        { border-color: var(--border1); background: var(--bg1); }
+  .btn-odds-queued      { background: var(--accent-muted); border-color: rgba(0,212,255,0.3); }
+
+  /* ── Table ────────────────────────────────────────────────────────── */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .data-table th {
+    padding: 6px var(--space-12);
+    text-align: left;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text1);
+    border-bottom: 1px solid var(--border0);
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .data-table th.col-right,
+  .data-table td.col-right {
+    text-align: right;
+  }
+
+  .data-table td {
+    padding: 7px var(--space-12);
+    border-bottom: 1px solid var(--border0);
+    color: var(--text0);
+    vertical-align: middle;
+  }
+
+  .data-table tr:last-child td { border-bottom: none; }
+
+  .data-table tbody tr {
+    transition: background 100ms;
+    cursor: pointer;
+  }
+
+  .data-table tbody tr:hover {
+    background: rgba(255,255,255,0.025);
+  }
+
+  .data-table tbody tr:hover td { border-color: transparent; }
+
+  .data-table.compact th { padding: 4px var(--space-8); }
+  .data-table.compact td { padding: 5px var(--space-8); }
+
+  /* ── Tabs ─────────────────────────────────────────────────────────── */
+
+  /* Underline style (default) */
+  .tabs-underline {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border0);
+  }
+  .tab-item {
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text1);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    cursor: pointer;
+    transition: color 120ms, border-color 120ms;
+    white-space: nowrap;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .tab-item:hover             { color: var(--text0); }
+  .tab-item[data-active=true] { color: var(--text0); border-bottom-color: var(--accent); }
+
+  /* Segmented style */
+  .tabs-segmented {
+    display: inline-flex;
+    background: var(--bg2);
+    border: 1px solid var(--border0);
+    border-radius: var(--radius-md);
+    padding: 2px;
+    gap: 2px;
+  }
+  .tab-seg-item {
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text1);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 120ms, color 120ms;
+    background: none;
+    border: none;
+    white-space: nowrap;
+  }
+  .tab-seg-item:hover             { color: var(--text0); background: rgba(255,255,255,0.04); }
+  .tab-seg-item[data-active=true] { background: var(--bg1); color: var(--text0); }
+
+  /* Legacy aliases */
+  .tab-underline-root { @apply tabs-underline; }
+  .tab-underline-item { @apply tab-item; }
+
+  /* ── Input ────────────────────────────────────────────────────────── */
+  .input-field {
+    width: 100%;
+    padding: 5px var(--space-8);
+    background: var(--bg2);
+    border: 1px solid var(--border0);
+    border-radius: var(--radius-md);
+    color: var(--text0);
+    font-size: 12px;
+    font-family: Inter, system-ui, sans-serif;
+    transition: border-color 120ms;
+    outline: none;
+  }
+  .input-field::placeholder { color: var(--text2); }
+  .input-field:hover        { border-color: var(--border1); }
+  .input-field:focus        { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring); }
+
+  /* ── Tooltip ──────────────────────────────────────────────────────── */
+  .tooltip-box {
+    position: absolute;
+    z-index: 50;
+    background: var(--bg2);
+    border: 1px solid var(--border1);
+    border-radius: var(--radius-md);
+    padding: 4px 8px;
+    font-size: 11px;
+    color: var(--text0);
+    white-space: nowrap;
+    box-shadow: var(--shadow-1);
+    pointer-events: none;
+  }
+
+  /* ── Sportsbook market rows ───────────────────────────────────────── */
+  .sb-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: var(--space-8) var(--space-12);
+    min-height: 48px;
+    border-bottom: 1px solid var(--border0);
+    transition: background 100ms;
+    cursor: pointer;
+  }
+  .sb-row:hover { background: rgba(255,255,255,0.018); }
+
+  .sb-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px var(--space-12);
+    background: var(--bg1);
+    border-top: 1px solid var(--border0);
+    border-bottom: 1px solid var(--border0);
+    position: sticky;
+    z-index: 10;
+  }
+
+  /* ── Dividers ─────────────────────────────────────────────────────── */
+  .divider   { border-top: 1px solid var(--border0); }
   .label {
     font-size: 10px;
-    @apply text-text-muted uppercase tracking-widest font-semibold;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text1);
   }
 
-  /* ── Positive / Negative ──────────────────────────────────────────── */
-  .positive { @apply text-accent-green; }
-  .negative { @apply text-accent-red; }
-  .neutral  { @apply text-accent-amber; }
+  /* ── Positive/Negative ────────────────────────────────────────────── */
+  .positive { color: var(--positive); }
+  .negative { color: var(--negative); }
+  .neutral  { color: var(--warning); }
 
-  /* ── Subtle divider ───────────────────────────────────────────────── */
-  .divider {
-    @apply border-t border-surface-border;
+  /* ── Shimmer skeleton ─────────────────────────────────────────────── */
+  .shimmer {
+    background: linear-gradient(90deg, var(--bg2) 25%, var(--border0) 50%, var(--bg2) 75%);
+    background-size: 800px 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+    border-radius: var(--radius-sm);
   }
 
-  /* ── Table row hover ──────────────────────────────────────────────── */
+  /* ── Row hover language (all interactive rows) ────────────────────── */
   .tr-hover {
-    @apply hover:bg-white/[0.025] transition-colors cursor-pointer;
+    transition: background 100ms;
+    cursor: pointer;
+  }
+  .tr-hover:hover { background: rgba(255,255,255,0.025); }
+
+  /* ── Stat card ────────────────────────────────────────────────────── */
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border0);
+    border-radius: var(--radius-md);
+    padding: var(--space-12) var(--space-16);
   }
 
-  /* ── Ghost button ─────────────────────────────────────────────────── */
-  .btn-ghost {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[13px]
-           text-text-muted hover:text-text-primary hover:bg-white/[0.05]
-           transition-colors disabled:opacity-50 disabled:pointer-events-none;
+  /* ── Chart container ──────────────────────────────────────────────── */
+  .chart-container {
+    background: var(--bg2);
+    border: 1px solid var(--border0);
+    border-radius: var(--radius-md);
+    padding: var(--space-12);
   }
 
-  /* ── Primary button ───────────────────────────────────────────────── */
-  .btn-primary {
-    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px]
-           font-medium bg-accent-blue/90 text-white hover:bg-accent-blue
-           transition-colors disabled:opacity-50 disabled:pointer-events-none;
+  /* ── Nav link (sidebar) ───────────────────────────────────────────── */
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text1);
+    transition: background 100ms, color 100ms;
+    text-decoration: none;
+    border-left: 2px solid transparent;
   }
-
-  /* ── Teal CTA (sportsbook primary) ───────────────────────────────── */
-  .btn-cta {
-    @apply inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-md
-           text-[13px] font-semibold bg-accent-teal text-white
-           hover:bg-teal-500 transition-colors
-           disabled:opacity-40 disabled:pointer-events-none;
+  .nav-link:hover { background: rgba(255,255,255,0.04); color: var(--text0); }
+  .nav-link.active {
+    background: var(--accent-muted);
+    color: var(--accent);
+    border-left-color: var(--accent);
   }
-
-  /* ── Danger button ────────────────────────────────────────────────── */
-  .btn-danger {
-    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px]
-           font-medium bg-accent-red/90 text-white hover:bg-accent-red
-           transition-colors disabled:opacity-50 disabled:pointer-events-none;
-  }
-
-  /* ── PanelCard chrome ─────────────────────────────────────────────── */
-  .panel-header {
-    @apply px-3 py-2.5 border-b border-surface-border flex items-center justify-between;
-  }
-  .panel-content       { @apply px-3 py-3; }
-  .panel-content-tight { @apply px-3 py-2; }
-
-  /* ── Form input ───────────────────────────────────────────────────── */
-  .input-field {
-    @apply w-full px-3 py-2 rounded-md text-[13px] bg-surface-base border border-surface-border
-           text-text-primary placeholder:text-text-subtle
-           focus:outline-none focus:border-accent-teal/50 focus:ring-1 focus:ring-accent-teal/20
-           transition-colors disabled:opacity-50;
-  }
-
-  /* ── Underline tabs ───────────────────────────────────────────────── */
-  .tab-underline-root { @apply flex gap-0 border-b border-surface-border; }
-  .tab-underline-item {
-    @apply px-3 py-2 text-[13px] text-text-muted border-b-2 border-transparent -mb-px
-           transition-colors hover:text-text-primary whitespace-nowrap;
-  }
-  .tab-underline-item[data-active="true"] {
-    @apply text-text-primary border-accent-teal;
-  }
-
-  /* ── Sportsbook: market row ───────────────────────────────────────── */
-  .sb-row {
-    @apply flex items-center gap-2.5 px-3 min-h-[52px] border-b border-surface-border/60
-           hover:bg-white/[0.02] transition-colors cursor-pointer;
-  }
-
-  /* ── Sportsbook: odds/probability button ──────────────────────────── */
-  .btn-odds {
-    @apply flex flex-col items-center justify-center rounded border
-           w-[58px] h-[42px] shrink-0 transition-all duration-150
-           bg-surface-raised border-surface-border
-           hover:bg-white/[0.04] hover:border-surface-border1;
-  }
-
-  .btn-odds-lean {
-    @apply btn-odds border-surface-border1 bg-surface-overlay;
-  }
-
-  .btn-odds-queued {
-    @apply btn-odds bg-accent-teal/15 border-accent-teal/40;
-  }
-
-  /* ── Sportsbook: group section header ─────────────────────────────── */
-  .sb-section-header {
-    @apply flex items-center justify-between px-3 py-2
-           bg-surface-raised border-y border-surface-border
-           sticky z-10;
-  }
-
-  /* ── Sportsbook: rail header ──────────────────────────────────────── */
-  .rail-header {
-    @apply px-3 py-2.5 border-b border-surface-border flex items-center justify-between
-           bg-surface-raised;
-  }
-
-  /* ── Compact KPI bar (single row) ─────────────────────────────────── */
-  .kpi-bar {
-    @apply flex items-center gap-0 h-8 px-3 border-b border-surface-border
-           bg-surface-raised sticky top-0 z-20 overflow-x-auto;
-  }
-  .kpi-bar-item {
-    @apply flex items-center gap-1.5 px-3 border-r border-surface-border/50
-           text-[11px] text-text-muted whitespace-nowrap shrink-0;
-  }
-  .kpi-bar-item:last-child { @apply border-r-0; }
 }
 
-/* Shimmer skeleton animation */
+/* ── Animations ──────────────────────────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -400px 0; }
   100% { background-position:  400px 0; }
 }
 
-.shimmer {
-  background: linear-gradient(90deg, #0f0f15 25%, #16161e 50%, #0f0f15 75%);
-  background-size: 800px 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
+@keyframes ping {
+  75%, 100% { transform: scale(2); opacity: 0; }
 }

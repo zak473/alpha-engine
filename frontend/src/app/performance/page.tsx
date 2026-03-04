@@ -11,14 +11,14 @@ const SPORT_STATS = [
 ];
 
 const DEFAULT_KPIS = [
-  { label: "Total Predictions", value: "597",    delta: 14     },
-  { label: "Overall Accuracy",  value: "58.9%",  delta: 0.7    },
-  { label: "Net PnL",           value: "+43.2u", delta: 3.1    },
-  { label: "Max Drawdown",      value: "-8.4u",  delta: -1.2   },
-  { label: "Sharpe Ratio",      value: "1.42",   delta: 0.08   },
-  { label: "Brier Score",       value: "0.231",  delta: -0.004 },
-  { label: "Log-Loss",          value: "0.648",  delta: -0.011 },
-  { label: "Cal. Error (ECE)",  value: "0.024",  delta: -0.002 },
+  { label: "Win Rate",      value: "58.9%",  delta: 0.7    },
+  { label: "ROI",           value: "+7.4%",  delta: 0.3    },
+  { label: "Sharpe",        value: "1.42",   delta: 0.08   },
+  { label: "Brier Score",   value: "0.231",  delta: -0.004 },
+  { label: "Total Bets",    value: "597",    delta: 14     },
+  { label: "Net PnL",       value: "+43.2u", delta: 3.1    },
+  { label: "Max Drawdown",  value: "-8.4u",  delta: -1.2   },
+  { label: "Cal. Error",    value: "0.024",  delta: -0.002 },
 ];
 
 export default async function PerformancePage() {
@@ -32,14 +32,14 @@ export default async function PerformancePage() {
     if (liveModels.length > 0) {
       const first = liveModels[0];
       kpis = [
-        { label: "Total Predictions", value: String(first.n_train_samples ?? "—"),                                delta: 0      },
-        { label: "Overall Accuracy",  value: first.accuracy != null ? `${(first.accuracy * 100).toFixed(1)}%` : "—", delta: 0.7 },
-        { label: "Net PnL",           value: "+43.2u",                                                            delta: 3.1    },
-        { label: "Max Drawdown",      value: "-8.4u",                                                             delta: -1.2   },
-        { label: "Sharpe Ratio",      value: "1.42",                                                              delta: 0.08   },
-        { label: "Brier Score",       value: first.brier_score != null ? first.brier_score.toFixed(4) : "—",      delta: -0.004 },
-        { label: "Log-Loss",          value: first.log_loss != null ? first.log_loss.toFixed(4) : "—",            delta: -0.011 },
-        { label: "Cal. Error (ECE)",  value: first.ece != null ? first.ece.toFixed(4) : "—",                      delta: -0.002 },
+        { label: "Win Rate",     value: first.accuracy != null ? `${(first.accuracy * 100).toFixed(1)}%` : "—", delta: 0.7 },
+        { label: "ROI",          value: "+7.4%",                                                               delta: 0.3    },
+        { label: "Sharpe",       value: "1.42",                                                                delta: 0.08   },
+        { label: "Brier Score",  value: first.brier_score != null ? first.brier_score.toFixed(4) : "—",        delta: -0.004 },
+        { label: "Total Bets",   value: String(first.n_train_samples ?? "—"),                                  delta: 0      },
+        { label: "Net PnL",      value: "+43.2u",                                                              delta: 3.1    },
+        { label: "Max Drawdown", value: "-8.4u",                                                               delta: -1.2   },
+        { label: "Cal. Error",   value: first.ece != null ? first.ece.toFixed(4) : "—",                        delta: -0.002 },
       ];
     }
   } catch {

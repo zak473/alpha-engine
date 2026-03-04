@@ -14,6 +14,7 @@ import { chartDefaults, colors } from "@/lib/tokens";
 
 interface ROIChartProps {
   data: RoiPoint[];
+  title?: string;
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -40,7 +41,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-export function ROIChart({ data }: ROIChartProps) {
+export function ROIChart({ data, title }: ROIChartProps) {
   if (!data.length) {
     return (
       <div className="h-48 flex items-center justify-center text-text-muted text-sm">
@@ -50,43 +51,46 @@ export function ROIChart({ data }: ROIChartProps) {
   }
 
   const isPositive = data[data.length - 1]?.cumulative_pnl >= 0;
-  const color = isPositive ? colors.accentGreen : colors.accentRed;
+  const color = isPositive ? colors.positive : colors.negative;
 
   return (
-    <ResponsiveContainer width="100%" height={220}>
-      <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-        <defs>
-          <linearGradient id="roi-gradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%"  stopColor={color} stopOpacity={0.15} />
-            <stop offset="95%" stopColor={color} stopOpacity={0.0}  />
-          </linearGradient>
-        </defs>
-        <XAxis
-          dataKey="date"
-          tick={chartDefaults.axis.tick}
-          tickLine={chartDefaults.axis.tickLine}
-          axisLine={chartDefaults.axis.axisLine}
-          tickFormatter={(v: string) => v.slice(5)}
-        />
-        <YAxis
-          tick={chartDefaults.axis.tick}
-          tickLine={chartDefaults.axis.tickLine}
-          axisLine={chartDefaults.axis.axisLine}
-          width={chartDefaults.yAxisWidth}
-          tickFormatter={(v: number) => `${v.toFixed(1)}`}
-        />
-        <Tooltip content={<CustomTooltip />} cursor={chartDefaults.cursor} />
-        <ReferenceLine y={0} stroke={colors.surfaceBorder} strokeDasharray="4 4" />
-        <Area
-          type="monotone"
-          dataKey="cumulative_pnl"
-          stroke={color}
-          strokeWidth={1.5}
-          fill="url(#roi-gradient)"
-          dot={false}
-          activeDot={{ r: 3, fill: color }}
-        />
-      </AreaChart>
-    </ResponsiveContainer>
+    <div className="chart-container">
+      {title && (
+        <div className="chart-header">
+          <span className="chart-title">{title}</span>
+        </div>
+      )}
+      <ResponsiveContainer width="100%" height={220}>
+        <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+          <defs>
+            <linearGradient id="roi-gradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%"  stopColor={color} stopOpacity={0.15} />
+              <stop offset="95%" stopColor={color} stopOpacity={0.0}  />
+            </linearGradient>
+          </defs>
+          <XAxis
+            dataKey="date"
+            {...chartDefaults.axis}
+            tickFormatter={(v: string) => v.slice(5)}
+          />
+          <YAxis
+            {...chartDefaults.axis}
+            width={chartDefaults.yAxisWidth}
+            tickFormatter={(v: number) => `${v.toFixed(1)}`}
+          />
+          <Tooltip content={<CustomTooltip />} cursor={chartDefaults.cursor} />
+          <ReferenceLine y={0} stroke={colors.border1} strokeDasharray="4 4" />
+          <Area
+            type="monotone"
+            dataKey="cumulative_pnl"
+            stroke={color}
+            strokeWidth={1.5}
+            fill="url(#roi-gradient)"
+            dot={false}
+            activeDot={{ r: 3, fill: color }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
