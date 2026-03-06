@@ -1,4 +1,51 @@
-import type { BettingMatch } from "./betting-types";
+import type { BettingMatch, Market } from "./betting-types";
+
+// Helper to create featured markets
+function createMarkets(sport: string, homeShort: string, awayShort: string, homeOdds: number, awayOdds: number, drawOdds?: number): { featured: Market[]; all: Market[] } {
+  const featured: Market[] = [];
+  const all: Market[] = [];
+
+  if (drawOdds !== undefined) {
+    // Soccer-style 1X2
+    const market1X2: Market = {
+      id: "1x2",
+      name: "1X2",
+      selections: [
+        { id: "home", label: homeShort, odds: homeOdds, edge: 0.042 },
+        { id: "draw", label: "Draw", odds: drawOdds, edge: -0.01 },
+        { id: "away", label: awayShort, odds: awayOdds, edge: -0.02 },
+      ],
+    };
+    featured.push(market1X2);
+    all.push(market1X2);
+  } else {
+    // Moneyline
+    const moneyline: Market = {
+      id: "ml",
+      name: "Moneyline",
+      selections: [
+        { id: "home", label: homeShort, odds: homeOdds, edge: 0.038 },
+        { id: "away", label: awayShort, odds: awayOdds, edge: -0.015 },
+      ],
+    };
+    featured.push(moneyline);
+    all.push(moneyline);
+  }
+
+  // Over/Under or Total
+  const total: Market = {
+    id: "total",
+    name: sport === "soccer" ? "O/U 2.5" : "Total",
+    selections: [
+      { id: "over", label: "Over", odds: 1.9, edge: 0.02 },
+      { id: "under", label: "Under", odds: 1.9, edge: -0.01 },
+    ],
+  };
+  featured.push(total);
+  all.push(total);
+
+  return { featured, all };
+}
 
 // Mock data for UI preview when backend is unavailable
 export const MOCK_MATCHES: BettingMatch[] = [
@@ -9,23 +56,20 @@ export const MOCK_MATCHES: BettingMatch[] = [
     league: "Premier League",
     status: "live",
     startTime: new Date().toISOString(),
-    liveMinute: 67,
-    home: {
-      name: "Manchester City",
-      shortName: "MCI",
-      elo: 1892,
-    },
-    away: {
-      name: "Liverpool",
-      shortName: "LIV",
-      elo: 1878,
-    },
-    score: { home: 2, away: 1 },
-    odds: { home: 1.65, draw: 3.8, away: 4.5 },
-    modelProb: { home: 0.58, draw: 0.24, away: 0.18 },
-    pick: "home",
+    liveClock: "67'",
+    homeScore: 2,
+    awayScore: 1,
+    home: { id: "mci", name: "Manchester City", shortName: "MCI" },
+    away: { id: "liv", name: "Liverpool", shortName: "LIV" },
+    ...(() => {
+      const m = createMarkets("soccer", "MCI", "LIV", 1.65, 4.5, 3.8);
+      return { featuredMarkets: m.featured, allMarkets: m.all };
+    })(),
+    modelConfidence: 0.72,
     edgePercent: 4.2,
-    confidence: 72,
+    pHome: 0.58,
+    pAway: 0.18,
+    pDraw: 0.24,
   },
   {
     id: "basketball-live-1",
@@ -33,23 +77,19 @@ export const MOCK_MATCHES: BettingMatch[] = [
     league: "NBA",
     status: "live",
     startTime: new Date().toISOString(),
-    liveMinute: 32,
-    home: {
-      name: "Los Angeles Lakers",
-      shortName: "LAL",
-      elo: 1756,
-    },
-    away: {
-      name: "Boston Celtics",
-      shortName: "BOS",
-      elo: 1812,
-    },
-    score: { home: 78, away: 82 },
-    odds: { home: 2.1, away: 1.75 },
-    modelProb: { home: 0.42, away: 0.58 },
-    pick: "away",
+    liveClock: "Q3 8:12",
+    homeScore: 78,
+    awayScore: 82,
+    home: { id: "lal", name: "Los Angeles Lakers", shortName: "LAL" },
+    away: { id: "bos", name: "Boston Celtics", shortName: "BOS" },
+    ...(() => {
+      const m = createMarkets("basketball", "LAL", "BOS", 2.1, 1.75);
+      return { featuredMarkets: m.featured, allMarkets: m.all };
+    })(),
+    modelConfidence: 0.68,
     edgePercent: 3.8,
-    confidence: 68,
+    pHome: 0.42,
+    pAway: 0.58,
   },
   {
     id: "tennis-live-1",
@@ -57,22 +97,19 @@ export const MOCK_MATCHES: BettingMatch[] = [
     league: "ATP Tour",
     status: "live",
     startTime: new Date().toISOString(),
-    home: {
-      name: "Carlos Alcaraz",
-      shortName: "ALC",
-      elo: 2145,
-    },
-    away: {
-      name: "Jannik Sinner",
-      shortName: "SIN",
-      elo: 2138,
-    },
-    score: { home: 2, away: 1 },
-    odds: { home: 1.85, away: 1.95 },
-    modelProb: { home: 0.54, away: 0.46 },
-    pick: "home",
+    liveClock: "3rd Set",
+    homeScore: 2,
+    awayScore: 1,
+    home: { id: "alc", name: "Carlos Alcaraz", shortName: "ALC" },
+    away: { id: "sin", name: "Jannik Sinner", shortName: "SIN" },
+    ...(() => {
+      const m = createMarkets("tennis", "ALC", "SIN", 1.85, 1.95);
+      return { featuredMarkets: m.featured, allMarkets: m.all };
+    })(),
+    modelConfidence: 0.61,
     edgePercent: 2.1,
-    confidence: 61,
+    pHome: 0.54,
+    pAway: 0.46,
   },
 
   // Upcoming matches
@@ -82,21 +119,17 @@ export const MOCK_MATCHES: BettingMatch[] = [
     league: "La Liga",
     status: "upcoming",
     startTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-    home: {
-      name: "Real Madrid",
-      shortName: "RMA",
-      elo: 1905,
-    },
-    away: {
-      name: "Barcelona",
-      shortName: "BAR",
-      elo: 1889,
-    },
-    odds: { home: 2.2, draw: 3.4, away: 3.0 },
-    modelProb: { home: 0.48, draw: 0.26, away: 0.26 },
-    pick: "home",
+    home: { id: "rma", name: "Real Madrid", shortName: "RMA" },
+    away: { id: "bar", name: "Barcelona", shortName: "BAR" },
+    ...(() => {
+      const m = createMarkets("soccer", "RMA", "BAR", 2.2, 3.0, 3.4);
+      return { featuredMarkets: m.featured, allMarkets: m.all };
+    })(),
+    modelConfidence: 0.78,
     edgePercent: 5.6,
-    confidence: 78,
+    pHome: 0.48,
+    pAway: 0.26,
+    pDraw: 0.26,
   },
   {
     id: "soccer-upcoming-2",
@@ -104,21 +137,17 @@ export const MOCK_MATCHES: BettingMatch[] = [
     league: "Bundesliga",
     status: "upcoming",
     startTime: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
-    home: {
-      name: "Bayern Munich",
-      shortName: "BAY",
-      elo: 1876,
-    },
-    away: {
-      name: "Borussia Dortmund",
-      shortName: "BVB",
-      elo: 1834,
-    },
-    odds: { home: 1.55, draw: 4.2, away: 5.5 },
-    modelProb: { home: 0.64, draw: 0.22, away: 0.14 },
-    pick: "home",
+    home: { id: "bay", name: "Bayern Munich", shortName: "BAY" },
+    away: { id: "bvb", name: "Borussia Dortmund", shortName: "BVB" },
+    ...(() => {
+      const m = createMarkets("soccer", "BAY", "BVB", 1.55, 5.5, 4.2);
+      return { featuredMarkets: m.featured, allMarkets: m.all };
+    })(),
+    modelConfidence: 0.71,
     edgePercent: 3.2,
-    confidence: 71,
+    pHome: 0.64,
+    pAway: 0.14,
+    pDraw: 0.22,
   },
   {
     id: "basketball-upcoming-1",
@@ -126,21 +155,16 @@ export const MOCK_MATCHES: BettingMatch[] = [
     league: "NBA",
     status: "upcoming",
     startTime: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
-    home: {
-      name: "Golden State Warriors",
-      shortName: "GSW",
-      elo: 1789,
-    },
-    away: {
-      name: "Phoenix Suns",
-      shortName: "PHX",
-      elo: 1778,
-    },
-    odds: { home: 1.9, away: 1.9 },
-    modelProb: { home: 0.55, away: 0.45 },
-    pick: "home",
+    home: { id: "gsw", name: "Golden State Warriors", shortName: "GSW" },
+    away: { id: "phx", name: "Phoenix Suns", shortName: "PHX" },
+    ...(() => {
+      const m = createMarkets("basketball", "GSW", "PHX", 1.9, 1.9);
+      return { featuredMarkets: m.featured, allMarkets: m.all };
+    })(),
+    modelConfidence: 0.63,
     edgePercent: 2.4,
-    confidence: 63,
+    pHome: 0.55,
+    pAway: 0.45,
   },
   {
     id: "basketball-upcoming-2",
@@ -148,21 +172,16 @@ export const MOCK_MATCHES: BettingMatch[] = [
     league: "EuroLeague",
     status: "upcoming",
     startTime: new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString(),
-    home: {
-      name: "Real Madrid",
-      shortName: "RMB",
-      elo: 1723,
-    },
-    away: {
-      name: "Olympiacos",
-      shortName: "OLY",
-      elo: 1698,
-    },
-    odds: { home: 1.7, away: 2.15 },
-    modelProb: { home: 0.62, away: 0.38 },
-    pick: "home",
+    home: { id: "rmb", name: "Real Madrid", shortName: "RMB" },
+    away: { id: "oly", name: "Olympiacos", shortName: "OLY" },
+    ...(() => {
+      const m = createMarkets("basketball", "RMB", "OLY", 1.7, 2.15);
+      return { featuredMarkets: m.featured, allMarkets: m.all };
+    })(),
+    modelConfidence: 0.69,
     edgePercent: 4.1,
-    confidence: 69,
+    pHome: 0.62,
+    pAway: 0.38,
   },
   {
     id: "tennis-upcoming-1",
@@ -170,21 +189,16 @@ export const MOCK_MATCHES: BettingMatch[] = [
     league: "WTA Tour",
     status: "upcoming",
     startTime: new Date(Date.now() + 1.5 * 60 * 60 * 1000).toISOString(),
-    home: {
-      name: "Iga Swiatek",
-      shortName: "SWI",
-      elo: 2089,
-    },
-    away: {
-      name: "Aryna Sabalenka",
-      shortName: "SAB",
-      elo: 2067,
-    },
-    odds: { home: 1.75, away: 2.05 },
-    modelProb: { home: 0.59, away: 0.41 },
-    pick: "home",
+    home: { id: "swi", name: "Iga Swiatek", shortName: "SWI" },
+    away: { id: "sab", name: "Aryna Sabalenka", shortName: "SAB" },
+    ...(() => {
+      const m = createMarkets("tennis", "SWI", "SAB", 1.75, 2.05);
+      return { featuredMarkets: m.featured, allMarkets: m.all };
+    })(),
+    modelConfidence: 0.67,
     edgePercent: 3.5,
-    confidence: 67,
+    pHome: 0.59,
+    pAway: 0.41,
   },
   {
     id: "esports-upcoming-1",
@@ -192,21 +206,16 @@ export const MOCK_MATCHES: BettingMatch[] = [
     league: "LEC",
     status: "upcoming",
     startTime: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
-    home: {
-      name: "G2 Esports",
-      shortName: "G2",
-      elo: 1654,
-    },
-    away: {
-      name: "Fnatic",
-      shortName: "FNC",
-      elo: 1638,
-    },
-    odds: { home: 1.65, away: 2.2 },
-    modelProb: { home: 0.63, away: 0.37 },
-    pick: "home",
+    home: { id: "g2", name: "G2 Esports", shortName: "G2" },
+    away: { id: "fnc", name: "Fnatic", shortName: "FNC" },
+    ...(() => {
+      const m = createMarkets("esports", "G2", "FNC", 1.65, 2.2);
+      return { featuredMarkets: m.featured, allMarkets: m.all };
+    })(),
+    modelConfidence: 0.64,
     edgePercent: 2.8,
-    confidence: 64,
+    pHome: 0.63,
+    pAway: 0.37,
   },
   {
     id: "baseball-upcoming-1",
@@ -214,21 +223,16 @@ export const MOCK_MATCHES: BettingMatch[] = [
     league: "MLB",
     status: "upcoming",
     startTime: new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString(),
-    home: {
-      name: "New York Yankees",
-      shortName: "NYY",
-      elo: 1612,
-    },
-    away: {
-      name: "Boston Red Sox",
-      shortName: "BOS",
-      elo: 1589,
-    },
-    odds: { home: 1.8, away: 2.0 },
-    modelProb: { home: 0.56, away: 0.44 },
-    pick: "home",
+    home: { id: "nyy", name: "New York Yankees", shortName: "NYY" },
+    away: { id: "bos", name: "Boston Red Sox", shortName: "BOS" },
+    ...(() => {
+      const m = createMarkets("baseball", "NYY", "BOS", 1.8, 2.0);
+      return { featuredMarkets: m.featured, allMarkets: m.all };
+    })(),
+    modelConfidence: 0.58,
     edgePercent: 1.9,
-    confidence: 58,
+    pHome: 0.56,
+    pAway: 0.44,
   },
 
   // Finished matches
@@ -238,23 +242,19 @@ export const MOCK_MATCHES: BettingMatch[] = [
     league: "Serie A",
     status: "finished",
     startTime: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    home: {
-      name: "Inter Milan",
-      shortName: "INT",
-      elo: 1856,
-    },
-    away: {
-      name: "AC Milan",
-      shortName: "ACM",
-      elo: 1823,
-    },
-    score: { home: 3, away: 1 },
-    odds: { home: 1.9, draw: 3.5, away: 3.8 },
-    modelProb: { home: 0.52, draw: 0.25, away: 0.23 },
-    pick: "home",
+    homeScore: 3,
+    awayScore: 1,
+    home: { id: "int", name: "Inter Milan", shortName: "INT" },
+    away: { id: "acm", name: "AC Milan", shortName: "ACM" },
+    ...(() => {
+      const m = createMarkets("soccer", "INT", "ACM", 1.9, 3.8, 3.5);
+      return { featuredMarkets: m.featured, allMarkets: m.all };
+    })(),
+    modelConfidence: 0.74,
     edgePercent: 4.8,
-    confidence: 74,
-    result: "win",
+    pHome: 0.52,
+    pAway: 0.23,
+    pDraw: 0.25,
   },
   {
     id: "basketball-finished-1",
@@ -262,23 +262,18 @@ export const MOCK_MATCHES: BettingMatch[] = [
     league: "NBA",
     status: "finished",
     startTime: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-    home: {
-      name: "Miami Heat",
-      shortName: "MIA",
-      elo: 1745,
-    },
-    away: {
-      name: "Milwaukee Bucks",
-      shortName: "MIL",
-      elo: 1798,
-    },
-    score: { home: 98, away: 112 },
-    odds: { home: 2.3, away: 1.6 },
-    modelProb: { home: 0.38, away: 0.62 },
-    pick: "away",
+    homeScore: 98,
+    awayScore: 112,
+    home: { id: "mia", name: "Miami Heat", shortName: "MIA" },
+    away: { id: "mil", name: "Milwaukee Bucks", shortName: "MIL" },
+    ...(() => {
+      const m = createMarkets("basketball", "MIA", "MIL", 2.3, 1.6);
+      return { featuredMarkets: m.featured, allMarkets: m.all };
+    })(),
+    modelConfidence: 0.66,
     edgePercent: 3.1,
-    confidence: 66,
-    result: "win",
+    pHome: 0.38,
+    pAway: 0.62,
   },
   {
     id: "tennis-finished-1",
@@ -286,22 +281,17 @@ export const MOCK_MATCHES: BettingMatch[] = [
     league: "ATP Tour",
     status: "finished",
     startTime: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-    home: {
-      name: "Novak Djokovic",
-      shortName: "DJO",
-      elo: 2156,
-    },
-    away: {
-      name: "Daniil Medvedev",
-      shortName: "MED",
-      elo: 2098,
-    },
-    score: { home: 2, away: 0 },
-    odds: { home: 1.5, away: 2.6 },
-    modelProb: { home: 0.68, away: 0.32 },
-    pick: "home",
+    homeScore: 2,
+    awayScore: 0,
+    home: { id: "djo", name: "Novak Djokovic", shortName: "DJO" },
+    away: { id: "med", name: "Daniil Medvedev", shortName: "MED" },
+    ...(() => {
+      const m = createMarkets("tennis", "DJO", "MED", 1.5, 2.6);
+      return { featuredMarkets: m.featured, allMarkets: m.all };
+    })(),
+    modelConfidence: 0.55,
     edgePercent: 1.2,
-    confidence: 55,
-    result: "win",
+    pHome: 0.68,
+    pAway: 0.32,
   },
 ];
