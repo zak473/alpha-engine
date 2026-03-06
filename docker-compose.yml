@@ -27,6 +27,10 @@ services:
     environment:
       - POSTGRES_DSN=postgresql://alpha:alpha@postgres:5432/alpha_engine
       - ENV=development
+      - FOOTBALL_DATA_API_KEY=${FOOTBALL_DATA_API_KEY:-}
+      - TENNIS_API_KEY=${TENNIS_API_KEY:-}
+      - ESPORTS_API_KEY=${ESPORTS_API_KEY:-}
+      - SCHEDULER_ENABLED=${SCHEDULER_ENABLED:-true}
     volumes:
       - .:/app
     depends_on:

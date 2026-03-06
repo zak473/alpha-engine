@@ -40,6 +40,7 @@ class CoreLeague(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
+    sport: Mapped[str] = mapped_column(String(20), nullable=True, default="soccer")
     country: Mapped[str] = mapped_column(String(100), nullable=True)
     tier: Mapped[int] = mapped_column(Integer, default=1)
     provider_id: Mapped[str] = mapped_column(String(200), nullable=True, unique=True)
@@ -92,13 +93,20 @@ class CoreMatch(Base):
     home_score: Mapped[int] = mapped_column(Integer, nullable=True)
     away_score: Mapped[int] = mapped_column(Integer, nullable=True)
     outcome: Mapped[str] = mapped_column(String(20), nullable=True)         # home_win|draw|away_win
+    sport: Mapped[str] = mapped_column(String(20), nullable=True, default="soccer")
     venue: Mapped[str] = mapped_column(String(200), nullable=True)
     is_neutral: Mapped[bool] = mapped_column(Boolean, default=False)
+    odds_home: Mapped[float] = mapped_column(Float, nullable=True)
+    odds_away: Mapped[float] = mapped_column(Float, nullable=True)
+    odds_draw: Mapped[float] = mapped_column(Float, nullable=True)
     provider_id: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)  # upsert key
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+    live_clock: Mapped[str] = mapped_column(String(20), nullable=True)           # "34'", "HT", "Q3", "Top 5th", "Map 2 R17"
+    current_period: Mapped[int] = mapped_column(Integer, nullable=True)           # 1-based: half/quarter/inning/set/map
+    current_state_json: Mapped[dict] = mapped_column(JSON, nullable=True)         # sport-specific live state blob
 
     __table_args__ = (
         Index("ix_core_matches_kickoff", "kickoff_utc"),

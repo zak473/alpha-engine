@@ -66,8 +66,8 @@ FEATURE_NAMES = [
 ]
 
 # Outcome → integer label
-OUTCOME_LABELS = {"home_win": 0, "draw": 1, "away_win": 2}
-LABEL_OUTCOMES = {v: k for k, v in OUTCOME_LABELS.items()}
+OUTCOME_LABELS = {"home_win": 0, "draw": 1, "away_win": 2, "H": 0, "D": 1, "A": 2}
+LABEL_OUTCOMES = {0: "home_win", 1: "draw", 2: "away_win"}
 
 
 # ---------------------------------------------------------------------------
@@ -106,8 +106,12 @@ def _load_training_data(session) -> tuple[np.ndarray, np.ndarray, list[str]]:
 
     # Impute missing values (None → NaN → column mean)
     col_means = np.nanmean(X, axis=0)
-    nan_mask = np.isnan(X)
-    X[nan_mask] = np.take(col_means, np.where(nan_mask)[1])
+    # Replace any NaN col_means (all-NaN column) with 0
+    col_means = np.where(np.isnan(col_means), 0.0, col_means)
+    for j in range(X.shape[1]):
+        mask = np.isnan(X[:, j])
+        if mask.any():
+            X[mask, j] = col_means[j]
 
     log.info("Loaded %d training samples, %d features.", len(y), X.shape[1])
     return X, y, match_ids

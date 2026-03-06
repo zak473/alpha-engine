@@ -2,23 +2,40 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Calendar, Zap, Cpu, Activity, Trophy, X } from "lucide-react";
+import { Calendar, Zap, Cpu, Activity, Trophy, X, RefreshCw } from "lucide-react";
 import type { MvpPrediction, Challenge, MvpPerformance } from "@/lib/types";
+import { triggerSync } from "@/lib/api";
 
 // ── System drawer ─────────────────────────────────────────────────────────────
 
 function SystemDrawer({ apiOk, dbOk, onClose }: { apiOk: boolean; dbOk: boolean; onClose: () => void }) {
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+
   const checks = [
     { label: "API endpoint",  ok: apiOk, detail: apiOk ? "Responding · p50 42ms"  : "Unreachable"       },
     { label: "Database",      ok: dbOk,  detail: dbOk  ? "Connected · 12 active"  : "Connection refused" },
     { label: "ML pipeline",   ok: true,  detail: "Last run 2h ago · OK"                                  },
-    { label: "Data ingest",   ok: true,  detail: "14 sources · live"                                     },
+    { label: "Data ingest",   ok: true,  detail: "Scheduler · 6h interval"                               },
   ];
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const res = await triggerSync();
+      setSyncMsg(res.status === "sync started" ? "Sync started — check logs" : res.status);
+    } catch {
+      setSyncMsg("Sync failed — check API key");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   return (
     <div style={{
       position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50,
-      width: 260, background: "var(--bg2)", border: "1px solid var(--border1)",
+      width: 272, background: "var(--bg2)", border: "1px solid var(--border1)",
       borderRadius: "var(--radius-md)", boxShadow: "0 8px 24px rgba(0,0,0,0.5)", padding: 12,
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -38,6 +55,27 @@ function SystemDrawer({ apiOk, dbOk, onClose }: { apiOk: boolean; dbOk: boolean;
           <span style={{ fontSize: 11, color: "var(--text2)" }}>{c.detail}</span>
         </div>
       ))}
+
+      {/* Manual sync */}
+      <div style={{ borderTop: "1px solid var(--border0)", marginTop: 8, paddingTop: 8 }}>
+        <button
+          onClick={handleSync}
+          disabled={syncing}
+          style={{
+            display: "flex", alignItems: "center", gap: 6, width: "100%",
+            background: "var(--bg3)", border: "1px solid var(--border1)",
+            borderRadius: "var(--radius-sm)", padding: "5px 8px",
+            color: "var(--text1)", fontSize: 11, cursor: syncing ? "default" : "pointer",
+            opacity: syncing ? 0.6 : 1,
+          }}
+        >
+          <RefreshCw size={10} style={{ animation: syncing ? "spin 1s linear infinite" : "none" }} />
+          {syncing ? "Syncing…" : "Sync live data now"}
+        </button>
+        {syncMsg && (
+          <p style={{ fontSize: 10, color: "var(--text2)", marginTop: 5, margin: "5px 0 0" }}>{syncMsg}</p>
+        )}
+      </div>
     </div>
   );
 }

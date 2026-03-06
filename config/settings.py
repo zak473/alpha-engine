@@ -25,6 +25,34 @@ class Settings(BaseSettings):
     # Model artefact storage
     MODEL_ARTEFACT_PATH: str = "/app/artefacts"
 
+    # Live data — football-data.org (free tier, soccer)
+    # Register at https://www.football-data.org/client/register
+    FOOTBALL_DATA_API_KEY: str = ""
+
+    # Live data — The Odds API (free tier, tennis ATP/WTA)
+    TENNIS_API_KEY: str = ""
+
+    # Live data — api-tennis.com (tennis fixtures, live scores, set scores, point-by-point)
+    # Register at https://api-tennis.com → get API key
+    TENNIS_LIVE_API_KEY: str = ""
+
+    # Live data — PandaScore (free tier, esports: CS2/LoL/Dota2/Valorant)
+    # Register at https://pandascore.co → Dashboard → API token
+    ESPORTS_API_KEY: str = ""
+
+    # Real market odds — The Odds API (free tier: 500 req/month)
+    # Register at https://the-odds-api.com → Get API Key
+    ODDS_API_KEY: str = ""
+
+    # Auto-pick bot settings
+    AUTO_PICK_USER_ID: str = "bot"          # user_id for auto-generated picks
+    AUTO_PICK_MIN_EDGE: float = 0.03        # minimum edge to generate a pick (3%)
+    AUTO_PICK_MIN_CONFIDENCE: float = 0.45  # minimum model confidence
+    AUTO_PICK_KELLY_FRACTION: float = 0.25  # fractional Kelly (25% = conservative)
+
+    # Scheduler — set to False to disable background fetching (e.g. in tests)
+    SCHEDULER_ENABLED: bool = True
+
     # ELO — Soccer
     SOCCER_ELO_BASE: float = 1500.0
     SOCCER_ELO_K_BASE: float = 32.0

@@ -25,6 +25,8 @@ from db.models.esports import (
 from db.models.challenges import (
     Challenge, ChallengeMember, ChallengeEntry, ChallengeEntryResult,
 )
+from db.models.basketball import BasketballTeamMatchStats
+from db.models.baseball import BaseballTeamMatchStats, EventContext
 
 __all__ = [
     "Sport", "Competition", "Season", "Venue",
@@ -42,4 +44,6 @@ __all__ = [
     "CoreLeague", "CoreTeam", "CoreMatch", "CoreTeamMatchStats",
     "RatingEloTeam", "FeatSoccerMatch", "PredMatch", "ModelRegistry",
     "Challenge", "ChallengeMember", "ChallengeEntry", "ChallengeEntryResult",
+    "BasketballTeamMatchStats",
+    "BaseballTeamMatchStats", "EventContext",
 ]

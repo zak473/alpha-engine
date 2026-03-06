@@ -289,7 +289,7 @@ export function MatchesTable({ initialMatches, loading = false }: MatchesTablePr
                   <tr
                     key={m.id}
                     className="tr-hover"
-                    onClick={() => router.push(`/matches/${m.id}`)}
+                    onClick={() => window.open(`/sports/${m.sport}/matches/${m.id}`, "_blank")}
                   >
                     {/* Sport */}
                     <td>

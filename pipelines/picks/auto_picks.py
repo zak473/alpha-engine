@@ -1,0 +1,231 @@
+"""
+Auto-pick bot — generates TrackedPick records for high-edge opportunities.
+
+Runs after predict_only + fetch_odds. For each upcoming/live match that has:
+  - A prediction (pred_match row)
+  - Real market odds (core_matches.odds_home/away)
+  - Edge > AUTO_PICK_MIN_EDGE (default 3%)
+  - Confidence > AUTO_PICK_MIN_CONFIDENCE (default 55%)
+
+Computes fractional Kelly stake and creates a pick under AUTO_PICK_USER_ID.
+Deduplicates: won't create a duplicate pick for the same match+market+selection.
+
+Usage:
+    python -m pipelines.picks.auto_picks
+    python -m pipelines.picks.auto_picks --dry-run
+    python -m pipelines.picks.auto_picks --min-edge 0.05 --kelly 0.25
+"""
+
+from __future__ import annotations
+
+import argparse
+import logging
+import uuid
+from datetime import datetime, timezone
+from typing import Optional
+
+from sqlalchemy.orm import Session
+
+from config.settings import settings
+from db.models.mvp import CoreMatch, PredMatch, CoreLeague, CoreTeam
+from db.models.picks import TrackedPick
+from db.session import SessionLocal
+
+log = logging.getLogger(__name__)
+
+
+# ── Kelly maths ───────────────────────────────────────────────────────────────
+
+def kelly_fraction(prob: float, decimal_odds: float) -> float:
+    """
+    Full Kelly criterion: (b*p - q) / b
+    where b = decimal_odds - 1, p = win prob, q = 1 - p.
+    Returns 0 if the bet has no edge.
+    """
+    b = decimal_odds - 1.0
+    if b <= 0:
+        return 0.0
+    k = (b * prob - (1 - prob)) / b
+    return max(0.0, k)
+
+
+def edge_pct(model_prob: float, decimal_odds: float) -> float:
+    """Edge = model_prob − implied_prob_from_book_odds."""
+    return model_prob - (1.0 / decimal_odds)
+
+
+# ── Dedup check ────────────────────────────────────────────────────────────────
+
+def _already_picked(db: Session, user_id: str, match_id: str, market: str, selection: str) -> bool:
+    return db.query(TrackedPick).filter(
+        TrackedPick.user_id == user_id,
+        TrackedPick.match_id == match_id,
+        TrackedPick.market_name == market,
+        TrackedPick.selection_label == selection,
+    ).first() is not None
+
+
+# ── Main ───────────────────────────────────────────────────────────────────────
+
+def run(
+    min_edge: float = settings.AUTO_PICK_MIN_EDGE,
+    min_confidence: float = settings.AUTO_PICK_MIN_CONFIDENCE,
+    kelly_frac: float = settings.AUTO_PICK_KELLY_FRACTION,
+    user_id: str = settings.AUTO_PICK_USER_ID,
+    dry_run: bool = False,
+) -> int:
+    """
+    Scan predictions and create auto-picks for value bets.
+    Returns number of picks created.
+    """
+    db = SessionLocal()
+    created = 0
+
+    try:
+        # All upcoming/live matches with predictions AND real odds
+        rows = (
+            db.query(CoreMatch, PredMatch)
+            .join(PredMatch, PredMatch.match_id == CoreMatch.id)
+            .filter(
+                CoreMatch.status.in_(["scheduled", "live"]),
+                CoreMatch.kickoff_utc > datetime.now(timezone.utc),
+                # Must have at least home + away real odds
+                CoreMatch.odds_home.isnot(None),
+                CoreMatch.odds_away.isnot(None),
+            )
+            .order_by(CoreMatch.kickoff_utc.asc())
+            .all()
+        )
+
+        log.info("Auto-pick bot: evaluating %d match-prediction pairs ...", len(rows))
+
+        for match, pred in rows:
+            league = db.get(CoreLeague, match.league_id)
+            home_team = db.get(CoreTeam, match.home_team_id)
+            away_team = db.get(CoreTeam, match.away_team_id)
+            if not home_team or not away_team:
+                continue
+
+            league_name = league.name if league else "Unknown"
+            match_label = f"{home_team.name} vs {away_team.name}"
+
+            # Build candidate selections: (label, model_prob, book_odds, market_name)
+            candidates: list[tuple[str, float, float, str]] = []
+
+            # Determine correct market name based on sport
+            sport = match.sport
+            ml_market = "Moneyline" if sport in ("basketball", "baseball") else "Match Winner" if sport in ("tennis", "esports") else "1X2"
+
+            if match.odds_home and pred.p_home:
+                candidates.append(("home", pred.p_home, match.odds_home, ml_market))
+            if match.odds_away and pred.p_away:
+                candidates.append(("away", pred.p_away, match.odds_away, ml_market))
+            if match.odds_draw and pred.p_draw and pred.p_draw > 0.01:
+                candidates.append(("draw", pred.p_draw, match.odds_draw, ml_market))
+
+            for selection_label, model_prob, book_odds, market_name in candidates:
+                e = edge_pct(model_prob, book_odds)
+                confidence = pred.confidence / 100.0 if pred.confidence else model_prob
+
+                if e < min_edge:
+                    continue
+                if confidence < min_confidence:
+                    continue
+                if book_odds < settings.MIN_ODDS or book_odds > settings.MAX_ODDS:
+                    continue
+
+                # Dedup
+                if _already_picked(db, user_id, match.id, market_name, selection_label):
+                    log.debug("  Skip (already picked): %s %s", match_label, selection_label)
+                    continue
+
+                k = kelly_fraction(model_prob, book_odds)
+                stake = round(k * kelly_frac, 4)
+
+                log.info(
+                    "  [%s] %s | %s @ %.2f | edge=+%.1f%% | kelly=%.1f%% | stake=%.2fu",
+                    sport, match_label, selection_label, book_odds,
+                    e * 100, k * 100, stake,
+                )
+
+                if not dry_run:
+                    pick = TrackedPick(
+                        id=str(uuid.uuid4()),
+                        user_id=user_id,
+                        match_id=match.id,
+                        match_label=match_label,
+                        sport=sport,
+                        league=league_name,
+                        start_time=match.kickoff_utc,
+                        market_name=market_name,
+                        selection_label=selection_label,
+                        odds=book_odds,
+                        edge=round(e, 4),
+                        kelly_fraction=round(k, 4),
+                        stake_fraction=stake,
+                        auto_generated=True,
+                    )
+                    db.add(pick)
+                    created += 1
+
+        if not dry_run:
+            db.commit()
+            log.info("Auto-pick bot: created %d picks.", created)
+        else:
+            log.info("DRY RUN — would create %d picks.", created)
+
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+    return created
+
+
+# ── CLV batch settlement ───────────────────────────────────────────────────────
+
+def settle_all_clv() -> int:
+    """
+    For all settled auto-picks without CLV, compute it from market_odds snapshots.
+    Run after fetch_odds to get closing prices.
+    """
+    from pipelines.odds.fetch_odds import settle_clv
+
+    db = SessionLocal()
+    settled = 0
+    try:
+        pending_clv = (
+            db.query(TrackedPick)
+            .filter(
+                TrackedPick.outcome.isnot(None),
+                TrackedPick.closing_odds.is_(None),
+            )
+            .all()
+        )
+        for pick in pending_clv:
+            settle_clv(db, pick.id, pick.match_id)
+            settled += 1
+        db.commit()
+        if settled:
+            log.info("CLV settlement: computed CLV for %d picks.", settled)
+    finally:
+        db.close()
+    return settled
+
+
+# ── CLI ────────────────────────────────────────────────────────────────────────
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Auto-pick bot with Kelly staking")
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--min-edge", type=float, default=settings.AUTO_PICK_MIN_EDGE)
+    parser.add_argument("--kelly", type=float, default=settings.AUTO_PICK_KELLY_FRACTION)
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
+    n = run(min_edge=args.min_edge, kelly_frac=args.kelly, dry_run=args.dry_run)
+    print(f"Done. {n} picks {'would be ' if args.dry_run else ''}created.")
+
+
+if __name__ == "__main__":
+    main()

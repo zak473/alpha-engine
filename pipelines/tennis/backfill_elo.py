@@ -1,0 +1,176 @@
+"""
+Tennis ELO backfill pipeline.
+
+Replays all finished tennis matches chronologically through TennisEloEngine
+and writes one rating_elo_team row per (player, match).
+
+Surface context: uses "hard" for all matches by default (most common surface).
+For surface-specific backfill, extend with a mapping from league_name → surface.
+
+Idempotent: deletes existing tennis rating_elo_team rows before rebuilding.
+
+Usage:
+    python -m pipelines.tennis.backfill_elo
+    python -m pipelines.tennis.backfill_elo --incremental
+"""
+
+from __future__ import annotations
+
+import argparse
+import logging
+from datetime import timezone
+
+from sqlalchemy.orm import Session
+
+from core.types import MatchContext, Sport
+from db.models.mvp import CoreMatch, RatingEloTeam
+from db.session import SessionLocal
+from ratings.tennis_elo import TennisEloEngine
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
+log = logging.getLogger(__name__)
+
+# Map league name keywords to surface context
+_SURFACE_MAP: dict[str, str] = {
+    "aus_open": "hard",
+    "us_open": "hard",
+    "wimbledon": "grass",
+    "french_open": "clay",
+    "clay": "clay",
+    "grass": "grass",
+    "indoor": "hard",
+}
+
+
+def _infer_surface(league_name: str) -> str:
+    lower = (league_name or "").lower()
+    for keyword, surface in _SURFACE_MAP.items():
+        if keyword in lower:
+            return surface
+    return "hard"
+
+
+def run_backfill(incremental: bool = False) -> int:
+    session: Session = SessionLocal()
+    engine = TennisEloEngine()
+    rows_written = 0
+
+    try:
+        matches = (
+            session.query(CoreMatch)
+            .filter(CoreMatch.status == "finished", CoreMatch.sport == "tennis")
+            .order_by(CoreMatch.kickoff_utc.asc())
+            .all()
+        )
+        log.info("Found %d finished tennis matches to process.", len(matches))
+
+        if not incremental:
+            sport_match_ids = [m.id for m in matches]
+            if sport_match_ids:
+                deleted = (
+                    session.query(RatingEloTeam)
+                    .filter(RatingEloTeam.match_id.in_(sport_match_ids))
+                    .delete(synchronize_session="fetch")
+                )
+                log.info("Cleared %d existing tennis rating_elo_team rows.", deleted)
+                session.flush()
+        else:
+            sport_match_ids = [m.id for m in matches]
+            existing = (
+                session.query(RatingEloTeam)
+                .filter(RatingEloTeam.match_id.in_(sport_match_ids))
+                .order_by(RatingEloTeam.rated_at.asc())
+                .all()
+            )
+            already_rated: set[tuple[str, str]] = set()
+            for row in existing:
+                engine.set_rating(row.team_id, row.rating_after)
+                already_rated.add((row.team_id, row.match_id))
+            log.info("Loaded %d existing ELO rows for incremental run.", len(existing))
+
+        for match in matches:
+            if incremental:
+                if (
+                    (match.home_team_id, match.id) in already_rated
+                    and (match.away_team_id, match.id) in already_rated
+                ):
+                    continue
+
+            home_score = match.home_score if match.home_score is not None else 0
+            away_score = match.away_score if match.away_score is not None else 0
+
+            kickoff = match.kickoff_utc
+            if kickoff.tzinfo is None:
+                kickoff = kickoff.replace(tzinfo=timezone.utc)
+
+            # Get league name via join
+            from db.models.mvp import CoreLeague
+            league = session.get(CoreLeague, match.league_id) if match.league_id else None
+            league_name_str = league.name if league else ""
+            surface = _infer_surface(league_name_str)
+
+            context = MatchContext(
+                match_id=match.id,
+                sport=Sport.TENNIS,
+                date=kickoff,
+                home_entity_id=match.home_team_id,
+                away_entity_id=match.away_team_id,
+                importance=1.0,
+                extra={"surface": surface},
+            )
+
+            update_home, update_away = engine.update_ratings(
+                match.home_team_id,
+                match.away_team_id,
+                float(home_score),
+                float(away_score),
+                context,
+            )
+
+            for update, team_id in [(update_home, match.home_team_id), (update_away, match.away_team_id)]:
+                rated_at = update.timestamp
+                if rated_at.tzinfo is None:
+                    rated_at = rated_at.replace(tzinfo=timezone.utc)
+
+                row = RatingEloTeam(
+                    team_id=team_id,
+                    match_id=match.id,
+                    context=surface,
+                    rating_before=update.rating_before,
+                    rating_after=update.rating_after,
+                    expected_score=update.expected_score,
+                    actual_score=update.actual_score,
+                    k_factor=update.k_factor,
+                    rated_at=rated_at,
+                )
+                session.add(row)
+                rows_written += 1
+
+        session.commit()
+        log.info("Tennis ELO backfill complete. %d rating rows written.", rows_written)
+
+    except Exception:
+        session.rollback()
+        log.exception("Backfill failed — rolled back")
+        raise
+    finally:
+        session.close()
+
+    lb = engine.leaderboard(top_n=10)
+    log.info("Top 10 tennis players by ELO:")
+    for rank, (team_id, rating) in enumerate(lb, 1):
+        log.info("  %2d. %-40s %.1f", rank, team_id, rating)
+
+    return rows_written
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Backfill tennis ELO ratings")
+    parser.add_argument("--incremental", action="store_true",
+                        help="Skip matches that already have rating rows")
+    args = parser.parse_args()
+    run_backfill(incremental=args.incremental)
+
+
+if __name__ == "__main__":
+    main()

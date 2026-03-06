@@ -6,7 +6,7 @@ import { Search, X, Bookmark, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
-export type SportFilter = "all" | "soccer" | "tennis" | "esports";
+export type SportFilter = "all" | "soccer" | "tennis" | "esports" | "basketball" | "baseball";
 export type RangeFilter = "today" | "7d" | "30d";
 
 export interface FocusViewDef {
@@ -28,9 +28,11 @@ export const FOCUS_VIEWS: FocusViewDef[] = [
 
 const SPORTS: { value: SportFilter; label: string }[] = [
   { value: "all",     label: "All sports" },
-  { value: "soccer",  label: "⚽ Soccer"  },
-  { value: "tennis",  label: "🎾 Tennis"  },
-  { value: "esports", label: "🎮 Esports" },
+  { value: "soccer",     label: "⚽ Soccer"     },
+  { value: "tennis",     label: "🎾 Tennis"     },
+  { value: "esports",    label: "🎮 Esports"    },
+  { value: "basketball", label: "🏀 Basketball" },
+  { value: "baseball",   label: "⚾ Baseball"   },
 ];
 
 const RANGES: { value: RangeFilter; label: string }[] = [

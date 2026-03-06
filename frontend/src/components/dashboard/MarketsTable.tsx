@@ -149,7 +149,7 @@ function MatchDrawer({ p }: { p: MvpPrediction }) {
             <span className={cn("text-[11px] font-medium", vol === "Stable" ? "text-accent-green" : "text-accent-amber")}>{vol}</span>
           </div>
         )}
-        {p.model.version && <span className="text-[10px] text-text-subtle font-mono ml-auto">{p.model.version}</span>}
+        {p.model?.version && <span className="text-[10px] text-text-subtle font-mono ml-auto">{p.model.version}</span>}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -457,12 +457,11 @@ export function MarketsTable({
                       "sb-row",
                       expanded && "bg-white/[0.015]"
                     )}
-                    onClick={() => setExpandedId((prev) => prev === p.event_id ? null : p.event_id)}
                   >
                     {/* Compare checkbox */}
                     {onCompareToggle && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); onCompareToggle(p.event_id); }}
+                        onClick={() => onCompareToggle(p.event_id)}
                         className="shrink-0 text-text-subtle hover:text-text-muted transition-colors"
                       >
                         {isCompared
@@ -473,8 +472,7 @@ export function MarketsTable({
 
                     {/* Watchlist star */}
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      onClick={() => {
                         addToWatchlist({ id: p.participants.home.id, name: p.participants.home.name, sport: p.sport });
                         setWatchlistedIds((prev) => new Set(prev).add(p.event_id));
                       }}
@@ -483,8 +481,11 @@ export function MarketsTable({
                       <Star size={12} fill={isWatched ? "currentColor" : "none"} />
                     </button>
 
-                    {/* Match info */}
-                    <div className="min-w-0 flex-1">
+                    {/* Match info — clicking this area navigates to match detail */}
+                    <div
+                      className="min-w-0 flex-1 cursor-pointer"
+                      onClick={() => window.open(`/sports/${p.sport}/matches/${p.event_id}`, "_blank")}
+                    >
                       <p className="text-[13px] font-semibold text-text-primary leading-tight truncate">
                         {p.participants.home.name}
                         <span className="text-text-subtle font-normal text-[11px] mx-1">vs</span>
@@ -506,7 +507,7 @@ export function MarketsTable({
                     </div>
 
                     {/* Odds buttons */}
-                    <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1 shrink-0">
                       <OddsBtn
                         label={hasDraw ? "Home" : "P1"}
                         prob={p.probabilities.home_win}
@@ -541,15 +542,16 @@ export function MarketsTable({
                     {/* View link + expand */}
                     <div className="flex items-center gap-1 shrink-0">
                       <Link
-                        href={`/matches/${p.event_id}`}
-                        onClick={(e) => e.stopPropagation()}
+                        href={`/sports/${p.sport}/matches/${p.event_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="p-1 rounded text-text-subtle hover:text-text-muted opacity-0 group-hover/mrow:opacity-100 transition-all"
                         title="View match"
                       >
                         <Eye size={11} />
                       </Link>
                       <button
-                        onClick={(e) => { e.stopPropagation(); setExpandedId((prev) => prev === p.event_id ? null : p.event_id); }}
+                        onClick={() => setExpandedId((prev) => prev === p.event_id ? null : p.event_id)}
                         className="p-1 rounded text-text-subtle hover:text-text-muted transition-colors"
                       >
                         {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}

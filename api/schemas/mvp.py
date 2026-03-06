@@ -74,7 +74,7 @@ class PredictionSchema(BaseModel):
     fair_odds: FairOddsSchema
     confidence: int = Field(..., ge=0, le=100)
     key_drivers: list[KeyDriverSchema]
-    model: ModelMetaSchema
+    model: Optional[ModelMetaSchema]
     simulation: Optional[SimulationSchema]
     created_at: datetime
 

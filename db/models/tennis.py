@@ -28,7 +28,7 @@ class TennisMatch(Base):
     """
     __tablename__ = "tennis_matches"
 
-    match_id: Mapped[str] = mapped_column(ForeignKey("matches.id"), primary_key=True)
+    match_id: Mapped[str] = mapped_column(ForeignKey("core_matches.id"), primary_key=True)
 
     surface: Mapped[str] = mapped_column(String(50), nullable=False)  # hard, clay, grass, carpet
     is_indoor: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -64,7 +64,7 @@ class TennisMatchStats(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     match_id: Mapped[str] = mapped_column(ForeignKey("tennis_matches.match_id"), nullable=False)
-    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), nullable=False)
+    player_id: Mapped[str] = mapped_column(ForeignKey("core_teams.id"), nullable=False)
 
     # Serve
     aces: Mapped[int] = mapped_column(Integer, nullable=True)
@@ -105,7 +105,7 @@ class TennisPlayerForm(Base):
     __tablename__ = "tennis_player_form"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), nullable=False)
+    player_id: Mapped[str] = mapped_column(ForeignKey("core_teams.id"), nullable=False)
     as_of_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     surface: Mapped[str] = mapped_column(String(50), default="all")   # "all", "hard", "clay", "grass"
     window_days: Mapped[int] = mapped_column(Integer, default=365)

@@ -153,7 +153,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
     : { p_home: 0.52, p_draw: 0.24, p_away: 0.24 };
 
   const confidence   = prediction?.confidence ?? 68;
-  const modelVersion = prediction?.model.version ?? "—";
+  const modelVersion = prediction?.model?.version ?? "—";
 
   const simBuckets: SimBucket[] = prediction?.simulation?.distribution?.length
     ? prediction.simulation.distribution

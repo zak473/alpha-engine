@@ -131,6 +131,33 @@ def _build_prediction_schema(
 # Endpoints
 # ---------------------------------------------------------------------------
 
+def _build_fixture_schema(session: Session, match: CoreMatch) -> PredictionSchema:
+    """Build a prediction schema for a match that has no model prediction yet."""
+    home_team = _get_team(session, match.home_team_id)
+    away_team = _get_team(session, match.away_team_id)
+    league = _get_league(session, match.league_id)
+
+    return PredictionSchema(
+        event_id=match.id,
+        sport=match.sport or "soccer",
+        league=league.name,
+        season=match.season,
+        start_time=match.kickoff_utc,
+        status=match.status,
+        participants=ParticipantsSchema(
+            home=ParticipantSchema(id=match.home_team_id, name=home_team.name),
+            away=ParticipantSchema(id=match.away_team_id, name=away_team.name),
+        ),
+        probabilities=ProbabilitiesSchema(home_win=0.333, draw=0.333, away_win=0.334),
+        fair_odds=FairOddsSchema(home_win=3.0, draw=3.0, away_win=3.0),
+        confidence=0,
+        key_drivers=[],
+        model=None,
+        simulation=None,
+        created_at=datetime.utcnow(),
+    )
+
+
 @router.get("", response_model=PredictionListResponse)
 def list_predictions(
     sport: Optional[str] = Query(None, description="Filter by sport slug (e.g. 'soccer')"),
@@ -144,38 +171,49 @@ def list_predictions(
     """
     List match predictions.
 
-    Joins core_matches → pred_match → model_registry.
-    Returns only matches that have predictions from the live model.
+    Joins core_matches → pred_match → model_registry when a live model exists.
+    Falls back to returning raw ingested fixtures (no probability scores) when
+    no model has been trained yet — so the dashboard shows real matches immediately
+    after the first data sync.
     """
-    # Get live model version(s)
-    live_versions = [
-        r.model_name
-        for r in session.query(ModelRegistry).filter_by(is_live=True).all()
-    ]
-    if not live_versions and sport != "soccer":
-        return PredictionListResponse(items=[], total=0, sport=sport, date_from=date_from, date_to=date_to)
+    live_registry = session.query(ModelRegistry).filter_by(is_live=True).first()
 
-    query = (
-        session.query(CoreMatch, PredMatch, ModelRegistry)
-        .join(PredMatch, PredMatch.match_id == CoreMatch.id)
-        .join(ModelRegistry, ModelRegistry.model_name == PredMatch.model_version)
-        .filter(ModelRegistry.is_live == True)
-    )
+    if live_registry is not None:
+        # ── Normal path: return model predictions ─────────────────────────
+        query = (
+            session.query(CoreMatch, PredMatch, ModelRegistry)
+            .join(PredMatch, PredMatch.match_id == CoreMatch.id)
+            .join(ModelRegistry, ModelRegistry.model_name == PredMatch.model_version)
+            .filter(ModelRegistry.is_live == True)
+        )
+        if date_from:
+            query = query.filter(CoreMatch.kickoff_utc >= date_from)
+        if date_to:
+            query = query.filter(CoreMatch.kickoff_utc <= date_to)
+        if status:
+            query = query.filter(CoreMatch.status == status)
 
-    if date_from:
-        query = query.filter(CoreMatch.kickoff_utc >= date_from)
-    if date_to:
-        query = query.filter(CoreMatch.kickoff_utc <= date_to)
-    if status:
-        query = query.filter(CoreMatch.status == status)
+        total = query.count()
+        rows = query.order_by(CoreMatch.kickoff_utc.asc()).offset(offset).limit(limit).all()
+        items = [_build_prediction_schema(session, m, p, r) for m, p, r in rows]
 
-    total = query.count()
-    rows = query.order_by(CoreMatch.kickoff_utc.asc()).offset(offset).limit(limit).all()
+    else:
+        # ── Fallback: return raw fixtures so the dashboard isn't empty ─────
+        query = session.query(CoreMatch)
+        if sport:
+            query = query.filter(CoreMatch.sport == sport)
+        if date_from:
+            query = query.filter(CoreMatch.kickoff_utc >= date_from)
+        if date_to:
+            query = query.filter(CoreMatch.kickoff_utc <= date_to)
+        if status:
+            query = query.filter(CoreMatch.status == status)
+        else:
+            query = query.filter(CoreMatch.kickoff_utc >= datetime.utcnow())
 
-    items = [
-        _build_prediction_schema(session, match, pred, registry)
-        for match, pred, registry in rows
-    ]
+        total = query.count()
+        rows = query.order_by(CoreMatch.kickoff_utc.asc()).offset(offset).limit(limit).all()
+        items = [_build_fixture_schema(session, m) for m in rows]
 
     return PredictionListResponse(
         items=items,

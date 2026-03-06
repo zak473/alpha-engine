@@ -178,7 +178,9 @@ export function WatchlistModule({ predictions }: WatchlistModuleProps) {
                 </div>
                 {fixture && (
                   <Link
-                    href={`/matches/${fixture.event_id}`}
+                    href={`/sports/${fixture.sport}/matches/${fixture.event_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="shrink-0 text-2xs text-accent-blue hover:underline opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     View →

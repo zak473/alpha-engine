@@ -21,9 +21,21 @@ import type {
   RatingResponse,
   SimulationResponse,
   Sport,
+  SportMatchListItem,
+  SportMatchDetail,
+  TennisMatchDetail,
+  EsportsMatchDetail,
+  BasketballMatchDetail,
+  BaseballMatchDetail,
 } from "./types";
 
-const BASE = "/api/v1";
+// Server components need absolute URLs; browser fetches use the Next.js rewrite proxy.
+const API_ORIGIN =
+  typeof window === "undefined"
+    ? (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000")
+    : "";
+
+const BASE = `${API_ORIGIN}/api/v1`;
 
 // ─── Typed error class ────────────────────────────────────────────────────
 
@@ -36,6 +48,19 @@ export class ApiError extends Error {
     super(message);
     this.name = "ApiError";
   }
+}
+
+// ─── Auth token helper ────────────────────────────────────────────────────
+
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    const token = localStorage.getItem("alpha_engine_token");
+    if (token) return { Authorization: `Bearer ${token}` };
+  } catch {
+    // ignore
+  }
+  return {};
 }
 
 // ─── Low-level fetch with retry/backoff ───────────────────────────────────
@@ -51,6 +76,7 @@ async function request<T>(
     try {
       const res = await fetch(`${BASE}${path}`, {
         next: { revalidate: options?.revalidate ?? 30 },
+        headers: getAuthHeaders(),
       });
 
       if (!res.ok) {
@@ -80,13 +106,13 @@ async function request<T>(
 // ─── Health + Readiness ───────────────────────────────────────────────────
 
 export async function getHealth(): Promise<{ status: string; env: string }> {
-  const res = await fetch("/health", { next: { revalidate: 10 } });
+  const res = await fetch(`${API_ORIGIN}/health`, { next: { revalidate: 10 } });
   if (!res.ok) throw new ApiError("Health check failed", res.status, "/health");
   return res.json();
 }
 
 export async function getReady(): Promise<{ status: "ok" | "degraded"; db: boolean }> {
-  const res = await fetch("/ready", { cache: "no-store" });
+  const res = await fetch(`${API_ORIGIN}/ready`, { cache: "no-store" });
   return res.json();
 }
 
@@ -150,6 +176,7 @@ export async function getPrediction(
     case "soccer":  return getSoccerPrediction(matchId);
     case "tennis":  return getTennisPrediction(matchId);
     case "esports": return getEsportsPrediction(matchId);
+    default:        throw new Error(`Unsupported sport: ${sport}`);
   }
 }
 
@@ -193,7 +220,7 @@ async function mutate<T>(
 ): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: { "Content-Type": "application/json", ...headers },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders(), ...headers },
     body: body !== undefined ? JSON.stringify(body) : undefined,
     cache: "no-store",
   });
@@ -246,6 +273,263 @@ export async function getChallengeEntries(
 
 export async function getLeaderboard(id: string): Promise<LeaderboardOut> {
   return request<LeaderboardOut>(`/challenges/${id}/leaderboard`, { revalidate: 0 });
+}
+
+// ─── Sport-specific match endpoints ──────────────────────────────────────
+
+export type SportSlug = "soccer" | "tennis" | "esports" | "basketball" | "baseball";
+
+export async function getSportMatches(
+  sport: SportSlug,
+  params?: {
+    status?: string;
+    league?: string;
+    date_from?: string;
+    date_to?: string;
+    limit?: number;
+    offset?: number;
+  }
+): Promise<{ items: SportMatchListItem[]; total: number; sport: string }> {
+  const qs = new URLSearchParams();
+  if (params?.status)    qs.set("status",    params.status);
+  if (params?.league)    qs.set("league",    params.league);
+  if (params?.date_from) qs.set("date_from", params.date_from);
+  if (params?.date_to)   qs.set("date_to",   params.date_to);
+  if (params?.limit)     qs.set("limit",     String(params.limit));
+  if (params?.offset)    qs.set("offset",    String(params.offset));
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return request<{ items: SportMatchListItem[]; total: number; sport: string }>(
+    `/sports/${sport}/matches${suffix}`,
+    { revalidate: 30 }
+  );
+}
+
+export async function getSportMatchDetail(
+  sport: SportSlug,
+  matchId: string
+): Promise<SportMatchDetail> {
+  return request<SportMatchDetail>(`/sports/${sport}/matches/${matchId}`, { revalidate: 30 });
+}
+
+export async function getEsportsMatchDetail(matchId: string): Promise<EsportsMatchDetail> {
+  return request<EsportsMatchDetail>(`/sports/esports/matches/${matchId}`, { revalidate: 30 });
+}
+
+export async function getEsportsTeamEloHistory(
+  teamId: string,
+  mapName?: string,
+  limit = 30
+): Promise<Array<{ date: string; rating: number; match_id?: string | null }>> {
+  try {
+    const qs = mapName ? `?map_name=${mapName}&limit=${limit}` : `?limit=${limit}`;
+    return await request(`/sports/esports/teams/${teamId}/elo-history${qs}`, { revalidate: 60 });
+  } catch {
+    return [];
+  }
+}
+
+export async function getTennisMatchDetail(matchId: string): Promise<TennisMatchDetail> {
+  return request<TennisMatchDetail>(`/sports/tennis/matches/${matchId}`, { revalidate: 30 });
+}
+
+export async function getTennisPlayerEloHistory(
+  playerId: string,
+  surface?: string,
+  limit = 30
+): Promise<Array<{ date: string; rating: number; match_id?: string | null }>> {
+  try {
+    const qs = surface ? `?surface=${surface}&limit=${limit}` : `?limit=${limit}`;
+    return await request(`/sports/tennis/players/${playerId}/elo-history${qs}`, { revalidate: 60 });
+  } catch {
+    return [];
+  }
+}
+
+export async function getSoccerTeamEloHistory(
+  teamId: string,
+  limit = 30
+): Promise<Array<{ date: string; rating: number; match_id?: string | null }>> {
+  try {
+    return await request(`/sports/soccer/teams/${teamId}/elo-history?limit=${limit}`, { revalidate: 60 });
+  } catch {
+    return [];
+  }
+}
+
+export async function getBasketballMatchDetail(matchId: string): Promise<BasketballMatchDetail> {
+  return request<BasketballMatchDetail>(`/sports/basketball/matches/${matchId}`, { revalidate: 30 });
+}
+
+export async function getBasketballTeamEloHistory(
+  teamId: string,
+  limit = 30
+): Promise<Array<{ date: string; rating: number; match_id?: string | null }>> {
+  try {
+    return await request(`/sports/basketball/teams/${teamId}/elo-history?limit=${limit}`, { revalidate: 60 });
+  } catch {
+    return [];
+  }
+}
+
+export async function getBaseballMatchDetail(matchId: string): Promise<BaseballMatchDetail> {
+  return request<BaseballMatchDetail>(`/sports/baseball/matches/${matchId}`, { revalidate: 30 });
+}
+
+export async function getBaseballTeamEloHistory(
+  teamId: string,
+  limit = 30
+): Promise<Array<{ date: string; rating: number; match_id?: string | null }>> {
+  try {
+    return await request(`/sports/baseball/teams/${teamId}/elo-history?limit=${limit}`, { revalidate: 60 });
+  } catch {
+    return [];
+  }
+}
+
+export interface LiveMatchOut {
+  id: string;
+  sport: string;
+  league: string;
+  home_id: string;
+  home_name: string;
+  away_id: string;
+  away_name: string;
+  home_score: number | null;
+  away_score: number | null;
+  kickoff_utc: string;
+  is_live: boolean;
+}
+
+export async function getLiveMatches(): Promise<LiveMatchOut[]> {
+  return request<LiveMatchOut[]>("/matches/live", { revalidate: 15 });
+}
+
+// ─── Picks / Record ───────────────────────────────────────────────────────
+
+export interface PickCreate {
+  match_id: string;
+  match_label: string;
+  sport: string;
+  league?: string;
+  start_time: string;
+  market_name: string;
+  selection_label: string;
+  odds: number;
+  edge?: number;
+}
+
+export interface PickOut {
+  id: string;
+  match_id: string;
+  match_label: string;
+  sport: string;
+  league: string | null;
+  start_time: string;
+  market_name: string;
+  selection_label: string;
+  odds: number;
+  edge: number | null;
+  kelly_fraction: number | null;
+  stake_fraction: number | null;
+  closing_odds: number | null;
+  clv: number | null;
+  auto_generated: boolean;
+  outcome: "won" | "lost" | "void" | null;
+  settled_at: string | null;
+  created_at: string;
+}
+
+export interface PicksStatsOut {
+  total: number;
+  settled: number;
+  pending: number;
+  won: number;
+  lost: number;
+  void: number;
+  win_rate: number;
+  avg_odds: number;
+  avg_edge: number;
+  roi: number;
+  avg_clv: number | null;
+  kelly_roi: number | null;
+}
+
+export async function trackPicks(picks: PickCreate[]): Promise<PickOut[]> {
+  return mutate<PickOut[]>("/picks", "POST", { picks });
+}
+
+export async function getPicks(params?: {
+  sport?: string;
+  outcome?: "won" | "lost" | "void" | "pending";
+  limit?: number;
+  offset?: number;
+}): Promise<PickOut[]> {
+  const qs = new URLSearchParams();
+  if (params?.sport)   qs.set("sport",   params.sport);
+  if (params?.outcome) qs.set("outcome", params.outcome);
+  if (params?.limit)   qs.set("limit",   String(params.limit));
+  if (params?.offset)  qs.set("offset",  String(params.offset));
+  const suffix = qs.toString() ? `?${qs}` : "";
+  const res = await fetch(`${BASE}/picks${suffix}`, { cache: "no-store" });
+  if (!res.ok) throw new ApiError(`API ${res.status}`, res.status, "/picks");
+  return res.json();
+}
+
+export async function getPicksStats(sport?: string): Promise<PicksStatsOut> {
+  const suffix = sport ? `?sport=${sport}` : "";
+  const res = await fetch(`${BASE}/picks/stats${suffix}`, { cache: "no-store" });
+  if (!res.ok) throw new ApiError(`API ${res.status}`, res.status, "/picks/stats");
+  return res.json();
+}
+
+export async function deletePick(id: string): Promise<void> {
+  return mutate<void>(`/picks/${id}`, "DELETE");
+}
+
+// ─── Bankroll ──────────────────────────────────────────────────────────────
+
+export interface BankrollSnapshotOut {
+  id: string;
+  balance: number;
+  event_type: string;
+  pnl: number | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface BankrollStatsOut {
+  current_balance: number;
+  starting_balance: number;
+  peak_balance: number;
+  total_deposited: number;
+  total_withdrawn: number;
+  total_pnl: number;
+  roi: number;
+  max_drawdown: number;
+  sharpe: number | null;
+  snapshots: BankrollSnapshotOut[];
+}
+
+export async function getBankroll(): Promise<BankrollStatsOut> {
+  const res = await fetch(`${BASE}/bankroll`, { cache: "no-store" });
+  if (!res.ok) throw new ApiError(`API ${res.status}`, res.status, "/bankroll");
+  return res.json();
+}
+
+export async function depositBankroll(amount: number, notes?: string): Promise<BankrollSnapshotOut> {
+  return mutate<BankrollSnapshotOut>("/bankroll/deposit", "POST", { amount, event_type: "deposit", notes });
+}
+
+export async function withdrawBankroll(amount: number, notes?: string): Promise<BankrollSnapshotOut> {
+  return mutate<BankrollSnapshotOut>("/bankroll/withdraw", "POST", { amount, event_type: "withdrawal", notes });
+}
+
+// ─── Admin / pipeline control ─────────────────────────────────────────────
+
+export async function triggerSync(): Promise<{ status: string; note: string }> {
+  const res = await fetch(`${BASE}/admin/sync`, { method: "POST", cache: "no-store" });
+  if (!res.ok) throw new ApiError("Sync trigger failed", res.status, "/admin/sync");
+  return res.json();
 }
 
 // ─── Mock data (used until real data flows through) ───────────────────────

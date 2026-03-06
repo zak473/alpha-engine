@@ -4,21 +4,25 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Swords, TrendingUp, ShieldCheck, Trophy,
-  Activity, Circle,
+  Activity, Circle, ClipboardList, BrainCircuit,
 } from "lucide-react";
 import { useSidebar } from "./SidebarContext";
 
 const NAV = [
   { label: "Dashboard",   href: "/dashboard",   icon: LayoutDashboard },
   { label: "Matches",     href: "/matches",      icon: Swords          },
+  { label: "Predictions", href: "/predictions",  icon: BrainCircuit    },
   { label: "Challenges",  href: "/challenges",   icon: Trophy          },
+  { label: "Record",      href: "/record",       icon: ClipboardList   },
   { label: "Performance", href: "/performance",  icon: TrendingUp      },
 ];
 
 const SPORTS = [
-  { label: "Soccer",  href: "/matches?sport=soccer",  color: "#3b82f6" },
-  { label: "Tennis",  href: "/matches?sport=tennis",  color: "#10b981" },
-  { label: "Esports", href: "/matches?sport=esports", color: "#a855f7" },
+  { label: "Soccer",     href: "/sports/soccer/matches",     color: "#3b82f6" },
+  { label: "Tennis",     href: "/sports/tennis/matches",     color: "#10b981" },
+  { label: "Esports",    href: "/sports/esports/matches",    color: "#a855f7" },
+  { label: "Basketball", href: "/sports/basketball/matches", color: "#f59e0b" },
+  { label: "Baseball",   href: "/sports/baseball/matches",   color: "#ef4444" },
 ];
 
 export function Sidebar() {
@@ -27,7 +31,7 @@ export function Sidebar() {
 
   function isActive(href: string) {
     const base = href.split("?")[0];
-    return path === base || (base !== "/" && path.startsWith(base + "/"));
+    return path === base || (base !== "/" && path.startsWith(base));
   }
 
   return (
@@ -50,8 +54,10 @@ export function Sidebar() {
           width:           "var(--sidebar-width)",
           display:         "flex",
           flexDirection:   "column",
-          background:      "var(--bg1)",
+          background:      "linear-gradient(180deg, rgba(10,10,28,0.97) 0%, rgba(6,6,18,0.99) 100%)",
           borderRight:     "1px solid var(--border0)",
+          backdropFilter:  "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
           zIndex:          40,
           transform:       open ? "translateX(0)" : undefined,
           transition:      "transform 200ms",
@@ -63,15 +69,22 @@ export function Sidebar() {
           style={{
             display:      "flex",
             alignItems:   "center",
-            gap:          8,
+            gap:          10,
             padding:      "0 16px",
             height:       "var(--topbar-height)",
             borderBottom: "1px solid var(--border0)",
             flexShrink:   0,
           }}
         >
-          <Activity size={14} style={{ color: "var(--accent)" }} strokeWidth={2.5} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text0)", letterSpacing: "-0.01em" }}>
+          <div style={{
+            width: 26, height: 26, borderRadius: 8,
+            background: "linear-gradient(135deg, var(--accent) 0%, #6366f1 100%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 2px 12px rgba(34,211,238,0.3)",
+          }}>
+            <Activity size={14} color="#000" strokeWidth={2.5} />
+          </div>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text0)", letterSpacing: "-0.02em" }}>
             Alpha Engine
           </span>
         </div>
@@ -104,18 +117,21 @@ export function Sidebar() {
           {/* Sports */}
           <div>
             <p className="label" style={{ padding: "0 10px", marginBottom: 4 }}>Markets</p>
-            {SPORTS.map(({ label, href, color }) => (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setOpen(false)}
-                className="nav-link"
-                style={{ gap: 8 }}
-              >
-                <Circle size={6} style={{ color, fill: color, flexShrink: 0 }} />
-                {label}
-              </Link>
-            ))}
+            {SPORTS.map(({ label, href, color }) => {
+              const active = isActive(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setOpen(false)}
+                  className="nav-link"
+                  style={{ gap: 8, ...(active ? { background: "var(--accent-muted)", borderLeft: "2px solid var(--accent)" } : {}) }}
+                >
+                  <Circle size={6} style={{ color, fill: color, flexShrink: 0 }} />
+                  {label}
+                </Link>
+              );
+            })}
           </div>
 
           {/* Admin */}

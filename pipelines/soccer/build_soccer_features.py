@@ -35,6 +35,13 @@ log = logging.getLogger(__name__)
 
 FORM_WINDOW = 5   # number of prior matches for rolling averages
 
+# Normalise outcome codes — DB may store "H"/"D"/"A" or "home_win"/"draw"/"away_win"
+_NORM_OUTCOME = {
+    "H": "home_win", "D": "draw", "A": "away_win",
+    "home_win": "home_win", "draw": "draw", "away_win": "away_win",
+}
+_FLIP_OUTCOME = {"home_win": "away_win", "away_win": "home_win", "draw": "draw"}
+
 
 # ---------------------------------------------------------------------------
 # Feature helpers
@@ -89,11 +96,11 @@ def _get_team_form(session: Session, team_id: str, before_kickoff) -> dict:
         if is_home:
             gf = m.home_score
             ga = m.away_score
-            outcome = m.outcome
+            outcome = _NORM_OUTCOME.get(m.outcome or "", None)
         else:
             gf = m.away_score
             ga = m.home_score
-            outcome = {"home_win": "away_win", "away_win": "home_win", "draw": "draw"}.get(m.outcome or "", m.outcome)
+            outcome = _FLIP_OUTCOME.get(_NORM_OUTCOME.get(m.outcome or "", ""), None)
 
         if gf is not None:
             gf_list.append(gf)
@@ -167,9 +174,10 @@ def _get_h2h(session: Session, home_team_id: str, away_team_id: str, before_kick
 
     wins = 0
     for m in h2h:
-        if m.home_team_id == home_team_id and m.outcome == "home_win":
+        norm = _NORM_OUTCOME.get(m.outcome or "", None)
+        if m.home_team_id == home_team_id and norm == "home_win":
             wins += 1
-        elif m.away_team_id == home_team_id and m.outcome == "away_win":
+        elif m.away_team_id == home_team_id and norm == "away_win":
             wins += 1
 
     return dict(
@@ -201,8 +209,8 @@ def build_features_for_match(session: Session, match: CoreMatch) -> None:
 
     h2h = _get_h2h(session, match.home_team_id, match.away_team_id, kickoff)
 
-    # Target (filled only for finished matches)
-    outcome = match.outcome
+    # Target (filled only for finished matches) — normalise H/D/A → home_win/draw/away_win
+    outcome = _NORM_OUTCOME.get(match.outcome or "", None)
     target_map = {"home_win": 1.0, "draw": 0.5, "away_win": 0.0}
     target = target_map.get(outcome) if outcome else None
 

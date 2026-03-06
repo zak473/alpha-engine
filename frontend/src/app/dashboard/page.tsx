@@ -7,6 +7,8 @@ import {
   getMockPredictions,
   getChallenges,
   getLeaderboard,
+  getLiveMatches,
+  type LiveMatchOut,
 } from "@/lib/api";
 import { mvpToMatch } from "@/lib/transforms";
 import type { MvpPrediction, MvpPerformance, Challenge, LeaderboardOut } from "@/lib/types";
@@ -21,7 +23,7 @@ interface PageProps {
 
 export default async function DashboardPage({ searchParams }: PageProps) {
   // Parse URL filters
-  const sport  = (["soccer", "tennis", "esports"].includes(searchParams.sport ?? "")
+  const sport  = (["soccer", "tennis", "esports", "basketball", "baseball"].includes(searchParams.sport ?? "")
     ? searchParams.sport as SportFilter
     : "all");
   const range  = (["today", "7d", "30d"].includes(searchParams.range ?? "")
@@ -33,16 +35,18 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   let performance: MvpPerformance | null = null;
   let myChallenges: Challenge[] = [];
   let leaderboards: LeaderboardOut[] = [];
+  let liveMatches: LiveMatchOut[] = [];
   let apiOk = false;
   let dbOk  = false;
 
-  const [predResult, perfResult, healthResult, readyResult, challengeResult] =
+  const [predResult, perfResult, healthResult, readyResult, challengeResult, liveResult] =
     await Promise.allSettled([
       getPredictions({ status: "scheduled", limit: 50 }),
       getPerformance("soccer"),
       getHealth(),
       getReady(),
       getChallenges({ mine: true }),
+      getLiveMatches(),
     ]);
 
   if (predResult.status === "fulfilled") {
@@ -60,6 +64,9 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   }
   if (challengeResult.status === "fulfilled") {
     myChallenges = challengeResult.value;
+  }
+  if (liveResult.status === "fulfilled") {
+    liveMatches = liveResult.value;
   }
 
   // Fallback to rich mock predictions when API has no data
@@ -87,6 +94,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         performance={performance}
         myChallenges={myChallenges}
         leaderboards={leaderboards}
+        liveMatches={liveMatches}
         systemStatus={{ api: apiOk, db: dbOk, env: "development" }}
         initialSport={sport}
         initialRange={range}

@@ -1,0 +1,235 @@
+"""
+Basketball prediction pipeline.
+
+Tries the live ML model from model_registry first; falls back to pure ELO
+if no trained model is available.
+
+Usage:
+    python -m pipelines.basketball.predict_basketball
+    python -m pipelines.basketball.predict_basketball --match-id <uuid>
+    python -m pipelines.basketball.predict_basketball --all
+"""
+
+from __future__ import annotations
+
+import argparse
+import logging
+import uuid
+from datetime import datetime, timezone
+from typing import Optional
+
+import numpy as np
+from sqlalchemy.orm import Session
+
+from core.types import MatchContext, Sport
+from db.models.mvp import CoreMatch, ModelRegistry, PredMatch, RatingEloTeam
+from db.session import SessionLocal
+from ratings.basketball_elo import BasketballEloEngine
+from pipelines.common.feature_engineering import (
+    FEATURE_NAMES,
+    build_feature_vector,
+)
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
+log = logging.getLogger(__name__)
+
+_SPORT = "basketball"
+
+
+# ── Model loading ──────────────────────────────────────────────────────────────
+
+def _try_load_model(session: Session) -> Optional[dict]:
+    """Load the live ML model if available; return None to fall back to ELO."""
+    try:
+        import joblib
+        reg = (
+            session.query(ModelRegistry)
+            .filter_by(sport=_SPORT, is_live=True)
+            .order_by(ModelRegistry.trained_at.desc())
+            .first()
+        )
+        if reg is None:
+            return None
+        payload = joblib.load(reg.artifact_path)
+        payload["registry"] = reg
+        payload["model_name"] = reg.model_name
+        log.info("Loaded ML model %s from %s", reg.model_name, reg.artifact_path)
+        return payload
+    except Exception as exc:
+        log.warning("Could not load ML model, falling back to ELO: %s", exc)
+        return None
+
+
+# ── ELO helpers ────────────────────────────────────────────────────────────────
+
+def _load_elo_engine(session: Session) -> BasketballEloEngine:
+    engine = BasketballEloEngine()
+    sport_match_ids = (
+        session.query(CoreMatch.id)
+        .filter(CoreMatch.sport == _SPORT)
+        .subquery()
+    )
+    rows = (
+        session.query(RatingEloTeam)
+        .filter(RatingEloTeam.match_id.in_(sport_match_ids))
+        .order_by(RatingEloTeam.rated_at.asc())
+        .all()
+    )
+    for r in rows:
+        engine.set_rating(r.team_id, r.rating_after)
+    log.info("Loaded ELO ratings for %d entries.", len(rows))
+    return engine
+
+
+def _elo_confidence(p_home: float, p_away: float) -> int:
+    return int(round(max(0, min(100, (max(p_home, p_away) - 0.5) * 200))))
+
+
+# ── Prediction ─────────────────────────────────────────────────────────────────
+
+def _predict_ml(match: CoreMatch, payload: dict, session: Session) -> dict:
+    """Return pred kwargs using the ML model."""
+    model = payload["model"]
+    vector, raw = build_feature_vector(session, match)
+    X = np.array(vector, dtype=float).reshape(1, -1)
+    X = np.nan_to_num(X, nan=0.0)
+
+    proba = model.predict_proba(X)[0]  # shape (2,) — [home_win, away_win]
+    p_home = float(proba[0])
+    p_away = float(proba[1])
+    # Normalise
+    total = p_home + p_away
+    p_home, p_away = p_home / total, p_away / total
+
+    confidence = int(round(max(0, min(100, abs(p_home - 0.5) * 200))))
+    drivers = [
+        {"feature": f, "importance": 0.0, "value": v}
+        for f, v in list(raw.items())[:5]
+    ]
+    return dict(
+        p_home=round(p_home, 4),
+        p_draw=0.0,
+        p_away=round(p_away, 4),
+        fair_odds_home=round(1.0 / p_home, 3) if p_home > 0 else 999.0,
+        fair_odds_draw=999.0,
+        fair_odds_away=round(1.0 / p_away, 3) if p_away > 0 else 999.0,
+        confidence=confidence,
+        key_drivers=drivers,
+        simulation={"n_simulations": 0, "distribution": []},
+        features_snapshot=raw,
+    )
+
+
+def _predict_elo(match: CoreMatch, engine: BasketballEloEngine, session: Session) -> dict:
+    """Return pred kwargs using ELO only."""
+    r_home = engine.get_rating(match.home_team_id)
+    r_away = engine.get_rating(match.away_team_id)
+    kickoff = match.kickoff_utc
+    if kickoff.tzinfo is None:
+        kickoff = kickoff.replace(tzinfo=timezone.utc)
+
+    context = MatchContext(
+        match_id=match.id, sport=Sport.BASKETBALL, date=kickoff,
+        home_entity_id=match.home_team_id, away_entity_id=match.away_team_id,
+        importance=1.0, extra={},
+    )
+    p_home, p_away = engine.win_probability(match.home_team_id, match.away_team_id, context)
+    p_home = round(p_home, 4)
+    p_away = round(1.0 - p_home, 4)
+    elo_diff = round(r_home - r_away, 1)
+    return dict(
+        p_home=p_home,
+        p_draw=0.0,
+        p_away=p_away,
+        fair_odds_home=round(1.0 / p_home, 3) if p_home > 0 else 999.0,
+        fair_odds_draw=999.0,
+        fair_odds_away=round(1.0 / p_away, 3) if p_away > 0 else 999.0,
+        confidence=_elo_confidence(p_home, p_away),
+        key_drivers=[
+            {"feature": "elo_home", "importance": 0.40, "value": round(r_home, 1)},
+            {"feature": "elo_away", "importance": 0.40, "value": round(r_away, 1)},
+            {"feature": "elo_diff", "importance": 0.20, "value": elo_diff},
+        ],
+        simulation={"n_simulations": 0, "distribution": []},
+        features_snapshot={"elo_home": r_home, "elo_away": r_away, "elo_diff": elo_diff},
+    )
+
+
+# ── Main loop ──────────────────────────────────────────────────────────────────
+
+def run_predictions(session: Session, matches: list[CoreMatch],
+                    payload: Optional[dict], engine: Optional[BasketballEloEngine]) -> int:
+    model_version = payload["model_name"] if payload else "elo-v1"
+    count = 0
+    for match in matches:
+        try:
+            if payload:
+                data = _predict_ml(match, payload, session)
+            else:
+                data = _predict_elo(match, engine, session)
+
+            existing = session.query(PredMatch).filter_by(
+                match_id=match.id, model_version=model_version
+            ).first()
+
+            if existing is None:
+                session.add(PredMatch(id=str(uuid.uuid4()), match_id=match.id,
+                                      model_version=model_version, **data))
+                log.info("  [+] %s  p_home=%.3f  p_away=%.3f  conf=%d%%",
+                         match.provider_id, data["p_home"], data["p_away"], data["confidence"])
+            else:
+                for k, v in data.items():
+                    setattr(existing, k, v)
+            count += 1
+        except Exception as exc:
+            log.warning("  SKIP %s: %s", match.id[:8], exc)
+    return count
+
+
+def run(match_id: Optional[str] = None, all_matches: bool = False) -> int:
+    session: Session = SessionLocal()
+    try:
+        payload = _try_load_model(session)
+        engine = _load_elo_engine(session) if not payload else None
+
+        if match_id:
+            matches = session.query(CoreMatch).filter(
+                CoreMatch.id == match_id, CoreMatch.sport == _SPORT
+            ).all()
+        elif all_matches:
+            matches = session.query(CoreMatch).filter(
+                CoreMatch.sport == _SPORT
+            ).order_by(CoreMatch.kickoff_utc.asc()).all()
+        else:
+            matches = (
+                session.query(CoreMatch)
+                .filter(CoreMatch.sport == _SPORT, CoreMatch.status == "scheduled")
+                .order_by(CoreMatch.kickoff_utc.asc())
+                .all()
+            )
+
+        log.info("Running basketball predictions for %d matches (model=%s)...",
+                 len(matches), payload["model_name"] if payload else "elo-v1")
+        count = run_predictions(session, matches, payload, engine)
+        session.commit()
+        log.info("Basketball predictions complete. %d rows upserted.", count)
+        return count
+
+    except Exception:
+        session.rollback()
+        log.exception("Prediction run failed")
+        raise
+    finally:
+        session.close()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Run basketball predictions")
+    parser.add_argument("--match-id")
+    parser.add_argument("--all", dest="all_matches", action="store_true")
+    args = parser.parse_args()
+    run(match_id=args.match_id, all_matches=args.all_matches)
+
+
+if __name__ == "__main__":
+    main()

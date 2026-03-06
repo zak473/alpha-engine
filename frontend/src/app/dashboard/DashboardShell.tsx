@@ -10,13 +10,16 @@ import { CompareModal } from "@/components/dashboard/CompareModal";
 import { DashboardLeftRail } from "@/components/dashboard/DashboardLeftRail";
 import { SlipRail } from "@/components/dashboard/SlipRail";
 import { DecisionQueue, type QueueItem } from "@/components/dashboard/DecisionQueue";
+import { InPlayModule } from "@/components/dashboard/InPlayModule";
 import type { MvpPrediction, MvpPerformance, Challenge, LeaderboardOut } from "@/lib/types";
+import type { LiveMatchOut } from "@/lib/api";
 
 interface DashboardShellProps {
   predictions: MvpPrediction[];
   performance: MvpPerformance | null;
   myChallenges: Challenge[];
   leaderboards: LeaderboardOut[];
+  liveMatches: LiveMatchOut[];
   systemStatus: { api: boolean; db: boolean; env: string };
   initialSport: SportFilter;
   initialRange: RangeFilter;
@@ -28,6 +31,7 @@ export function DashboardShell({
   performance,
   myChallenges,
   leaderboards,
+  liveMatches,
   systemStatus,
   initialSport,
   initialRange,
@@ -189,6 +193,16 @@ export function DashboardShell({
             }} />
             <span style={{ color: "var(--text2)" }}>{systemStatus.api && systemStatus.db ? "Live" : "Degraded"}</span>
           </span>
+          {liveMatches.filter((m) => m.is_live).length > 0 && (
+            <span className="kpi-bar-item">
+              <span className="relative flex h-1.5 w-1.5 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500" />
+              </span>
+              <span style={{ color: "var(--text2)" }}>Live</span>
+              <span className="num" style={{ fontWeight: 600, color: "#22c55e" }}>{liveMatches.filter((m) => m.is_live).length}</span>
+            </span>
+          )}
           {queueItems.length > 0 && (
             <span className="kpi-bar-item">
               <span style={{ color: "var(--text2)" }}>Queue</span>
@@ -226,8 +240,12 @@ export function DashboardShell({
             stickyOffset={0}
           />
 
-          {/* Bottom panels: Performance + ELO + Challenges */}
+          {/* Bottom panels: InPlay + Performance + ELO + Challenges */}
           <div className="p-4 space-y-4 border-t border-surface-border">
+            {/* InPlay — full width if there are live matches */}
+            {liveMatches.length > 0 && (
+              <InPlayModule matches={liveMatches} />
+            )}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               <PerformanceSnapshot performance={performance} />
               <div className="space-y-4">

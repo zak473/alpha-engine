@@ -19,6 +19,8 @@ class Sport(str, Enum):
     SOCCER = "soccer"
     TENNIS = "tennis"
     ESPORTS = "esports"
+    BASKETBALL = "basketball"
+    BASEBALL = "baseball"
 
 
 class Outcome(str, Enum):

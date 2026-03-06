@@ -126,7 +126,7 @@ function PredictionDrawer({ p, mode }: { p: MvpPrediction; mode: SignalMode }) {
           <span className="text-2xs text-text-muted">Lean</span>
           <span className="text-xs font-medium text-text-primary">{pick.label} ({pick.pct}%)</span>
         </div>
-        {p.model.version && (
+        {p.model?.version && (
           <span className="text-2xs text-text-subtle font-mono ml-auto">{p.model.version}</span>
         )}
       </div>
@@ -502,7 +502,7 @@ export function TopSignalsTable({
               <div key={p.event_id} className={cn("group/row", isKeyboard && !expanded && "bg-white/[0.015]")}>
                 {/* Row */}
                 <button
-                  onClick={() => { toggle(p.event_id); setSelectedIdx(idx); }}
+                  onClick={() => window.open(`/sports/${p.sport}/matches/${p.event_id}`, "_blank")}
                   className={cn(
                     "w-full flex items-center gap-2.5 px-4 py-3 text-left transition-colors",
                     "hover:bg-white/[0.025]",
@@ -580,7 +580,7 @@ export function TopSignalsTable({
                     >
                       <Star size={12} fill={isWatched ? "currentColor" : "none"} />
                     </button>
-                    <Link href={`/matches/${p.event_id}`} onClick={(e) => e.stopPropagation()} title="View match" className="p-1.5 rounded hover:bg-white/[0.06] transition-colors text-text-subtle hover:text-text-muted">
+                    <Link href={`/sports/${p.sport}/matches/${p.event_id}`} onClick={(e) => e.stopPropagation()} target="_blank" rel="noopener noreferrer" title="View match" className="p-1.5 rounded hover:bg-white/[0.06] transition-colors text-text-subtle hover:text-text-muted">
                       <Eye size={12} />
                     </Link>
                     <button
