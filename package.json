@@ -1,0 +1,12 @@
+{
+  "name": "alpha-engine",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "preinstall": "cd frontend && npm install",
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "start": "cd frontend && npm run start",
+    "lint": "cd frontend && npm run lint"
+  }
+}
