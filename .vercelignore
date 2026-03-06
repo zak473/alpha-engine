@@ -1,0 +1,19 @@
+# Ignore Python backend entirely
+*.py
+api/
+alembic/
+requirements.txt
+pyproject.toml
+.python-version
+Pipfile*
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Other non-frontend files
+docker-compose*.yml
+Dockerfile*
+.env*
+scripts/
+docs/
