@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, X, SlidersHorizontal } from "lucide-react";
+import { Search, X, SlidersHorizontal, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BettingFilter } from "@/lib/betting-types";
 import { DEFAULT_BETTING_FILTER } from "@/lib/betting-types";
@@ -18,68 +18,78 @@ type Chip<T extends string = string> = { value: T; label: string };
 
 const STATUS_CHIPS: Chip<BettingFilter["status"]>[] = [
   { value: "all",      label: "Active" },
-  { value: "live",     label: "● Live" },
+  { value: "live",     label: "Live" },
   { value: "upcoming", label: "Upcoming" },
   { value: "finished", label: "Results" },
 ];
 
 const TIME_CHIPS: Chip<BettingFilter["time"]>[] = [
-  { value: "all",      label: "Any time" },
+  { value: "all",      label: "Any" },
   { value: "today",    label: "Today" },
   { value: "tomorrow", label: "Tomorrow" },
 ];
 
 const EDGE_CHIPS: Chip<BettingFilter["edge"]>[] = [
-  { value: "all", label: "Any edge" },
-  { value: "1",   label: "> 1%" },
-  { value: "3",   label: "> 3%" },
-  { value: "5",   label: "> 5%" },
+  { value: "all", label: "Any" },
+  { value: "1",   label: "+1%" },
+  { value: "3",   label: "+3%" },
+  { value: "5",   label: "+5%" },
 ];
 
 const CONF_CHIPS: Chip<BettingFilter["confidence"]>[] = [
-  { value: "all", label: "Any conf." },
-  { value: "55",  label: "> 55%" },
-  { value: "65",  label: "> 65%" },
-  { value: "75",  label: "> 75%" },
+  { value: "all", label: "Any" },
+  { value: "55",  label: "55%+" },
+  { value: "65",  label: "65%+" },
+  { value: "75",  label: "75%+" },
 ];
 
 function ChipGroup<T extends string>({
   chips,
   value,
   onChange,
-  accent,
+  label,
+  accentLive,
 }: {
   chips: Chip<T>[];
   value: T;
   onChange: (v: T) => void;
-  accent?: boolean;
+  label: string;
+  accentLive?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-1">
-      {chips.map((c) => {
-        const active = c.value === value;
-        const isLive = c.value === "live";
-        return (
-          <button
-            key={c.value}
-            onClick={() => onChange(c.value)}
-            className={cn(
-              "px-2.5 py-1 rounded-full text-[11px] font-medium transition-all duration-120 whitespace-nowrap",
-              active
-                ? isLive
-                  ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                  : "border text-[var(--accent)]"
-                : "text-text-muted border border-transparent hover:text-text-primary hover:bg-white/[0.05]"
-            )}
-            style={active && !isLive ? {
-              background: "var(--accent-dim)",
-              borderColor: "rgba(34,211,238,0.3)",
-            } : {}}
-          >
-            {c.label}
-          </button>
-        );
-      })}
+    <div className="flex items-center gap-1.5">
+      <span className="text-[10px] font-medium text-text-subtle uppercase tracking-wide flex-shrink-0">
+        {label}
+      </span>
+      <div className="flex items-center gap-0.5">
+        {chips.map((c) => {
+          const active = c.value === value;
+          const isLive = accentLive && c.value === "live";
+          return (
+            <button
+              key={c.value}
+              onClick={() => onChange(c.value)}
+              className={cn(
+                "px-2 py-1 rounded-md text-[11px] font-medium transition-all duration-120 whitespace-nowrap",
+                active
+                  ? isLive
+                    ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                    : "border text-[var(--accent)]"
+                  : "text-text-muted border border-transparent hover:text-text-primary hover:bg-white/[0.05]"
+              )}
+              style={active && !isLive ? {
+                background: "var(--accent-dim)",
+                borderColor: "rgba(34,211,238,0.3)",
+              } : {}}
+            >
+              {isLive && active && (
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 mr-1 inline-block animate-pulse" />
+              )}
+              {c.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -105,24 +115,25 @@ export function StickyFilterBar({
 
   return (
     <div
-      className="sticky top-[var(--topbar-height)] z-20 border-b"
+      className="sticky top-0 z-20 border-b flex-shrink-0"
       style={{
-        background: "rgba(4,4,15,0.85)",
+        background: "rgba(4,4,15,0.92)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
         borderColor: "var(--border0)",
       }}
     >
-      {/* Row 1: Search + Queue toggle */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b" style={{ borderColor: "var(--border0)" }}>
+      {/* Row 1: Search + actions */}
+      <div className="flex items-center gap-3 px-4 py-2.5 border-b" style={{ borderColor: "var(--border0)" }}>
+        {/* Search */}
         <div className="relative flex-1 max-w-xs">
           <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle pointer-events-none" />
           <input
             type="text"
-            placeholder="Search teams, leagues…"
+            placeholder="Search teams, leagues..."
             value={filter.search}
             onChange={(e) => set("search", e.target.value)}
-            className="input-field pl-7 text-xs h-7"
+            className="input-field pl-7 text-xs h-8"
           />
           {filter.search && (
             <button
@@ -134,56 +145,95 @@ export function StickyFilterBar({
           )}
         </div>
 
-        <span className="text-[11px] text-text-muted flex-shrink-0">
-          {totalShown} games
+        {/* Count */}
+        <span className="text-[11px] text-text-muted flex-shrink-0 tabular-nums">
+          <span className="text-text-primary font-semibold">{totalShown}</span> games
         </span>
 
+        {/* Clear filters */}
         {dirty && (
           <button
             onClick={reset}
             className="text-[11px] text-text-muted hover:text-[var(--accent)] transition-colors flex-shrink-0 flex items-center gap-1"
           >
-            <X size={11} /> Clear
+            <X size={11} /> Clear filters
           </button>
         )}
 
         <div className="flex-1" />
 
+        {/* Top picks button */}
         {onShowTopPicks && (
           <button
             onClick={onShowTopPicks}
-            className="btn btn-sm btn-secondary text-[11px] flex-shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
+            style={{
+              background: "linear-gradient(135deg, rgba(251,191,36,0.15) 0%, rgba(251,191,36,0.08) 100%)",
+              color: "var(--warning)",
+              border: "1px solid rgba(251,191,36,0.25)",
+            }}
           >
-            Top picks
+            <Zap size={12} />
+            Show top picks
           </button>
         )}
 
-        {/* Queue pill */}
+        {/* Queue pill (mobile) */}
         {onShowQueueRail && (
           <button
             onClick={onShowQueueRail}
             className={cn(
-              "flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium transition-all flex-shrink-0",
+              "lg:hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-medium transition-all flex-shrink-0",
               queue.length > 0
                 ? "text-[var(--accent)] border-[rgba(34,211,238,0.3)] bg-[var(--accent-dim)]"
-                : "text-text-muted border-transparent hover:bg-white/[0.05]"
+                : "text-text-muted border-[var(--border0)] hover:bg-white/[0.05]"
             )}
           >
             <SlidersHorizontal size={11} />
-            Queue {queue.length > 0 && <span className="font-bold">{queue.length}</span>}
+            {queue.length > 0 ? queue.length : "Queue"}
           </button>
         )}
       </div>
 
       {/* Row 2: Filter chips */}
-      <div className="flex items-center gap-3 px-4 py-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-        <ChipGroup chips={STATUS_CHIPS} value={filter.status} onChange={(v) => set("status", v)} />
-        <div className="w-px h-4 bg-white/[0.07] flex-shrink-0" />
-        <ChipGroup chips={TIME_CHIPS} value={filter.time} onChange={(v) => set("time", v)} />
-        <div className="w-px h-4 bg-white/[0.07] flex-shrink-0" />
-        <ChipGroup chips={EDGE_CHIPS} value={filter.edge} onChange={(v) => set("edge", v)} />
-        <div className="w-px h-4 bg-white/[0.07] flex-shrink-0" />
-        <ChipGroup chips={CONF_CHIPS} value={filter.confidence} onChange={(v) => set("confidence", v)} />
+      <div 
+        className="flex items-center gap-4 px-4 py-2 overflow-x-auto" 
+        style={{ scrollbarWidth: "none" }}
+      >
+        <ChipGroup 
+          chips={STATUS_CHIPS} 
+          value={filter.status} 
+          onChange={(v) => set("status", v)}
+          label="Status"
+          accentLive
+        />
+        
+        <div className="w-px h-5 bg-white/[0.07] flex-shrink-0" />
+        
+        <ChipGroup 
+          chips={TIME_CHIPS} 
+          value={filter.time} 
+          onChange={(v) => set("time", v)}
+          label="Time"
+        />
+        
+        <div className="w-px h-5 bg-white/[0.07] flex-shrink-0" />
+        
+        <ChipGroup 
+          chips={EDGE_CHIPS} 
+          value={filter.edge} 
+          onChange={(v) => set("edge", v)}
+          label="Edge"
+        />
+        
+        <div className="w-px h-5 bg-white/[0.07] flex-shrink-0" />
+        
+        <ChipGroup 
+          chips={CONF_CHIPS} 
+          value={filter.confidence} 
+          onChange={(v) => set("confidence", v)}
+          label="Conf"
+        />
       </div>
     </div>
   );

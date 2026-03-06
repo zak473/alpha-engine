@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Trash2, TrendingUp, ChevronRight, CheckCircle2, Loader2 } from "lucide-react";
+import { X, Trash2, TrendingUp, ChevronRight, CheckCircle2, Loader2, Zap, Plus } from "lucide-react";
 import type { BettingMatch, QueueSelection } from "@/lib/betting-types";
 import { useBetting } from "./BettingContext";
 import { TopPicksMiniModule } from "./TopPicksMiniModule";
@@ -18,31 +18,50 @@ function QueueItem({ sel, onRemove }: { sel: QueueSelection; onRemove: () => voi
   const edge = sel.edge ?? 0;
 
   return (
-    <div className="flex items-start gap-2 p-3 rounded-lg border relative group"
-         style={{ background: "var(--glass-bg)", borderColor: "var(--glass-border)" }}>
+    <div 
+      className="flex items-start gap-2.5 p-3 rounded-lg border relative group transition-all"
+      style={{ 
+        background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.015) 100%)", 
+        borderColor: "rgba(255,255,255,0.08)" 
+      }}
+    >
       {/* Sport dot */}
-      <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
-            style={{ background: cfg.color }} />
+      <span 
+        className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+        style={{ background: cfg.color }} 
+      />
 
       <div className="flex-1 min-w-0">
         {/* Match */}
         <p className="text-[11px] text-text-muted leading-tight truncate">{sel.matchLabel}</p>
         {/* Market + selection */}
-        <p className="text-xs font-semibold text-text-primary leading-tight mt-0.5">
+        <p className="text-xs font-semibold text-text-primary leading-tight mt-1">
           {sel.selectionLabel}
           <span className="text-text-muted font-normal"> · {sel.marketName}</span>
         </p>
         {/* Meta */}
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-xs font-mono font-bold text-text-primary">{sel.odds.toFixed(2)}</span>
+        <div className="flex items-center gap-2 mt-1.5">
+          <span className="text-xs font-mono font-bold text-text-primary tabular-nums">
+            {sel.odds.toFixed(2)}
+          </span>
           {edge !== 0 && (
-            <span className="text-[10px] font-semibold"
-                  style={{ color: edge > 0 ? "var(--positive)" : "var(--negative)" }}>
+            <span 
+              className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+              style={{ 
+                color: edge > 0 ? "var(--positive)" : "var(--negative)",
+                background: edge > 0 ? "var(--positive-dim)" : "var(--negative-dim)",
+              }}
+            >
               {edge > 0 ? "+" : ""}{edge.toFixed(1)}%
             </span>
           )}
           {soon && (
-            <span className="text-[10px]" style={{ color: "var(--warning)" }}>Soon</span>
+            <span 
+              className="text-[10px] px-1.5 py-0.5 rounded"
+              style={{ color: "var(--warning)", background: "var(--warning-dim)" }}
+            >
+              Soon
+            </span>
           )}
         </div>
       </div>
@@ -50,7 +69,7 @@ function QueueItem({ sel, onRemove }: { sel: QueueSelection; onRemove: () => voi
       {/* Remove button */}
       <button
         onClick={onRemove}
-        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-text-muted hover:text-[var(--negative)]"
+        className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md text-text-muted hover:text-[var(--negative)] hover:bg-[var(--negative-dim)]"
         aria-label="Remove from queue"
       >
         <X size={12} />
@@ -67,23 +86,79 @@ function EvSummary({ queue }: { queue: QueueSelection[] }) {
   const parlayOdds = queue.reduce((p, q) => p * q.odds, 1);
 
   return (
-    <div className="grid grid-cols-3 gap-2 p-3 rounded-lg border"
-         style={{ background: "rgba(34,211,238,0.04)", borderColor: "rgba(34,211,238,0.12)" }}>
-      <div className="text-center">
-        <p className="text-[10px] text-text-muted">Avg odds</p>
-        <p className="text-xs font-mono font-bold text-text-primary">{avgOdds.toFixed(2)}</p>
-      </div>
-      <div className="text-center border-x" style={{ borderColor: "rgba(34,211,238,0.12)" }}>
-        <p className="text-[10px] text-text-muted">Avg edge</p>
-        <p className="text-xs font-bold"
-           style={{ color: avgEdge > 0 ? "var(--positive)" : "var(--negative)" }}>
-          {avgEdge > 0 ? "+" : ""}{avgEdge.toFixed(1)}%
+    <div 
+      className="grid grid-cols-3 gap-px rounded-lg overflow-hidden"
+      style={{ 
+        background: "rgba(255,255,255,0.06)",
+        border: "1px solid rgba(34,211,238,0.15)",
+      }}
+    >
+      <SummaryCell label="Avg odds" value={avgOdds.toFixed(2)} mono />
+      <SummaryCell 
+        label="Avg edge" 
+        value={`${avgEdge > 0 ? "+" : ""}${avgEdge.toFixed(1)}%`} 
+        color={avgEdge > 0 ? "var(--positive)" : "var(--negative)"}
+      />
+      <SummaryCell label="Parlay" value={parlayOdds.toFixed(2)} mono />
+    </div>
+  );
+}
+
+function SummaryCell({ 
+  label, 
+  value, 
+  mono, 
+  color 
+}: { 
+  label: string; 
+  value: string; 
+  mono?: boolean;
+  color?: string;
+}) {
+  return (
+    <div className="text-center py-2.5 px-2" style={{ background: "rgba(4,4,15,0.6)" }}>
+      <p className="text-[9px] text-text-muted uppercase tracking-wider mb-0.5">{label}</p>
+      <p 
+        className={cn("text-xs font-bold", mono && "font-mono tabular-nums")}
+        style={{ color: color ?? "var(--text0)" }}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+
+function EmptyQueueState({ matches }: { matches: BettingMatch[] }) {
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Helper copy */}
+      <div className="text-center py-3">
+        <div 
+          className="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center"
+          style={{ 
+            background: "linear-gradient(135deg, rgba(34,211,238,0.12) 0%, rgba(34,211,238,0.04) 100%)",
+            border: "1px solid rgba(34,211,238,0.2)",
+          }}
+        >
+          <Plus size={20} style={{ color: "var(--accent)" }} />
+        </div>
+        <p className="text-sm font-semibold text-text-primary">Your slip is empty</p>
+        <p className="text-[11px] text-text-muted mt-1 leading-relaxed px-2">
+          Tap any odds button on a match card to add it to your queue.
         </p>
       </div>
-      <div className="text-center">
-        <p className="text-[10px] text-text-muted">Parlay</p>
-        <p className="text-xs font-mono font-bold text-text-primary">{parlayOdds.toFixed(2)}</p>
+
+      {/* Divider */}
+      <div className="flex items-center gap-2 px-2">
+        <div className="flex-1 h-px" style={{ background: "var(--border0)" }} />
+        <span className="text-[9px] text-text-subtle uppercase tracking-widest">or try these</span>
+        <div className="flex-1 h-px" style={{ background: "var(--border0)" }} />
       </div>
+
+      {/* Top picks module */}
+      <TopPicksMiniModule matches={matches} />
     </div>
   );
 }
@@ -133,11 +208,11 @@ export function QueueRail({ matches }: QueueRailProps) {
     <aside
       className="hidden lg:flex flex-col gap-0 flex-shrink-0 border-l"
       style={{
-        width: "260px",
+        width: "280px",
         borderColor: "var(--border0)",
-        background: "linear-gradient(180deg, rgba(8,8,24,0.6) 0%, rgba(4,4,15,0.7) 100%)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
+        background: "linear-gradient(180deg, rgba(8,8,24,0.95) 0%, rgba(4,4,15,0.98) 100%)",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
         position: "sticky",
         top: 0,
         height: "100vh",
@@ -149,14 +224,23 @@ export function QueueRail({ matches }: QueueRailProps) {
         className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0"
         style={{ borderColor: "var(--border0)" }}
       >
-        <div className="flex items-center gap-2">
-          <TrendingUp size={13} style={{ color: "var(--accent)" }} />
-          <span className="text-xs font-bold text-text-primary uppercase tracking-wider">
+        <div className="flex items-center gap-2.5">
+          <div 
+            className="w-6 h-6 rounded-md flex items-center justify-center"
+            style={{ 
+              background: queue.length > 0 
+                ? "linear-gradient(135deg, var(--accent) 0%, #06b6d4 100%)"
+                : "rgba(255,255,255,0.06)",
+            }}
+          >
+            <TrendingUp size={12} color={queue.length > 0 ? "#000" : "var(--text1)"} />
+          </div>
+          <span className="text-xs font-bold text-text-primary">
             Queue
           </span>
           {queue.length > 0 && (
             <span
-              className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full"
               style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
             >
               {queue.length}
@@ -175,20 +259,9 @@ export function QueueRail({ matches }: QueueRailProps) {
       </div>
 
       {/* Body */}
-      <div className="flex flex-col gap-4 p-4 flex-1">
+      <div className="flex flex-col gap-4 p-4 flex-1 overflow-y-auto">
         {isEmpty ? (
-          <>
-            {/* Empty state copy */}
-            <div className="text-center py-4">
-              <p className="text-xs font-semibold text-text-primary">Your slip is empty</p>
-              <p className="text-[11px] text-text-muted mt-1 leading-relaxed">
-                Tap any odds button to add a pick.
-              </p>
-            </div>
-
-            {/* Top picks auto-populated */}
-            <TopPicksMiniModule matches={matches} />
-          </>
+          <EmptyQueueState matches={matches} />
         ) : (
           <>
             {/* Queue items */}
@@ -209,14 +282,14 @@ export function QueueRail({ matches }: QueueRailProps) {
             <button
               onClick={handleTrack}
               disabled={tracking || tracked}
-              className="btn btn-primary w-full flex items-center justify-center gap-1.5 disabled:opacity-70"
+              className="btn btn-primary w-full flex items-center justify-center gap-2 h-10 disabled:opacity-70"
             >
               {tracked ? (
-                <><CheckCircle2 size={13} /> Tracked!</>
+                <><CheckCircle2 size={14} /> Tracked!</>
               ) : tracking ? (
-                <><Loader2 size={13} className="animate-spin" /> Saving…</>
+                <><Loader2 size={14} className="animate-spin" /> Saving...</>
               ) : (
-                <>Track these picks <ChevronRight size={13} /></>
+                <>Track picks <ChevronRight size={14} /></>
               )}
             </button>
 
@@ -225,6 +298,19 @@ export function QueueRail({ matches }: QueueRailProps) {
             </p>
           </>
         )}
+      </div>
+
+      {/* Footer hint */}
+      <div 
+        className="px-4 py-3 border-t flex-shrink-0"
+        style={{ borderColor: "var(--border0)" }}
+      >
+        <div className="flex items-center gap-2">
+          <Zap size={11} style={{ color: "var(--warning)" }} />
+          <span className="text-[10px] text-text-muted">
+            Track picks to monitor your ROI over time
+          </span>
+        </div>
       </div>
     </aside>
   );

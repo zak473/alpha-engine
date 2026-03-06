@@ -1,105 +1,54 @@
 import { AppShell } from "@/components/layout/AppShell";
-import {
-  getPredictions,
-  getPerformance,
-  getHealth,
-  getReady,
-  getMockPredictions,
-  getChallenges,
-  getLeaderboard,
-  getLiveMatches,
-  type LiveMatchOut,
-} from "@/lib/api";
-import { mvpToMatch } from "@/lib/transforms";
-import type { MvpPrediction, MvpPerformance, Challenge, LeaderboardOut } from "@/lib/types";
-import { DashboardShell } from "./DashboardShell";
-import type { SportFilter, RangeFilter } from "@/components/dashboard/FilterBar";
+import { BettingDashboard } from "@/components/betting/BettingDashboard";
+import { getSportMatches, type SportSlug } from "@/lib/api";
+import { adaptToMatchCard } from "@/lib/betting-adapters";
+import type { BettingMatch } from "@/lib/betting-types";
+import { MOCK_MATCHES } from "@/lib/mock-betting-data";
 
 export const revalidate = 30;
 
-interface PageProps {
-  searchParams: { sport?: string; range?: string };
+const SPORTS: SportSlug[] = ["soccer", "basketball", "tennis", "esports", "baseball"];
+
+async function getMatches(): Promise<BettingMatch[]> {
+  try {
+    // Try to fetch from backend
+    const results = await Promise.allSettled(
+      SPORTS.map((sport) =>
+        getSportMatches(sport, { limit: 50 })
+          .then((res) => res.items.map((item) => adaptToMatchCard(item, sport)))
+      )
+    );
+
+    const allMatches: BettingMatch[] = results
+      .filter((r): r is PromiseFulfilledResult<BettingMatch[]> => r.status === "fulfilled")
+      .flatMap((r) => r.value);
+
+    // If we got data, use it; otherwise fall back to mock
+    if (allMatches.length > 0) {
+      return allMatches;
+    }
+    return MOCK_MATCHES;
+  } catch {
+    // Backend unavailable, use mock data
+    return MOCK_MATCHES;
+  }
 }
 
-export default async function DashboardPage({ searchParams }: PageProps) {
-  // Parse URL filters
-  const sport  = (["soccer", "tennis", "esports", "basketball", "baseball"].includes(searchParams.sport ?? "")
-    ? searchParams.sport as SportFilter
-    : "all");
-  const range  = (["today", "7d", "30d"].includes(searchParams.range ?? "")
-    ? searchParams.range as RangeFilter
-    : "today");
+export default async function DashboardPage() {
+  const allMatches = await getMatches();
 
-  // ── Data fetching ──────────────────────────────────────────────────────────
-  let predictions: MvpPrediction[] = [];
-  let performance: MvpPerformance | null = null;
-  let myChallenges: Challenge[] = [];
-  let leaderboards: LeaderboardOut[] = [];
-  let liveMatches: LiveMatchOut[] = [];
-  let apiOk = false;
-  let dbOk  = false;
-
-  const [predResult, perfResult, healthResult, readyResult, challengeResult, liveResult] =
-    await Promise.allSettled([
-      getPredictions({ status: "scheduled", limit: 50 }),
-      getPerformance("soccer"),
-      getHealth(),
-      getReady(),
-      getChallenges({ mine: true }),
-      getLiveMatches(),
-    ]);
-
-  if (predResult.status === "fulfilled") {
-    predictions = predResult.value.items;
-  }
-  if (perfResult.status === "fulfilled") {
-    performance = perfResult.value;
-  }
-  if (healthResult.status === "fulfilled") {
-    apiOk = healthResult.value.status === "ok";
-  }
-  if (readyResult.status === "fulfilled") {
-    dbOk = readyResult.value.db === true;
-    if (readyResult.value.status === "ok") apiOk = true;
-  }
-  if (challengeResult.status === "fulfilled") {
-    myChallenges = challengeResult.value;
-  }
-  if (liveResult.status === "fulfilled") {
-    liveMatches = liveResult.value;
-  }
-
-  // Fallback to rich mock predictions when API has no data
-  if (predictions.length === 0) {
-    predictions = getMockPredictions();
-  }
-
-  // Fetch leaderboards for each active challenge
-  if (myChallenges.length > 0) {
-    const lbResults = await Promise.allSettled(
-      myChallenges
-        .filter((c) => new Date(c.end_at).getTime() > Date.now())
-        .slice(0, 4)
-        .map((c) => getLeaderboard(c.id))
-    );
-    leaderboards = lbResults
-      .filter((r): r is PromiseFulfilledResult<LeaderboardOut> => r.status === "fulfilled")
-      .map((r) => r.value);
-  }
+  // Sort: live first, then by edge, then by start time
+  const sorted = [...allMatches].sort((a, b) => {
+    if (a.status === "live" && b.status !== "live") return -1;
+    if (b.status === "live" && a.status !== "live") return 1;
+    const edgeDiff = (b.edgePercent ?? 0) - (a.edgePercent ?? 0);
+    if (Math.abs(edgeDiff) > 0.5) return edgeDiff;
+    return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+  });
 
   return (
-    <AppShell title="Dashboard" subtitle="Command Center" compact>
-      <DashboardShell
-        predictions={predictions}
-        performance={performance}
-        myChallenges={myChallenges}
-        leaderboards={leaderboards}
-        liveMatches={liveMatches}
-        systemStatus={{ api: apiOk, db: dbOk, env: "development" }}
-        initialSport={sport}
-        initialRange={range}
-        userId="user-demo"
-      />
+    <AppShell title="Today" subtitle="Find your edge" compact>
+      <BettingDashboard matches={sorted} />
     </AppShell>
   );
 }
