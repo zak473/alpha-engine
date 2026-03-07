@@ -29,11 +29,8 @@ import type {
   BaseballMatchDetail,
 } from "./types";
 
-// Server components need absolute URLs; browser fetches use the Next.js rewrite proxy.
-const API_ORIGIN =
-  typeof window === "undefined"
-    ? (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000")
-    : "";
+// Always use the absolute backend URL (works for both SSR and browser).
+const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const BASE = `${API_ORIGIN}/api/v1`;
 
