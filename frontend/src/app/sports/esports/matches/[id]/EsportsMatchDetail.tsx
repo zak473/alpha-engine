@@ -131,7 +131,7 @@ function Panel({ title, subtitle, badge, action, padded = true, children }: {
 
 function MetricRow({ label, value, sub, accent }: { label: string; value: React.ReactNode; sub?: string; accent?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-zinc-800/50 last:border-0">
+    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-b0 last:border-0">
       <span className="text-2xs text-t2 shrink-0">{label}</span>
       <div className="text-right">
         <span className={cn("text-xs font-mono font-medium", accent ? "text-accent-blue" : "text-t1")}>{value}</span>
@@ -143,10 +143,10 @@ function MetricRow({ label, value, sub, accent }: { label: string; value: React.
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    scheduled: "bg-zinc-700/40 text-zinc-400",
-    live:      "bg-green-500/20 text-green-400 animate-pulse",
-    finished:  "bg-zinc-700/40 text-zinc-400",
-    cancelled: "bg-red-500/20 text-red-400",
+    scheduled: "bg-bg2 text-t2 border border-b0",
+    live:      "bg-positive/10 text-positive border border-positive/20",
+    finished:  "bg-bg2 text-t2 border border-b0",
+    cancelled: "bg-negative/10 text-negative border border-negative/20",
   };
   return (
     <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded text-2xs font-medium uppercase tracking-wide", map[status] ?? map.scheduled)}>
@@ -372,7 +372,7 @@ function EsportsMatchHeader({ match }: { match: EsportsMatch }) {
 
 function KpiCell({ label, value, sub, accent }: { label: string; value: React.ReactNode; sub?: string; accent?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 px-3 py-2 border-r border-zinc-800/50 last:border-0 min-w-0">
+    <div className="flex flex-col gap-0.5 px-3 py-2 border-r border-b0 last:border-0 min-w-0">
       <span className="text-2xs text-t3 uppercase tracking-wide truncate">{label}</span>
       <span className={cn("text-xs font-mono font-semibold truncate", accent ?? "text-t1")}>{value}</span>
       {sub && <span className="text-2xs text-t3 truncate">{sub}</span>}
@@ -404,7 +404,7 @@ function EsportsKpiStrip({ match }: { match: EsportsMatch }) {
 
   return (
     <div className="card mb-3 overflow-x-auto">
-      <div className="flex border-b border-zinc-800/60">
+      <div className="flex border-b border-b0">
         <KpiCell label="Model P(A)" value={p ? `${Math.round(p.home_win * 100)}%` : "—"} sub={match.home.name.split(" ").slice(-1)[0]} accent={p ? "text-accent-blue" : undefined} />
         <KpiCell label="Model P(B)" value={p ? `${Math.round(p.away_win * 100)}%` : "—"} sub={match.away.name.split(" ").slice(-1)[0]} />
         <KpiCell label="ELO P(A)" value={eloH} accent="text-accent-purple" />
@@ -512,7 +512,7 @@ function Cs2PlayerTable({ players, teamName }: { players: EsportsPlayerStatsOut[
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
-          <tr className="border-b border-zinc-800/60">
+          <tr className="border-b border-b0">
             <th className="text-left py-1.5 px-2 text-t3 font-medium">{teamName}</th>
             {cols.slice(1).map(c => <th key={c} className="text-center py-1.5 px-2 text-t3 font-medium">{c}</th>)}
           </tr>
@@ -543,7 +543,7 @@ function Cs2OverviewPanel({ match }: { match: EsportsMatch }) {
   const fA = match.form_away;
   return (
     <Panel title="Team Form Comparison" subtitle="Series form">
-      <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-zinc-800/60 text-2xs text-t3 font-medium">
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-b0 text-2xs text-t3 font-medium">
         <span>{match.home.name}</span><span className="text-center">Stat</span><span className="text-right">{match.away.name}</span>
       </div>
       {[
@@ -560,7 +560,7 @@ function Cs2OverviewPanel({ match }: { match: EsportsMatch }) {
         const bWins = vA != null && vB != null && vB > vA;
         const fmt = (v: number | null) => v == null ? "—" : `${v.toFixed(1)}${unit}`;
         return (
-          <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 py-1.5 border-b border-zinc-800/50 last:border-0 text-xs font-mono">
+          <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 py-1.5 border-b border-b0 last:border-0 text-xs font-mono">
             <span className={cn("font-medium", aWins ? "text-accent-green" : "text-t1")}>{fmt(vA)}</span>
             <span className="text-2xs text-t3 text-center whitespace-nowrap">{label}</span>
             <span className={cn("font-medium text-right", bWins ? "text-accent-green" : "text-t1")}>{fmt(vB)}</span>
@@ -665,7 +665,7 @@ function LolPlayerTable({ players, teamName }: { players: EsportsPlayerStatsOut[
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
-          <tr className="border-b border-zinc-800/60">
+          <tr className="border-b border-b0">
             <th className="text-left py-1.5 px-2 text-t3 font-medium">{teamName}</th>
             <th className="text-center py-1.5 px-2 text-t3 font-medium">Role</th>
             <th className="text-center py-1.5 px-2 text-t3 font-medium">KDA</th>
@@ -707,7 +707,7 @@ function LolOverviewPanel({ match }: { match: EsportsMatch }) {
 
   return (
     <Panel title="Team Style Metrics" subtitle="Series overview">
-      <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-zinc-800/60 text-2xs text-t3 font-medium">
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-b0 text-2xs text-t3 font-medium">
         <span>{match.home.name}</span><span className="text-center">Stat</span><span className="text-right">{match.away.name}</span>
       </div>
       {[
@@ -719,7 +719,7 @@ function LolOverviewPanel({ match }: { match: EsportsMatch }) {
         const bWins = vA != null && vB != null && vB > vA;
         const fmt = (v: number | null) => v == null ? "—" : `${v.toFixed(1)}${unit}`;
         return (
-          <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 py-1.5 border-b border-zinc-800/50 last:border-0 text-xs font-mono">
+          <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 py-1.5 border-b border-b0 last:border-0 text-xs font-mono">
             <span className={cn("font-medium", aWins ? "text-accent-green" : "text-t1")}>{fmt(vA)}</span>
             <span className="text-2xs text-t3 text-center whitespace-nowrap">{label}</span>
             <span className={cn("font-medium text-right", bWins ? "text-accent-green" : "text-t1")}>{fmt(vB)}</span>
@@ -1205,7 +1205,7 @@ function H2HTab({ match }: { match: EsportsMatch }) {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-zinc-800/60">
+                <tr className="border-b border-b0">
                   <th className="text-left py-2 px-3 text-t3 font-medium">Date</th>
                   <th className="text-center py-2 px-3 text-t3 font-medium">Score</th>
                   <th className="text-left py-2 px-3 text-t3 font-medium">Winner</th>
@@ -1408,7 +1408,7 @@ function ModelTab({ match }: { match: EsportsMatch }) {
                 if (val == null) return null;
                 const edge = prob != null ? (prob - 1 / Number(val)) * 100 : null;
                 return (
-                  <div key={label} className="flex-1 bg-zinc-900 rounded border border-zinc-800/60 p-3 flex flex-col items-center gap-1">
+                  <div key={label} className="flex-1 bg-zinc-900 rounded border border-b0 p-3 flex flex-col items-center gap-1">
                     <span className="text-2xs text-t2">{label}</span>
                     <span className="text-lg font-bold font-mono text-t0">{Number(val).toFixed(2)}</span>
                     {edge != null && (
@@ -1519,29 +1519,26 @@ export function EsportsMatchDetail({ match, eloHomeHistory, eloAwayHistory }: Pr
   useEffect(() => { if (tick > 0) router.refresh(); }, [tick, router]);
 
   return (
-    <div className="px-4 py-3 max-w-[1440px] mx-auto">
-      <EsportsMatchHeader match={match} />
-      <EsportsKpiStrip match={match} />
+    <div className="match-page-shell match-page-shell--contained">
+      <div className="match-hero-card overflow-hidden"><EsportsMatchHeader match={match} /></div>
+      <div className="match-kpi-strip match-kpi-strip--soft overflow-hidden"><EsportsKpiStrip match={match} /></div>
 
-      {match.status === "live" && <div className="px-4 pb-2"><EsportsLivePanel match={match as any} /></div>}
+      {match.status === "live" && <div className="match-live-wrap px-1"><EsportsLivePanel match={match as any} /></div>}
 
       {/* Tabs */}
-      <div className="flex items-center gap-0 border-b border-zinc-800/60 mb-3 overflow-x-auto scrollbar-none">
+      <div className="match-tabbar mb-1 scrollbar-none">
         {TABS.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={cn(
-              "px-3 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors",
-              tab === t.id ? "border-accent-blue text-t1" : "border-transparent text-t3 hover:text-t2"
-            )}
+            className="match-tab" data-active={tab === t.id}
           >
             {t.label}
           </button>
         ))}
       </div>
 
-      <div>
+      <div className="match-content-wrap">
         {tab === "overview" && <OverviewTab match={match} />}
         {tab === "series"   && <SeriesTab match={match} />}
         {tab === "roster"   && <RosterTab match={match} />}

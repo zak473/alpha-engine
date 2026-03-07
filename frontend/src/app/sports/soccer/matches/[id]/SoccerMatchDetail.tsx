@@ -1831,20 +1831,20 @@ export function SoccerMatchDetail({ match, eloHome, eloAway }: MatchProps) {
   useEffect(() => { if (tick > 0) router.refresh(); }, [tick, router]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-bg0">
+    <div className="match-page-shell flex flex-col min-h-screen bg-bg0 max-w-screen-2xl mx-auto w-full px-3 md:px-4 py-4">
       {/* Header */}
-      <MatchHeader match={match} />
+      <div className="match-hero-card overflow-hidden"><MatchHeader match={match} /></div>
 
       {/* KPI strip */}
-      <KpiStrip2Row match={match} />
+      <div className="match-kpi-strip match-kpi-strip--soft overflow-hidden"><KpiStrip2Row match={match} /></div>
 
-      {match.status === "live" && <div className="px-4 pb-2"><SoccerLivePanel match={match} /></div>}
+      {match.status === "live" && <div className="match-live-wrap px-4 pb-1"><SoccerLivePanel match={match} /></div>}
 
       {/* Sticky tab bar */}
-      <div className="bg-bg1 border-b border-b0 sticky top-0 z-20">
-        <div className="tabs-underline px-4 overflow-x-auto no-scrollbar max-w-screen-2xl mx-auto">
+      <div className="px-3 md:px-4 sticky top-0 z-20">
+        <div className="match-tabbar max-w-screen-2xl mx-auto no-scrollbar">
           {TABS.map(t => (
-            <button key={t.id} className="tab-item shrink-0" data-active={activeTab === t.id} onClick={() => setActiveTab(t.id)}>
+            <button key={t.id} className="match-tab shrink-0" data-active={activeTab === t.id} onClick={() => setActiveTab(t.id)}>
               {t.label}
             </button>
           ))}
@@ -1852,7 +1852,7 @@ export function SoccerMatchDetail({ match, eloHome, eloAway }: MatchProps) {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 p-3 md:p-4 max-w-screen-2xl mx-auto w-full">
+      <div className="match-content-wrap flex-1 p-3 md:p-4 max-w-screen-2xl mx-auto w-full">
         {activeTab === "overview"  && <OverviewTab  match={match} />}
         {activeTab === "lineups"   && <LineupsTab   match={match} />}
         {activeTab === "stats"     && <StatsTab     match={match} />}

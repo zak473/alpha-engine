@@ -100,7 +100,7 @@ function surfaceBg(s: string | null | undefined) {
     case "grass":  return "bg-green-500/15 text-green-400 border border-green-500/25";
     case "hard":   return "bg-blue-500/15 text-blue-400 border border-blue-500/25";
     case "carpet": return "bg-purple-500/15 text-purple-400 border border-purple-500/25";
-    default:       return "bg-zinc-700/30 text-t2 border border-zinc-700/40";
+    default:       return "bg-bg2 text-t2 border border-b0";
   }
 }
 
@@ -150,7 +150,7 @@ function Panel({
 
 function MetricRow({ label, value, sub, accent }: { label: string; value: React.ReactNode; sub?: string; accent?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-zinc-800/50 last:border-0">
+    <div className="flex items-center justify-between gap-2 py-1.5 border-b border-b0 last:border-0">
       <span className="text-2xs text-t2 shrink-0">{label}</span>
       <div className="text-right">
         <span className={cn("text-xs font-mono font-medium", accent ? "text-accent-blue" : "text-t1")}>{value}</span>
@@ -162,10 +162,10 @@ function MetricRow({ label, value, sub, accent }: { label: string; value: React.
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    scheduled: "bg-zinc-700/40 text-zinc-400",
-    live:      "bg-green-500/20 text-green-400 animate-pulse",
-    finished:  "bg-zinc-700/40 text-zinc-400",
-    cancelled: "bg-red-500/20 text-red-400",
+    scheduled: "bg-bg2 text-t2 border border-b0",
+    live:      "bg-positive/10 text-positive border border-positive/20",
+    finished:  "bg-bg2 text-t2 border border-b0",
+    cancelled: "bg-negative/10 text-negative border border-negative/20",
   };
   return (
     <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded text-2xs font-medium uppercase tracking-wide", map[status] ?? map.scheduled)}>
@@ -286,7 +286,7 @@ function StatDuel({
   const bWins = vA != null && vB != null && (higherBetter ? vB > vA : vB < vA);
   const fmt = (v: number | null) => v == null ? "—" : `${v.toFixed(1)}${unit}`;
   return (
-    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 py-1.5 border-b border-zinc-800/50 last:border-0 text-xs font-mono">
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 py-1.5 border-b border-b0 last:border-0 text-xs font-mono">
       <span className={cn("font-medium", aWins ? "text-accent-green" : "text-t1")}>{fmt(vA)}</span>
       <span className="text-2xs text-t3 text-center whitespace-nowrap">{label}</span>
       <span className={cn("font-medium text-right", bWins ? "text-accent-green" : "text-t1")}>{fmt(vB)}</span>
@@ -475,7 +475,7 @@ function MatchBlock({ match }: { match: TennisMatch }) {
 
 function TennisMatchHeader({ match }: { match: TennisMatch }) {
   return (
-    <div className="card mb-3">
+    <div className="card overflow-hidden">
       {/* Nav */}
       <div className="flex items-center gap-2 px-3 pt-2.5 pb-0">
         <Link href="/sports/tennis/matches" className="inline-flex items-center gap-1 text-2xs text-t3 hover:text-t1 transition-colors">
@@ -511,7 +511,7 @@ function TennisMatchHeader({ match }: { match: TennisMatch }) {
 
 function KpiCell({ label, value, sub, accent }: { label: string; value: React.ReactNode; sub?: string; accent?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 px-3 py-2 border-r border-zinc-800/50 last:border-0 min-w-0">
+    <div className="flex flex-col gap-0.5 px-3 py-2 border-r border-b0 last:border-0 min-w-0">
       <span className="text-2xs text-t3 uppercase tracking-wide truncate">{label}</span>
       <span className={cn("text-xs font-mono font-semibold truncate", accent ?? "text-t1")}>{value}</span>
       {sub && <span className="text-2xs text-t3 truncate">{sub}</span>}
@@ -542,9 +542,9 @@ function TennisKpiStrip({ match }: { match: TennisMatch }) {
     : "—";
 
   return (
-    <div className="card mb-3 overflow-x-auto">
+    <div className="card overflow-x-auto">
       {/* Row 1 */}
-      <div className="flex border-b border-zinc-800/60">
+      <div className="flex border-b border-b0">
         <KpiCell
           label="Model P1 win"
           value={p ? `${Math.round(p.home_win * 100)}%` : "—"}
@@ -651,7 +651,7 @@ function OverviewTab({ match }: { match: TennisMatch }) {
         {/* Player comparison */}
         <Panel title="Player Comparison" subtitle={`${info?.surface ?? "All surfaces"} · form avg`}>
           {/* Header */}
-          <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-zinc-800/60 text-2xs text-t3 font-medium">
+          <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-b0 text-2xs text-t3 font-medium">
             <span>{match.home.name}</span>
             <span className="text-center">Metric</span>
             <span className="text-right">{match.away.name}</span>
@@ -836,7 +836,7 @@ function ServeReturnTab({ match }: { match: TennisMatch }) {
         {/* Serve profile */}
         {(sH || sA) && (
           <Panel title="Serve Profile" subtitle="This match">
-            <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-zinc-800/60 text-2xs text-t3 font-medium">
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-b0 text-2xs text-t3 font-medium">
               <span>{match.home.name}</span>
               <span className="text-center">Stat</span>
               <span className="text-right">{match.away.name}</span>
@@ -850,7 +850,7 @@ function ServeReturnTab({ match }: { match: TennisMatch }) {
         {/* Return / Break profile */}
         {(sH || sA) && (
           <Panel title="Return & Break Profile" subtitle="This match">
-            <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-zinc-800/60 text-2xs text-t3 font-medium">
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-b0 text-2xs text-t3 font-medium">
               <span>{match.home.name}</span>
               <span className="text-center">Stat</span>
               <span className="text-right">{match.away.name}</span>
@@ -864,7 +864,7 @@ function ServeReturnTab({ match }: { match: TennisMatch }) {
         {/* Form averages comparison */}
         {(fH || fA) && (
           <Panel title="Form Averages" subtitle={`${match.form_home?.surface ?? "all surfaces"} · ${match.form_home?.window_days ?? 365}d window`}>
-            <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-zinc-800/60 text-2xs text-t3 font-medium">
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-b0 text-2xs text-t3 font-medium">
               <span>{match.home.name}</span>
               <span className="text-center">Stat</span>
               <span className="text-right">{match.away.name}</span>
@@ -889,7 +889,7 @@ function ServeReturnTab({ match }: { match: TennisMatch }) {
               { label: "1st Srv max", vH: sH?.first_serve_max_mph, vA: sA?.first_serve_max_mph },
               { label: "2nd Srv avg", vH: sH?.second_serve_avg_mph, vA: sA?.second_serve_avg_mph },
             ].map(({ label, vH, vA: vAway }) => (
-              <div key={label} className="py-1.5 border-b border-zinc-800/50 last:border-0">
+              <div key={label} className="py-1.5 border-b border-b0 last:border-0">
                 <div className="text-2xs text-t3 mb-1">{label}</div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono text-accent-blue w-14">{vH != null ? `${vH.toFixed(0)} mph` : "—"}</span>
@@ -911,7 +911,7 @@ function ServeReturnTab({ match }: { match: TennisMatch }) {
         {/* Winners vs UE */}
         {(sH?.winners != null || sA?.winners != null) && (
           <Panel title="Winners vs Errors">
-            <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-zinc-800/60 text-2xs text-t3 font-medium">
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-b0 text-2xs text-t3 font-medium">
               <span>{match.home.name}</span>
               <span className="text-center">Stat</span>
               <span className="text-right">{match.away.name}</span>
@@ -937,7 +937,7 @@ function ServeReturnTab({ match }: { match: TennisMatch }) {
               { label: "5–8 shots", vH: sH?.rally_5_8_won_pct, vA: sA?.rally_5_8_won_pct },
               { label: "9+ shots",  vH: sH?.rally_9plus_won_pct, vA: sA?.rally_9plus_won_pct },
             ].map(({ label, vH, vA: vAway }) => (
-              <div key={label} className="py-1.5 border-b border-zinc-800/50 last:border-0">
+              <div key={label} className="py-1.5 border-b border-b0 last:border-0">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-2xs text-t3">{label}</span>
                 </div>
@@ -1059,7 +1059,7 @@ function SetsTab({ match }: { match: TennisMatch }) {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-zinc-800/60">
+                  <tr className="border-b border-b0">
                     <th className="text-left py-2 text-t3 font-medium">Player</th>
                     {sets.map((s, i) => (
                       <th key={i} className="text-center py-2 text-t3 font-medium px-3">Set {s.set_num}</th>
@@ -1235,7 +1235,7 @@ function H2HTab({ match }: { match: TennisMatch }) {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-zinc-800/60">
+                  <tr className="border-b border-b0">
                     <th className="text-left py-2 px-3 text-t3 font-medium">Date</th>
                     <th className="text-left py-2 px-3 text-t3 font-medium">Surface</th>
                     <th className="text-left py-2 px-3 text-t3 font-medium">Round</th>
@@ -1331,7 +1331,7 @@ function SurfaceTab({ match, eloHomeSurface, eloAwaySurface }: { match: TennisMa
         <Panel title="Surface Form" subtitle={surface ? `${surface} surface` : "All surfaces"}>
           {fH || fA ? (
             <>
-              <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-zinc-800/60 text-2xs text-t3 font-medium">
+              <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-b0 text-2xs text-t3 font-medium">
                 <span>{match.home.name}</span>
                 <span className="text-center">Stat</span>
                 <span className="text-right">{match.away.name}</span>
@@ -1416,7 +1416,7 @@ function SurfaceTab({ match, eloHomeSurface, eloAwaySurface }: { match: TennisMa
                 { surf: "Clay",  vH: fH?.win_pct_clay,  vA: fA?.win_pct_clay  },
                 { surf: "Grass", vH: fH?.win_pct_grass, vA: fA?.win_pct_grass },
               ].map(({ surf, vH: vHome, vA: vAway }) => (vHome != null || vAway != null) ? (
-                <div key={surf} className="py-1.5 border-b border-zinc-800/50 last:border-0">
+                <div key={surf} className="py-1.5 border-b border-b0 last:border-0">
                   <div className="flex items-center justify-between mb-1">
                     <span className={cn("text-2xs px-1.5 py-0.5 rounded border", surfaceBg(surf.toLowerCase()))}>{surf}</span>
                     <div className="flex items-center gap-2 text-2xs font-mono">
@@ -1913,24 +1913,19 @@ export function TennisMatchDetail({ match, eloHomeOverall, eloAwayOverall, eloHo
   useEffect(() => { if (tick > 0) router.refresh(); }, [tick, router]);
 
   return (
-    <div className="px-4 py-3 max-w-[1440px] mx-auto">
-      <TennisMatchHeader match={match} />
-      <TennisKpiStrip match={match} />
+    <div className="match-page-shell match-page-shell--contained">
+      <div className="match-hero-card overflow-hidden"><TennisMatchHeader match={match} /></div>
+      <div className="match-kpi-strip match-kpi-strip--soft overflow-hidden"><TennisKpiStrip match={match} /></div>
 
-      {match.status === "live" && <div className="px-4 pb-2"><TennisLivePanel match={match as any} /></div>}
+      {match.status === "live" && <div className="match-live-wrap px-1"><TennisLivePanel match={match as any} /></div>}
 
       {/* Tabs */}
-      <div className="flex items-center gap-0 border-b border-zinc-800/60 mb-3 overflow-x-auto scrollbar-none">
+      <div className="match-tabbar mb-1 scrollbar-none">
         {TABS.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={cn(
-              "px-3 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors",
-              tab === t.id
-                ? "border-accent-blue text-t1"
-                : "border-transparent text-t3 hover:text-t2"
-            )}
+            className="match-tab" data-active={tab === t.id}
           >
             {t.label}
           </button>
@@ -1938,7 +1933,7 @@ export function TennisMatchDetail({ match, eloHomeOverall, eloAwayOverall, eloHo
       </div>
 
       {/* Tab content */}
-      <div>
+      <div className="match-content-wrap">
         {tab === "overview" && <OverviewTab match={match} />}
         {tab === "serve"    && <ServeReturnTab match={match} />}
         {tab === "sets"     && <SetsTab match={match} />}

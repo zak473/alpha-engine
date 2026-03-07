@@ -154,9 +154,9 @@ function TeamBlock({ elo, name, form, isHome }: { elo: BaseballEloPanelOut | nul
       {elo && (
         <div className="flex items-center gap-2">
           <span className="text-text-subtle text-xs">ELO</span>
-          <span className="text-accent-blue font-mono text-sm font-semibold">{fmtInt(elo.rating)}</span>
+          <span className="text-positive font-mono text-sm font-semibold">{fmtInt(elo.rating)}</span>
           {elo.rating_change != null && (
-            <span className={cn("text-xs font-mono", elo.rating_change >= 0 ? "text-accent-green" : "text-accent-red")}>
+            <span className={cn("text-xs font-mono", elo.rating_change >= 0 ? "text-accent-green" : "text-t1")}>
               {elo.rating_change >= 0 ? "+" : ""}{fmt(elo.rating_change, 1)}
             </span>
           )}
@@ -229,7 +229,7 @@ function MatchBlock({ match }: { match: TMatch }) {
             <div className="bg-accent-amber h-full flex-1" />
           </div>
           <div className="flex justify-between w-full text-[10px] font-mono tabular-nums">
-            <span className="text-accent-blue">{Math.round(match.probabilities.home_win * 100)}%</span>
+            <span className="text-positive">{Math.round(match.probabilities.home_win * 100)}%</span>
             <span className="text-accent-amber">{Math.round(match.probabilities.away_win * 100)}%</span>
           </div>
         </div>
@@ -240,7 +240,7 @@ function MatchBlock({ match }: { match: TMatch }) {
 
 function BaseballMatchHeader({ match }: { match: TMatch }) {
   return (
-    <div className="sticky top-0 z-20 bg-surface-base border-b border-surface-border px-4 py-3">
+    <div className="bg-surface-base px-4 py-4">
       <div className="flex items-center justify-between gap-4">
         <TeamBlock elo={match.elo_home} name={match.home.name} form={match.form_home} isHome={true} />
         <MatchBlock match={match} />
@@ -274,12 +274,12 @@ function BaseballKpiStrip({ match }: { match: TMatch }) {
   const eloDiff = elo_h && elo_a ? Math.round(elo_h.rating - elo_a.rating) : null;
 
   return (
-    <div className="border-b border-surface-border bg-surface-base px-4 py-2">
+    <div className="bg-surface-base px-4 py-3">
       <div className="flex items-center gap-6 flex-wrap pb-2 border-b border-surface-border/40">
         {p && (
           <>
-            <Kpi label={`${match.home.name} Win`} value={fmtPct(p.home_win, 1)} color="text-accent-blue" />
-            <Kpi label={`${match.away.name} Win`} value={fmtPct(p.away_win, 1)} color="text-accent-red" />
+            <Kpi label={`${match.home.name} Win`} value={fmtPct(p.home_win, 1)} color="text-positive" />
+            <Kpi label={`${match.away.name} Win`} value={fmtPct(p.away_win, 1)} color="text-t1" />
           </>
         )}
         {elo_h && elo_a && (
@@ -299,11 +299,11 @@ function BaseballKpiStrip({ match }: { match: TMatch }) {
         )}
       </div>
       <div className="flex items-center gap-6 flex-wrap pt-2">
-        {eloDiff != null && <Kpi label="Elo Diff" value={eloDiff >= 0 ? `+${eloDiff}` : String(eloDiff)} color={eloDiff > 0 ? "text-accent-blue" : "text-accent-red"} />}
-        {elo_h?.pitcher_adj != null && <Kpi label="SP Adj (H)" value={elo_h.pitcher_adj >= 0 ? `+${fmtInt(elo_h.pitcher_adj)}` : fmtInt(elo_h.pitcher_adj)} sub="Elo pts" color={elo_h.pitcher_adj > 0 ? "text-accent-green" : "text-accent-red"} />}
-        {elo_a?.pitcher_adj != null && <Kpi label="SP Adj (A)" value={elo_a.pitcher_adj >= 0 ? `+${fmtInt(elo_a.pitcher_adj)}` : fmtInt(elo_a.pitcher_adj)} sub="Elo pts" color={elo_a.pitcher_adj > 0 ? "text-accent-green" : "text-accent-red"} />}
-        {match.bullpen_home?.fatigue_score != null && <Kpi label="Bullpen (H)" value={`${match.bullpen_home.fatigue_score.toFixed(1)}/10`} sub="fatigue" color={match.bullpen_home.fatigue_score > 6 ? "text-accent-red" : match.bullpen_home.fatigue_score > 4 ? "text-accent-amber" : "text-accent-green"} />}
-        {match.bullpen_away?.fatigue_score != null && <Kpi label="Bullpen (A)" value={`${match.bullpen_away.fatigue_score.toFixed(1)}/10`} sub="fatigue" color={match.bullpen_away.fatigue_score > 6 ? "text-accent-red" : match.bullpen_away.fatigue_score > 4 ? "text-accent-amber" : "text-accent-green"} />}
+        {eloDiff != null && <Kpi label="Elo Diff" value={eloDiff >= 0 ? `+${eloDiff}` : String(eloDiff)} color={eloDiff > 0 ? "text-positive" : "text-t1"} />}
+        {elo_h?.pitcher_adj != null && <Kpi label="SP Adj (H)" value={elo_h.pitcher_adj >= 0 ? `+${fmtInt(elo_h.pitcher_adj)}` : fmtInt(elo_h.pitcher_adj)} sub="Elo pts" color={elo_h.pitcher_adj > 0 ? "text-accent-green" : "text-t1"} />}
+        {elo_a?.pitcher_adj != null && <Kpi label="SP Adj (A)" value={elo_a.pitcher_adj >= 0 ? `+${fmtInt(elo_a.pitcher_adj)}` : fmtInt(elo_a.pitcher_adj)} sub="Elo pts" color={elo_a.pitcher_adj > 0 ? "text-accent-green" : "text-t1"} />}
+        {match.bullpen_home?.fatigue_score != null && <Kpi label="Bullpen (H)" value={`${match.bullpen_home.fatigue_score.toFixed(1)}/10`} sub="fatigue" color={match.bullpen_home.fatigue_score > 6 ? "text-t1" : match.bullpen_home.fatigue_score > 4 ? "text-accent-amber" : "text-accent-green"} />}
+        {match.bullpen_away?.fatigue_score != null && <Kpi label="Bullpen (A)" value={`${match.bullpen_away.fatigue_score.toFixed(1)}/10`} sub="fatigue" color={match.bullpen_away.fatigue_score > 6 ? "text-t1" : match.bullpen_away.fatigue_score > 4 ? "text-accent-amber" : "text-accent-green"} />}
         {mi?.park_factor != null && <Kpi label="Park Factor" value={mi.park_factor >= 0 ? `+${fmtInt(mi.park_factor)}` : fmtInt(mi.park_factor)} sub="Elo adj" color={mi.park_factor > 0 ? "text-accent-amber" : mi.park_factor < 0 ? "text-accent-purple" : "text-text-muted"} />}
         {weather?.wind_speed_mph != null && <Kpi label="Wind" value={`${fmtInt(weather.wind_speed_mph)} mph`} sub={weather.wind_direction ?? ""} />}
       </div>
@@ -373,7 +373,7 @@ function BullpenTable({ bp, teamName }: { bp: BullpenSummaryOut; teamName: strin
         <div className="text-[10px] uppercase tracking-widest text-text-subtle">{teamName} Bullpen</div>
         {bp.fatigue_score != null && (
           <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded",
-            bp.fatigue_score > 6 ? "bg-accent-red/20 text-accent-red" :
+            bp.fatigue_score > 6 ? "bg-accent-red/20 text-t1" :
             bp.fatigue_score > 4 ? "bg-accent-amber/20 text-accent-amber" :
             "bg-accent-green/20 text-accent-green"
           )}>Fatigue {bp.fatigue_score.toFixed(1)}</span>
@@ -400,7 +400,7 @@ function BullpenTable({ bp, teamName }: { bp: BullpenSummaryOut; teamName: strin
                 <td className="py-1 px-2 text-right text-text-muted">{p.ip != null ? fmt(p.ip, 1) : "—"}</td>
                 <td className="py-1 px-2 text-right text-text-muted">{fmtInt(p.earned_runs)}</td>
                 <td className="py-1 px-2 text-right text-text-muted">{fmtInt(p.strikeouts)}</td>
-                <td className={cn("py-1 px-2 text-right", (p.days_since_last ?? 99) === 0 ? "text-accent-red font-bold" : "text-text-subtle")}>{p.days_since_last ?? "—"}</td>
+                <td className={cn("py-1 px-2 text-right", (p.days_since_last ?? 99) === 0 ? "text-t1 font-bold" : "text-text-subtle")}>{p.days_since_last ?? "—"}</td>
                 <td className={cn("py-1 text-right", (p.pitches_last_3d ?? 0) > 60 ? "text-accent-amber" : "text-text-subtle")}>{fmtInt(p.pitches_last_3d)}</td>
               </tr>
             ))}
@@ -477,7 +477,7 @@ function OverviewTab({ match }: { match: TMatch }) {
                       <td className="py-1 pr-2 font-mono text-text-subtle">{e.opponent}</td>
                       <td className="py-1 pr-2 font-mono text-text-muted text-right">{e.score}</td>
                       <td className="py-1 pr-2 text-center text-text-subtle">{e.home_away}</td>
-                      <td className={cn("py-1 pr-2 text-center font-bold", e.result === "W" ? "text-accent-green" : "text-accent-red")}>{e.result}</td>
+                      <td className={cn("py-1 pr-2 text-center font-bold", e.result === "W" ? "text-accent-green" : "text-t1")}>{e.result}</td>
                       <td className="py-1 pr-2 text-text-subtle truncate max-w-[80px]">{e.starter ?? "—"}</td>
                       <td className="py-1 font-mono text-text-subtle text-right">{e.starter_era != null ? fmt(e.starter_era, 2) : "—"}</td>
                     </tr>
@@ -510,7 +510,7 @@ function OverviewTab({ match }: { match: TMatch }) {
             { bp: match.bullpen_away, name: match.away.name },
           ].map(({ bp, name }) => bp ? (
             <div key={name} className="flex items-center justify-between py-2 border-b border-surface-border/30 last:border-0">
-              <div className="flex flex-col">
+              <div className="match-page-shell flex flex-col max-w-[1440px] mx-auto w-full px-4 py-4">
                 <span className="text-xs text-text-muted">{name}</span>
                 <span className="text-[10px] text-text-subtle">{bp.total_pitches_last_3d} P / last 3d</span>
               </div>
@@ -518,7 +518,7 @@ function OverviewTab({ match }: { match: TMatch }) {
                 <div className="w-20 h-1.5 rounded-full bg-white/[0.06]">
                   <div className={cn("h-full rounded-full", bp.fatigue_score != null && bp.fatigue_score > 6 ? "bg-accent-red" : bp.fatigue_score != null && bp.fatigue_score > 4 ? "bg-accent-amber" : "bg-accent-green")} style={{ width: `${Math.min(100, (bp.fatigue_score ?? 0) * 10)}%` }} />
                 </div>
-                <span className={cn("font-mono text-xs font-bold", bp.fatigue_score != null && bp.fatigue_score > 6 ? "text-accent-red" : bp.fatigue_score != null && bp.fatigue_score > 4 ? "text-accent-amber" : "text-accent-green")}>{bp.fatigue_score?.toFixed(1)}</span>
+                <span className={cn("font-mono text-xs font-bold", bp.fatigue_score != null && bp.fatigue_score > 6 ? "text-t1" : bp.fatigue_score != null && bp.fatigue_score > 4 ? "text-accent-amber" : "text-accent-green")}>{bp.fatigue_score?.toFixed(1)}</span>
               </div>
             </div>
           ) : null)}
@@ -638,13 +638,13 @@ function PitchingTab({ match }: { match: TMatch }) {
             <div className="grid grid-cols-2 gap-x-8">
               {match.starter_home && (
                 <div>
-                  <div className="text-[10px] text-accent-blue uppercase tracking-widest mb-2">{match.home.name}</div>
+                  <div className="text-[10px] text-positive uppercase tracking-widest mb-2">{match.home.name}</div>
                   <StarterCard sp={match.starter_home} teamName={match.home.name} />
                 </div>
               )}
               {match.starter_away && (
                 <div>
-                  <div className="text-[10px] text-accent-red uppercase tracking-widest mb-2">{match.away.name}</div>
+                  <div className="text-[10px] text-t1 uppercase tracking-widest mb-2">{match.away.name}</div>
                   <StarterCard sp={match.starter_away} teamName={match.away.name} />
                 </div>
               )}
@@ -855,8 +855,8 @@ function BattingTab({ match }: { match: TMatch }) {
         {(match.situational_home || match.situational_away) ? (
           <PanelCard title="Situational Hitting">
             {[
-              { t: match.home.name, s: match.situational_home, col: "text-accent-blue" },
-              { t: match.away.name, s: match.situational_away, col: "text-accent-red" },
+              { t: match.home.name, s: match.situational_home, col: "text-positive" },
+              { t: match.away.name, s: match.situational_away, col: "text-t1" },
             ].map(({ t, s, col }) => s ? (
               <div key={t} className="mb-3 last:mb-0">
                 <div className={cn("text-[10px] uppercase tracking-widest mb-1", col)}>{t}</div>
@@ -867,7 +867,7 @@ function BattingTab({ match }: { match: TMatch }) {
                   {s.vs_lhp_ops != null && <div className="flex justify-between py-0.5 border-b border-surface-border/20"><span className="text-text-subtle">vs LHP OPS</span><span className="font-mono">{fmtAvg(s.vs_lhp_ops)}</span></div>}
                   {s.vs_rhp_ops != null && <div className="flex justify-between py-0.5 border-b border-surface-border/20"><span className="text-text-subtle">vs RHP OPS</span><span className="font-mono">{fmtAvg(s.vs_rhp_ops)}</span></div>}
                   {s.late_close_avg != null && <div className="flex justify-between py-0.5 border-b border-surface-border/20"><span className="text-text-subtle">Late/Close</span><span className="font-mono">{fmtAvg(s.late_close_avg)}</span></div>}
-                  {s.clutch_score != null && <div className="flex justify-between py-0.5"><span className="text-text-subtle">Clutch Score</span><span className={cn("font-mono font-semibold", s.clutch_score > 0 ? "text-accent-green" : "text-accent-red")}>{s.clutch_score >= 0 ? "+" : ""}{s.clutch_score.toFixed(2)}</span></div>}
+                  {s.clutch_score != null && <div className="flex justify-between py-0.5"><span className="text-text-subtle">Clutch Score</span><span className={cn("font-mono font-semibold", s.clutch_score > 0 ? "text-accent-green" : "text-t1")}>{s.clutch_score >= 0 ? "+" : ""}{s.clutch_score.toFixed(2)}</span></div>}
                 </div>
               </div>
             ) : null)}
@@ -971,7 +971,7 @@ function InningsTab({ match }: { match: TMatch }) {
                       <span className={cn("text-[10px] font-bold px-1 py-0.5 rounded mt-0.5",
                         e.event_type === "HR" ? "bg-accent-amber/20 text-accent-amber" : "bg-surface-border text-text-subtle"
                       )}>{e.event_type ?? "•"}</span>
-                      <span className={cn("text-xs", e.team === "home" ? "text-accent-blue" : "text-accent-red")}>{e.half === "bottom" ? "▼" : "▲"}</span>
+                      <span className={cn("text-xs", e.team === "home" ? "text-positive" : "text-t1")}>{e.half === "bottom" ? "▼" : "▲"}</span>
                       <span className="text-xs text-text-muted">{e.description}</span>
                     </div>
                   ))}
@@ -1031,7 +1031,7 @@ function H2HTab({ match }: { match: TMatch }) {
                     <td className="py-1 text-right font-mono text-text-muted">{m.away_score ?? "—"}</td>
                     <td className="py-1 text-center text-text-subtle px-2">–</td>
                     <td className="py-1 font-mono text-text-muted">{m.home_score ?? "—"}</td>
-                    <td className={cn("py-1 text-right capitalize", m.winner === "home" ? "text-accent-blue" : "text-text-muted")}>{m.winner}</td>
+                    <td className={cn("py-1 text-right capitalize", m.winner === "home" ? "text-positive" : "text-text-muted")}>{m.winner}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1043,7 +1043,7 @@ function H2HTab({ match }: { match: TMatch }) {
         <PanelCard title="H2H Summary">
           <div className="flex flex-col gap-2 text-xs">
             <div className="flex justify-between"><span className="text-text-subtle">Total Games</span><span className="font-mono text-text-muted">{h2h.total_matches}</span></div>
-            <div className="flex justify-between"><span className="text-text-subtle">{match.home.name} Win%</span><span className="font-mono text-accent-blue">{h2h.total_matches > 0 ? fmtPct(h2h.home_wins / h2h.total_matches) : "—"}</span></div>
+            <div className="flex justify-between"><span className="text-text-subtle">{match.home.name} Win%</span><span className="font-mono text-positive">{h2h.total_matches > 0 ? fmtPct(h2h.home_wins / h2h.total_matches) : "—"}</span></div>
             <div className="flex justify-between"><span className="text-text-subtle">{match.away.name} Win%</span><span className="font-mono text-text-muted">{h2h.total_matches > 0 ? fmtPct(h2h.away_wins / h2h.total_matches) : "—"}</span></div>
           </div>
         </PanelCard>
@@ -1103,11 +1103,11 @@ function EloTab({
                 <div key={name} className="flex flex-col gap-1">
                   <div className="text-text-muted font-semibold mb-1">{name}</div>
                   <div className="flex justify-between py-0.5"><span className="text-text-subtle">Team Rating</span><span className="font-mono">{fmtInt(elo.rating)}</span></div>
-                  <div className="flex justify-between py-0.5"><span className="text-text-subtle">Δ last game</span><span className={cn("font-mono", (elo.rating_change ?? 0) >= 0 ? "text-accent-green" : "text-accent-red")}>{(elo.rating_change ?? 0) >= 0 ? "+" : ""}{fmt(elo.rating_change, 1)}</span></div>
+                  <div className="flex justify-between py-0.5"><span className="text-text-subtle">Δ last game</span><span className={cn("font-mono", (elo.rating_change ?? 0) >= 0 ? "text-accent-green" : "text-t1")}>{(elo.rating_change ?? 0) >= 0 ? "+" : ""}{fmt(elo.rating_change, 1)}</span></div>
                   {elo.home_advantage_applied != null && <div className="flex justify-between py-0.5"><span className="text-text-subtle">Home Adv</span><span className="font-mono">+{fmtInt(elo.home_advantage_applied)}</span></div>}
-                  {elo.pitcher_adj != null && <div className="flex justify-between py-0.5"><span className="text-text-subtle">SP Adj</span><span className={cn("font-mono", elo.pitcher_adj >= 0 ? "text-accent-green" : "text-accent-red")}>{elo.pitcher_adj >= 0 ? "+" : ""}{fmt(elo.pitcher_adj, 1)}</span></div>}
+                  {elo.pitcher_adj != null && <div className="flex justify-between py-0.5"><span className="text-text-subtle">SP Adj</span><span className={cn("font-mono", elo.pitcher_adj >= 0 ? "text-accent-green" : "text-t1")}>{elo.pitcher_adj >= 0 ? "+" : ""}{fmt(elo.pitcher_adj, 1)}</span></div>}
                   {elo.park_factor_applied != null && <div className="flex justify-between py-0.5"><span className="text-text-subtle">Park Factor</span><span className={cn("font-mono", elo.park_factor_applied > 0 ? "text-accent-amber" : "text-text-muted")}>{elo.park_factor_applied > 0 ? "+" : ""}{fmt(elo.park_factor_applied, 0)}</span></div>}
-                  {elo.bullpen_fatigue_adj != null && <div className="flex justify-between py-0.5"><span className="text-text-subtle">Bullpen Adj</span><span className={cn("font-mono", elo.bullpen_fatigue_adj < 0 ? "text-accent-red" : "text-text-muted")}>{fmt(elo.bullpen_fatigue_adj, 1)}</span></div>}
+                  {elo.bullpen_fatigue_adj != null && <div className="flex justify-between py-0.5"><span className="text-text-subtle">Bullpen Adj</span><span className={cn("font-mono", elo.bullpen_fatigue_adj < 0 ? "text-t1" : "text-text-muted")}>{fmt(elo.bullpen_fatigue_adj, 1)}</span></div>}
                   {elo.implied_win_prob != null && <div className="flex justify-between py-0.5 border-t border-surface-border/40 mt-1 pt-1"><span className="text-text-subtle">Elo Win Prob</span><span className="font-mono font-bold text-text-primary">{fmtPct(elo.implied_win_prob, 1)}</span></div>}
                 </div>
               ))}
@@ -1185,7 +1185,7 @@ function ModelTab({ match }: { match: TMatch }) {
                 <div key={i} className="flex items-center gap-3">
                   <div className="w-40 text-xs text-text-muted truncate">{d.feature}</div>
                   <div className="flex-1 h-1.5 rounded-full bg-white/[0.06]">
-                    <div className={cn("h-full rounded-full", d.direction === "home" ? "bg-accent-blue/70" : d.direction === "away" ? "bg-accent-red/70" : "bg-accent-amber/50")} style={{ width: `${d.importance * 100}%` }} />
+                    <div className={cn("h-full rounded-full", d.direction === "home" ? "bg-positive/55" : d.direction === "away" ? "bg-accent-red/70" : "bg-accent-amber/50")} style={{ width: `${d.importance * 100}%` }} />
                   </div>
                   <div className="text-[10px] font-mono text-text-subtle w-8 text-right">{Math.round(d.importance * 100)}%</div>
                   {d.value != null && <div className="text-[10px] font-mono text-text-subtle w-12 text-right">{fmt(d.value, 1)}</div>}
@@ -1313,12 +1313,12 @@ function ContextTab({ match }: { match: TMatch }) {
             <div className="flex flex-col gap-2 text-xs">
               <div className="text-text-muted font-semibold">{match.umpire.name}</div>
               {match.umpire.games_called != null && <div className="flex justify-between"><span className="text-text-subtle">Games called</span><span className="font-mono">{match.umpire.games_called}</span></div>}
-              {match.umpire.k_zone_size != null && <div className="flex justify-between"><span className="text-text-subtle">K-zone size</span><span className={cn("font-mono", match.umpire.k_zone_size > 1.02 ? "text-accent-amber" : match.umpire.k_zone_size < 0.98 ? "text-accent-blue" : "text-text-muted")}>{(match.umpire.k_zone_size * 100).toFixed(0)}%</span></div>}
+              {match.umpire.k_zone_size != null && <div className="flex justify-between"><span className="text-text-subtle">K-zone size</span><span className={cn("font-mono", match.umpire.k_zone_size > 1.02 ? "text-accent-amber" : match.umpire.k_zone_size < 0.98 ? "text-positive" : "text-text-muted")}>{(match.umpire.k_zone_size * 100).toFixed(0)}%</span></div>}
               {match.umpire.strikeouts_per_game != null && <div className="flex justify-between"><span className="text-text-subtle">K/game</span><span className="font-mono">{fmt(match.umpire.strikeouts_per_game, 1)}</span></div>}
               {match.umpire.walks_per_game != null && <div className="flex justify-between"><span className="text-text-subtle">BB/game</span><span className="font-mono">{fmt(match.umpire.walks_per_game, 1)}</span></div>}
               {match.umpire.home_win_pct != null && <div className="flex justify-between"><span className="text-text-subtle">Home team win%</span><span className="font-mono">{fmtPct(match.umpire.home_win_pct, 1)}</span></div>}
               {match.umpire.over_record && <div className="flex justify-between"><span className="text-text-subtle">Over record</span><span className="font-mono text-accent-green">{match.umpire.over_record}</span></div>}
-              {match.umpire.run_scoring_impact != null && <div className="flex justify-between"><span className="text-text-subtle">Run scoring impact</span><span className={cn("font-mono", match.umpire.run_scoring_impact > 0 ? "text-accent-amber" : "text-accent-blue")}>{match.umpire.run_scoring_impact >= 0 ? "+" : ""}{fmt(match.umpire.run_scoring_impact, 2)} runs/game</span></div>}
+              {match.umpire.run_scoring_impact != null && <div className="flex justify-between"><span className="text-text-subtle">Run scoring impact</span><span className={cn("font-mono", match.umpire.run_scoring_impact > 0 ? "text-accent-amber" : "text-positive")}>{match.umpire.run_scoring_impact >= 0 ? "+" : ""}{fmt(match.umpire.run_scoring_impact, 2)} runs/game</span></div>}
             </div>
           </PanelCard>
         )}
@@ -1334,8 +1334,8 @@ function ContextTab({ match }: { match: TMatch }) {
                   {bet.total != null && <div className="flex justify-between"><span className="text-text-subtle">Total (O/U)</span><span className="font-mono">{bet.total}</span></div>}
                   {bet.home_ml != null && <div className="flex justify-between"><span className="text-text-subtle">{match.home.name} ML</span><span className="font-mono">{bet.home_ml >= 0 ? "+" : ""}{bet.home_ml}</span></div>}
                   {bet.away_ml != null && <div className="flex justify-between"><span className="text-text-subtle">{match.away.name} ML</span><span className="font-mono">{bet.away_ml >= 0 ? "+" : ""}{bet.away_ml}</span></div>}
-                  {bet.implied_home_total != null && <div className="flex justify-between"><span className="text-text-subtle">Impl. home runs</span><span className="font-mono text-accent-blue">{fmt(bet.implied_home_total, 1)}</span></div>}
-                  {bet.implied_away_total != null && <div className="flex justify-between"><span className="text-text-subtle">Impl. away runs</span><span className="font-mono text-accent-red">{fmt(bet.implied_away_total, 1)}</span></div>}
+                  {bet.implied_home_total != null && <div className="flex justify-between"><span className="text-text-subtle">Impl. home runs</span><span className="font-mono text-positive">{fmt(bet.implied_home_total, 1)}</span></div>}
+                  {bet.implied_away_total != null && <div className="flex justify-between"><span className="text-text-subtle">Impl. away runs</span><span className="font-mono text-t1">{fmt(bet.implied_away_total, 1)}</span></div>}
                 </div>
               );
             })()}
@@ -1352,7 +1352,7 @@ function ContextTab({ match }: { match: TMatch }) {
                   <span className="font-mono font-semibold text-text-primary">{mi.home_record}</span>
                   {mi.home_streak && (
                     <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-bold",
-                      mi.home_streak.startsWith("W") ? "bg-accent-green/20 text-accent-green" : "bg-accent-red/20 text-accent-red"
+                      mi.home_streak.startsWith("W") ? "bg-accent-green/20 text-accent-green" : "bg-accent-red/20 text-t1"
                     )}>{mi.home_streak}</span>
                   )}
                 </div>
@@ -1365,7 +1365,7 @@ function ContextTab({ match }: { match: TMatch }) {
                   <span className="font-mono font-semibold text-text-primary">{mi.away_record}</span>
                   {mi.away_streak && (
                     <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-bold",
-                      mi.away_streak.startsWith("W") ? "bg-accent-green/20 text-accent-green" : "bg-accent-red/20 text-accent-red"
+                      mi.away_streak.startsWith("W") ? "bg-accent-green/20 text-accent-green" : "bg-accent-red/20 text-t1"
                     )}>{mi.away_streak}</span>
                   )}
                 </div>
@@ -1408,34 +1408,29 @@ export function BaseballMatchDetail({ match, eloHomeHistory, eloAwayHistory }: P
   useEffect(() => { if (tick > 0) router.refresh(); }, [tick, router]);
 
   return (
-    <div className="flex flex-col">
-      <BaseballMatchHeader match={match} />
-      <BaseballKpiStrip match={match} />
+    <div className="match-page-shell flex flex-col max-w-[1440px] mx-auto w-full px-4 py-4">
+      <div className="match-hero-card overflow-hidden"><BaseballMatchHeader match={match} /></div>
+      <div className="match-kpi-strip match-kpi-strip--soft overflow-hidden"><BaseballKpiStrip match={match} /></div>
 
-      {match.status === "live" && <div className="px-4 pb-2"><BaseballLivePanel match={match as any} /></div>}
+      {match.status === "live" && <div className="match-live-wrap px-4 pb-1"><BaseballLivePanel match={match as any} /></div>}
 
       {/* Tab bar */}
-      <div className="sticky top-[var(--header-h,130px)] z-10 bg-surface-base border-b border-surface-border px-4 overflow-x-auto">
+      <div className="px-4"><div className="match-tabbar">
         <div className="flex gap-0 min-w-max">
           {TABS.map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={cn(
-                "px-4 py-2.5 text-xs font-medium transition-colors whitespace-nowrap border-b-2",
-                activeTab === tab
-                  ? "border-accent-blue text-accent-blue"
-                  : "border-transparent text-text-subtle hover:text-text-muted"
-              )}
+              className="match-tab" data-active={activeTab === tab}
             >
               {tab}
             </button>
           ))}
         </div>
-      </div>
+      </div></div>
 
       {/* Tab content */}
-      <div className="p-4">
+      <div className="match-content-wrap p-4">
         {activeTab === "Overview"  && <OverviewTab match={match} />}
         {activeTab === "Lineups"   && <LineupsTab match={match} />}
         {activeTab === "Pitching"  && <PitchingTab match={match} />}
