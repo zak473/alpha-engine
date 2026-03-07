@@ -1,10 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { Bell, Menu, Search, LogIn } from "lucide-react";
+import { Bell, Menu, Search, LogIn, Sun, Moon } from "lucide-react";
 import Link from "next/link";
 import { useSidebar } from "./SidebarContext";
 import { useAuth } from "@/lib/auth";
+import { useTheme } from "@/lib/theme";
+import { useOddsFormat } from "@/lib/odds-format";
+import type { OddsFormat } from "@/lib/odds-format";
 
 const ENV = process.env.NEXT_PUBLIC_ENV ?? "development";
 const ENV_BADGE: Record<string, { label: string; color: string; bg: string }> = {
@@ -19,6 +22,13 @@ interface TopBarProps { title: string; subtitle?: string; }
 export function TopBar({ title, subtitle }: TopBarProps) {
   const { setOpen } = useSidebar();
   const { user, isLoggedIn, logout } = useAuth();
+  const { theme, toggle: toggleTheme } = useTheme();
+  const { format, setFormat } = useOddsFormat();
+  const oddsFormats: { value: OddsFormat; label: string }[] = [
+    { value: "decimal", label: "Dec" },
+    { value: "fractional", label: "Frac" },
+    { value: "american", label: "US" },
+  ];
 
   return (
     <header style={{ height: "64px", display: "grid", gridTemplateColumns: "1fr auto auto", alignItems: "center", gap: 12, padding: "0 16px", borderBottom: "1px solid var(--border0)", background: "rgba(246,248,244,0.94)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", position: "sticky", top: 0, zIndex: 30, flexShrink: 0 }}>
@@ -53,18 +63,46 @@ export function TopBar({ title, subtitle }: TopBarProps) {
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 }}>
-        <button className="hidden sm:inline-flex" style={{ width: 34, height: 34, alignItems: "center", justifyContent: "center", borderRadius: 14, border: "1px solid var(--border0)", background: "#fff", color: "var(--text1)" }} aria-label="Notifications">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+        {/* Odds format */}
+        <div className="hidden sm:flex items-center gap-0.5 rounded-xl border p-0.5" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+          {oddsFormats.map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setFormat(value)}
+              style={{
+                padding: "3px 8px", borderRadius: 10, fontSize: 10, fontWeight: 700,
+                background: format === value ? "var(--bg1)" : "transparent",
+                color: format === value ? "var(--text0)" : "var(--text2)",
+                border: "none", cursor: "pointer", transition: "all 120ms",
+                boxShadow: format === value ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Dark mode */}
+        <button
+          onClick={toggleTheme}
+          style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 12, border: "1px solid var(--border0)", background: "var(--bg1)", color: "var(--text1)", cursor: "pointer" }}
+          aria-label="Toggle theme"
+        >
+          {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+        </button>
+
+        <button className="hidden sm:inline-flex" style={{ width: 34, height: 34, alignItems: "center", justifyContent: "center", borderRadius: 14, border: "1px solid var(--border0)", background: "var(--bg1)", color: "var(--text1)" }} aria-label="Notifications">
           <Bell size={15} />
         </button>
 
         {isLoggedIn && user ? (
           <div className="flex items-center gap-2 rounded-2xl border px-2 py-1.5" style={{ borderColor: "var(--border0)", background: "#fff" }}>
             <div onClick={logout} title="Click to log out" style={{ width: 32, height: 32, borderRadius: 12, background: "rgba(46,219,108,0.10)", border: "1px solid rgba(46,219,108,0.18)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "var(--positive)", fontFamily: "'JetBrains Mono', monospace", cursor: "pointer" }}>
-              {user.username?.slice(0, 2).toUpperCase() ?? "ND"}
+              {user.displayName?.slice(0, 2).toUpperCase() ?? "ND"}
             </div>
             <div className="hidden sm:block leading-tight">
-              <div className="text-[11px] font-semibold text-text-primary">{user.username ?? "Member"}</div>
+              <div className="text-[11px] font-semibold text-text-primary">{user.displayName ?? "Member"}</div>
               <div className="text-[10px] text-text-subtle">Signed in</div>
             </div>
           </div>

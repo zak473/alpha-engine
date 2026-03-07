@@ -16,13 +16,6 @@ interface StickyFilterBarProps {
 
 type Chip<T extends string = string> = { value: T; label: string };
 
-const STATUS_CHIPS: Chip<BettingFilter["status"]>[] = [
-  { value: "all",      label: "Active" },
-  { value: "live",     label: "Live" },
-  { value: "upcoming", label: "Upcoming" },
-  { value: "finished", label: "Results" },
-];
-
 const TIME_CHIPS: Chip<BettingFilter["time"]>[] = [
   { value: "all",      label: "Any" },
   { value: "today",    label: "Today" },
@@ -95,8 +88,7 @@ function ChipGroup<T extends string>({
 }
 
 const isDirty = (f: BettingFilter) =>
-  f.status !== "all" || f.time !== "all" || f.edge !== "all" ||
-  f.confidence !== "all" || f.search !== "";
+  f.time !== "all" || f.edge !== "all" || f.confidence !== "all" || f.search !== "";
 
 export function StickyFilterBar({
   filter,
@@ -111,7 +103,7 @@ export function StickyFilterBar({
   const set = <K extends keyof BettingFilter>(key: K, val: BettingFilter[K]) =>
     onChange({ ...filter, [key]: val });
 
-  const reset = () => onChange(DEFAULT_BETTING_FILTER);
+  const reset = () => onChange({ ...filter, time: "all", edge: "all", confidence: "all", search: "" });
 
   return (
     <div
@@ -196,45 +188,36 @@ export function StickyFilterBar({
       </div>
 
       {/* Row 2: Filter chips */}
-      <div 
-        className="flex items-center gap-4 px-4 py-2 overflow-x-auto" 
+      <div
+        className="flex items-center gap-4 px-4 py-2 overflow-x-auto"
         style={{ scrollbarWidth: "none" }}
       >
-        <ChipGroup 
-          chips={STATUS_CHIPS} 
-          value={filter.status} 
-          onChange={(v) => set("status", v)}
-          label="Status"
-          accentLive
-        />
-        
-        <div className="w-px h-5 bg-[var(--border0)] flex-shrink-0" />
-        
-        <ChipGroup 
-          chips={TIME_CHIPS} 
-          value={filter.time} 
+        <ChipGroup
+          chips={TIME_CHIPS}
+          value={filter.time}
           onChange={(v) => set("time", v)}
           label="Time"
         />
-        
+
         <div className="w-px h-5 bg-[var(--border0)] flex-shrink-0" />
-        
-        <ChipGroup 
-          chips={EDGE_CHIPS} 
-          value={filter.edge} 
+
+        <ChipGroup
+          chips={EDGE_CHIPS}
+          value={filter.edge}
           onChange={(v) => set("edge", v)}
           label="Edge"
         />
-        
+
         <div className="w-px h-5 bg-[var(--border0)] flex-shrink-0" />
-        
-        <ChipGroup 
-          chips={CONF_CHIPS} 
-          value={filter.confidence} 
+
+        <ChipGroup
+          chips={CONF_CHIPS}
+          value={filter.confidence}
           onChange={(v) => set("confidence", v)}
           label="Conf"
         />
       </div>
+
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useId } from "react";
+import { useState, useCallback, useId, useEffect } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronUp, Shield, Timer, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -35,7 +35,7 @@ function OddsButton({ selection, market, match, compact = false }: { selection: 
     setTimeout(() => setFlash(false), 1400);
   }, [added, addToQueue, selId, match, market, selection]);
 
-  const edgePct = (selection.edge ?? 0) * 100;
+  const edgePct = selection.edge ?? 0;
 
   return (
     <button
@@ -212,6 +212,14 @@ export function MatchCard({ match, highlighted, sport, detailHref }: MatchCardPr
   void cardId;
   void sport;
 
+  // Tick every 60s so countdown stays current
+  const [, forceUpdate] = useState(0);
+  useEffect(() => {
+    if (match.status !== "upcoming") return;
+    const id = setInterval(() => forceUpdate((n) => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, [match.status]);
+
   const isLive = match.status === "live";
   const isFinished = match.status === "finished";
   const featuredSlice = match.featuredMarkets.slice(0, 2);
@@ -224,10 +232,13 @@ export function MatchCard({ match, highlighted, sport, detailHref }: MatchCardPr
         "sportsbook-card flex flex-col gap-0 overflow-hidden transition-all duration-200",
         highlighted && "ring-2 ring-[var(--accent)]"
       )}
-      style={isLive ? { boxShadow: `0 0 0 1px ${cfg.color}22, 0 14px 28px rgba(17,24,17,0.10)` } : undefined}
+      style={isLive ? {
+        boxShadow: `0 0 0 1.5px ${cfg.color}55, 0 8px 28px ${cfg.color}18`,
+        borderTop: `2px solid ${cfg.color}cc`,
+      } : undefined}
     >
       {detailHref ? (
-        <Link href={detailHref} className="block transition-colors hover:bg-[var(--accent-muted)]">
+        <Link href={detailHref} target="_blank" rel="noopener noreferrer" className="block transition-colors hover:bg-[var(--accent-muted)]">
           <MatchCardIdentity match={match} cfg={cfg} />
         </Link>
       ) : (
@@ -247,7 +258,7 @@ export function MatchCard({ match, highlighted, sport, detailHref }: MatchCardPr
             {expanded ? "Hide extra markets" : `${match.allMarkets.length - 2} more markets`}
           </button>
         ) : <div />}
-        {detailHref && <Link href={detailHref} className="text-[11px] font-medium text-[var(--accent)] transition-opacity hover:opacity-80">View full breakdown</Link>}
+        {detailHref && <Link href={detailHref} target="_blank" rel="noopener noreferrer" className="text-[11px] font-medium text-[var(--accent)] transition-opacity hover:opacity-80">View full breakdown</Link>}
       </div>
 
       {expanded && !isFinished && (
