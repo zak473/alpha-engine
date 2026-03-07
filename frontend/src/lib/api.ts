@@ -29,7 +29,7 @@ import type {
   BaseballMatchDetail,
 } from "./types";
 
-// Always use the absolute backend URL (works for both SSR and browser).
+// Always use absolute URL — Vercel blocks proxied SSR requests to external origins.
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const BASE = `${API_ORIGIN}/api/v1`;

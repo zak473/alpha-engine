@@ -5,7 +5,7 @@ import { adaptToMatchCard } from "@/lib/betting-adapters";
 import type { BettingMatch } from "@/lib/betting-types";
 import { MOCK_MATCHES } from "@/lib/mock-betting-data";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 const SPORTS: SportSlug[] = ["soccer", "basketball", "tennis", "esports", "baseball"];
 
