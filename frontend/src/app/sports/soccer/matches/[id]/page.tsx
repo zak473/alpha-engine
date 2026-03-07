@@ -36,7 +36,7 @@ export default async function SoccerMatchPage({ params }: Props) {
   ]);
 
   return (
-    <AppShell title={`${match.home.name} vs ${match.away.name}`} compact>
+    <AppShell title={`${match.home.name} vs ${match.away.name}`}>
       <SoccerMatchDetail match={match} eloHome={eloHome} eloAway={eloAway} />
     </AppShell>
   );

@@ -17,45 +17,18 @@ export function AppShell({ children, title, subtitle, compact }: AppShellProps) 
     <SidebarProvider>
       <div className="brand-shell relative bg-surface-base">
         <Sidebar />
-        <div
-          className={compact ? "lg:pl-56 h-screen overflow-hidden flex flex-col relative z-[1]" : "lg:pl-56 flex min-h-screen flex-col relative z-[1]"}
-        >
+        <div className={compact ? "lg:pl-56 h-screen overflow-hidden flex flex-col relative z-[1]" : "lg:pl-56 flex min-h-screen flex-col relative z-[1]"}>
           <TopBar title={title} subtitle={subtitle} />
-          <main
-            className={compact ? "flex-1 overflow-hidden h-full flex flex-col pb-14 lg:pb-0" : "flex-1 p-4 lg:p-6 pb-20 lg:pb-6"}
-          >
+          <main className={compact ? "flex-1 overflow-y-auto flex flex-col pb-14 lg:pb-0" : "flex-1 p-4 lg:p-6 pb-20 lg:pb-6"}>
             {!compact && (
-              <section className="page-intro mb-5 lg:mb-6">
-                <div className="page-intro__copy">
-                  <div className="page-intro__eyebrow">Never In Doubt</div>
-                  <div>
-                    <h1 className="page-intro__title">{title}</h1>
-                    {subtitle && <p className="page-intro__subtitle">{subtitle}</p>}
-                  </div>
-                  <div className="page-intro__tags">
-                    <span className="page-chip">Blackout premium theme</span>
-                    <span className="page-chip">Logo-led identity</span>
-                    <span className="page-chip">High-conviction picks</span>
-                  </div>
+              <div className="mx-4 mt-3 mb-5 lg:mx-6 flex items-center justify-between rounded-2xl px-4 py-3" style={{ background: "rgba(48,224,106,0.07)", border: "1px solid rgba(48,224,106,0.15)" }}>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="inline-flex h-2 w-2 rounded-full flex-shrink-0" style={{ background: "var(--accent)" }} />
+                  <span className="text-sm font-semibold truncate" style={{ color: "var(--positive)" }}>Never In Doubt</span>
+                  {subtitle && <span className="hidden text-xs text-text-muted sm:inline truncate">— {subtitle}</span>}
                 </div>
-
-                <div className="page-intro__brand">
-                  <div className="page-intro__logoWrap">
-                    <Image
-                      src="/never-in-doubt-logo.png"
-                      alt="Never In Doubt logo"
-                      width={900}
-                      height={600}
-                      className="h-auto w-full"
-                      priority
-                    />
-                  </div>
-                  <div className="page-intro__meta">
-                    <span className="page-intro__dot" />
-                    Never In Doubt premium theme live
-                  </div>
-                </div>
-              </section>
+                <span className="text-xs text-text-muted shrink-0 pl-3 hidden sm:block">{title}</span>
+              </div>
             )}
             {children}
           </main>
