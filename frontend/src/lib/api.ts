@@ -521,6 +521,45 @@ export async function withdrawBankroll(amount: number, notes?: string): Promise<
   return mutate<BankrollSnapshotOut>("/bankroll/withdraw", "POST", { amount, event_type: "withdrawal", notes });
 }
 
+// ─── Tipsters ─────────────────────────────────────────────────────────────
+
+export interface TipsterProfile {
+  id: string;
+  username: string;
+  bio?: string | null;
+  followers: number;
+  is_following: boolean;
+  weekly_win_rate: number;
+  total_picks: number;
+  won_picks: number;
+  active_tips_count: number;
+  recent_results: ("W" | "L")[];
+}
+
+export interface TipsterTip {
+  id: string;
+  sport: string;
+  match_label: string;
+  market_name: string;
+  selection_label: string;
+  odds: number;
+  outcome?: string | null;
+  start_time: string;
+  note?: string | null;
+}
+
+export async function getTipsters(): Promise<TipsterProfile[]> {
+  const res = await fetch(`${BASE}/tipsters`, { cache: "no-store" });
+  if (!res.ok) throw new ApiError(`API ${res.status}`, res.status, "/tipsters");
+  return res.json();
+}
+
+export async function getTipsterTips(tipsterId: string): Promise<TipsterTip[]> {
+  const res = await fetch(`${BASE}/tipsters/${tipsterId}/tips`, { cache: "no-store" });
+  if (!res.ok) throw new ApiError(`API ${res.status}`, res.status, `/tipsters/${tipsterId}/tips`);
+  return res.json();
+}
+
 // ─── Admin / pipeline control ─────────────────────────────────────────────
 
 export async function triggerSync(): Promise<{ status: string; note: string }> {

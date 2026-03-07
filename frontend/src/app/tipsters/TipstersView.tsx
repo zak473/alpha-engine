@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { Users, TrendingUp, Plus, X, Search, ChevronRight, Trophy, Zap } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Users, Plus, X, Search, ChevronRight, Trophy, Zap } from "lucide-react";
 import { SPORT_CONFIG } from "@/lib/betting-types";
 import type { SportSlug } from "@/lib/betting-types";
 import { cn } from "@/lib/utils";
 import type { TipsterProfile, TipsterTip } from "@/lib/api";
+import { getTipsters, getTipsterTips } from "@/lib/api";
 import { useBetting } from "@/components/betting/BettingContext";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -457,7 +458,18 @@ export function TipstersView() {
   const [sort, setSort] = useState<SortOpt>("followers");
   const [tab, setTab] = useState<Tab>("tipsters");
   const [openTipster, setOpenTipster] = useState<TipsterProfile | null>(null);
+  const [openTips, setOpenTips] = useState<TipsterTip[]>([]);
   const [showPostModal, setShowPostModal] = useState(false);
+
+  useEffect(() => {
+    getTipsters().then(setTipsters).catch(() => {/* keep mock data on error */});
+  }, []);
+
+  function handleOpenTipster(tipster: TipsterProfile) {
+    setOpenTipster(tipster);
+    setOpenTips([]);
+    getTipsterTips(tipster.id).then(setOpenTips).catch(() => {});
+  }
 
   const handleFollow = useCallback((id: string) => {
     setTipsters(prev => prev.map(t =>
@@ -582,7 +594,7 @@ export function TipstersView() {
                 )}
               <TipsterCard
                 tipster={t}
-                onOpen={() => setOpenTipster(t)}
+                onOpen={() => handleOpenTipster(t)}
                 onFollow={() => handleFollow(t.id)}
               />
               </div>
@@ -600,8 +612,8 @@ export function TipstersView() {
       {openTipster && (
         <TipsterModal
           tipster={openTipster}
-          tips={[]}
-          onClose={() => setOpenTipster(null)}
+          tips={openTips}
+          onClose={() => { setOpenTipster(null); setOpenTips([]); }}
           onFollow={() => handleFollow(openTipster.id)}
         />
       )}

@@ -39,7 +39,7 @@ from api.sports.basketball.schemas import (
     ShotZoneOut,
 )
 from api.sports.base.queries import compute_team_form, form_summary
-from db.models.basketball import BasketballTeamMatchStats
+from db.models.basketball import BasketballTeamMatchStats, BasketballPlayerMatchStats
 from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, RatingEloTeam
 
 
@@ -378,13 +378,47 @@ def _mock_elo_panel(
     )
 
 
-def _box_from_stats(row: "BasketballTeamMatchStats", team_name: str) -> BasketballTeamBoxScore:
-    """Build a team box score from a real DB stats row (no per-player breakdown)."""
+def _box_from_stats(row: "BasketballTeamMatchStats", team_name: str, db: Session | None = None) -> BasketballTeamBoxScore:
+    """Build a team box score from real DB stats, including player rows when available."""
+    players = []
+    if db is not None:
+        player_rows = (
+            db.query(BasketballPlayerMatchStats)
+            .filter_by(match_id=row.match_id, team_id=row.team_id)
+            .order_by(BasketballPlayerMatchStats.is_starter.desc(), BasketballPlayerMatchStats.minutes.desc())
+            .all()
+        )
+        for p in player_rows:
+            players.append(BasketballPlayerOut(
+                name=p.player_name,
+                position=p.position,
+                is_starter=p.is_starter,
+                minutes=p.minutes,
+                points=p.points,
+                rebounds=p.rebounds_total,
+                reb_off=p.rebounds_offensive,
+                reb_def=p.rebounds_defensive,
+                assists=p.assists,
+                steals=p.steals,
+                blocks=p.blocks,
+                turnovers=p.turnovers,
+                fouls=p.fouls,
+                plus_minus=p.plus_minus,
+                fg_made=p.fg_made,
+                fg_att=p.fg_attempted,
+                fg_pct=p.fg_pct,
+                fg3_made=p.fg3_made,
+                fg3_att=p.fg3_attempted,
+                fg3_pct=p.fg3_pct,
+                ft_made=p.ft_made,
+                ft_att=p.ft_attempted,
+                ft_pct=p.ft_pct,
+            ))
     return BasketballTeamBoxScore(
         team_id=row.team_id,
         team_name=team_name,
         is_home=row.is_home,
-        players=[],
+        players=players,
         total_points=row.points,
         total_rebounds=row.rebounds_total,
         total_assists=row.assists,
@@ -478,11 +512,11 @@ def _mock_basketball_detail(
             match_id=match.id, team_id=match.away_team_id
         ).first()
         if stats_home:
-            box_home = _box_from_stats(stats_home, home_name)
+            box_home = _box_from_stats(stats_home, home_name, db)
         else:
             box_home = _mock_box_score(match.home_team_id, home_name, True, home_pts or 108, seed)
         if stats_away:
-            box_away = _box_from_stats(stats_away, away_name)
+            box_away = _box_from_stats(stats_away, away_name, db)
         else:
             box_away = _mock_box_score(match.away_team_id, away_name, False, away_pts or 104, seed + 3)
     else:

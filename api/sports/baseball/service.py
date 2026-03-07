@@ -669,7 +669,7 @@ def _mock_baseball_detail(
 
     # Real inning scores from EventContext (populated by fetch_stats.py)
     innings = None
-    ctx = db.query(EventContext).filter_by(match_id=match_id).first()
+    ctx = db.query(EventContext).filter_by(match_id=match.id).first()
     if ctx and ctx.inning_scores_json:
         try:
             import json as _json

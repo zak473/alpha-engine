@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from api.deps import get_db
 from api.exceptions import register_exception_handlers
 from api.middleware import RequestLoggingMiddleware
-from api.routers import auth, challenges, esports, matches, picks, predictions, soccer, tennis
+from api.routers import auth, challenges, esports, matches, picks, predictions, soccer, tennis, tipsters
 from api.sports.soccer import routes as soccer_sport
 from api.sports.tennis import routes as tennis_sport
 from api.sports.esports import routes as esports_sport
@@ -119,6 +119,7 @@ app.include_router(predictions.router, prefix=settings.API_PREFIX)
 app.include_router(challenges.router,  prefix=settings.API_PREFIX)
 app.include_router(matches.router,     prefix=settings.API_PREFIX)
 app.include_router(picks.router,       prefix=settings.API_PREFIX)
+app.include_router(tipsters.router,    prefix=settings.API_PREFIX)
 
 from api.routers import bankroll
 app.include_router(bankroll.router,    prefix=settings.API_PREFIX)

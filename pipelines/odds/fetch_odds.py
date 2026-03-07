@@ -34,18 +34,49 @@ BASE_URL = "https://api.the-odds-api.com/v4"
 
 # The Odds API sport keys → our sport slugs
 SPORT_MAP: dict[str, str] = {
-    "soccer_epl":               "soccer",
-    "soccer_spain_la_liga":     "soccer",
-    "soccer_germany_bundesliga":"soccer",
-    "soccer_italy_serie_a":     "soccer",
-    "soccer_france_ligue_one":  "soccer",
-    "soccer_uefa_champs_league":"soccer",
-    "basketball_nba":           "basketball",
-    "baseball_mlb":             "baseball",
-    "tennis_atp_french_open":   "tennis",
-    "tennis_wta_french_open":   "tennis",
-    "tennis_atp_us_open":       "tennis",
-    "tennis_wta_us_open":       "tennis",
+    # Soccer
+    "soccer_epl":                    "soccer",
+    "soccer_spain_la_liga":          "soccer",
+    "soccer_germany_bundesliga":     "soccer",
+    "soccer_italy_serie_a":          "soccer",
+    "soccer_france_ligue_one":       "soccer",
+    "soccer_uefa_champs_league":     "soccer",
+    "soccer_uefa_europa_league":     "soccer",
+    "soccer_uefa_conference_league": "soccer",
+    "soccer_netherlands_eredivisie": "soccer",
+    "soccer_portugal_primeira_liga": "soccer",
+    "soccer_turkey_super_league":    "soccer",
+    # Basketball
+    "basketball_nba":                "basketball",
+    "basketball_euroleague":         "basketball",
+    "basketball_nbl":                "basketball",
+    # Baseball
+    "baseball_mlb":                  "baseball",
+    # Tennis — Grand Slams
+    "tennis_atp_aus_open":           "tennis",
+    "tennis_wta_aus_open":           "tennis",
+    "tennis_atp_french_open":        "tennis",
+    "tennis_wta_french_open":        "tennis",
+    "tennis_atp_wimbledon":          "tennis",
+    "tennis_wta_wimbledon":          "tennis",
+    "tennis_atp_us_open":            "tennis",
+    "tennis_wta_us_open":            "tennis",
+    # Tennis — Masters / WTA 1000
+    "tennis_atp_miami_open":         "tennis",
+    "tennis_wta_miami_open":         "tennis",
+    "tennis_atp_madrid_open":        "tennis",
+    "tennis_wta_madrid_open":        "tennis",
+    "tennis_atp_rome":               "tennis",
+    "tennis_wta_rome":               "tennis",
+    "tennis_atp_monte_carlo":        "tennis",
+    "tennis_atp_canadian_open":      "tennis",
+    "tennis_wta_canadian_open":      "tennis",
+    "tennis_atp_cincinnati":         "tennis",
+    "tennis_wta_cincinnati":         "tennis",
+    "tennis_atp_paris":              "tennis",
+    "tennis_atp_vienna":             "tennis",
+    "tennis_atp_basel":              "tennis",
+    "tennis_atp_stockholm":          "tennis",
 }
 
 # Preferred bookmakers for sharpest lines (in priority order)
