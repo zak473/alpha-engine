@@ -324,10 +324,13 @@ function SideCol({ children }: { children: React.ReactNode }) {
   return <div className="lg:col-span-4 flex flex-col gap-3">{children}</div>;
 }
 
+const initials = (name: string) => name.split(" ").map(s => s[0]).slice(0,2).join("").toUpperCase();
+const flagText = (profile?: TennisPlayerProfileOut | null) => profile?.nationality ? profile.nationality.toUpperCase().slice(0,3) : null;
+
 // ─── Player Block (header) ────────────────────────────────────────────────────
 
 function PlayerBlock({
-  name, isHome, elo, form, info, side,
+  name, isHome, elo, form, info, side, profile,
 }: {
   name: string;
   isHome: boolean;
@@ -335,54 +338,33 @@ function PlayerBlock({
   form: TennisPlayerFormOut | null;
   info: TennisMatch["tennis_info"];
   side: "home" | "away";
+  profile?: TennisPlayerProfileOut | null;
 }) {
   const daysRest = side === "home" ? info?.player_a_days_rest : info?.player_b_days_rest;
   const last14   = side === "home" ? info?.player_a_matches_last_14d : info?.player_b_matches_last_14d;
-  const align = isHome ? "items-start text-left" : "items-end text-right";
+  const rank = profile?.ranking != null ? `#${profile.ranking}` : null;
+  const nat = flagText(profile);
 
   return (
-    <div className={cn("flex flex-col gap-1.5 flex-1 min-w-0 px-3 py-2", align)}>
-      <span className="text-sm font-semibold text-t1 leading-tight truncate max-w-full">{name}</span>
-
-      {/* ELO */}
-      {elo && (
-        <div className={cn("flex items-center gap-2 flex-wrap", isHome ? "" : "justify-end")}>
-          <span className="text-xs font-mono text-accent-blue">{elo.overall_rating}</span>
-          {elo.surface_rating != null && (
-            <span className={cn("text-2xs font-mono px-1.5 py-0.5 rounded", surfaceBg(info?.surface))}>
-              {elo.surface_rating} {info?.surface}
-            </span>
-          )}
-          <Delta v={elo.rating_change} />
+    <div className="match-hero-team" data-side={isHome ? "home" : "away"}>
+      <div className="match-hero-id">
+        <div className="match-avatar">{initials(name)}</div>
+        <div className="min-w-0">
+          <div className="match-hero-name truncate">{name}</div>
+          <div className="match-hero-sub">{[nat, rank].filter(Boolean).join(" • ") || "Tour profile"}</div>
         </div>
-      )}
+      </div>
 
-      {/* Form streak dots */}
-      {form && (
-        <div className={cn("flex flex-col gap-1", isHome ? "" : "items-end")}>
-          <FormStreak
-            results={[
-              ...Array(form.wins ?? 0).fill("W" as const),
-              ...Array(form.losses ?? 0).fill("L" as const),
-            ].slice(0, 5)}
-            size="sm"
-          />
-        </div>
-      )}
+      <div className="match-meta-row">
+        {elo && <span className="match-meta-chip match-meta-chip--green">ELO {Math.round(elo.surface_rating ?? elo.overall_rating)}</span>}
+        {profile?.plays && <span className="match-meta-chip">{profile.plays}</span>}
+        {info?.surface && <span className="match-meta-chip">{info.surface}</span>}
+      </div>
 
-      {/* Fatigue */}
-      <div className={cn("flex items-center gap-2 flex-wrap", isHome ? "" : "justify-end")}>
-        {daysRest != null && (
-          <span className={cn(
-            "text-2xs px-1.5 py-0.5 rounded font-medium",
-            daysRest < 2 ? "bg-red-500/15 text-red-400" : daysRest < 4 ? "bg-amber-500/15 text-amber-400" : "bg-zinc-700/30 text-t3"
-          )}>
-            {daysRest}d rest
-          </span>
-        )}
-        {last14 != null && (
-          <span className="text-2xs text-t3">{last14} matches/14d</span>
-        )}
+      <div className="match-meta-row">
+        {daysRest != null && <span className={cn("match-meta-chip", daysRest < 2 ? "match-meta-chip--amber" : "match-meta-chip--green")}>{daysRest}d rest</span>}
+        {last14 != null && <span className="match-meta-chip">{last14} matches / 14d</span>}
+        {form && <span className="match-meta-chip">{form.wins ?? 0}W · {form.losses ?? 0}L</span>}
       </div>
     </div>
   );
@@ -394,76 +376,52 @@ function MatchBlock({ match }: { match: TennisMatch }) {
   const info = match.tennis_info;
   const status = match.status;
   const sets = info?.sets_detail ?? [];
+  const liveClock = match.live_clock || (status === "live" ? "Live" : fmtTime(match.kickoff_utc));
 
   return (
-    <div className="flex flex-col items-center gap-1.5 px-3 py-2 min-w-0">
-      {/* Tournament + round */}
-      <div className="text-center">
-        <div className="text-xs font-semibold text-t1 leading-tight">{match.league}</div>
-        {info?.round_name && <div className="text-2xs text-t2">{info.round_name}</div>}
+    <div className="match-hero-center">
+      <span className="match-hero-eyebrow">Never In Doubt</span>
+      <div className="match-hero-centerMeta">
+        <div className="text-base font-semibold text-t1 text-center">{match.league}</div>
+        <div className="match-hero-subtle">{[info?.round_name, info?.surface, info?.is_indoor ? "Indoor" : null].filter(Boolean).join(" • ") || fmtDate(match.kickoff_utc)}</div>
       </div>
 
-      {/* Surface + level */}
-      <div className="flex items-center gap-1.5 flex-wrap justify-center">
-        {info?.surface && (
-          <span className={cn("text-2xs px-1.5 py-0.5 rounded border font-medium", surfaceBg(info.surface))}>
-            {info.surface}
-          </span>
-        )}
-        {info?.tournament_level && (
-          <span className="text-2xs text-t3">{levelLabel(info.tournament_level)}</span>
-        )}
-        {info?.is_indoor && <span className="text-2xs text-t3">Indoor</span>}
-      </div>
-
-      {/* Score */}
-      {status === "finished" || status === "live" ? (
-        <div className="flex flex-col items-center gap-0.5">
-          <div className="flex items-center gap-3">
-            <span className="text-xl font-bold font-mono text-t1 tabular-nums">
-              {match.home_score ?? 0}
-            </span>
-            <span className="text-xs text-t3">sets</span>
-            <span className="text-xl font-bold font-mono text-t1 tabular-nums">
-              {match.away_score ?? 0}
-            </span>
-          </div>
-          {/* Set-by-set */}
-          {sets.length > 0 && (
-            <div className="flex items-center gap-1 text-2xs font-mono text-t3">
-              {sets.map((s, i) => (
-                <span key={i}>
-                  {s.a}{s.tb_a != null ? `(${s.tb_a})` : ""}–{s.b}{s.tb_b != null ? `(${s.tb_b})` : ""}
-                  {i < sets.length - 1 && <span className="mx-0.5 opacity-40">·</span>}
-                </span>
-              ))}
-            </div>
-          )}
-          {info?.retired && <span className="text-2xs text-red-400 font-medium">retired</span>}
+      {(status === "finished" || status === "live") ? (
+        <div className="match-hero-score">
+          <span className="match-hero-scoreNum">{match.home_score ?? 0}</span>
+          <span className="match-hero-scoreDivider">–</span>
+          <span className="match-hero-scoreNum">{match.away_score ?? 0}</span>
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-0.5">
-          <div className="text-sm font-mono text-t1">{fmtTime(match.kickoff_utc)}</div>
-          <Countdown kickoff={match.kickoff_utc} />
+        <div className="match-hero-centerMeta">
+          <div className="match-hero-subtle text-sm font-semibold uppercase tracking-[0.2em]">Scheduled</div>
+          <div className="match-hero-subtle">{fmtTime(match.kickoff_utc)}</div>
         </div>
       )}
 
-      <StatusBadge status={status} />
-      {info?.best_of && <span className="text-2xs text-t3">Best of {info.best_of}</span>}
-      {info?.match_duration_min && (
-        <span className="text-2xs text-t3">{Math.floor(info.match_duration_min / 60)}h {info.match_duration_min % 60}m</span>
+      <div className="match-meta-row justify-center">
+        <StatusBadge status={status} />
+        {info?.best_of && <span className="match-meta-chip">Best of {info.best_of}</span>}
+        <span className="match-meta-chip">{liveClock}</span>
+      </div>
+
+      {sets.length > 0 && (
+        <div className="match-meta-row justify-center">
+          {sets.map((s, i) => (
+            <span key={i} className="match-meta-chip">S{s.set_num}: {s.a}-{s.b}</span>
+          ))}
+        </div>
       )}
 
-      {/* Win probability bar */}
       {match.probabilities && (
-        <div className="w-full flex flex-col items-center gap-0.5 mt-1">
-          <div className="flex h-1.5 w-full rounded-full overflow-hidden">
-            <div className="bg-accent-blue h-full" style={{ width: `${Math.round(match.probabilities.home_win * 100)}%` }} />
-            <div className="bg-amber-500 h-full flex-1" />
+        <div className="match-hero-prob">
+          <div className="match-hero-probBar">
+            <div style={{ width: `${Math.round(match.probabilities.home_win * 100)}%` }} className="bg-[#2edb6c]" />
+            <div className="bg-[#f0bf58] flex-1" />
           </div>
-          <div className="flex justify-between w-full text-2xs font-mono tabular-nums">
-            <span className="text-accent-blue">{Math.round(match.probabilities.home_win * 100)}%</span>
-            <span className="text-amber-400">{Math.round(match.probabilities.away_win * 100)}%</span>
+          <div className="match-hero-probLabel">
+            <span>{Math.round(match.probabilities.home_win * 100)}%</span>
+            <span>{Math.round(match.probabilities.away_win * 100)}%</span>
           </div>
         </div>
       )}
@@ -475,16 +433,15 @@ function MatchBlock({ match }: { match: TennisMatch }) {
 
 function TennisMatchHeader({ match }: { match: TennisMatch }) {
   return (
-    <div className="card overflow-hidden">
-      {/* Nav */}
-      <div className="flex items-center gap-2 px-3 pt-2.5 pb-0">
+    <div className="overflow-hidden">
+      <div className="flex items-center gap-2 px-5 pt-4 pb-0">
         <Link href="/sports/tennis/matches" className="inline-flex items-center gap-1 text-2xs text-t3 hover:text-t1 transition-colors">
           <ArrowLeft size={12} />
           Tennis Matches
         </Link>
       </div>
 
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-0 px-1 py-2">
+      <div className="match-hero-shell">
         <PlayerBlock
           name={match.home.name}
           isHome
@@ -492,6 +449,7 @@ function TennisMatchHeader({ match }: { match: TennisMatch }) {
           form={match.form_home}
           info={match.tennis_info}
           side="home"
+          profile={match.profile_home}
         />
         <MatchBlock match={match} />
         <PlayerBlock
@@ -501,6 +459,7 @@ function TennisMatchHeader({ match }: { match: TennisMatch }) {
           form={match.form_away}
           info={match.tennis_info}
           side="away"
+          profile={match.profile_away}
         />
       </div>
     </div>
@@ -509,9 +468,9 @@ function TennisMatchHeader({ match }: { match: TennisMatch }) {
 
 // ─── KPI Strip ────────────────────────────────────────────────────────────────
 
-function KpiCell({ label, value, sub, accent }: { label: string; value: React.ReactNode; sub?: string; accent?: string }) {
+function KpiCell({ label, value, sub, accent, tone = "soft" }: { label: string; value: React.ReactNode; sub?: string; accent?: string; tone?: "soft" | "mint" | "cream" }) {
   return (
-    <div className="detail-kpi-card">
+    <div className={cn("detail-kpi-card", tone === "mint" && "detail-kpi-card--mint", tone === "cream" && "detail-kpi-card--cream", tone === "soft" && "detail-kpi-card--soft")}>
       <span className="detail-kpi-label block truncate">{label}</span>
       <span className={cn("detail-kpi-value block truncate", accent ?? "text-t1")}>{value}</span>
       {sub && <span className="detail-kpi-sub block truncate">{sub}</span>}
@@ -525,99 +484,26 @@ function TennisKpiStrip({ match }: { match: TennisMatch }) {
   const elo_h = match.elo_home;
   const elo_a = match.elo_away;
   const fH = match.form_home;
-  const fA = match.form_away;
   const info = match.tennis_info;
 
-  // ELO-derived win prob
-  let eloH: string = "—", eloA: string = "—";
-  if (elo_h && elo_a) {
-    const rH = elo_h.surface_rating ?? elo_h.overall_rating;
-    const rA = elo_a.surface_rating ?? elo_a.overall_rating;
-    eloH = `${Math.round(eloWinProb(rH, rA) * 100)}%`;
-    eloA = `${Math.round(eloWinProb(rA, rH) * 100)}%`;
-  }
-
-  const eloDiff = (elo_h && elo_a)
-    ? ((elo_h.surface_rating ?? elo_h.overall_rating) - (elo_a.surface_rating ?? elo_a.overall_rating)).toFixed(0)
-    : "—";
+  const surfaceHome = elo_h ? Math.round(elo_h.surface_rating ?? elo_h.overall_rating) : null;
+  const surfaceAway = elo_a ? Math.round(elo_a.surface_rating ?? elo_a.overall_rating) : null;
+  const eloDiff = surfaceHome != null && surfaceAway != null ? surfaceHome - surfaceAway : null;
+  const edge = p && fo?.home_win ? ((p.home_win - (1 / fo.home_win)) * 100) : null;
 
   return (
-    <div className="px-3 py-3 space-y-3">
+    <div className="px-4 py-4 space-y-3">
       <div className="detail-kpi-grid">
-        <KpiCell
-          label="Model P1 win"
-          value={p ? `${Math.round(p.home_win * 100)}%` : "—"}
-          sub={match.home.name.split(" ").pop()}
-          accent={p ? "text-accent-blue" : undefined}
-        />
-        <KpiCell
-          label="Model P2 win"
-          value={p ? `${Math.round(p.away_win * 100)}%` : "—"}
-          sub={match.away.name.split(" ").pop()}
-        />
-        <KpiCell
-          label="ELO P1 win"
-          value={eloH}
-          sub="surface-adj"
-          accent="text-accent-purple"
-        />
-        <KpiCell
-          label="ELO P2 win"
-          value={eloA}
-          sub="surface-adj"
-          accent="text-accent-purple"
-        />
-        <KpiCell
-          label="Fair odds P1"
-          value={fo?.home_win ? fo.home_win.toFixed(2) : "—"}
-        />
-        <KpiCell
-          label="Fair odds P2"
-          value={fo?.away_win ? fo.away_win.toFixed(2) : "—"}
-        />
-        <KpiCell
-          label="Confidence"
-          value={match.confidence ? `${match.confidence}%` : "—"}
-          accent={match.confidence && match.confidence >= 65 ? "text-accent-green" : undefined}
-        />
+        <KpiCell label="Model Win" value={p ? `${Math.round(p.home_win * 100)}%` : "—"} sub={match.home.name} accent="text-[#178445]" tone="mint" />
+        <KpiCell label="Fair Odds" value={fo?.home_win ? fo.home_win.toFixed(2) : "—"} sub={`${match.home.name} price`} tone="soft" />
+        <KpiCell label="Confidence" value={match.confidence ? `${match.confidence}%` : "—"} sub="Model signal" tone="soft" />
+        <KpiCell label="Value" value={edge != null ? `${edge >= 0 ? '+' : ''}${edge.toFixed(1)}%` : "—"} sub="Model edge" tone="cream" />
       </div>
       <div className="detail-kpi-grid">
-        <KpiCell
-          label="ELO diff"
-          value={eloDiff !== "—" ? `${Number(eloDiff) > 0 ? "+" : ""}${eloDiff}` : "—"}
-          sub="surface-adj"
-          accent={Number(eloDiff) > 50 ? "text-accent-blue" : Number(eloDiff) < -50 ? "text-amber-400" : undefined}
-        />
-        <KpiCell
-          label="Hold% P1"
-          value={fH?.avg_service_hold_pct != null ? pct(fH.avg_service_hold_pct) : "—"}
-          sub="form avg"
-        />
-        <KpiCell
-          label="Hold% P2"
-          value={fA?.avg_service_hold_pct != null ? pct(fA.avg_service_hold_pct) : "—"}
-          sub="form avg"
-        />
-        <KpiCell
-          label="Break% P1"
-          value={fH?.avg_bp_conversion_pct != null ? pct(fH.avg_bp_conversion_pct) : "—"}
-          sub="form avg"
-        />
-        <KpiCell
-          label="Break% P2"
-          value={fA?.avg_bp_conversion_pct != null ? pct(fA.avg_bp_conversion_pct) : "—"}
-          sub="form avg"
-        />
-        <KpiCell
-          label="Rest P1"
-          value={info?.player_a_days_rest != null ? `${info.player_a_days_rest}d` : "—"}
-          accent={info?.player_a_days_rest != null && info.player_a_days_rest < 2 ? "text-red-400" : undefined}
-        />
-        <KpiCell
-          label="Rest P2"
-          value={info?.player_b_days_rest != null ? `${info.player_b_days_rest}d` : "—"}
-          accent={info?.player_b_days_rest != null && info.player_b_days_rest < 2 ? "text-red-400" : undefined}
-        />
+        <KpiCell label="Surface ELO" value={surfaceHome != null ? `${surfaceHome}` : "—"} sub={match.home.name} tone="soft" />
+        <KpiCell label="Surface ELO" value={surfaceAway != null ? `${surfaceAway}` : "—"} sub={match.away.name} tone="soft" />
+        <KpiCell label="ELO Delta" value={eloDiff != null ? `${eloDiff >= 0 ? '+' : ''}${eloDiff}` : "—"} sub="Home − away" tone={eloDiff != null && eloDiff >= 0 ? "mint" : "cream"} />
+        <KpiCell label="Rest / Form" value={`${info?.player_a_days_rest ?? "—"}d · ${fH?.wins ?? 0}-${fH?.losses ?? 0}`} sub={match.home.name.split(" ").slice(-1)[0]} tone="soft" />
       </div>
     </div>
   );
@@ -646,6 +532,35 @@ function OverviewTab({ match }: { match: TennisMatch }) {
   return (
     <SideGrid>
       <MainCol>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="detail-soft-box">
+            <div className="flex items-center gap-3">
+              <div className="match-avatar">{initials(match.home.name)}</div>
+              <div className="min-w-0">
+                <div className="text-lg font-semibold text-t1 truncate">{match.home.name}</div>
+                <div className="text-xs text-t2">{match.profile_home?.nationality ?? "Tour profile"}</div>
+              </div>
+              <div className="ml-auto text-right">
+                <div className="text-xl font-bold text-[#178445]">{match.profile_home?.ranking ? `#${match.profile_home.ranking}` : "—"}</div>
+                <div className="text-xs text-t2">Rank</div>
+              </div>
+            </div>
+          </div>
+          <div className="detail-soft-box">
+            <div className="flex items-center gap-3">
+              <div className="match-avatar">{initials(match.away.name)}</div>
+              <div className="min-w-0">
+                <div className="text-lg font-semibold text-t1 truncate">{match.away.name}</div>
+                <div className="text-xs text-t2">{match.profile_away?.nationality ?? "Tour profile"}</div>
+              </div>
+              <div className="ml-auto text-right">
+                <div className="text-xl font-bold text-[#178445]">{match.profile_away?.ranking ? `#${match.profile_away.ranking}` : "—"}</div>
+                <div className="text-xs text-t2">Rank</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Player comparison */}
         <Panel title="Player Comparison" subtitle={`${info?.surface ?? "All surfaces"} · form avg`}>
           {/* Header */}
