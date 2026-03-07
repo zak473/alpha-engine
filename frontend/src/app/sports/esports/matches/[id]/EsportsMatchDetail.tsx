@@ -372,10 +372,10 @@ function EsportsMatchHeader({ match }: { match: EsportsMatch }) {
 
 function KpiCell({ label, value, sub, accent }: { label: string; value: React.ReactNode; sub?: string; accent?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 px-3 py-2 border-r border-b0 last:border-0 min-w-0">
-      <span className="text-2xs text-t3 uppercase tracking-wide truncate">{label}</span>
-      <span className={cn("text-xs font-mono font-semibold truncate", accent ?? "text-t1")}>{value}</span>
-      {sub && <span className="text-2xs text-t3 truncate">{sub}</span>}
+    <div className="detail-kpi-card">
+      <span className="detail-kpi-label block truncate">{label}</span>
+      <span className={cn("detail-kpi-value block truncate", accent ?? "text-t1")}>{value}</span>
+      {sub && <span className="detail-kpi-sub block truncate">{sub}</span>}
     </div>
   );
 }
@@ -403,8 +403,8 @@ function EsportsKpiStrip({ match }: { match: EsportsMatch }) {
     : { label: "Avg GD@15", value: "—" };
 
   return (
-    <div className="card mb-3 overflow-x-auto">
-      <div className="flex border-b border-b0">
+    <div className="px-3 py-3 space-y-3">
+      <div className="detail-kpi-grid">
         <KpiCell label="Model P(A)" value={p ? `${Math.round(p.home_win * 100)}%` : "—"} sub={match.home.name.split(" ").slice(-1)[0]} accent={p ? "text-accent-blue" : undefined} />
         <KpiCell label="Model P(B)" value={p ? `${Math.round(p.away_win * 100)}%` : "—"} sub={match.away.name.split(" ").slice(-1)[0]} />
         <KpiCell label="ELO P(A)" value={eloH} accent="text-accent-purple" />
@@ -413,7 +413,7 @@ function EsportsKpiStrip({ match }: { match: EsportsMatch }) {
         <KpiCell label="Fair odds B" value={fo?.away_win ? fo.away_win.toFixed(2) : "—"} />
         <KpiCell label="Confidence" value={match.confidence ? `${match.confidence}%` : "—"} accent={match.confidence && match.confidence >= 65 ? "text-accent-green" : undefined} />
       </div>
-      <div className="flex">
+      <div className="detail-kpi-grid">
         <KpiCell label="ELO diff" value={eloDiff !== "—" ? `${Number(eloDiff) > 0 ? "+" : ""}${eloDiff}` : "—"} />
         <KpiCell label="Series W% (A)" value={fH?.series_win_pct != null ? pct(fH.series_win_pct) : "—"} />
         <KpiCell label="Series W% (B)" value={fA?.series_win_pct != null ? pct(fA.series_win_pct) : "—"} />
@@ -1525,7 +1525,7 @@ export function EsportsMatchDetail({ match, eloHomeHistory, eloAwayHistory }: Pr
 
       {match.status === "live" && <div className="match-live-wrap px-1"><EsportsLivePanel match={match as any} /></div>}
 
-      {/* Tabs */}
+      <div className="match-tabbar-wrap">
       <div className="match-tabbar mb-1 scrollbar-none">
         {TABS.map(t => (
           <button
@@ -1536,6 +1536,7 @@ export function EsportsMatchDetail({ match, eloHomeHistory, eloAwayHistory }: Pr
             {t.label}
           </button>
         ))}
+      </div>
       </div>
 
       <div className="match-content-wrap">

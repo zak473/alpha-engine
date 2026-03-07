@@ -426,10 +426,10 @@ function MatchHeader({ match }: { match: MatchProps["match"] }) {
 
 function KpiCell({ label, value, sub, col }: { label: string; value: React.ReactNode; sub?: string; col?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 px-3 py-2 border-r border-b0 last:border-0 shrink-0">
-      <p className="text-2xs uppercase tracking-widest text-t2 whitespace-nowrap">{label}</p>
-      <p className={cn("font-mono text-xs font-bold tabular-nums text-t0 whitespace-nowrap", col)}>{value}</p>
-      {sub && <p className="text-2xs text-t2 font-mono whitespace-nowrap">{sub}</p>}
+    <div className="detail-kpi-card min-w-[120px]">
+      <p className="detail-kpi-label whitespace-nowrap">{label}</p>
+      <p className={cn("detail-kpi-value text-[18px] whitespace-nowrap", col ?? "text-t0")}>{value}</p>
+      {sub && <p className="detail-kpi-sub whitespace-nowrap">{sub}</p>}
     </div>
   );
 }
@@ -447,9 +447,9 @@ function KpiStrip2Row({ match }: { match: MatchProps["match"] }) {
   const restDiff = fh?.days_rest != null && fa?.days_rest != null ? fh.days_rest - fa.days_rest : null;
 
   return (
-    <div className="border-b border-b0 bg-bg2">
+    <div className="px-3 py-3 space-y-3">
       {/* Row 1: probabilities */}
-      <div className="flex overflow-x-auto no-scrollbar border-b border-b0">
+      <div className="detail-kpi-grid">
         <div className="flex items-center px-3 py-1 shrink-0 border-r border-b0">
           <span className="label text-t2 whitespace-nowrap">MODEL</span>
         </div>
@@ -483,7 +483,7 @@ function KpiStrip2Row({ match }: { match: MatchProps["match"] }) {
         )}
       </div>
       {/* Row 2: odds + context */}
-      <div className="flex overflow-x-auto no-scrollbar">
+      <div className="detail-kpi-grid">
         {fo && (
           <>
             <KpiCell label="Fair H" value={fo.home_win?.toFixed(2) ?? "—"} col="text-info" />
@@ -1841,7 +1841,7 @@ export function SoccerMatchDetail({ match, eloHome, eloAway }: MatchProps) {
       {match.status === "live" && <div className="match-live-wrap px-4 pb-1"><SoccerLivePanel match={match} /></div>}
 
       {/* Sticky tab bar */}
-      <div className="px-3 md:px-4 sticky top-0 z-20">
+      <div className="match-tabbar-wrap px-3 md:px-4">
         <div className="match-tabbar max-w-screen-2xl mx-auto no-scrollbar">
           {TABS.map(t => (
             <button key={t.id} className="match-tab shrink-0" data-active={activeTab === t.id} onClick={() => setActiveTab(t.id)}>

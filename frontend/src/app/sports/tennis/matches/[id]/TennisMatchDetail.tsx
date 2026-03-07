@@ -511,10 +511,10 @@ function TennisMatchHeader({ match }: { match: TennisMatch }) {
 
 function KpiCell({ label, value, sub, accent }: { label: string; value: React.ReactNode; sub?: string; accent?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 px-3 py-2 border-r border-b0 last:border-0 min-w-0">
-      <span className="text-2xs text-t3 uppercase tracking-wide truncate">{label}</span>
-      <span className={cn("text-xs font-mono font-semibold truncate", accent ?? "text-t1")}>{value}</span>
-      {sub && <span className="text-2xs text-t3 truncate">{sub}</span>}
+    <div className="detail-kpi-card">
+      <span className="detail-kpi-label block truncate">{label}</span>
+      <span className={cn("detail-kpi-value block truncate", accent ?? "text-t1")}>{value}</span>
+      {sub && <span className="detail-kpi-sub block truncate">{sub}</span>}
     </div>
   );
 }
@@ -542,9 +542,8 @@ function TennisKpiStrip({ match }: { match: TennisMatch }) {
     : "—";
 
   return (
-    <div className="card overflow-x-auto">
-      {/* Row 1 */}
-      <div className="flex border-b border-b0">
+    <div className="px-3 py-3 space-y-3">
+      <div className="detail-kpi-grid">
         <KpiCell
           label="Model P1 win"
           value={p ? `${Math.round(p.home_win * 100)}%` : "—"}
@@ -582,8 +581,7 @@ function TennisKpiStrip({ match }: { match: TennisMatch }) {
           accent={match.confidence && match.confidence >= 65 ? "text-accent-green" : undefined}
         />
       </div>
-      {/* Row 2 */}
-      <div className="flex">
+      <div className="detail-kpi-grid">
         <KpiCell
           label="ELO diff"
           value={eloDiff !== "—" ? `${Number(eloDiff) > 0 ? "+" : ""}${eloDiff}` : "—"}
@@ -651,7 +649,7 @@ function OverviewTab({ match }: { match: TennisMatch }) {
         {/* Player comparison */}
         <Panel title="Player Comparison" subtitle={`${info?.surface ?? "All surfaces"} · form avg`}>
           {/* Header */}
-          <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-b0 text-2xs text-t3 font-medium">
+          <div className="detail-compare-head">
             <span>{match.home.name}</span>
             <span className="text-center">Metric</span>
             <span className="text-right">{match.away.name}</span>
@@ -1919,7 +1917,7 @@ export function TennisMatchDetail({ match, eloHomeOverall, eloAwayOverall, eloHo
 
       {match.status === "live" && <div className="match-live-wrap px-1"><TennisLivePanel match={match as any} /></div>}
 
-      {/* Tabs */}
+      <div className="match-tabbar-wrap">
       <div className="match-tabbar mb-1 scrollbar-none">
         {TABS.map(t => (
           <button
@@ -1930,6 +1928,7 @@ export function TennisMatchDetail({ match, eloHomeOverall, eloAwayOverall, eloHo
             {t.label}
           </button>
         ))}
+      </div>
       </div>
 
       {/* Tab content */}

@@ -266,10 +266,10 @@ function BasketballMatchHeader({ match }: { match: TMatch }) {
 
 function Kpi({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 min-w-[80px]">
-      <div className="text-[10px] text-text-subtle uppercase tracking-widest">{label}</div>
-      <div className={cn("text-base font-bold font-mono tabular-nums", color || "text-text-primary")}>{value}</div>
-      {sub && <div className="text-[10px] text-text-subtle">{sub}</div>}
+    <div className="detail-kpi-card min-w-[120px]">
+      <div className="detail-kpi-label">{label}</div>
+      <div className={cn("detail-kpi-value text-[18px]", color || "text-text-primary")}>{value}</div>
+      {sub && <div className="detail-kpi-sub">{sub}</div>}
     </div>
   );
 }
@@ -1410,7 +1410,7 @@ export function BasketballMatchDetail({ match, eloHomeHistory, eloAwayHistory }:
       {match.status === "live" && <div className="match-live-wrap px-4 pb-1"><BasketballLivePanel match={match} /></div>}
 
       {/* Tab bar */}
-      <div className="px-4"><div className="match-tabbar">
+      <div className="match-tabbar-wrap px-1"><div className="match-tabbar">
         <div className="flex gap-0 min-w-max">
           {TABS.map(tab => (
             <button

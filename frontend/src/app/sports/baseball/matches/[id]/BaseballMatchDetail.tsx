@@ -257,10 +257,10 @@ function BaseballMatchHeader({ match }: { match: TMatch }) {
 
 function Kpi({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 min-w-[80px]">
-      <div className="text-[10px] text-text-subtle uppercase tracking-widest">{label}</div>
-      <div className={cn("text-base font-bold font-mono tabular-nums", color || "text-text-primary")}>{value}</div>
-      {sub && <div className="text-[10px] text-text-subtle">{sub}</div>}
+    <div className="detail-kpi-card min-w-[120px]">
+      <div className="detail-kpi-label">{label}</div>
+      <div className={cn("detail-kpi-value text-[18px]", color || "text-text-primary")}>{value}</div>
+      {sub && <div className="detail-kpi-sub">{sub}</div>}
     </div>
   );
 }
@@ -274,8 +274,8 @@ function BaseballKpiStrip({ match }: { match: TMatch }) {
   const eloDiff = elo_h && elo_a ? Math.round(elo_h.rating - elo_a.rating) : null;
 
   return (
-    <div className="bg-surface-base px-4 py-3">
-      <div className="flex items-center gap-6 flex-wrap pb-2 border-b border-surface-border/40">
+    <div className="px-3 py-3 space-y-3">
+      <div className="detail-kpi-grid">
         {p && (
           <>
             <Kpi label={`${match.home.name} Win`} value={fmtPct(p.home_win, 1)} color="text-positive" />
@@ -298,7 +298,7 @@ function BaseballKpiStrip({ match }: { match: TMatch }) {
           <Kpi label="Confidence" value={`${match.confidence}%`} color={match.confidence >= 65 ? "text-accent-green" : match.confidence >= 55 ? "text-accent-amber" : "text-text-muted"} />
         )}
       </div>
-      <div className="flex items-center gap-6 flex-wrap pt-2">
+      <div className="detail-kpi-grid">
         {eloDiff != null && <Kpi label="Elo Diff" value={eloDiff >= 0 ? `+${eloDiff}` : String(eloDiff)} color={eloDiff > 0 ? "text-positive" : "text-t1"} />}
         {elo_h?.pitcher_adj != null && <Kpi label="SP Adj (H)" value={elo_h.pitcher_adj >= 0 ? `+${fmtInt(elo_h.pitcher_adj)}` : fmtInt(elo_h.pitcher_adj)} sub="Elo pts" color={elo_h.pitcher_adj > 0 ? "text-accent-green" : "text-t1"} />}
         {elo_a?.pitcher_adj != null && <Kpi label="SP Adj (A)" value={elo_a.pitcher_adj >= 0 ? `+${fmtInt(elo_a.pitcher_adj)}` : fmtInt(elo_a.pitcher_adj)} sub="Elo pts" color={elo_a.pitcher_adj > 0 ? "text-accent-green" : "text-t1"} />}
@@ -1415,7 +1415,7 @@ export function BaseballMatchDetail({ match, eloHomeHistory, eloAwayHistory }: P
       {match.status === "live" && <div className="match-live-wrap px-4 pb-1"><BaseballLivePanel match={match as any} /></div>}
 
       {/* Tab bar */}
-      <div className="px-4"><div className="match-tabbar">
+      <div className="match-tabbar-wrap px-1"><div className="match-tabbar">
         <div className="flex gap-0 min-w-max">
           {TABS.map(tab => (
             <button

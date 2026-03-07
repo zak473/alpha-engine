@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Swords, TrendingUp, ShieldCheck, Trophy,
   Activity, Circle, ClipboardList, BrainCircuit,
 } from "lucide-react";
-import { useSidebar } from "@/components/layout/SidebarContext";
+import { useSidebar } from "./SidebarContext";
 
 const NAV = [
   { label: "Betting Board", href: "/dashboard", icon: LayoutDashboard },

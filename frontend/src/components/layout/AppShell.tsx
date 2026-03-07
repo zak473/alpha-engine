@@ -4,7 +4,6 @@ import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { BottomNav } from "./BottomNav";
 import { SidebarProvider } from "./SidebarContext";
-import { OnboardingModal } from "@/components/ui/OnboardingModal";
 
 interface AppShellProps {
   children: ReactNode;
@@ -62,7 +61,6 @@ export function AppShell({ children, title, subtitle, compact }: AppShellProps) 
           </main>
         </div>
         <BottomNav />
-        <OnboardingModal />
       </div>
     </SidebarProvider>
   );

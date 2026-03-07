@@ -1,39 +1,50 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { BettingDashboard } from "@/components/betting/BettingDashboard";
-import {
-  getPredictions,
-  getMockPredictions,
-} from "@/lib/api";
-import { mvpToBettingMatch, sortMatches } from "@/lib/betting-adapters";
-import { MOCK_MATCHES } from "@/lib/mock-betting-data";
+import { getSportMatches, type SportSlug } from "@/lib/api";
+import { adaptToMatchCard } from "@/lib/betting-adapters";
 import type { BettingMatch } from "@/lib/betting-types";
+import { MOCK_MATCHES } from "@/lib/mock-betting-data";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
-  let matches: BettingMatch[] = [];
+const SPORTS: SportSlug[] = ["soccer", "basketball", "tennis", "esports", "baseball"];
 
+async function getMatches(): Promise<BettingMatch[]> {
   try {
-    // Fetch both live and scheduled in parallel
-    const [liveResult, scheduledResult] = await Promise.allSettled([
-      getPredictions({ status: "live", limit: 100 }),
-      getPredictions({ status: "scheduled", limit: 100 }),
-    ]);
+    // Try to fetch from backend
+    const results = await Promise.allSettled(
+      SPORTS.map((sport) =>
+        getSportMatches(sport, { limit: 50 })
+          .then((res) => res.items.map((item) => adaptToMatchCard(item, sport)))
+      )
+    );
 
-    const liveItems = liveResult.status === "fulfilled" ? liveResult.value.items : [];
-    const scheduledItems = scheduledResult.status === "fulfilled" ? scheduledResult.value.items : [];
-    const allItems = [...liveItems, ...scheduledItems];
+    const allMatches: BettingMatch[] = results
+      .filter((r): r is PromiseFulfilledResult<BettingMatch[]> => r.status === "fulfilled")
+      .flatMap((r) => r.value);
 
-    if (allItems.length > 0) {
-      matches = allItems.map(mvpToBettingMatch);
-    } else {
-      matches = getMockPredictions().map(mvpToBettingMatch);
+    // If we got data, use it; otherwise fall back to mock
+    if (allMatches.length > 0) {
+      return allMatches;
     }
+    return MOCK_MATCHES;
   } catch {
-    matches = MOCK_MATCHES;
+    // Backend unavailable, use mock data
+    return MOCK_MATCHES;
   }
+}
 
-  const sorted = sortMatches(matches);
+export default async function DashboardPage() {
+  const allMatches = await getMatches();
+
+  // Sort: live first, then by edge, then by start time
+  const sorted = [...allMatches].sort((a, b) => {
+    if (a.status === "live" && b.status !== "live") return -1;
+    if (b.status === "live" && a.status !== "live") return 1;
+    const edgeDiff = (b.edgePercent ?? 0) - (a.edgePercent ?? 0);
+    if (Math.abs(edgeDiff) > 0.5) return edgeDiff;
+    return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+  });
 
   return (
     <AppShell title="Betting Board" subtitle="Never In Doubt live market view" compact>
