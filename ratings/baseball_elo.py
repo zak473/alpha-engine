@@ -103,8 +103,12 @@ class BaseballEloEngine(EloEngine):
         park_delta = PARK_FACTORS.get(park_name.lower().replace(" ", "_"), 0.0)
 
         ctx_adjusted = MatchContext(
+            match_id=context.match_id,
+            sport=context.sport,
             date=context.date,
             home_entity_id=context.home_entity_id,
+            away_entity_id=context.away_entity_id,
+            importance=context.importance,
             extra={
                 **context.extra,
                 # pitcher_adj goes through player_adjustment (home pitcher quality)

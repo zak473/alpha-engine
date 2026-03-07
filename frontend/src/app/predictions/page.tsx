@@ -37,7 +37,7 @@ export default async function PredictionsPage({
   }
 
   return (
-    <AppShell title="Predictions" subtitle="Model predictions & probabilities">
+    <AppShell title="Tip Finder" subtitle="Model edges, confidence, and pre-match pricing">
       <PredictionsShell
         initialData={data}
         initialSport={params.sport ?? "all"}

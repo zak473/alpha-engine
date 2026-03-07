@@ -1,26 +1,14 @@
 "use client";
 
-import { useState, useCallback, useId } from "react";
+import { useState, useCallback, useId, useEffect } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Shield, Timer, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BettingMatch, Market, Selection, SportSlug } from "@/lib/betting-types";
 import { SPORT_CONFIG } from "@/lib/betting-types";
 import { useBetting } from "./BettingContext";
 
-// ── Odds button ──────────────────────────────────────────────────────────────
-
-function OddsButton({
-  selection,
-  market,
-  match,
-  compact = false,
-}: {
-  selection: Selection;
-  market: Market;
-  match: BettingMatch;
-  compact?: boolean;
-}) {
+function OddsButton({ selection, market, match, compact = false }: { selection: Selection; market: Market; match: BettingMatch; compact?: boolean }) {
   const { addToQueue, isInQueue } = useBetting();
   const selId = `${match.id}:${market.id}:${selection.id}`;
   const added = isInQueue(selId);
@@ -47,168 +35,168 @@ function OddsButton({
     setTimeout(() => setFlash(false), 1400);
   }, [added, addToQueue, selId, match, market, selection]);
 
+  const edgePct = selection.edge ?? 0;
+
   return (
     <button
       onClick={handleClick}
       disabled={match.status === "finished"}
       className={cn(
-        "flex flex-col items-center justify-center rounded-lg border transition-all duration-150",
+        "relative flex flex-col items-start justify-center overflow-hidden rounded-2xl border text-left transition-all duration-150",
         "disabled:opacity-40 disabled:cursor-not-allowed",
-        compact ? "px-2.5 py-1.5 min-w-[56px]" : "px-3 py-2 min-w-[68px]",
+        compact ? "min-w-[62px] px-2.5 py-2" : "min-w-[84px] px-3 py-2.5",
         added || flash
-          ? "bg-[var(--accent-dim)] border-[rgba(34,211,238,0.4)] text-[var(--accent)]"
-          : "bg-white/[0.05] border-white/[0.09] hover:bg-white/[0.09] hover:border-white/[0.16] text-text-primary"
+          ? "text-white"
+          : "text-text-primary hover:-translate-y-[1px]"
       )}
+      style={added || flash ? {
+        background: "rgba(46,219,108,0.12)",
+        borderColor: "rgba(46,219,108,0.20)",
+        boxShadow: "0 10px 22px rgba(46,219,108,0.10)",
+      } : {
+        background: "#ffffff",
+        borderColor: "var(--border0)",
+      }}
     >
-      <span className={cn("font-mono font-bold tabular-nums leading-tight",
-            compact ? "text-[11px]" : "text-xs")}>
-        {flash || added ? "✓" : selection.odds.toFixed(2)}
+      <span className={cn("font-mono font-bold tabular-nums leading-tight", compact ? "text-[11px]" : "text-sm")}>
+        {flash || added ? "✓ Added" : selection.odds.toFixed(2)}
       </span>
-      <span className={cn("text-text-muted leading-tight truncate max-w-full",
-            compact ? "text-[9px]" : "text-[10px]")}>
-        {flash || added ? "Added" : selection.label}
+      <span className={cn("mt-0.5 max-w-full truncate leading-tight text-text-muted", compact ? "text-[9px]" : "text-[10px]")}>
+        {flash || added ? "Tracked" : selection.label}
       </span>
+      {!flash && !added && edgePct > 0.5 && (
+        <span className="mt-1 rounded-full bg-emerald-500/12 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300">
+          +{edgePct.toFixed(1)}%
+        </span>
+      )}
     </button>
   );
 }
 
-// ── Market row (one market inline) ───────────────────────────────────────────
-
 function MarketRow({ market, match, compact }: { market: Market; match: BettingMatch; compact?: boolean }) {
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      <span className={cn("text-text-muted flex-shrink-0", compact ? "text-[10px]" : "text-[11px]")}>
-        {market.name}
-      </span>
-      {market.selections.map((sel) => (
-        <OddsButton key={sel.id} selection={sel} market={market} match={match} compact={compact} />
-      ))}
+    <div className="rounded-[20px] border p-2.5" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+      <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-text-muted">{market.name}</div>
+      <div className="flex items-center gap-2 flex-wrap">
+        {market.selections.map((sel) => (
+          <OddsButton key={sel.id} selection={sel} market={market} match={match} compact={compact} />
+        ))}
+      </div>
     </div>
   );
 }
-
-// ── Live badge ────────────────────────────────────────────────────────────────
 
 function LiveBadge({ match }: { match: BettingMatch }) {
   const cfg = SPORT_CONFIG[match.sport];
 
   if (match.status === "live") {
     return (
-      <div className="flex items-center gap-1.5">
-        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: cfg.color }} />
-        <span className="text-[11px] font-bold uppercase" style={{ color: cfg.color }}>
-          LIVE{match.liveClock ? ` ${match.liveClock}` : ""}
+      <div className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1" style={{ borderColor: `${cfg.color}35`, background: `${cfg.color}12` }}>
+        <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: cfg.color }} />
+        <span className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: cfg.color }}>
+          Live {match.liveClock ? `· ${match.liveClock}` : ""}
         </span>
       </div>
     );
   }
 
   if (match.status === "finished") {
-    return (
-      <span className="text-[11px] text-text-muted font-medium uppercase tracking-wide">FT</span>
-    );
+    return <span className="rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>Final</span>;
   }
 
-  // Upcoming
   const soon = isWithinHour(match.startTime);
   const timeStr = formatMatchTime(match.startTime);
   return (
-    <span className={cn("text-[11px] font-medium", soon ? "text-[var(--warning)]" : "text-text-muted")}>
+    <span className={cn("rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]", soon ? "text-[var(--warning)]" : "text-text-muted")} style={{ borderColor: soon ? "rgba(251,191,36,0.25)" : "var(--border0)", background: soon ? "rgba(251,191,36,0.10)" : "var(--bg2)" }}>
       {timeStr}
     </span>
   );
 }
 
-// ── Score block ───────────────────────────────────────────────────────────────
-
 function ScoreBlock({ match }: { match: BettingMatch }) {
   const hasScore = match.homeScore != null && match.awayScore != null;
-  if (!hasScore) {
-    return (
-      <div className="flex items-center justify-center gap-2 px-3">
-        <span className="text-text-subtle text-xs">vs</span>
-      </div>
-    );
-  }
+  if (!hasScore) return <div className="px-3 text-sm text-text-subtle">vs</div>;
+
   return (
-    <div className="flex items-center justify-center gap-2 px-3">
-      <span className="text-2xl font-mono font-bold tabular-nums text-text-primary leading-none">
-        {match.homeScore}
-      </span>
-      <span className="text-text-subtle text-sm">–</span>
-      <span className="text-2xl font-mono font-bold tabular-nums text-text-primary leading-none">
-        {match.awayScore}
-      </span>
+    <div className="rounded-2xl border px-3 py-2 text-center min-w-[86px]" style={{ borderColor: "var(--border0)", background: "#fff" }}>
+      <div className="text-[10px] uppercase tracking-[0.18em] text-text-subtle">score</div>
+      <div className="mt-1 flex items-center justify-center gap-2 text-2xl font-mono font-bold text-text-primary">
+        <span>{match.homeScore}</span>
+        <span className="text-text-subtle">–</span>
+        <span>{match.awayScore}</span>
+      </div>
     </div>
   );
 }
-
-// ── Model signal bar ──────────────────────────────────────────────────────────
 
 function ModelBar({ match }: { match: BettingMatch }) {
   const p = match.pHome ?? 0.5;
   const pct = Math.round(p * 100);
   const edge = match.edgePercent ?? 0;
-  const edgeColor = edge >= 3 ? "var(--positive)" : edge >= 1 ? "var(--warning)" : "var(--text2)";
+  const confidence = Math.round((match.modelConfidence ?? 0.5) * 100);
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex h-1.5 rounded-full overflow-hidden flex-1 max-w-[120px]">
-        <div
-          className="h-full rounded-full transition-all"
-          style={{ width: `${pct}%`, background: "var(--info)" }}
-        />
-        <div className="flex-1 h-full" style={{ background: "var(--warning)", opacity: 0.5 }} />
+    <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+      <div>
+        <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-text-muted">
+          <span>Model lean</span>
+          <span>{pct}% home</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full" style={{ background: "var(--bg3)" }}>
+          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "var(--accent)" }} />
+        </div>
       </div>
-      <span className="text-[11px] text-text-muted whitespace-nowrap">
-        <span className="text-text-primary font-medium">{pct}%</span> model
-        {edge !== 0 && (
-          <>
-            {" · "}
-            <span style={{ color: edgeColor }} className="font-semibold">
-              {edge > 0 ? "+" : ""}{edge.toFixed(1)}% edge
-            </span>
-          </>
-        )}
-      </span>
+      <div className="flex flex-wrap items-center gap-2 text-[11px]">
+        <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-text-muted" style={{ borderColor: "var(--border0)", background: "#fff" }}>
+          <Shield size={12} /> {confidence}% confidence
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-semibold" style={{ borderColor: edge >= 3 ? "rgba(34,197,94,0.2)" : "rgba(245,158,11,0.2)", background: edge >= 3 ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.10)", color: edge >= 3 ? "var(--positive)" : "var(--warning)" }}>
+          <TrendingUp size={12} /> {edge > 0 ? "+" : ""}{edge.toFixed(1)}% edge
+        </span>
+      </div>
     </div>
   );
 }
 
-// ── Identity section (clickable area) ────────────────────────────────────────
-
 function MatchCardIdentity({ match, cfg }: { match: BettingMatch; cfg: (typeof SPORT_CONFIG)[keyof typeof SPORT_CONFIG] }) {
   return (
     <>
-      {/* Header row: sport dot · league · time/status */}
-      <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-1">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: cfg.color }} />
-          <span className="text-[11px] text-text-muted truncate">{match.league}</span>
+      <div className="flex items-center justify-between gap-3 px-5 pt-4">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full text-sm" style={{ background: `${cfg.color}16`, color: cfg.color }}>
+            {cfg.icon}
+          </span>
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-text-subtle">{cfg.label}</div>
+            <div className="truncate text-sm font-medium text-text-primary">{match.league}</div>
+          </div>
         </div>
         <LiveBadge match={match} />
       </div>
 
-      {/* Team names + score */}
-      <div className="flex items-center gap-0 px-4 py-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-[15px] font-semibold text-text-primary leading-snug truncate">{match.home.name}</p>
+      <div className="grid gap-4 px-5 py-4 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+        <div className="min-w-0">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-text-subtle">Home</p>
+          <p className="mt-1 truncate text-[18px] font-semibold leading-tight text-text-primary">{match.home.name}</p>
         </div>
         <ScoreBlock match={match} />
-        <div className="flex-1 min-w-0 text-right">
-          <p className="text-[15px] font-semibold text-text-primary leading-snug truncate">{match.away.name}</p>
+        <div className="min-w-0 text-left lg:text-right">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-text-subtle">Away</p>
+          <p className="mt-1 truncate text-[18px] font-semibold leading-tight text-text-primary">{match.away.name}</p>
         </div>
       </div>
 
-      {/* Model signal bar */}
-      <div className="px-4 pb-3">
+      <div className="px-5 pb-4">
+        <div className="flex flex-wrap items-center gap-2 pb-3 text-[11px] text-text-muted">
+          <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1" style={{ borderColor: "var(--border0)", background: "#fff" }}>
+            <Timer size={12} /> {formatCountdown(match.startTime, match.status)}
+          </span>
+        </div>
         <ModelBar match={match} />
       </div>
     </>
   );
 }
-
-// ── Main MatchCard ────────────────────────────────────────────────────────────
 
 interface MatchCardProps {
   match: BettingMatch;
@@ -221,11 +209,19 @@ export function MatchCard({ match, highlighted, sport, detailHref }: MatchCardPr
   const [expanded, setExpanded] = useState(false);
   const cfg = SPORT_CONFIG[match.sport];
   const cardId = useId();
+  void cardId;
+  void sport;
+
+  // Tick every 60s so countdown stays current
+  const [, forceUpdate] = useState(0);
+  useEffect(() => {
+    if (match.status !== "upcoming") return;
+    const id = setInterval(() => forceUpdate((n) => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, [match.status]);
 
   const isLive = match.status === "live";
   const isFinished = match.status === "finished";
-
-  // Featured markets: first 2 (1X2 + one more) to keep the card compact
   const featuredSlice = match.featuredMarkets.slice(0, 2);
   const hasMoreMarkets = match.allMarkets.length > 2;
 
@@ -233,70 +229,46 @@ export function MatchCard({ match, highlighted, sport, detailHref }: MatchCardPr
     <article
       id={`match-${match.id}`}
       className={cn(
-        "card flex flex-col gap-0 overflow-hidden transition-all duration-200",
-        isLive && "ring-1",
+        "sportsbook-card flex flex-col gap-0 overflow-hidden transition-all duration-200",
         highlighted && "ring-2 ring-[var(--accent)]"
       )}
-      style={isLive ? { "--tw-ring-color": cfg.color } as React.CSSProperties : undefined}
+      style={isLive ? {
+        boxShadow: `0 0 0 1.5px ${cfg.color}55, 0 8px 28px ${cfg.color}18`,
+        borderTop: `2px solid ${cfg.color}cc`,
+      } : undefined}
     >
-      {/* ── Clickable identity section ── */}
       {detailHref ? (
-        <Link href={detailHref} className="block hover:bg-white/[0.025] transition-colors">
+        <Link href={detailHref} target="_blank" rel="noopener noreferrer" className="block transition-colors hover:bg-[var(--accent-muted)]">
           <MatchCardIdentity match={match} cfg={cfg} />
         </Link>
       ) : (
         <MatchCardIdentity match={match} cfg={cfg} />
       )}
 
-      {/* ── Featured odds ── */}
       {!isFinished && (
-        <div className="border-t px-4 py-3 flex flex-col gap-2.5" style={{ borderColor: "var(--border0)" }}>
-          {featuredSlice.map((mkt) => (
-            <MarketRow key={mkt.id} market={mkt} match={match} />
-          ))}
+        <div className="border-t px-5 py-4 flex flex-col gap-3" style={{ borderColor: "var(--border0)" }}>
+          {featuredSlice.map((mkt) => <MarketRow key={mkt.id} market={mkt} match={match} />)}
         </div>
       )}
 
-      {/* ── Expand / detail links ── */}
-      <div
-        className="border-t flex items-center justify-between px-4 py-2"
-        style={{ borderColor: "var(--border0)" }}
-      >
+      <div className="flex items-center justify-between border-t px-5 py-3" style={{ borderColor: "var(--border0)" }}>
         {hasMoreMarkets && !isFinished ? (
-          <button
-            onClick={() => setExpanded((v) => !v)}
-            className="flex items-center gap-1 text-[11px] text-text-muted hover:text-[var(--accent)] transition-colors"
-          >
+          <button onClick={() => setExpanded((v) => !v)} className="flex items-center gap-1 text-[11px] font-medium text-text-muted transition-colors hover:text-text-primary">
             {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-            {expanded ? "Hide markets" : `${match.allMarkets.length - 2} more markets`}
+            {expanded ? "Hide extra markets" : `${match.allMarkets.length - 2} more markets`}
           </button>
-        ) : (
-          <div />
-        )}
-        {detailHref && (
-          <Link
-            href={detailHref}
-            className="text-[11px] text-text-muted hover:text-[var(--accent)] transition-colors"
-          >
-            Full analysis →
-          </Link>
-        )}
+        ) : <div />}
+        {detailHref && <Link href={detailHref} target="_blank" rel="noopener noreferrer" className="text-[11px] font-medium text-[var(--accent)] transition-opacity hover:opacity-80">View full breakdown</Link>}
       </div>
 
-      {/* ── Expanded market drawer ── */}
       {expanded && !isFinished && (
-        <div className="border-t px-4 py-3 flex flex-col gap-3 bg-white/[0.018]"
-             style={{ borderColor: "var(--border0)" }}>
-          {match.allMarkets.slice(2).map((mkt) => (
-            <MarketRow key={mkt.id} market={mkt} match={match} />
-          ))}
+        <div className="border-t px-5 py-4 flex flex-col gap-3" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+          {match.allMarkets.slice(2).map((mkt) => <MarketRow key={mkt.id} market={mkt} match={match} />)}
         </div>
       )}
     </article>
   );
 }
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function isWithinHour(iso: string): boolean {
   const diff = new Date(iso).getTime() - Date.now();
@@ -309,12 +281,18 @@ function formatMatchTime(iso: string): string {
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const tomorrowStart = new Date(todayStart.getTime() + 86_400_000);
 
-  if (d >= todayStart && d < tomorrowStart) {
-    return "Today " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  }
-  if (d >= tomorrowStart && d < new Date(tomorrowStart.getTime() + 86_400_000)) {
-    return "Tomorrow " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  }
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) + " " +
-    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  if (d >= todayStart && d < tomorrowStart) return "Today " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  if (d >= tomorrowStart && d < new Date(tomorrowStart.getTime() + 86_400_000)) return "Tomorrow " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) + " " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatCountdown(iso: string, status: BettingMatch["status"]): string {
+  if (status === "live") return "In-play";
+  if (status === "finished") return "Settled";
+  const diff = new Date(iso).getTime() - Date.now();
+  const mins = Math.round(diff / 60000);
+  if (mins < 60) return `${Math.max(0, mins)} min to start`;
+  const hours = Math.floor(mins / 60);
+  const rem = mins % 60;
+  return `${hours}h ${rem}m to start`;
 }

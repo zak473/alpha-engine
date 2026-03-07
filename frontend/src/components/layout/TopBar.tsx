@@ -1,172 +1,116 @@
 "use client";
 
-import { Menu, Search, LogIn } from "lucide-react";
+import Image from "next/image";
+import { Bell, Menu, Search, LogIn, Sun, Moon } from "lucide-react";
 import Link from "next/link";
 import { useSidebar } from "./SidebarContext";
 import { useAuth } from "@/lib/auth";
+import { useTheme } from "@/lib/theme";
+import { useOddsFormat } from "@/lib/odds-format";
+import type { OddsFormat } from "@/lib/odds-format";
 
 const ENV = process.env.NEXT_PUBLIC_ENV ?? "development";
-
 const ENV_BADGE: Record<string, { label: string; color: string; bg: string }> = {
-  production:  { label: "PROD",  color: "var(--positive)", bg: "rgba(16,185,129,0.10)" },
-  staging:     { label: "STAGE", color: "var(--info)",     bg: "rgba(129,140,248,0.10)" },
-  development: { label: "DEV",   color: "var(--warning)",  bg: "rgba(245,158,11,0.10)"  },
+  production: { label: "PROD", color: "#16a34a", bg: "rgba(22,163,74,0.10)" },
+  staging: { label: "STAGE", color: "#2563eb", bg: "rgba(37,99,235,0.10)" },
+  development: { label: "DEV", color: "#1d9a4d", bg: "rgba(29,154,77,0.10)" },
 };
-
 const badge = ENV_BADGE[ENV] ?? ENV_BADGE.development;
 
-interface TopBarProps {
-  title:     string;
-  subtitle?: string;
-}
+interface TopBarProps { title: string; subtitle?: string; }
 
 export function TopBar({ title, subtitle }: TopBarProps) {
   const { setOpen } = useSidebar();
   const { user, isLoggedIn, logout } = useAuth();
+  const { theme, toggle: toggleTheme } = useTheme();
+  const { format, setFormat } = useOddsFormat();
+  const oddsFormats: { value: OddsFormat; label: string }[] = [
+    { value: "decimal", label: "Dec" },
+    { value: "fractional", label: "Frac" },
+    { value: "american", label: "US" },
+  ];
 
   return (
-    <header
-      style={{
-        height:       "var(--topbar-height)",
-        display:      "grid",
-        gridTemplateColumns: "1fr auto 1fr",
-        alignItems:   "center",
-        padding:      "0 16px",
-        borderBottom: "1px solid var(--border0)",
-        background:   "rgba(6,6,18,0.85)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        position:     "sticky",
-        top:          0,
-        zIndex:       30,
-        flexShrink:   0,
-      }}
-    >
-      {/* Left — hamburger + breadcrumb */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-        <button
-          className="lg:hidden"
-          onClick={() => setOpen(true)}
-          style={{
-            padding:      "4px",
-            borderRadius: "var(--radius-md)",
-            color:        "var(--text1)",
-            background:   "none",
-            border:       "none",
-            cursor:       "pointer",
-            display:      "flex",
-            alignItems:   "center",
-          }}
-          aria-label="Open sidebar"
-        >
-          <Menu size={15} />
+    <header style={{ height: "64px", display: "grid", gridTemplateColumns: "1fr auto auto", alignItems: "center", gap: 12, padding: "0 16px", borderBottom: "1px solid var(--border0)", background: "rgba(246,248,244,0.94)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", position: "sticky", top: 0, zIndex: 30, flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+        <button className="lg:hidden" onClick={() => setOpen(true)} style={{ padding: "6px", borderRadius: 12, color: "var(--text1)", background: "#fff", border: "1px solid var(--border0)", cursor: "pointer", display: "flex", alignItems: "center" }} aria-label="Open sidebar">
+          <Menu size={16} />
         </button>
 
-        <div style={{ minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <h1 style={{ fontSize: 14, fontWeight: 600, color: "var(--text0)", lineHeight: 1, letterSpacing: "-0.01em" }}>
-              {title}
-            </h1>
-            <span
-              className="hidden sm:inline-flex"
-              style={{
-                padding:      "2px 7px",
-                borderRadius: 20,
-                fontSize:     10,
-                fontWeight:   700,
-                letterSpacing: "0.07em",
-                color:        badge.color,
-                background:   badge.bg,
-                border:       `1px solid ${badge.color}35`,
-              }}
-            >
-              {badge.label}
-            </span>
+        <div className="hidden sm:flex items-center gap-3 rounded-2xl border px-3 py-2" style={{ borderColor: "var(--border0)", background: "#fff" }}>
+          <div className="overflow-hidden rounded-xl border p-1.5" style={{ borderColor: "var(--border0)", background: "#111315" }}>
+            <Image src="/never-in-doubt-logo.png" alt="Never In Doubt logo" width={96} height={48} className="h-8 w-auto" />
           </div>
-          {subtitle && (
-            <p style={{ fontSize: 11, color: "var(--text1)", marginTop: 1 }}>{subtitle}</p>
-          )}
+          <div className="hidden md:block">
+            <div className="text-[10px] uppercase tracking-[0.22em] text-text-subtle">Never In Doubt</div>
+            <div className="text-xs font-medium text-text-primary">Premium board</div>
+          </div>
+        </div>
+
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <h1 style={{ fontSize: 15, fontWeight: 700, color: "var(--text0)", lineHeight: 1.1, letterSpacing: "-0.02em" }}>{title}</h1>
+            <span className="hidden sm:inline-flex" style={{ padding: "3px 8px", borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: badge.color, background: badge.bg, border: `1px solid ${badge.color}25` }}>{badge.label}</span>
+          </div>
+          {subtitle && <p style={{ fontSize: 11, color: "var(--text1)", marginTop: 2 }}>{subtitle}</p>}
         </div>
       </div>
 
-      {/* Center — global search (hidden on mobile) */}
-      <div className="hidden sm:flex" style={{ justifyContent: "center" }}>
-        <div style={{ position: "relative", width: 200 }}>
-          <Search
-            size={12}
-            style={{
-              position:  "absolute",
-              left:      8,
-              top:       "50%",
-              transform: "translateY(-50%)",
-              color:     "var(--text2)",
-              pointerEvents: "none",
-            }}
-          />
-          <input
-            type="search"
-            placeholder="Search…"
-            className="input-field"
-            style={{ paddingLeft: 26, fontSize: 11 }}
-          />
+      <div className="hidden md:flex" style={{ justifyContent: "center" }}>
+        <div className="relative w-[280px]">
+          <Search size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text2)", pointerEvents: "none" }} />
+          <input type="search" placeholder="Search matches, leagues, markets…" className="input-field" style={{ paddingLeft: 30, fontSize: 12 }} />
         </div>
       </div>
 
-      {/* Right — user chip */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
-        <div
-          style={{
-            display:    "flex",
-            alignItems: "center",
-            gap:        6,
-            paddingLeft: 10,
-            borderLeft: "1px solid var(--border0)",
-          }}
-        >
-          {isLoggedIn && user ? (
-            <>
-              <div
-                onClick={logout}
-                title="Click to log out"
-                style={{
-                  width:        30,
-                  height:       30,
-                  borderRadius: "var(--radius-md)",
-                  background:   "linear-gradient(135deg, var(--accent-dim) 0%, rgba(99,102,241,0.15) 100%)",
-                  border:       "1px solid rgba(34,211,238,0.25)",
-                  display:      "flex",
-                  alignItems:   "center",
-                  justifyContent: "center",
-                  fontSize:     11,
-                  fontWeight:   700,
-                  color:        "var(--accent)",
-                  fontFamily:   "'JetBrains Mono', monospace",
-                  cursor:       "pointer",
-                }}
-              >
-                {(user.displayName ?? user.email).slice(0, 2).toUpperCase()}
-              </div>
-              <span className="hidden sm:block" style={{ fontSize: 11, color: "var(--text1)" }}>
-                {user.displayName ?? user.email}
-              </span>
-            </>
-          ) : (
-            <Link
-              href="/login"
+        {/* Odds format */}
+        <div className="hidden sm:flex items-center gap-0.5 rounded-xl border p-0.5" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+          {oddsFormats.map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setFormat(value)}
               style={{
-                display:      "flex",
-                alignItems:   "center",
-                gap:          5,
-                fontSize:     11,
-                color:        "var(--accent)",
-                textDecoration: "none",
+                padding: "3px 8px", borderRadius: 10, fontSize: 10, fontWeight: 700,
+                background: format === value ? "var(--bg1)" : "transparent",
+                color: format === value ? "var(--text0)" : "var(--text2)",
+                border: "none", cursor: "pointer", transition: "all 120ms",
+                boxShadow: format === value ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
               }}
             >
-              <LogIn size={13} />
-              <span className="hidden sm:inline">Log in</span>
-            </Link>
-          )}
+              {label}
+            </button>
+          ))}
         </div>
+
+        {/* Dark mode */}
+        <button
+          onClick={toggleTheme}
+          style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 12, border: "1px solid var(--border0)", background: "var(--bg1)", color: "var(--text1)", cursor: "pointer" }}
+          aria-label="Toggle theme"
+        >
+          {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+        </button>
+
+        <button className="hidden sm:inline-flex" style={{ width: 34, height: 34, alignItems: "center", justifyContent: "center", borderRadius: 14, border: "1px solid var(--border0)", background: "var(--bg1)", color: "var(--text1)" }} aria-label="Notifications">
+          <Bell size={15} />
+        </button>
+
+        {isLoggedIn && user ? (
+          <div className="flex items-center gap-2 rounded-2xl border px-2 py-1.5" style={{ borderColor: "var(--border0)", background: "#fff" }}>
+            <div onClick={logout} title="Click to log out" style={{ width: 32, height: 32, borderRadius: 12, background: "rgba(46,219,108,0.10)", border: "1px solid rgba(46,219,108,0.18)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "var(--positive)", fontFamily: "'JetBrains Mono', monospace", cursor: "pointer" }}>
+              {user.displayName?.slice(0, 2).toUpperCase() ?? "ND"}
+            </div>
+            <div className="hidden sm:block leading-tight">
+              <div className="text-[11px] font-semibold text-text-primary">{user.displayName ?? "Member"}</div>
+              <div className="text-[10px] text-text-subtle">Signed in</div>
+            </div>
+          </div>
+        ) : (
+          <Link href="/login" className="inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-[12px] font-semibold transition-colors hover:opacity-90" style={{ borderColor: "rgba(46,219,108,0.18)", background: "rgba(46,219,108,0.10)", color: "var(--positive)" }}>
+            <LogIn size={14} /> Log in
+          </Link>
+        )}
       </div>
     </header>
   );

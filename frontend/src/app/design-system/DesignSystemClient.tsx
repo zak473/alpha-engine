@@ -91,10 +91,10 @@ export function DesignSystemClient() {
     <div style={{ maxWidth: 960, margin: "0 auto", padding: "24px 24px 64px" }}>
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: "var(--text0)", letterSpacing: "-0.02em" }}>
-          Quant Terminal
+          Never In Doubt
         </h1>
         <p style={{ fontSize: 13, color: "var(--text1)", marginTop: 4 }}>
-          Design system reference — tokens, typography, components, patterns.
+          Brand reference — colours, typography, cards, and platform patterns.
         </p>
       </div>
 

@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export default function LoginPage() {
   return (
-    <AppShell title="Login" subtitle="Sign in to Alpha Engine">
+    <AppShell title="Account Access" subtitle="Sign in to the Never In Doubt betting board">
       <LoginForm />
     </AppShell>
   );

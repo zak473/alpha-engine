@@ -88,8 +88,12 @@ class BasketballEloEngine(EloEngine):
         # Apply rest penalty via surface_delta (reuses existing mechanism)
         rest_adj = self._rest_adjustment(context)
         ctx_with_rest = MatchContext(
+            match_id=context.match_id,
+            sport=context.sport,
             date=context.date,
             home_entity_id=context.home_entity_id,
+            away_entity_id=context.away_entity_id,
+            importance=context.importance,
             extra={**context.extra, "surface_delta_a": rest_adj},
         )
 

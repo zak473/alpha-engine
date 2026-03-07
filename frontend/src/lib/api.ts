@@ -486,6 +486,51 @@ export async function deletePick(id: string): Promise<void> {
   return mutate<void>(`/picks/${id}`, "DELETE");
 }
 
+// ─── Tipsters ─────────────────────────────────────────────────────────────
+
+export interface TipsterProfile {
+  id: string;
+  username: string;
+  bio?: string;
+  followers: number;
+  is_following: boolean;
+  weekly_win_rate: number;   // 0–1
+  total_picks: number;
+  won_picks: number;
+  active_tips_count: number;
+  recent_results: ("W" | "L")[];
+}
+
+export interface TipsterTip {
+  id: string;
+  tipster_id: string;
+  match_label: string;
+  selection_label: string;
+  market_name: string;
+  odds: number;
+  sport: string;
+  start_time: string;
+  note?: string;
+  outcome?: "won" | "lost" | "void" | "pending";
+  created_at: string;
+}
+
+export async function getTipsters(): Promise<TipsterProfile[]> {
+  return request<TipsterProfile[]>("/tipsters");
+}
+
+export async function getTipsterTips(tipsterId: string): Promise<TipsterTip[]> {
+  return request<TipsterTip[]>(`/tipsters/${tipsterId}/tips`);
+}
+
+export async function followTipster(tipsterId: string): Promise<void> {
+  return mutate<void>(`/tipsters/${tipsterId}/follow`, "POST");
+}
+
+export async function unfollowTipster(tipsterId: string): Promise<void> {
+  return mutate<void>(`/tipsters/${tipsterId}/follow`, "DELETE");
+}
+
 // ─── Bankroll ──────────────────────────────────────────────────────────────
 
 export interface BankrollSnapshotOut {

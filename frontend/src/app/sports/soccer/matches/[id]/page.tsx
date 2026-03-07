@@ -13,11 +13,11 @@ export async function generateMetadata({ params }: Props) {
   try {
     const match = await getSportMatchDetail("soccer", params.id);
     return {
-      title: `${match.home.name} vs ${match.away.name} — Alpha Engine`,
+      title: `${match.home.name} vs ${match.away.name} — Never In Doubt`,
       description: `${match.league} · ${new Date(match.kickoff_utc).toLocaleDateString("en-GB")}`,
     };
   } catch {
-    return { title: "Match — Alpha Engine" };
+    return { title: "Match — Never In Doubt" };
   }
 }
 

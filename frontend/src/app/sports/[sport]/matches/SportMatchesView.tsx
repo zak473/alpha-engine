@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import type { SportMatchListItem } from "@/lib/types";
 import type { SportSlug } from "@/lib/api";
 import type { BettingMatch, BettingFilter } from "@/lib/betting-types";
@@ -22,6 +22,7 @@ interface SportMatchesViewProps {
 export function SportMatchesView({ sport, matches, total }: SportMatchesViewProps) {
   const [filter, setFilter] = useState<BettingFilter>(DEFAULT_BETTING_FILTER);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [mobileQueueOpen, setMobileQueueOpen] = useState(false);
 
   // Poll full match list every 30s — initialise with SSR snapshot (no flash)
   const liveItems = useLiveMatches(sport, matches);
@@ -112,7 +113,7 @@ export function SportMatchesView({ sport, matches, total }: SportMatchesViewProp
       </div>
 
       {/* Mobile queue drawer */}
-      <MobileQueueDrawer matches={mergedMatches} />
+      <MobileQueueDrawer open={mobileQueueOpen} onClose={() => setMobileQueueOpen(false)} matches={mergedMatches} />
     </div>
   );
 }

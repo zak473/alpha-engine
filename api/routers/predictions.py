@@ -97,7 +97,7 @@ def _build_prediction_schema(
 
     return PredictionSchema(
         event_id=match.id,
-        sport="soccer",
+        sport=match.sport or "soccer",
         league=league.name,
         season=match.season,
         start_time=match.kickoff_utc,

@@ -19,7 +19,7 @@ export default async function ChallengesPage() {
   }
 
   return (
-    <AppShell title="Challenges" subtitle="Compete, pick, climb the board">
+    <AppShell title="Challenges Arena" subtitle="Compete on picks, leaderboards, and profit races">
       <ChallengesClient
         allChallenges={allChallenges}
         myChallenges={myChallenges}

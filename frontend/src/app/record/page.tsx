@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export default function RecordPage() {
   return (
-    <AppShell title="📋 Record" subtitle="Pick History">
+    <AppShell title="Bet Record" subtitle="Settled picks, outcomes, and slip history">
       <RecordView />
     </AppShell>
   );

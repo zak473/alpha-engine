@@ -15,11 +15,11 @@ export async function generateMetadata({ params }: Props) {
     const info = match.match_info;
     const desc = [match.league, info?.series_format?.toUpperCase(), info?.game_type?.toUpperCase()].filter(Boolean).join(" · ");
     return {
-      title: `${match.home.name} vs ${match.away.name} — Alpha Engine`,
+      title: `${match.home.name} vs ${match.away.name} — Never In Doubt`,
       description: desc,
     };
   } catch {
-    return { title: "Match — Alpha Engine" };
+    return { title: "Match — Never In Doubt" };
   }
 }
 

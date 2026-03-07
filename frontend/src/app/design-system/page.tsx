@@ -3,7 +3,7 @@ import { DesignSystemClient } from "./DesignSystemClient";
 
 export default function DesignSystemPage() {
   return (
-    <AppShell title="Design System" subtitle="Quant Terminal token reference">
+    <AppShell title="Brand System" subtitle="Never In Doubt colours, cards, and UI language">
       <DesignSystemClient />
     </AppShell>
   );

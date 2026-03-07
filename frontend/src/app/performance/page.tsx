@@ -54,7 +54,7 @@ export default async function PerformancePage() {
     .slice(0, 20);
 
   return (
-    <AppShell title="📊 Performance" subtitle="Model & picks analytics">
+    <AppShell title="Performance Lab" subtitle="ROI, bankroll trends, and model output analytics">
       <PerformanceClient
         overall={overallStats}
         roiSeries={roiSeries}

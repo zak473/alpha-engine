@@ -55,7 +55,7 @@ export default async function SportMatchesPage({ params, searchParams }: PagePro
   const icon = SPORT_ICONS[sport];
 
   return (
-    <AppShell title={`${icon} ${label}`} subtitle="Games">
+    <AppShell title={`${icon} ${label} Hub`} subtitle={`${data.total} fixtures, live prices, and in-play reads`}>
       <SportMatchesView
         sport={sport}
         matches={data.items}

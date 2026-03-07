@@ -1,56 +1,44 @@
 /**
- * QUANT TERMINAL — Design Tokens (JS mirror of globals.css vars)
- * Used for Recharts props that can't receive CSS classes.
+ * Never In Doubt — Flat White Hybrid design tokens
  */
 
 export const colors = {
-  // Surfaces
-  bg0:      "#0c0c10",
-  bg1:      "#111116",
-  bg2:      "#16161d",
-  // Text
-  text0:    "#e2e2ea",
-  text1:    "#72728a",
-  text2:    "#36364a",
-  // Borders
-  border0:  "#1e1e2c",
-  border1:  "#2c2c3f",
-  // Accent
-  accent:   "#00d4ff",
-  // Status
-  positive: "#10b981",
-  negative: "#f43f5e",
-  warning:  "#f59e0b",
-  info:     "#818cf8",
-  // Sport
-  soccer:   "#3b82f6",
-  tennis:   "#10b981",
-  esports:  "#a855f7",
+  bg0:      "#f6f8f4",
+  bg1:      "#ffffff",
+  bg2:      "#eef2eb",
+  text0:    "#111315",
+  text1:    "#667066",
+  text2:    "#95a093",
+  border0:  "#d8e0d4",
+  border1:  "#c6d3c1",
+  accent:   "#2edb6c",
+  positive: "#1d9a4d",
+  negative: "#d94b61",
+  warning:  "#d6a23d",
+  info:     "#64748b",
+  soccer:   "#2edb6c",
+  tennis:   "#22c55e",
+  esports:  "#8b5cf6",
 
-  // Legacy aliases (keep for backward compat with existing chart code)
-  surfaceBase:    "#0c0c10",
-  surfaceRaised:  "#111116",
-  surfaceOverlay: "#16161d",
-  surfaceBorder:  "#1e1e2c",
-  textPrimary:    "#e2e2ea",
-  textMuted:      "#72728a",
-  textSubtle:     "#36364a",
-  accentGreen:    "#10b981",
-  accentRed:      "#f43f5e",
-  accentBlue:     "#3b82f6",
-  accentAmber:    "#f59e0b",
-  accentPurple:   "#a855f7",
-  accentTeal:     "#00d4ff",
-  accentGold:     "#b45309",
+  surfaceBase:    "#f6f8f4",
+  surfaceRaised:  "#ffffff",
+  surfaceOverlay: "#eef2eb",
+  surfaceBorder:  "#d8e0d4",
+  textPrimary:    "#111315",
+  textMuted:      "#667066",
+  textSubtle:     "#95a093",
+  accentGreen:    "#1d9a4d",
+  accentRed:      "#d94b61",
+  accentBlue:     "#64748b",
+  accentAmber:    "#d6a23d",
+  accentPurple:   "#8b5cf6",
+  accentTeal:     "#2edb6c",
+  accentGold:     "#d6a23d",
 } as const;
 
 export type ColorToken = keyof typeof colors;
+export const radius = { sm: 6, md: 10 } as const;
 
-export const radius = { sm: 2, md: 4 } as const;
-
-/**
- * Recharts defaults — import this in every chart component.
- */
 export const chartDefaults = {
   axis: {
     tick: {
@@ -62,14 +50,14 @@ export const chartDefaults = {
     tickLine: false,
   },
   yAxisWidth: 38,
-  cursor: { fill: "rgba(255,255,255,0.02)" },
+  cursor: { fill: "rgba(29,154,77,0.06)" },
   grid: {
     stroke: colors.border0,
     strokeDasharray: "2 4",
   },
   tooltip: {
     contentStyle: {
-      background: colors.bg2,
+      background: colors.bg1,
       border: `1px solid ${colors.border1}`,
       borderRadius: radius.md,
       fontSize: 11,
@@ -78,15 +66,14 @@ export const chartDefaults = {
     },
     labelStyle:  { color: colors.text1, marginBottom: 4, fontSize: 10 },
     itemStyle:   { color: colors.text0, padding: 0 },
-    cursor:      { fill: "rgba(255,255,255,0.02)" },
+    cursor:      { fill: "rgba(29,154,77,0.06)" },
   },
 } as const;
 
-/** Map sport string → brand color hex */
 export function sportColor(sport: string): string {
   const map: Record<string, string> = {
-    soccer:  colors.soccer,
-    tennis:  colors.tennis,
+    soccer: colors.soccer,
+    tennis: colors.tennis,
     esports: colors.esports,
   };
   return map[sport.toLowerCase()] ?? colors.text1;
