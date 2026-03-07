@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { QueueRail } from "./QueueRail";
@@ -56,6 +57,7 @@ function CompactOddsBtn({ label, odds, initOdds, matchId, marketId, selId, match
 
 function CompactMatchRow({ match, initOddsMap }: { match: BettingMatch; initOddsMap: Map<string, number> }) {
   const cfg = SPORT_CONFIG[match.sport];
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const isLive = match.status === "live";
   const time = isLive
@@ -64,12 +66,13 @@ function CompactMatchRow({ match, initOddsMap }: { match: BettingMatch; initOdds
 
   const featuredMarket = match.featuredMarkets[0];
   const extraMarkets = match.featuredMarkets.slice(1);
+  const matchHref = `/sports/${match.sport}/matches/${match.id}`;
 
   return (
     <div className="border-b last:border-b-0" style={{ borderColor: "var(--border0)" }}>
       <div
         className="flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--bg2)] transition-colors cursor-pointer"
-        onClick={() => extraMarkets.length > 0 && setExpanded(v => !v)}
+        onClick={() => router.push(matchHref)}
       >
         {/* Sport dot + time */}
         <div className="flex flex-col items-center gap-0.5 w-10 flex-shrink-0">
@@ -99,6 +102,13 @@ function CompactMatchRow({ match, initOddsMap }: { match: BettingMatch; initOdds
           <span className="text-[10px] text-text-subtle truncate max-w-[80px] hidden sm:block">{match.league}</span>
         )}
 
+        {/* Expand chevron */}
+        {extraMarkets.length > 0 && (
+          <span className="text-text-muted ml-1 flex-shrink-0" onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}>
+            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </span>
+        )}
+
         {/* Odds */}
         {featuredMarket && (
           <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
@@ -118,12 +128,6 @@ function CompactMatchRow({ match, initOddsMap }: { match: BettingMatch; initOdds
           </div>
         )}
 
-        {/* Expand chevron */}
-        {extraMarkets.length > 0 && (
-          <span className="text-text-muted ml-1 flex-shrink-0">
-            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-          </span>
-        )}
       </div>
 
       {/* Expanded extra markets */}
