@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ArrowUpRight, BarChart3, Flame, Plus, Radio, Sparkles, Star, Trophy, Users } from "lucide-react";
 import type { BettingFilter, BettingMatch, SportSlug } from "@/lib/betting-types";
 import { SPORT_CONFIG } from "@/lib/betting-types";
@@ -249,6 +250,8 @@ export function DashboardShowcase({
 }) {
   const inPlayActive = filter.status === "live";
   const featuredSports: SportSlug[] = ["soccer", "basketball", "baseball", "tennis", "esports"];
+  const visibleSports = featuredSports.slice(0, 2);
+  const hiddenCount = featuredSports.length - 2;
 
   return (
     <div className="space-y-5">
@@ -267,8 +270,8 @@ export function DashboardShowcase({
           </div>
         </div>
 
-        <div className="mt-5 grid gap-4 xl:grid-cols-5">
-          {featuredSports.map((sport) => (
+        <div className="mt-5 grid gap-4 sm:grid-cols-3">
+          {visibleSports.map((sport) => (
             <SportAccessCard
               key={sport}
               sport={sport}
@@ -277,6 +280,19 @@ export function DashboardShowcase({
               onClick={() => onSelectSport(sport)}
             />
           ))}
+          <Link
+            href="/matches"
+            className="flex flex-col items-center justify-center gap-3 rounded-[24px] border p-5 text-center transition-all duration-150 hover:-translate-y-[1px]"
+            style={{ background: "#ffffff", borderColor: "rgba(17,33,23,0.08)", borderStyle: "dashed" }}
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: "rgba(31,208,106,0.10)" }}>
+              <ArrowUpRight size={20} style={{ color: "#1fd06a" }} />
+            </div>
+            <div>
+              <div className="text-base font-semibold text-[#18211c]">See All Sports</div>
+              <div className="mt-1 text-sm text-[#677269]">+{hiddenCount} more</div>
+            </div>
+          </Link>
         </div>
       </div>
 
