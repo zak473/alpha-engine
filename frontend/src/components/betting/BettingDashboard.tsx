@@ -464,7 +464,19 @@ export function BettingDashboard({ matches, sport }: BettingDashboardProps) {
 
           {/* Compact match preview — grouped by sport, 4 per group */}
           <div className="px-4 pt-2 pb-2 lg:px-6">
-            <CompactMatchList matches={filtered} activeSport={activeSport} />
+            {filtered.length === 0 ? (
+              <div className="rounded-xl border py-10 flex flex-col items-center gap-2 text-center" style={{ borderColor: "var(--border0)", background: "var(--bg1)" }}>
+                <span className="text-2xl">{mode === "inplay" ? "📡" : "📅"}</span>
+                <p className="text-sm font-semibold text-text-primary">
+                  {mode === "inplay" ? "No live matches right now" : "No upcoming matches"}
+                </p>
+                <p className="text-xs text-text-muted">
+                  {mode === "inplay" ? "Check back soon — live matches will appear here" : "Try selecting a different sport"}
+                </p>
+              </div>
+            ) : (
+              <CompactMatchList matches={filtered} activeSport={activeSport} />
+            )}
           </div>
 
           {/* Tipsters promo banner */}
