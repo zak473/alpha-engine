@@ -38,7 +38,7 @@ export default async function EsportsMatchPage({ params }: Props) {
   ]);
 
   return (
-    <AppShell title={`${match.home.name} vs ${match.away.name}`}>
+    <AppShell title={`${match.home.name} vs ${match.away.name}`} compact>
       <EsportsMatchDetail
         match={match}
         eloHomeHistory={eloHomeHistory}
