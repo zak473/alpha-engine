@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { LiveNowStrip } from "./LiveNowStrip";
 import { StickyFilterBar } from "./StickyFilterBar";
 import { MatchList } from "./MatchList";
 import { QueueRail } from "./QueueRail";
@@ -152,10 +151,6 @@ export function BettingDashboard({ matches, sport }: BettingDashboardProps) {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
           <BettingHero matches={sportFiltered} filteredCount={filtered.length} activeSportLabel={activeSportLabel} />
-
-          <div className="px-4 pb-3 lg:px-6">
-            <LiveNowStrip matches={liveMatches} onTileClick={handleTileClick} nextUpcoming={nextUpcoming} />
-          </div>
 
           {!sport && <SportChips activeSport={activeSport} onSelect={handleSportSelect} counts={sportCounts} />}
 
