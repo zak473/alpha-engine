@@ -8,7 +8,7 @@ import { mvpToBettingMatch, sortMatches } from "@/lib/betting-adapters";
 import { MOCK_MATCHES } from "@/lib/mock-betting-data";
 import type { BettingMatch } from "@/lib/betting-types";
 
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   let matches: BettingMatch[] = [];
