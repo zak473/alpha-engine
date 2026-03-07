@@ -1,14 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { Trash2, TrendingUp, Clock, CheckCircle2, XCircle, MinusCircle, Plus, X, Search, Download } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Trash2, TrendingUp, Clock, CheckCircle2, XCircle, MinusCircle, Plus, X, Search } from "lucide-react";
 import Link from "next/link";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { getPicks, getPicksStats, deletePick, trackPicks, getSportMatches } from "@/lib/api";
 import type { PickOut, PicksStatsOut, PickCreate } from "@/lib/api";
-import type { RoiPoint } from "@/lib/types";
 import { SPORT_CONFIG } from "@/lib/betting-types";
-import { ROIChart } from "@/components/charts/ROIChart";
 
 // ── Outcome badge ─────────────────────────────────────────────────────────────
 
@@ -70,19 +67,11 @@ function StatsStrip({ stats }: { stats: PicksStatsOut }) {
 
 // ── Pick row ──────────────────────────────────────────────────────────────────
 
-function pnlUnits(pick: PickOut): number | null {
-  if (!pick.outcome || pick.outcome === "pending") return null;
-  if (pick.outcome === "void") return 0;
-  if (pick.outcome === "won") return pick.odds - 1;
-  return -1;
-}
-
 function PickRow({ pick, onRemove }: { pick: PickOut; onRemove: () => void }) {
   const cfg = SPORT_CONFIG[pick.sport as keyof typeof SPORT_CONFIG];
   const date = new Date(pick.start_time);
   const edge = pick.edge ?? 0;
   const clv = pick.clv;
-  const pnl = pnlUnits(pick);
 
   return (
     <tr className="tr-hover group">
@@ -132,14 +121,6 @@ function PickRow({ pick, onRemove }: { pick: PickOut; onRemove: () => void }) {
         </span>
       </td>
 
-      {/* P&L (units) */}
-      <td className="col-right hidden md:table-cell">
-        <span className="text-xs font-mono font-semibold"
-              style={{ color: pnl == null ? "var(--text2)" : pnl > 0 ? "var(--positive)" : pnl < 0 ? "var(--negative)" : "var(--text2)" }}>
-          {pnl == null ? "—" : pnl === 0 ? "0u" : `${pnl > 0 ? "+" : ""}${pnl.toFixed(2)}u`}
-        </span>
-      </td>
-
       {/* Outcome */}
       <td className="text-center">
         <OutcomeBadge outcome={pick.outcome} />
@@ -166,14 +147,6 @@ function PickRow({ pick, onRemove }: { pick: PickOut; onRemove: () => void }) {
 
 const SPORTS = ["soccer", "tennis", "esports", "basketball", "baseball"] as const;
 type SportSlug = typeof SPORTS[number];
-
-const SPORT_SELECTIONS: Record<SportSlug, string[]> = {
-  soccer:     ["Home", "Draw", "Away"],
-  basketball: ["Home", "Away"],
-  tennis:     ["Home", "Away"],
-  baseball:   ["Home", "Away"],
-  esports:    ["Home", "Away"],
-};
 
 function TrackPickModal({
   onClose,
@@ -263,7 +236,7 @@ function TrackPickModal({
                 <button
                   key={s}
                   type="button"
-                  onClick={() => { setSport(s); setSelectedMatch(null); setMatches([]); setSelection(SPORT_SELECTIONS[s][0]); }}
+                  onClick={() => { setSport(s); setSelectedMatch(null); setMatches([]); }}
                   className="text-xs px-3 py-1 rounded-full border transition-all capitalize"
                   style={sport === s ? {
                     background: "var(--accent-dim)", borderColor: "rgba(34,211,238,0.35)", color: "var(--accent)",
@@ -315,7 +288,7 @@ function TrackPickModal({
           <div className="flex flex-col gap-1.5">
             <label className="label">Selection</label>
             <div className="flex gap-2">
-              {SPORT_SELECTIONS[sport].map((s) => (
+              {["Home", "Draw", "Away"].map((s) => (
                 <button
                   key={s}
                   type="button"
@@ -428,115 +401,6 @@ function FilterBar({
   );
 }
 
-// ── Sport breakdown chart ─────────────────────────────────────────────────────
-
-function SportBreakdown({ picks }: { picks: PickOut[] }) {
-  const settled = picks.filter(p => p.outcome && p.outcome !== "pending" && p.outcome !== "void");
-  if (!settled.length) return null;
-
-  const sports = Array.from(new Set(settled.map(p => p.sport)));
-  const data = sports.map(sport => {
-    const sp = settled.filter(p => p.sport === sport);
-    const pnl = sp.reduce((s, p) => s + (p.outcome === "won" ? p.odds - 1 : -1), 0);
-    const cfg = SPORT_CONFIG[sport as keyof typeof SPORT_CONFIG];
-    return { sport: cfg?.label ?? sport, pnl: parseFloat(pnl.toFixed(2)), color: cfg?.color ?? "#22e283" };
-  }).sort((a, b) => b.pnl - a.pnl);
-
-  return (
-    <div className="px-4 pb-3 lg:px-6">
-      <div className="card p-4">
-        <p className="text-[10px] uppercase tracking-wider text-text-muted font-bold mb-3">P&amp;L by sport (units)</p>
-        <ResponsiveContainer width="100%" height={120}>
-          <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-            <XAxis dataKey="sport" tick={{ fontSize: 10, fill: "var(--text1)" }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 10, fill: "var(--text2)" }} axisLine={false} tickLine={false} />
-            <Tooltip
-              contentStyle={{ background: "var(--bg1)", border: "1px solid var(--border0)", borderRadius: 8, fontSize: 11 }}
-              formatter={(v: number) => [`${v > 0 ? "+" : ""}${v}u`, "P&L"]}
-            />
-            <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
-              {data.map((entry, i) => (
-                <Cell key={i} fill={entry.pnl >= 0 ? entry.color : "var(--negative)"} opacity={0.85} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-}
-
-// ── CSV export ────────────────────────────────────────────────────────────────
-
-function exportCSV(picks: PickOut[]) {
-  const headers = ["Date", "Match", "Sport", "Market", "Selection", "Odds", "Edge %", "CLV", "Outcome", "P&L (u)"];
-  const rows = picks.map(p => {
-    const pnl = !p.outcome || p.outcome === "pending" ? "" : p.outcome === "void" ? "0" : p.outcome === "won" ? (p.odds - 1).toFixed(2) : "-1";
-    return [
-      new Date(p.start_time).toLocaleDateString(),
-      p.match_label,
-      p.sport,
-      p.market_name,
-      p.selection_label,
-      p.odds.toFixed(2),
-      p.edge != null ? p.edge.toFixed(1) : "",
-      p.clv != null ? (p.clv * 100).toFixed(1) : "",
-      p.outcome ?? "pending",
-      pnl,
-    ];
-  });
-  const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `picks-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-// ── Bankroll tracker ──────────────────────────────────────────────────────────
-
-function BankrollTracker() {
-  const [bankroll, setBankroll] = useState<string>(() => {
-    try { return localStorage.getItem("ae_bankroll") ?? ""; } catch { return ""; }
-  });
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(bankroll);
-
-  function save() {
-    setBankroll(draft);
-    try { localStorage.setItem("ae_bankroll", draft); } catch {}
-    setEditing(false);
-  }
-
-  return (
-    <div className="flex items-center gap-3 px-4 py-2.5 lg:px-6 border-b" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-      <span className="text-[11px] text-text-muted font-semibold uppercase tracking-wider">Bankroll</span>
-      {editing ? (
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-text-muted">£</span>
-          <input
-            type="number"
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && save()}
-            className="w-28 h-7 text-sm font-mono rounded-lg border px-2"
-            style={{ borderColor: "var(--border1)", background: "var(--bg1)", color: "var(--text0)" }}
-            autoFocus
-          />
-          <button onClick={save} className="text-[11px] font-bold px-2 py-1 rounded-lg" style={{ background: "var(--accent)", color: "#0f2418" }}>Save</button>
-          <button onClick={() => setEditing(false)} className="text-[11px] text-text-muted hover:text-text-primary px-1">Cancel</button>
-        </div>
-      ) : (
-        <button onClick={() => { setDraft(bankroll); setEditing(true); }} className="flex items-center gap-1.5 text-sm font-bold font-mono text-text-primary hover:text-[var(--accent)] transition-colors">
-          {bankroll ? `£${parseFloat(bankroll).toLocaleString()}` : <span className="text-text-muted text-xs font-normal">Set bankroll…</span>}
-        </button>
-      )}
-    </div>
-  );
-}
-
 // ── Main view ─────────────────────────────────────────────────────────────────
 
 export function RecordView() {
@@ -547,46 +411,19 @@ export function RecordView() {
   const [loading, setLoading] = useState(true);
   const [showTrackModal, setShowTrackModal] = useState(false);
 
-  // All picks (unfiltered) for the ROI chart — always fetch without outcome filter
-  const [allPicks, setAllPicks] = useState<PickOut[]>([]);
-
-  const roiData = useMemo((): RoiPoint[] => {
-    const settled = allPicks.filter((p) => p.outcome && p.outcome !== "pending" && p.outcome !== "void");
-    if (!settled.length) return [];
-
-    // Group by date (YYYY-MM-DD from start_time)
-    const byDate = new Map<string, number>();
-    for (const p of settled) {
-      const date = p.start_time.slice(0, 10);
-      const pnl = p.outcome === "won" ? p.odds - 1 : -1;
-      byDate.set(date, (byDate.get(date) ?? 0) + pnl);
-    }
-
-    // Sort dates ascending
-    const dates = Array.from(byDate.keys()).sort();
-    let cumulative = 0;
-    return dates.map((date) => {
-      const pnl = byDate.get(date)!;
-      cumulative += pnl;
-      return { date, pnl, cumulative_pnl: cumulative, roi: 0 };
-    });
-  }, [allPicks]);
-
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, s, all] = await Promise.all([
+      const [p, s] = await Promise.all([
         getPicks({
           outcome: outcomeFilter === "all" ? undefined : outcomeFilter as "won" | "lost" | "void" | "pending",
           sport: sportFilter || undefined,
           limit: 200,
         }),
         getPicksStats(sportFilter || undefined),
-        getPicks({ limit: 500 }),
       ]);
       setPicks(p);
       setStats(s);
-      setAllPicks(all);
     } catch {
       // show empty state
     } finally {
@@ -609,21 +446,8 @@ export function RecordView() {
   return (
     <>
       <div className="flex flex-col">
-        {/* ROI chart */}
-        {roiData.length > 0 && (
-          <div className="px-4 pt-4 pb-2 lg:px-6">
-            <ROIChart data={roiData} title="Cumulative P&L (units)" />
-          </div>
-        )}
-
-        {/* Sport breakdown */}
-        <SportBreakdown picks={allPicks} />
-
         {/* Stats strip */}
         {stats && <StatsStrip stats={stats} />}
-
-        {/* Bankroll */}
-        <BankrollTracker />
 
         {/* Filter */}
         <FilterBar
@@ -659,15 +483,6 @@ export function RecordView() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <div className="flex justify-end px-4 py-2 lg:px-6">
-              <button
-                onClick={() => exportCSV(picks)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-semibold transition-colors hover:bg-[var(--bg2)]"
-                style={{ borderColor: "var(--border0)", color: "var(--text1)" }}
-              >
-                <Download size={12} /> Export CSV
-              </button>
-            </div>
             <table className="data-table" style={{ minWidth: 640 }}>
               <thead>
                 <tr>
@@ -677,7 +492,6 @@ export function RecordView() {
                   <th className="col-right">Odds</th>
                   <th className="col-right hidden sm:table-cell">Edge</th>
                   <th className="col-right hidden sm:table-cell">CLV</th>
-                  <th className="col-right hidden md:table-cell">P&amp;L</th>
                   <th className="text-center">Result</th>
                   <th />
                 </tr>

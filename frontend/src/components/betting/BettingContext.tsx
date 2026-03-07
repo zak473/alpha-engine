@@ -7,7 +7,6 @@ interface BettingContextValue {
   queue: QueueSelection[];
   addToQueue: (sel: QueueSelection) => void;
   removeFromQueue: (id: string) => void;
-  updateStake: (id: string, stake: number | undefined) => void;
   clearQueue: () => void;
   isInQueue: (id: string) => boolean;
 }
@@ -48,14 +47,6 @@ export function BettingProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const updateStake = useCallback((id: string, stake: number | undefined) => {
-    setQueue((prev) => {
-      const next = prev.map((q) => q.id === id ? { ...q, stake } : q);
-      persist(next);
-      return next;
-    });
-  }, []);
-
   const clearQueue = useCallback(() => {
     setQueue([]);
     try { localStorage.removeItem(STORAGE_KEY); } catch {}
@@ -67,7 +58,7 @@ export function BettingProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <BettingContext.Provider value={{ queue, addToQueue, removeFromQueue, updateStake, clearQueue, isInQueue }}>
+    <BettingContext.Provider value={{ queue, addToQueue, removeFromQueue, clearQueue, isInQueue }}>
       {children}
     </BettingContext.Provider>
   );

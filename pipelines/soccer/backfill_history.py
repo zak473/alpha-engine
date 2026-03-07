@@ -5,7 +5,7 @@ Downloads multiple seasons per league and creates CoreMatch records,
 fuzzy-matching team names to existing CoreTeam records in the DB.
 Also populates CoreTeamMatchStats with shots/cards.
 
-Seasons loaded: 2018-19 through 2024-25 (7 seasons, 5 top leagues)
+Seasons loaded: 2022-23, 2023-24, 2024-25 (in addition to current 2025-26)
 
 Usage:
     python -m pipelines.soccer.backfill_history
@@ -34,22 +34,13 @@ log = logging.getLogger(__name__)
 
 BASE_URL = "https://www.football-data.co.uk/mmz4281"
 
-# 7 seasons: 2018-19 through 2024-25
-_ALL_SEASONS = ["1819", "1920", "2021", "2122", "2223", "2324", "2425"]
-
 # (fdco_code, db_league_name, seasons_to_load)
 LEAGUES = [
-    ("E0",  "Premier League",    _ALL_SEASONS),
-    ("SP1", "Primera Division",  _ALL_SEASONS),
-    ("D1",  "Bundesliga",        _ALL_SEASONS),
-    ("I1",  "Serie A",           _ALL_SEASONS),
-    ("F1",  "Ligue 1",           _ALL_SEASONS),
-    # Championship (English second tier) — rich data, helps ELO for promoted/relegated teams
-    ("E1",  "Championship",      _ALL_SEASONS),
-    # Portuguese Primeira Liga
-    ("P1",  "Primeira Liga",     _ALL_SEASONS),
-    # Dutch Eredivisie
-    ("N1",  "Eredivisie",        _ALL_SEASONS),
+    ("E0",  "Premier League",    ["2324", "2425"]),
+    ("SP1", "Primera Division",  ["2324", "2425"]),
+    ("D1",  "Bundesliga",        ["2324", "2425"]),
+    ("I1",  "Serie A",           ["2324", "2425"]),
+    ("F1",  "Ligue 1",           ["2324", "2425"]),
 ]
 
 # Outcome map
@@ -78,8 +69,8 @@ def _sim(a: str, b: str) -> float:
 
 
 def _find_team(name: str, candidates: list[tuple[str, str]]) -> str | None:
-    """Find team_id for name from [(team_id, team_name)] candidates. Threshold 0.50."""
-    best_score, best_id = 0.50, None
+    """Find team_id for name from [(team_id, team_name)] candidates. Threshold 0.55."""
+    best_score, best_id = 0.55, None
     for tid, tname in candidates:
         s = _sim(name, tname)
         if s > best_score:

@@ -42,32 +42,20 @@ def run_backfill(incremental: bool = False) -> int:
         # Fetch finished matches ordered chronologically
         matches = (
             session.query(CoreMatch)
-            .filter(CoreMatch.status == "finished", CoreMatch.sport == "soccer")
+            .filter(CoreMatch.status == "finished")
             .order_by(CoreMatch.kickoff_utc.asc())
             .all()
         )
-        log.info("Found %d finished soccer matches to process.", len(matches))
-
-        sport_match_ids = [m.id for m in matches]
+        log.info("Found %d finished matches to process.", len(matches))
 
         if not incremental:
-            # Full rebuild: clear existing ELO rows for soccer matches only
-            if sport_match_ids:
-                deleted = (
-                    session.query(RatingEloTeam)
-                    .filter(RatingEloTeam.match_id.in_(sport_match_ids))
-                    .delete(synchronize_session="fetch")
-                )
-                log.info("Cleared %d existing soccer rating_elo_team rows.", deleted)
-                session.flush()
+            # Full rebuild: clear existing ELO rows and replay from scratch
+            deleted = session.query(RatingEloTeam).delete()
+            log.info("Cleared %d existing rating_elo_team rows.", deleted)
+            session.flush()
         else:
             # Load existing ratings into engine so we continue from where we left off
-            existing = (
-                session.query(RatingEloTeam)
-                .filter(RatingEloTeam.match_id.in_(sport_match_ids))
-                .order_by(RatingEloTeam.rated_at.asc())
-                .all()
-            )
+            existing = session.query(RatingEloTeam).order_by(RatingEloTeam.rated_at.asc()).all()
             already_rated: set[tuple[str, str]] = set()
             for row in existing:
                 engine.set_rating(row.team_id, row.rating_after)

@@ -5,7 +5,7 @@
  *
  * Feature-flag: NEXT_PUBLIC_REAL_ODDS=1 to swap in real odds (future).
  */
-import type { SportMatchListItem, MvpPrediction } from "@/lib/types";
+import type { SportMatchListItem } from "@/lib/types";
 import type {
   BettingMatch, BettingTeam, Market, Selection, SportSlug, BettingFilter
 } from "@/lib/betting-types";
@@ -305,9 +305,6 @@ export function applyBettingFilter(matches: BettingMatch[], f: BettingFilter): B
       if ((m.modelConfidence ?? 0) < threshold) return false;
     }
 
-    // Sport
-    if (f.sport && f.sport !== "all" && m.sport !== f.sport) return false;
-
     // Search
     if (f.search) {
       const q = f.search.toLowerCase();
@@ -320,71 +317,16 @@ export function applyBettingFilter(matches: BettingMatch[], f: BettingFilter): B
   });
 }
 
-/** Convert MvpPrediction (unified predictions API) to BettingMatch */
-export function mvpToBettingMatch(p: MvpPrediction): BettingMatch {
-  const sport = p.sport as SportSlug;
-  const pHome = p.probabilities.home_win;
-  const pAway = p.probabilities.away_win;
-  const pDraw = p.probabilities.draw ?? 0;
-
-  let featuredMarkets: Market[] = [];
-  switch (sport) {
-    case "soccer":      featuredMarkets = soccerMarkets(pHome, pDraw, pAway, p.participants.home.name, p.participants.away.name); break;
-    case "basketball":  featuredMarkets = basketballMarkets(pHome, pAway, p.participants.home.name, p.participants.away.name); break;
-    case "tennis":      featuredMarkets = tennisMarkets(pHome, pAway, p.participants.home.name, p.participants.away.name); break;
-    case "esports":     featuredMarkets = esportsMarkets(pHome, pAway, p.participants.home.name, p.participants.away.name); break;
-    case "baseball":    featuredMarkets = baseballMarkets(pHome, pAway, p.participants.home.name, p.participants.away.name); break;
-  }
-
-  const status: BettingMatch["status"] =
-    p.status === "live"      ? "live"      :
-    p.status === "finished"  ? "finished"  :
-    p.status === "cancelled" ? "cancelled" : "upcoming";
-
-  const edgePercent = Math.round((p.confidence - 50) / 5 * 10) / 10;
-
-  return {
-    id: p.event_id,
-    sport,
-    league: p.league,
-    startTime: p.start_time,
-    status,
-    home: { id: p.participants.home.id, name: p.participants.home.name, shortName: toShortName(p.participants.home.name) },
-    away: { id: p.participants.away.id, name: p.participants.away.name, shortName: toShortName(p.participants.away.name) },
-    featuredMarkets,
-    allMarkets: featuredMarkets,
-    modelConfidence: p.confidence / 100,
-    edgePercent,
-    pHome,
-    pAway,
-    pDraw: sport === "soccer" ? pDraw : undefined,
-  };
-}
-
-export type SortBy = "default" | "time" | "edge" | "confidence";
-
-/** Sort matches with configurable primary key. Live always floats to top. */
-export function sortMatchesBy(matches: BettingMatch[], by: SortBy = "default"): BettingMatch[] {
+/** Sort: live first, then by edge desc, then by startTime asc */
+export function sortMatches(matches: BettingMatch[]): BettingMatch[] {
   return [...matches].sort((a, b) => {
+    // Live always tops
     if (a.status === "live" && b.status !== "live") return -1;
     if (b.status === "live" && a.status !== "live") return 1;
-    switch (by) {
-      case "time":
-        return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
-      case "edge":
-        return (b.edgePercent ?? 0) - (a.edgePercent ?? 0);
-      case "confidence":
-        return (b.modelConfidence ?? 0) - (a.modelConfidence ?? 0);
-      default: {
-        const edgeDiff = (b.edgePercent ?? 0) - (a.edgePercent ?? 0);
-        if (Math.abs(edgeDiff) > 0.5) return edgeDiff;
-        return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
-      }
-    }
+    // Then edge descending
+    const edgeDiff = (b.edgePercent ?? 0) - (a.edgePercent ?? 0);
+    if (Math.abs(edgeDiff) > 0.5) return edgeDiff;
+    // Then start time ascending
+    return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
   });
-}
-
-/** @deprecated use sortMatchesBy */
-export function sortMatches(matches: BettingMatch[]): BettingMatch[] {
-  return sortMatchesBy(matches, "default");
 }

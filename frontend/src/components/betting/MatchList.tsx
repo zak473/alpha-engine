@@ -82,18 +82,18 @@ function EmptyState({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 w-full max-w-lg">
         <SuggestionCard
           icon={<Calendar size={16} />}
-          title="Try all sports"
-          subtitle="Switch the sport filter"
+          title="Check tomorrow"
+          subtitle="More games scheduled"
         />
         <SuggestionCard
           icon={<Zap size={16} />}
-          title="Turn off Top picks"
-          subtitle="See the full slate"
+          title="Lower edge filter"
+          subtitle="See more options"
         />
         <SuggestionCard
           icon={<Wifi size={16} />}
-          title="Check In Play"
-          subtitle="Live opportunities now"
+          title="Enable live"
+          subtitle="In-play opportunities"
         />
       </div>
     </div>

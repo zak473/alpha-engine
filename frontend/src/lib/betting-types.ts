@@ -72,7 +72,6 @@ export interface BettingFilter {
   edge: "all" | "1" | "3" | "5";
   confidence: "all" | "55" | "65" | "75";
   search: string;
-  sport: "all" | SportSlug;
 }
 
 export const DEFAULT_BETTING_FILTER: BettingFilter = {
@@ -81,7 +80,6 @@ export const DEFAULT_BETTING_FILTER: BettingFilter = {
   edge: "all",
   confidence: "all",
   search: "",
-  sport: "all",
 };
 
 // Sport display config

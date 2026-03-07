@@ -182,31 +182,6 @@ def _job_fetch_odds() -> None:
         log.error("[scheduler] auto_picks failed: %s", exc, exc_info=True)
 
 
-def _job_update_elo() -> None:
-    """Run incremental ELO backfill for all sports — only processes new finished matches."""
-    log.info("[scheduler] Starting update_elo job ...")
-
-    sports = [
-        ("soccer",     "pipelines.soccer.backfill_elo",     "run_backfill"),
-        ("tennis",     "pipelines.tennis.backfill_elo",     "run_backfill"),
-        ("esports",    "pipelines.esports.backfill_elo",    "run_backfill"),
-        ("basketball", "pipelines.basketball.backfill_elo", "run_backfill"),
-        ("baseball",   "pipelines.baseball.backfill_elo",   "run_backfill"),
-    ]
-
-    for sport, module_path, fn_name in sports:
-        try:
-            import importlib
-            mod = importlib.import_module(module_path)
-            fn = getattr(mod, fn_name)
-            n = fn(incremental=True)
-            log.info("[scheduler] %s ELO: %d rows written.", sport, n)
-        except Exception as exc:
-            log.error("[scheduler] %s ELO update failed: %s", sport, exc, exc_info=True)
-
-    log.info("[scheduler] update_elo done.")
-
-
 def _job_fetch_stats() -> None:
     """Fetch real box score stats from NBA and MLB APIs."""
     log.info("[scheduler] Starting fetch_stats job ...")
@@ -289,18 +264,8 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
-    # Incremental ELO update nightly (3 AM UTC)
-    from apscheduler.triggers.cron import CronTrigger
-    _scheduler.add_job(
-        _job_update_elo,
-        trigger=CronTrigger(hour=3, minute=0, timezone="UTC"),
-        id="update_elo",
-        name="Incremental ELO ratings update (all sports)",
-        replace_existing=True,
-    )
-
     _scheduler.start()
-    log.info("[scheduler] Started. Jobs: expire_stale (5m), fetch_live (30m), fetch_odds (30m), predict_only (1h), fetch_stats (6h), update_elo (nightly 03:00 UTC).")
+    log.info("[scheduler] Started. Jobs: expire_stale (5m), fetch_live (30m), fetch_odds (30m), predict_only (1h), fetch_stats (6h).")
     return _scheduler
 
 
