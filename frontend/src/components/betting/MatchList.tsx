@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Zap, RotateCcw, Wifi, ChevronRight, Calendar, Search } from "lucide-react";
 import type { BettingMatch, BettingFilter, SportSlug } from "@/lib/betting-types";
 import { MatchCard } from "./MatchCard";
@@ -126,6 +127,8 @@ function SuggestionCard({
   );
 }
 
+const DEFAULT_VISIBLE = 6;
+
 export function MatchList({
   matches,
   allMatches,
@@ -137,6 +140,8 @@ export function MatchList({
   onShowLive,
   onShowResults,
 }: MatchListProps) {
+  const [showAll, setShowAll] = useState(false);
+
   const finishedCount = allMatches.filter(
     (m) => m.status === "finished" || m.status === "cancelled"
   ).length;
@@ -167,39 +172,71 @@ export function MatchList({
     ...(results.length  ? [{ label: "Results",   items: results }] : []),
   ];
 
+  // Flatten all items to apply global show-more cap
+  const allItems = [...live, ...upcoming, ...results];
+  const visibleItems = showAll ? allItems : allItems.slice(0, DEFAULT_VISIBLE);
+  const hiddenCount = allItems.length - DEFAULT_VISIBLE;
+
   return (
     <div className="flex flex-col gap-6">
-      {sections.map(({ label, items, accent }) => (
-        <section key={label}>
-          {sections.length > 1 && (
-            <div className="flex items-center gap-2 px-1 mb-3">
-              {accent && (
-                <span 
-                  className="w-2 h-2 rounded-full animate-pulse" 
-                  style={{ background: accent }}
+      {sections.map(({ label, items, accent }) => {
+        const sectionItems = items.filter((m) => visibleItems.includes(m));
+        if (sectionItems.length === 0) return null;
+        return (
+          <section key={label}>
+            {sections.length > 1 && (
+              <div className="flex items-center gap-2 px-1 mb-3">
+                {accent && (
+                  <span
+                    className="w-2 h-2 rounded-full animate-pulse"
+                    style={{ background: accent }}
+                  />
+                )}
+                <h2 className="text-[11px] font-bold uppercase tracking-widest" style={{ color: accent ?? "var(--text1)" }}>
+                  {label}
+                </h2>
+                <span className="text-[10px] text-text-muted font-mono">
+                  {items.length}
+                </span>
+              </div>
+            )}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+              {sectionItems.map((m) => (
+                <MatchCard
+                  key={m.id}
+                  match={m}
+                  sport={m.sport}
+                  highlighted={m.id === highlightedId}
+                  detailHref={`/sports/${m.sport}/matches/${m.id}`}
                 />
-              )}
-              <h2 className="text-[11px] font-bold uppercase tracking-widest" style={{ color: accent ?? "var(--text1)" }}>
-                {label}
-              </h2>
-              <span className="text-[10px] text-text-muted font-mono">
-                {items.length}
-              </span>
+              ))}
             </div>
-          )}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-            {items.map((m) => (
-              <MatchCard
-                key={m.id}
-                match={m}
-                sport={m.sport}
-                highlighted={m.id === highlightedId}
-                detailHref={`/sports/${m.sport}/matches/${m.id}`}
-              />
-            ))}
-          </div>
-        </section>
-      ))}
+          </section>
+        );
+      })}
+
+      {/* Show more / show less */}
+      {!showAll && hiddenCount > 0 && (
+        <button
+          onClick={() => setShowAll(true)}
+          className="flex items-center justify-center gap-2 w-full py-4 rounded-lg transition-all"
+          style={{ background: "rgba(48,224,106,0.06)", border: "1px solid rgba(48,224,106,0.15)" }}
+        >
+          <span className="text-sm font-medium" style={{ color: "var(--positive)" }}>
+            Show {hiddenCount} more match{hiddenCount !== 1 ? "es" : ""}
+          </span>
+          <ChevronRight size={14} style={{ color: "var(--positive)" }} />
+        </button>
+      )}
+      {showAll && allItems.length > DEFAULT_VISIBLE && (
+        <button
+          onClick={() => setShowAll(false)}
+          className="flex items-center justify-center gap-2 w-full py-3 rounded-lg transition-all"
+          style={{ background: "transparent", border: "1px solid var(--border0)" }}
+        >
+          <span className="text-xs text-text-muted">Show less</span>
+        </button>
+      )}
 
       {/* Footer: nudge to see results */}
       {finishedCount > 0 && activeFilter !== "finished" && (
