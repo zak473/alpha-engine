@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Swords, ClipboardList, TrendingUp, MoreHorizontal,
-  Trophy, ShieldCheck, BrainCircuit,
+  Trophy, ShieldCheck, BrainCircuit, Users,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,7 @@ const PRIMARY_NAV = [
 ];
 
 const MORE_NAV = [
+  { label: "Tipsters",    href: "/tipsters",    icon: Users       },
   { label: "Challenges",  href: "/challenges",  icon: Trophy      },
   { label: "Performance", href: "/performance", icon: TrendingUp  },
   { label: "Admin",       href: "/admin",        icon: ShieldCheck },
