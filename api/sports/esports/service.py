@@ -706,8 +706,8 @@ class EsportsMatchService(BaseMatchListService):
             tournament_tier="a_tier",
         )
 
-        form_home = _team_form(db, match.home_team_id, home_name) or _mock_form(home_name, game_type, seed)
-        form_away = _team_form(db, match.away_team_id, away_name) or _mock_form(away_name, game_type, (seed+17)%100)
+        form_home = _team_form(db, match.home_team_id, home_name)
+        form_away = _team_form(db, match.away_team_id, away_name)
         h2h = _h2h(db, match.home_team_id, match.away_team_id, home_name, away_name)
 
         # Game-specific data with mock fallback

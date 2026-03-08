@@ -158,12 +158,6 @@ def _team_stats_out(
     )
     if row is None:
         return None
-    # Seeded mock values for extended fields
-    import random as _random
-    seed = sum(ord(c) for c in match_id + team_id + "stats") % 100
-    rng = _random.Random(seed)
-    shots_t = row.shots or 0
-    shots_on = row.shots_on_target or 0
     return SoccerTeamStatsOut(
         team_id=team_id,
         team_name=team_name,
@@ -178,22 +172,6 @@ def _team_stats_out(
         fouls=row.fouls,
         yellow_cards=row.yellow_cards,
         red_cards=row.red_cards,
-        corners=rng.randint(2, 10),
-        offsides=rng.randint(0, 5),
-        big_chances_created=rng.randint(1, 5),
-        big_chances_missed=rng.randint(0, 3),
-        aerial_duels_won=rng.randint(5, 20),
-        aerial_duels_lost=rng.randint(3, 18),
-        crosses=rng.randint(5, 22),
-        long_balls_accurate=rng.randint(10, 40),
-        through_balls=rng.randint(0, 5),
-        tackles_won=rng.randint(5, 18),
-        interceptions=rng.randint(3, 14),
-        clearances=rng.randint(5, 25),
-        blocks=rng.randint(1, 8),
-        shots_inside_box=max(0, shots_t - rng.randint(1, 4)) if shots_t > 0 else rng.randint(2, 8),
-        shots_outside_box=rng.randint(1, 5),
-        dribbles_completed=rng.randint(2, 10),
     )
 
 
@@ -201,10 +179,6 @@ def _form_stats(feat: FeatSoccerMatch, team_name: str, side: str, match_id: str 
     """Build FormStatsOut for home or away side from a FeatSoccerMatch row."""
     if feat is None:
         return None
-    import random as _random
-    seed = sum(ord(c) for c in (match_id or "") + side + "form") % 100
-    seed_val = seed / 100.0
-    rng = _random.Random(seed)
 
     if side == "home":
         wins = feat.home_form_w
@@ -241,7 +215,7 @@ def _form_stats(feat: FeatSoccerMatch, team_name: str, side: str, match_id: str 
             days_rest=feat.away_days_rest,
         )
 
-    # Enhance with mock extended fields
+    # Enhance with derived fields (no mock data)
     clean_sheets = wins if wins else 0
     btts = (losses or 0) + (draws or 0) // 2
     raw_form = (["W"] * (wins or 0) + ["D"] * (draws or 0) + ["L"] * (losses or 0))[:5]
@@ -251,11 +225,80 @@ def _form_stats(feat: FeatSoccerMatch, team_name: str, side: str, match_id: str 
     form.clean_sheets = clean_sheets
     form.btts = btts
     form.form_last_5 = raw_form if raw_form else None
-    form.ppda_avg = round(8.5 + seed_val * 0.15, 2)
     form.shots_avg = shots_avg
     form.shots_on_target_avg = shots_on_target_avg
-    form.corners_avg = round(5.5 + seed_val * 0.1, 1)
     return form
+
+
+def _real_league_context(db: Session, match: CoreMatch, home_id: str, away_id: str) -> Optional[SoccerLeagueContextOut]:
+    """Compute real league standings from CoreMatch history."""
+    if not match.league_id:
+        return None
+    matches = (
+        db.query(CoreMatch)
+        .filter(
+            CoreMatch.sport == "soccer",
+            CoreMatch.league_id == match.league_id,
+            CoreMatch.season == match.season,
+            CoreMatch.status == "finished",
+        )
+        .all()
+    )
+    if not matches:
+        return None
+
+    _norm = {"H": "home_win", "D": "draw", "A": "away_win",
+             "home_win": "home_win", "draw": "draw", "away_win": "away_win"}
+    standings: dict[str, dict] = {}
+    for m in matches:
+        for tid in [m.home_team_id, m.away_team_id]:
+            if tid not in standings:
+                standings[tid] = {"pts": 0, "gp": 0, "gf": 0, "ga": 0}
+        outcome = _norm.get(m.outcome or "", "draw")
+        standings[m.home_team_id]["gp"] += 1
+        standings[m.away_team_id]["gp"] += 1
+        standings[m.home_team_id]["gf"] += m.home_score or 0
+        standings[m.home_team_id]["ga"] += m.away_score or 0
+        standings[m.away_team_id]["gf"] += m.away_score or 0
+        standings[m.away_team_id]["ga"] += m.home_score or 0
+        if outcome == "home_win":
+            standings[m.home_team_id]["pts"] += 3
+        elif outcome == "draw":
+            standings[m.home_team_id]["pts"] += 1
+            standings[m.away_team_id]["pts"] += 1
+        else:
+            standings[m.away_team_id]["pts"] += 3
+
+    sorted_teams = sorted(
+        standings.keys(),
+        key=lambda t: (-standings[t]["pts"], -(standings[t]["gf"] - standings[t]["ga"]), -standings[t]["gf"])
+    )
+    position_map = {tid: i + 1 for i, tid in enumerate(sorted_teams)}
+    n = len(sorted_teams)
+
+    home_pos = position_map.get(home_id)
+    away_pos = position_map.get(away_id)
+    if home_pos is None or away_pos is None:
+        return None
+
+    home_s = standings.get(home_id, {"pts": 0, "gp": 0})
+    away_s = standings.get(away_id, {"pts": 0, "gp": 0})
+    top4_pts = standings[sorted_teams[3]]["pts"] if n >= 4 else None
+    rel_pts = standings[sorted_teams[max(0, n - 3)]]["pts"] if n >= 3 else None
+
+    return SoccerLeagueContextOut(
+        home_position=home_pos,
+        away_position=away_pos,
+        home_points=home_s["pts"],
+        away_points=away_s["pts"],
+        home_games_played=home_s["gp"],
+        away_games_played=away_s["gp"],
+        points_gap=home_s["pts"] - away_s["pts"],
+        top_4_gap_home=(home_s["pts"] - top4_pts) if top4_pts is not None else None,
+        relegation_gap_away=(away_s["pts"] - rel_pts) if rel_pts is not None else None,
+        home_form_rank=None,
+        away_form_rank=None,
+    )
 
 
 # --- Mock data helpers (deterministic from match_id seed) ---
@@ -661,14 +704,14 @@ class SoccerMatchService(BaseMatchListService):
             simulation=simulation,
             h2h=_h2h(db, match.home_team_id, match.away_team_id, home_name, away_name),
             context=match_context,
-            lineup_home=_mock_lineup(match_id, "home"),
-            lineup_away=_mock_lineup(match_id, "away"),
-            injuries_home=_mock_injuries(match_id, "home"),
-            injuries_away=_mock_injuries(match_id, "away"),
-            referee=_mock_referee(match_id),
-            league_context=_mock_league_context(match_id),
-            adv_home=_mock_adv_stats(match_id, "home"),
-            adv_away=_mock_adv_stats(match_id, "away"),
+            lineup_home=None,
+            lineup_away=None,
+            injuries_home=[],
+            injuries_away=[],
+            referee=None,
+            league_context=_real_league_context(db, match, match.home_team_id, match.away_team_id),
+            adv_home=None,
+            adv_away=None,
             betting={
                 "home_ml": round(1 / probabilities.home_win, 2) if probabilities and probabilities.home_win > 0 else None,
                 "draw_ml": round(1 / probabilities.draw, 2) if probabilities and probabilities.draw and probabilities.draw > 0 else None,

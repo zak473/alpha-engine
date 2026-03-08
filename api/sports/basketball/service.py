@@ -495,12 +495,12 @@ def _build_basketball_form(
         losses_last_5=losses,
         avg_pts_for=summary["avg_pts_for"],
         avg_pts_against=summary["avg_pts_against"],
-        ortg_last_5=round(108 + (seed % 12), 1),
-        drtg_last_5=round(108 + ((seed + 3) % 12), 1),
-        net_rtg_last_5=round(float((seed % 12) - ((seed + 3) % 12)), 1),
-        days_rest=1 + (seed % 3),
-        back_to_back=(seed % 7 == 0),
-        injury_count=(seed % 3),
+        ortg_last_5=None,
+        drtg_last_5=None,
+        net_rtg_last_5=None,
+        days_rest=None,
+        back_to_back=False,
+        injury_count=0,
     )
 
 
@@ -518,21 +518,21 @@ def _mock_basketball_detail(
     home_pts = match.home_score or (95 + (seed % 30) if is_finished else None)
     away_pts = match.away_score or (95 + ((seed + 13) % 30) if is_finished else None)
 
-    # Quarter scores (mock)
+    # Quarter scores (mock split when score known)
     if is_finished and home_pts and away_pts:
         h_qs = _split_quarters(home_pts, seed)
         a_qs = _split_quarters(away_pts, seed + 7)
     else:
         h_qs = a_qs = None
 
-    r_home = 1500 + (seed % 200) - 100
-    r_away = 1500 + ((seed + 17) % 200) - 100
+    # Real ELO ratings
+    elo_home = _elo_snapshot(db, match.home_team_id, home_name)
+    elo_away = _elo_snapshot(db, match.away_team_id, away_name)
+    r_home = elo_home.rating if elo_home else 1500.0
+    r_away = elo_away.rating if elo_away else 1500.0
 
     p_home = _elo_win_prob(r_home, r_away, 35.0)
     p_away = 1.0 - p_home
-
-    elo_home = _mock_elo_panel(match.home_team_id, home_name, r_home, seed, True, r_away)
-    elo_away = _mock_elo_panel(match.away_team_id, away_name, r_away, seed + 5, False, r_home)
 
     # Box scores: real DB stats if available, otherwise mock
     stats_home = None
@@ -596,36 +596,31 @@ def _mock_basketball_detail(
         current_period=live_current_period,
         current_state=match.current_state_json if status == "live" else None,
         probabilities=ProbabilitiesOut(home_win=round(p_home, 3), away_win=round(p_away, 3)),
-        confidence=55 + (seed % 30),
+        confidence=None,
         fair_odds=FairOddsOut(
-            home_win=round(1 / p_home, 2),
-            away_win=round(1 / p_away, 2),
+            home_win=round(1 / p_home, 2) if p_home > 0 else None,
+            away_win=round(1 / p_away, 2) if p_away > 0 else None,
         ),
         key_drivers=[
-            KeyDriverOut(feature="Home Elo Advantage", importance=0.28, value=round(r_home - r_away, 0), direction="home" if r_home > r_away else "away"),
-            KeyDriverOut(feature="Rest Differential", importance=0.18, value=float(elo_home.days_rest or 2), direction="neutral"),
-            KeyDriverOut(feature="Offensive Rating (last 5)", importance=0.22, value=round(110 + seed % 8, 1), direction="home"),
-            KeyDriverOut(feature="Pace Match-Up", importance=0.14, value=97.5, direction="neutral"),
-            KeyDriverOut(feature="Back-to-Back Penalty", importance=0.10, value=float(elo_away.back_to_back), direction="home"),
-            KeyDriverOut(feature="H2H Record (last 5)", importance=0.08, value=float(3), direction="home"),
+            KeyDriverOut(feature="ELO Differential", importance=0.5, value=round(r_home - r_away, 1)),
         ],
-        model=ModelMetaOut(version="bball-v1.2", algorithm="GBM", trained_at="2025-10-01", n_train_samples=14200, accuracy=0.618, brier_score=0.228),
+        model=None,
         elo_home=elo_home,
         elo_away=elo_away,
         match_info=BasketballMatchInfo(
-            arena="Crypto.com Arena" if "laker" in home_name.lower() else "TD Garden",
-            city="Los Angeles" if "laker" in home_name.lower() else "Boston",
-            attendance=18997 + (seed % 500),
+            arena=match.venue,
+            city=None,
+            attendance=None,
             season_phase="regular",
-            pace=round(97.5 + (seed % 8), 1),
+            pace=None,
             home_quarters=h_qs,
             away_quarters=a_qs,
-            home_record=f"{28 + seed % 20}-{14 + (seed + 3) % 18}",
-            away_record=f"{25 + (seed + 7) % 22}-{17 + (seed + 9) % 20}",
-            home_streak=f"W{1 + seed % 5}" if seed % 2 == 0 else f"L{1 + seed % 3}",
-            away_streak=f"W{1 + (seed + 3) % 4}" if (seed + 3) % 2 == 0 else f"L{1 + (seed + 3) % 3}",
-            home_home_record=f"{16 + seed % 12}-{6 + seed % 8}",
-            away_away_record=f"{11 + (seed + 5) % 12}-{9 + (seed + 5) % 10}",
+            home_record=None,
+            away_record=None,
+            home_streak=None,
+            away_streak=None,
+            home_home_record=None,
+            away_away_record=None,
             referee_crew=[],
             overtime_periods=0,
         ),
@@ -634,21 +629,17 @@ def _mock_basketball_detail(
         box_home=box_home,
         box_away=box_away,
         adv_home=(
-            _adv_from_stats(stats_home, home_name) if is_finished and stats_home
-            else _mock_adv_stats(match.home_team_id, home_name, True, seed) if not is_finished
-            else None
+            _adv_from_stats(stats_home, home_name) if is_finished and stats_home else None
         ),
         adv_away=(
-            _adv_from_stats(stats_away, away_name) if is_finished and stats_away
-            else _mock_adv_stats(match.away_team_id, away_name, False, seed + 5) if not is_finished
-            else None
+            _adv_from_stats(stats_away, away_name) if is_finished and stats_away else None
         ),
         injuries_home=[],
         injuries_away=[],
         shots_home=[],
         shots_away=[],
         h2h=_h2h(db, match.home_team_id, match.away_team_id),
-        context={"venue_name": "Crypto.com Arena", "attendance": 18997 + (seed % 500)},
+        context={"venue_name": match.venue} if match.venue else None,
         data_completeness={
             "box_score": is_finished and (stats_home is not None or stats_away is not None),
             "lineup": False,
@@ -663,7 +654,7 @@ def _mock_basketball_detail(
         top_lineups_away=[],
         scoring_runs=[],
         referee=None,
-        betting=_mock_betting_bball(match.id, p_home, p_away),
+        betting=None,
     )
 
 
@@ -849,9 +840,9 @@ class BasketballMatchService(BaseMatchListService):
                 elo_away=elo_a.rating if elo_a else None,
                 p_home=round(p_home, 3),
                 p_away=round(1.0 - p_home, 3),
-                confidence=55 + (seed % 30),
-                home_back_to_back=(seed % 7 == 0),
-                away_back_to_back=((seed + 3) % 7 == 0),
+                confidence=None,
+                home_back_to_back=False,
+                away_back_to_back=False,
             ))
         return BasketballMatchListResponse(items=items, total=total)
 

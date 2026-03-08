@@ -622,9 +622,9 @@ def _starter_from_stats(row: "BaseballTeamMatchStats") -> Optional[StarterPitche
 
 def _build_baseball_form(
     team_id: str, team_name: str, records: list[dict], summary: dict, seed: int, is_home: bool
-) -> BaseballTeamFormOut:
-    side = "home" if is_home else "away"
-    st_name, st_hand, st_era, st_whip, st_k9 = _MLB_STARTERS[side]
+) -> Optional[BaseballTeamFormOut]:
+    if not records:
+        return None
     entries = []
     for rec in records:
         pts_for = rec["pts_for"] or 0
@@ -649,9 +649,9 @@ def _build_baseball_form(
         losses_last_5=losses,
         avg_runs_for=summary["avg_pts_for"],
         avg_runs_against=summary["avg_pts_against"],
-        team_era_last_5=round(3.8 + (seed % 15) / 10, 2),
-        bullpen_era_last_5=round(3.5 + (seed % 20) / 10, 2),
-        starter=StarterPitcherOut(name=st_name, hand=st_hand, era=st_era, whip=st_whip, k_per_9=st_k9),
+        team_era_last_5=None,
+        bullpen_era_last_5=None,
+        starter=None,
     )
 
 
@@ -664,13 +664,13 @@ def _mock_baseball_detail(
     home_runs = match.home_score if match.home_score is not None else (3 + (seed % 6) if is_finished else None)
     away_runs = match.away_score if match.away_score is not None else (2 + ((seed + 4) % 6) if is_finished else None)
 
-    r_home = 1500 + (seed % 200) - 100
-    r_away = 1500 + ((seed + 17) % 200) - 100
+    # Real ELO
+    elo_home = _elo_snapshot(db, match.home_team_id, home_name)
+    elo_away = _elo_snapshot(db, match.away_team_id, away_name)
+    r_home = elo_home.rating if elo_home else 1500.0
+    r_away = elo_away.rating if elo_away else 1500.0
     p_home = _elo_win_prob(r_home, r_away, 24.0)
     p_away = 1.0 - p_home
-
-    elo_home = _mock_elo_panel(match.home_team_id, home_name, r_home, seed, True, r_away)
-    elo_away = _mock_elo_panel(match.away_team_id, away_name, r_away, seed + 5, False, r_home)
 
     # Stats: real DB if available, otherwise mock
     stats_home_row = db.query(BaseballTeamMatchStats).filter_by(
@@ -680,12 +680,12 @@ def _mock_baseball_detail(
         match_id=match.id, team_id=match.away_team_id
     ).first() if is_finished else None
 
-    starter_home = (_starter_from_stats(stats_home_row) or _mock_starter("home", seed, is_finished)) if is_finished else _mock_starter("home", seed, False)
-    starter_away = (_starter_from_stats(stats_away_row) or _mock_starter("away", seed + 3, is_finished)) if is_finished else _mock_starter("away", seed + 3, False)
-    bullpen_home = _mock_bullpen(match.home_team_id, home_name, True, seed, is_finished)
-    bullpen_away = _mock_bullpen(match.away_team_id, away_name, False, seed + 7, is_finished)
-    batting_home = (_batting_from_stats(stats_home_row, home_name, db) if stats_home_row else _mock_batting(match.home_team_id, home_name, True, home_runs, seed))
-    batting_away = (_batting_from_stats(stats_away_row, away_name, db) if stats_away_row else _mock_batting(match.away_team_id, away_name, False, away_runs, seed + 3))
+    starter_home = _starter_from_stats(stats_home_row) if stats_home_row else None
+    starter_away = _starter_from_stats(stats_away_row) if stats_away_row else None
+    bullpen_home = None
+    bullpen_away = None
+    batting_home = _batting_from_stats(stats_home_row, home_name, db) if stats_home_row else None
+    batting_away = _batting_from_stats(stats_away_row, away_name, db) if stats_away_row else None
 
     # Real form from CoreMatch
     home_form_records = compute_team_form(db, "baseball", match.home_team_id, limit=5)
@@ -703,21 +703,10 @@ def _mock_baseball_detail(
             innings = [InningScore(inning=r["inning"], home=r.get("home"), away=r.get("away")) for r in raw]
         except Exception:
             innings = None
-    if innings is None and is_finished:
-        innings = _mock_inning_scores(home_runs or 0, away_runs or 0, seed)
-    events = _mock_inning_events(home_name, away_name, seed, innings) if innings else None
+    events = None
 
-    wind_dirs = ["Out to LF", "In from CF", "Out to RF", "Calm", "Crosswind"]
-    conditions = ["Clear", "Partly Cloudy", "Overcast", "Clear"]
-    weather = BaseballWeatherOut(
-        temperature_f=round(62 + (seed % 30), 1),
-        wind_speed_mph=round(5 + (seed % 20), 1),
-        wind_direction=wind_dirs[seed % len(wind_dirs)],
-        conditions=conditions[seed % len(conditions)],
-        humidity_pct=round(40 + (seed % 40), 1),
-    )
-
-    park_factor = float((seed % 30) - 10)
+    weather = None
+    park_factor = None
 
     # Derive current_period for live baseball from EventContext inning_scores_json length
     baseball_current_period = match.current_period if match.status == "live" else None
@@ -741,37 +730,32 @@ def _mock_baseball_detail(
         current_period=baseball_current_period,
         current_state=baseball_current_state,
         probabilities=ProbabilitiesOut(home_win=round(p_home, 3), away_win=round(p_away, 3)),
-        confidence=52 + (seed % 28),
-        fair_odds=FairOddsOut(home_win=round(1 / p_home, 2), away_win=round(1 / p_away, 2)),
+        confidence=None,
+        fair_odds=FairOddsOut(home_win=round(1 / p_home, 2) if p_home > 0 else None, away_win=round(1 / p_away, 2) if p_away > 0 else None),
         key_drivers=[
-            KeyDriverOut(feature="Starter Quality (home)", importance=0.32, value=round(starter_home.era or 3.5, 2), direction="home" if (starter_home.era or 4) < (starter_away.era or 4) else "away"),
-            KeyDriverOut(feature="Team Elo Differential", importance=0.24, value=round(r_home - r_away, 0), direction="home" if r_home > r_away else "away"),
-            KeyDriverOut(feature="Bullpen Fatigue (away)", importance=0.16, value=elo_away.bullpen_fatigue_adj),
-            KeyDriverOut(feature="Park Factor", importance=0.12, value=park_factor, direction="home" if park_factor > 0 else "away"),
-            KeyDriverOut(feature="Weather (Wind)", importance=0.08, value=float(weather.wind_speed_mph or 0), direction="neutral"),
-            KeyDriverOut(feature="H2H Record", importance=0.08, value=float(2), direction="home"),
+            KeyDriverOut(feature="ELO Differential", importance=0.5, value=round(r_home - r_away, 1)),
         ],
-        model=ModelMetaOut(version="bsbl-v1.1", algorithm="GBM", trained_at="2025-10-01", n_train_samples=18600, accuracy=0.588, brier_score=0.238),
+        model=None,
         elo_home=elo_home,
         elo_away=elo_away,
         match_info=BaseballMatchInfo(
-            ballpark="Yankee Stadium",
-            city="New York",
-            attendance=42000 + (seed % 8000),
+            ballpark=match.venue,
+            city=None,
+            attendance=None,
             innings_played=9 if is_finished else None,
             inning_scores=innings,
-            home_hits=sum(b.hits or 0 for b in batting_home.batters) if is_finished else None,
-            home_errors=seed % 2,
-            away_hits=sum(b.hits or 0 for b in batting_away.batters) if is_finished else None,
-            away_errors=(seed + 1) % 2,
+            home_hits=batting_home.total_hits if batting_home else None,
+            home_errors=None,
+            away_hits=batting_away.total_hits if batting_away else None,
+            away_errors=None,
             weather=weather,
             park_factor=park_factor,
-            home_record=f"{42 + seed % 20}-{31 + (seed + 3) % 18}",
-            away_record=f"{38 + (seed + 7) % 22}-{35 + (seed + 9) % 20}",
-            home_streak=f"W{1 + seed % 4}" if seed % 2 == 0 else f"L{1 + seed % 3}",
-            away_streak=f"W{1 + (seed + 3) % 3}" if (seed + 3) % 2 == 0 else f"L{1 + (seed + 3) % 3}",
-            home_bullpen_era=round(3.2 + (seed % 20) / 10, 2),
-            away_bullpen_era=round(3.8 + ((seed + 5) % 20) / 10, 2),
+            home_record=None,
+            away_record=None,
+            home_streak=None,
+            away_streak=None,
+            home_bullpen_era=None,
+            away_bullpen_era=None,
         ),
         starter_home=starter_home,
         starter_away=starter_away,
@@ -783,7 +767,7 @@ def _mock_baseball_detail(
         form_away=_build_baseball_form(match.away_team_id, away_name, away_form_records, away_summary, seed + 11, False),
         inning_events=events,
         h2h=_h2h(db, match.home_team_id, match.away_team_id),
-        context={"venue_name": "Yankee Stadium", "attendance": 42000 + (seed % 8000)},
+        context={"venue_name": match.venue} if match.venue else None,
         data_completeness={
             "box_score": is_finished and (stats_home_row is not None or stats_away_row is not None),
             "pitching_line": is_finished and (stats_home_row is not None or stats_away_row is not None),
@@ -834,8 +818,6 @@ class BaseballMatchService(BaseMatchListService):
             r_home = (elo_h.rating if elo_h else 1500.0)
             r_away = (elo_a.rating if elo_a else 1500.0)
             p_home = _elo_win_prob(r_home, r_away, 24.0)
-            home_st = _MLB_STARTERS["home"][0]
-            away_st = _MLB_STARTERS["away"][0]
             items.append(BaseballMatchListItem(
                 id=m.id,
                 league=_league_name(db, m.league_id),
@@ -855,9 +837,9 @@ class BaseballMatchService(BaseMatchListService):
                 elo_away=elo_a.rating if elo_a else None,
                 p_home=round(p_home, 3),
                 p_away=round(1.0 - p_home, 3),
-                confidence=52 + (seed % 28),
-                home_starter=home_st,
-                away_starter=away_st,
+                confidence=None,
+                home_starter=None,
+                away_starter=None,
             ))
         return BaseballMatchListResponse(items=items, total=total)
 
