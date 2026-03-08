@@ -361,22 +361,50 @@ def _upsert_match(session: Session, event: dict, dry_run: bool = False) -> Optio
         session.add(away_team)
         session.flush()
 
+    # Skip if both players resolved to the same entity (happens with some doubles formats)
+    if home_team.id == away_team.id:
+        log.debug("Skipping self-play match: %s vs %s → same entity", first_player, second_player)
+        return None
+
     # --- CoreMatch upsert ---
+    # First: try to find an existing match (e.g. from Odds API) with same players on same date
+    # so we can attach TennisMatch data to it rather than creating a duplicate record
     match = session.query(CoreMatch).filter_by(provider_id=provider_id).first()
+    if match is None:
+        # Look for a match with same player names on the same date (any provider)
+        from datetime import timedelta
+        kickoff_day_start = kickoff.replace(hour=0, minute=0, second=0, microsecond=0)
+        kickoff_day_end = kickoff_day_start + timedelta(days=1)
+
+        # Find all CoreTeam IDs with the same player name (could be odds- or apitns- prefixed)
+        home_name_ids = [t.id for t in session.query(CoreTeam).filter_by(name=first_player).all()]
+        away_name_ids = [t.id for t in session.query(CoreTeam).filter_by(name=second_player).all()]
+
+        if home_name_ids and away_name_ids:
+            existing = (
+                session.query(CoreMatch)
+                .filter(
+                    CoreMatch.sport == "tennis",
+                    CoreMatch.home_team_id.in_(home_name_ids),
+                    CoreMatch.away_team_id.in_(away_name_ids),
+                    CoreMatch.kickoff_utc >= kickoff_day_start,
+                    CoreMatch.kickoff_utc < kickoff_day_end,
+                )
+                .first()
+            )
+            if existing:
+                log.debug("Linking api-tennis event %s → existing match %s", event_key, existing.id)
+                match = existing
+
     is_new = match is None
     if is_new:
         from db.models.mvp import _uuid
         match = CoreMatch(id=_uuid(), provider_id=provider_id, sport="tennis")
         session.add(match)
 
-    # Skip if both players resolved to the same entity (happens with some doubles formats)
-    if home_team.id == away_team.id:
-        log.debug("Skipping self-play match: %s vs %s → same entity", first_player, second_player)
-        return None
-
     match.league_id = league.id
-    match.home_team_id = home_team.id
-    match.away_team_id = away_team.id
+    match.home_team_id = match.home_team_id if not is_new else home_team.id
+    match.away_team_id = match.away_team_id if not is_new else away_team.id
     match.kickoff_utc = kickoff
     match.status = status
     match.home_score = home_score_int
