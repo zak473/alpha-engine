@@ -730,9 +730,11 @@ def fetch_all(dry_run: bool = False, days: int = 2) -> int:
                 serve_stats = _parse_serve_stats(pointbypoint or [], first_player, second_player)
 
                 # Fetch extended match statistics (serve speeds, winners, UE)
+                # Only attempt for live matches — api-tennis free tier returns 500
+                # for scheduled/finished matches; live matches have real-time stats.
                 extended_stats = None
                 event_key = str(event.get("event_key", ""))
-                if event_key and event.get("event_status") in ("Finished", "After Retirement"):
+                if event_key and event.get("event_live") == "1":
                     try:
                         stats_result = _get("get_match_statistics", {"event_id": event_key})
                         if stats_result:
