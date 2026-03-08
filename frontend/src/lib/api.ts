@@ -483,6 +483,18 @@ export async function deletePick(id: string): Promise<void> {
   return mutate<void>(`/picks/${id}`, "DELETE");
 }
 
+export async function getPicksStats(): Promise<PicksStatsOut> {
+  const res = await fetch(`${BASE}/picks/stats`, { cache: "no-store" });
+  if (!res.ok) throw new ApiError(`API ${res.status}`, res.status, "/picks/stats");
+  return res.json();
+}
+
+export async function getRecentWins(limit = 5): Promise<PickOut[]> {
+  const res = await fetch(`${BASE}/picks/recent-wins?limit=${limit}`, { cache: "no-store" });
+  if (!res.ok) throw new ApiError(`API ${res.status}`, res.status, "/picks/recent-wins");
+  return res.json();
+}
+
 // ─── Bankroll ──────────────────────────────────────────────────────────────
 
 export interface BankrollSnapshotOut {

@@ -811,28 +811,7 @@ class EsportsMatchService(BaseMatchListService):
             except Exception:
                 db.rollback()
 
-        if not has_real_data:
-            if game_type in ("cs2", "valorant"):
-                mock = _mock_cs2_data(home_name, away_name, match.home_score, match.away_score, match_id, status=match.status, current_state=match.current_state_json)
-                maps_data = mock["maps"]
-                veto_data = mock["veto"]
-                players_home = mock["players_home"]
-                players_away = mock["players_away"]
-                cs2_econ_home = [m.economy_a for m in maps_data if m.economy_a]
-                cs2_econ_away = [m.economy_b for m in maps_data if m.economy_b]
-                cs2_util_home = mock["utility_home"]
-                cs2_util_away = mock["utility_away"]
-                cs2_open_home = mock["opening_home"]
-                cs2_open_away = mock["opening_away"]
-            else:
-                mock = _mock_lol_data(home_name, away_name, match.home_score, match.away_score, match_id)
-                games_data = mock["games"]
-                players_home = mock["players_home"]
-                players_away = mock["players_away"]
-                lol_comp_home = mock.get("comp_home")
-                lol_comp_away = mock.get("comp_away")
-                lol_obj_home = mock.get("obj_home")
-                lol_obj_away = mock.get("obj_away")
+        # No mock fallback — leave all lists empty when real data is unavailable
 
         # Betting lines
         p_h = probabilities.home_win if probabilities else 0.5

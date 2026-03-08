@@ -378,6 +378,37 @@ def _mock_elo_panel(
     )
 
 
+def _adv_from_stats(row: "BasketballTeamMatchStats", team_name: str) -> BasketballAdvancedStatsOut:
+    """Build advanced stats from real DB row; compute eFG% and TS% from box score."""
+    fga = row.fg_attempted or 0
+    fg3m = row.fg3_made or 0
+    fta = row.ft_attempted or 0
+    pts = row.points or 0
+    tov = row.turnovers or 0
+    fg3a = row.fg3_attempted or 0
+
+    efg = round((( row.fg_made or 0) + 0.5 * fg3m) / fga, 3) if fga > 0 else None
+    ts = round(pts / (2 * (fga + 0.44 * fta)), 3) if (fga + 0.44 * fta) > 0 else None
+    tov_pct = round(tov / (fga + 0.44 * fta + tov) * 100, 1) if (fga + 0.44 * fta + tov) > 0 else None
+    ftr = round(fta / fga, 3) if fga > 0 else None
+    three_par = round(fg3a / fga, 3) if fga > 0 else None
+
+    return BasketballAdvancedStatsOut(
+        team_id=row.team_id,
+        team_name=team_name,
+        is_home=row.is_home,
+        ortg=row.offensive_rating,
+        drtg=row.defensive_rating,
+        net_rtg=row.net_rating,
+        pace=row.pace,
+        efg_pct=efg,
+        ts_pct=ts,
+        tov_pct=tov_pct,
+        ftr=ftr,
+        three_par=three_par,
+    )
+
+
 def _box_from_stats(row: "BasketballTeamMatchStats", team_name: str, db: Session | None = None) -> BasketballTeamBoxScore:
     """Build a team box score from real DB stats, including player rows when available."""
     players = []
@@ -504,6 +535,8 @@ def _mock_basketball_detail(
     elo_away = _mock_elo_panel(match.away_team_id, away_name, r_away, seed + 5, False, r_home)
 
     # Box scores: real DB stats if available, otherwise mock
+    stats_home = None
+    stats_away = None
     if is_finished:
         stats_home = db.query(BasketballTeamMatchStats).filter_by(
             match_id=match.id, team_id=match.home_team_id
@@ -593,35 +626,43 @@ def _mock_basketball_detail(
             away_streak=f"W{1 + (seed + 3) % 4}" if (seed + 3) % 2 == 0 else f"L{1 + (seed + 3) % 3}",
             home_home_record=f"{16 + seed % 12}-{6 + seed % 8}",
             away_away_record=f"{11 + (seed + 5) % 12}-{9 + (seed + 5) % 10}",
-            referee_crew=_mock_referee_bball(match.id).names,
+            referee_crew=[],
             overtime_periods=0,
         ),
         form_home=_build_basketball_form(match.home_team_id, home_name, home_form_records, home_summary, seed),
         form_away=_build_basketball_form(match.away_team_id, away_name, away_form_records, away_summary, seed + 11),
         box_home=box_home,
         box_away=box_away,
-        adv_home=_mock_adv_stats(match.home_team_id, home_name, True, seed),
-        adv_away=_mock_adv_stats(match.away_team_id, away_name, False, seed + 5),
-        injuries_home=_mock_injuries(seed, True),
-        injuries_away=_mock_injuries(seed + 3, False),
-        shots_home=_mock_shots(seed),
-        shots_away=_mock_shots(seed + 9),
+        adv_home=(
+            _adv_from_stats(stats_home, home_name) if is_finished and stats_home
+            else _mock_adv_stats(match.home_team_id, home_name, True, seed) if not is_finished
+            else None
+        ),
+        adv_away=(
+            _adv_from_stats(stats_away, away_name) if is_finished and stats_away
+            else _mock_adv_stats(match.away_team_id, away_name, False, seed + 5) if not is_finished
+            else None
+        ),
+        injuries_home=[],
+        injuries_away=[],
+        shots_home=[],
+        shots_away=[],
         h2h=_h2h(db, match.home_team_id, match.away_team_id),
         context={"venue_name": "Crypto.com Arena", "attendance": 18997 + (seed % 500)},
         data_completeness={
-            "box_score": is_finished,
+            "box_score": is_finished and (stats_home is not None or stats_away is not None),
             "lineup": False,
             "shot_chart": False,
-            "advanced_stats": True,
+            "advanced_stats": is_finished and (stats_home is not None or stats_away is not None),
             "elo_ratings": True,
             "h2h": True,
         },
-        clutch_home=_mock_clutch_stats(match.id, match.home_team_id, home_name),
-        clutch_away=_mock_clutch_stats(match.id, match.away_team_id, away_name),
-        top_lineups_home=_mock_lineup_units(match.id, box_home, True),
-        top_lineups_away=_mock_lineup_units(match.id, box_away, False),
-        scoring_runs=_mock_scoring_runs(match.id),
-        referee=_mock_referee_bball(match.id),
+        clutch_home=None,
+        clutch_away=None,
+        top_lineups_home=[],
+        top_lineups_away=[],
+        scoring_runs=[],
+        referee=None,
         betting=_mock_betting_bball(match.id, p_home, p_away),
     )
 

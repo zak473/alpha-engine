@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ArrowUpRight, BarChart3, Flame, Plus, Radio, Sparkles, Star, Trophy, Users } from "lucide-react";
 import type { BettingFilter, BettingMatch, SportSlug } from "@/lib/betting-types";
 import { SPORT_CONFIG } from "@/lib/betting-types";
 import { cn } from "@/lib/utils";
+import type { PickOut, PicksStatsOut } from "@/lib/api";
+import { getPicksStats, getRecentWins } from "@/lib/api";
 
 const TIPSTERS = [
   { name: "Jack", specialty: "Soccer Specialist", winRate: 58, roi: 19.3, streak: 5, picks: 32 },
@@ -134,9 +137,25 @@ function TipsterCard({ tipster }: { tipster: (typeof TIPSTERS)[number] }) {
 }
 
 function PerformanceCard({ matches }: { matches: BettingMatch[] }) {
+  const [stats, setStats] = useState<PicksStatsOut | null>(null);
   const liveCount = matches.filter((m) => m.status === "live").length;
-  const finishedCount = matches.filter((m) => m.status === "finished").length;
-  const avgEdge = matches.length ? matches.reduce((sum, m) => sum + (m.edgePercent ?? 0), 0) / matches.length : 0;
+
+  useEffect(() => {
+    getPicksStats().then(setStats).catch(() => {});
+  }, []);
+
+  const rows: [string, string][] = stats
+    ? [
+        ["Record", `${stats.won}W – ${stats.lost}L`],
+        ["ROI", `${stats.roi >= 0 ? "+" : ""}${(stats.roi * 100).toFixed(1)}%`],
+        ["Win %", `${(stats.win_rate * 100).toFixed(0)}%`],
+      ]
+    : [
+        ["Record", "—"],
+        ["ROI", "—"],
+        ["Win %", "—"],
+      ];
+
   return (
     <div className="rounded-[28px] border p-5" style={{ background: "#ffffff", borderColor: "rgba(17,33,23,0.08)" }}>
       <div className="flex items-center gap-2 text-[#18211c]">
@@ -144,11 +163,7 @@ function PerformanceCard({ matches }: { matches: BettingMatch[] }) {
         <h3 className="text-[30px] font-semibold leading-none">Performance Snapshot</h3>
       </div>
       <div className="mt-5 space-y-4">
-        {[
-          ["Today's Record", `${Math.max(3, Math.round(liveCount * 0.4))} – ${Math.max(1, Math.round(liveCount * 0.18))}`],
-          ["7-Day ROI", `+${(avgEdge * 3.2).toFixed(1)}%`],
-          ["Win %", `${Math.min(78, Math.max(54, Math.round(55 + avgEdge * 2)))}%`],
-        ].map(([label, value]) => (
+        {rows.map(([label, value]) => (
           <div key={label} className="flex items-center justify-between border-b pb-3" style={{ borderColor: "rgba(17,33,23,0.07)" }}>
             <span className="text-sm text-[#677269]">{label}</span>
             <span className="text-2xl font-semibold text-[#18211c]">{value}</span>
@@ -158,14 +173,14 @@ function PerformanceCard({ matches }: { matches: BettingMatch[] }) {
 
       <div className="mt-5 rounded-[22px] bg-[#f5faf6] p-4">
         <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.18em] text-[#738076]">
-          <Radio size={14} /> Live picks
+          <Radio size={14} /> Tracked picks
         </div>
         <div className="mt-4 h-3 overflow-hidden rounded-full bg-[#dbe8de]">
-          <div className="h-full rounded-full bg-[#2edb6c]" style={{ width: `${Math.min(90, Math.max(25, liveCount * 3))}%` }} />
+          <div className="h-full rounded-full bg-[#2edb6c]" style={{ width: stats && stats.total > 0 ? `${Math.min(90, Math.round(stats.win_rate * 100))}%` : "0%" }} />
         </div>
         <div className="mt-3 flex items-center justify-between text-sm text-[#4d594f]">
           <span>{liveCount} live</span>
-          <span>{finishedCount} graded</span>
+          <span>{stats ? stats.settled : 0} graded</span>
         </div>
       </div>
     </div>
@@ -205,12 +220,12 @@ function TopPicksCard({ matches }: { matches: BettingMatch[] }) {
 }
 
 function LastWinningPicks() {
-  const items = [
-    ["Jack", "WIN", "+1.23"],
-    ["Mason", "WIN", "+1.48"],
-    ["Nisa", "WIN", "+1.63"],
-    ["Aise", "WIN", "+0.80"],
-  ] as const;
+  const [picks, setPicks] = useState<PickOut[]>([]);
+
+  useEffect(() => {
+    getRecentWins(5).then(setPicks).catch(() => {});
+  }, []);
+
   return (
     <div className="rounded-[28px] border p-5" style={{ background: "#ffffff", borderColor: "rgba(17,33,23,0.08)" }}>
       <div className="flex items-center gap-2 text-[#18211c]">
@@ -218,18 +233,22 @@ function LastWinningPicks() {
         <h3 className="text-[30px] font-semibold leading-none">Last 5 winning picks</h3>
       </div>
       <div className="mt-5 space-y-3">
-        {items.map(([name, status, units]) => (
-          <div key={name} className="flex items-center justify-between rounded-[18px] border px-4 py-3" style={{ borderColor: "rgba(17,33,23,0.07)", background: "#fbfcfb" }}>
-            <div>
-              <div className="text-sm font-semibold text-[#18211c]">{name}</div>
-              <div className="text-xs text-[#748076]">6FT · tracked on board</div>
+        {picks.length === 0 ? (
+          <p className="text-sm text-[#748076] text-center py-4">No winning picks tracked yet</p>
+        ) : (
+          picks.map((pick) => (
+            <div key={pick.id} className="flex items-center justify-between rounded-[18px] border px-4 py-3" style={{ borderColor: "rgba(17,33,23,0.07)", background: "#fbfcfb" }}>
+              <div className="min-w-0 flex-1 pr-3">
+                <div className="text-sm font-semibold text-[#18211c] truncate">{pick.selection_label}</div>
+                <div className="text-xs text-[#748076] truncate">{pick.match_label}</div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <div className="text-sm font-semibold text-[#166534]">WIN</div>
+                <div className="text-xs text-[#748076]">@{pick.odds.toFixed(2)}</div>
+              </div>
             </div>
-            <div className="text-right">
-              <div className="text-sm font-semibold text-[#166534]">{status}</div>
-              <div className="text-xs text-[#748076]">{units}</div>
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );

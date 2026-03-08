@@ -52,6 +52,42 @@ class BaseballTeamMatchStats(Base):
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class BaseballPlayerMatchStats(Base):
+    __tablename__ = "baseball_player_match_stats"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    match_id: Mapped[str] = mapped_column(String(36), ForeignKey("core_matches.id"), nullable=False)
+    team_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    is_home: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    player_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    player_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    position: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    batting_order: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    is_starter: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    hand: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+
+    # Game stats
+    at_bats: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    runs: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    hits: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    doubles: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    triples: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    home_runs: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    rbi: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    walks: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    strikeouts: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    stolen_bases: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    left_on_base: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    # Season stats (for context)
+    batting_avg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    obp: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    slg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    ops: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class EventContext(Base):
     __tablename__ = "event_context"
 

@@ -40,7 +40,7 @@ from api.sports.baseball.schemas import (
     UmpireOut,
 )
 from api.sports.base.queries import compute_team_form, form_summary
-from db.models.baseball import BaseballTeamMatchStats, EventContext
+from db.models.baseball import BaseballTeamMatchStats, BaseballPlayerMatchStats, EventContext
 from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, RatingEloTeam
 
 
@@ -557,13 +557,39 @@ def _mock_elo_panel(
     )
 
 
-def _batting_from_stats(row: "BaseballTeamMatchStats", team_name: str) -> BaseballTeamBattingOut:
-    """Build team batting from a real DB stats row (no per-batter breakdown)."""
+def _batting_from_stats(row: "BaseballTeamMatchStats", team_name: str, db=None) -> BaseballTeamBattingOut:
+    """Build team batting from real DB stats, including per-batter rows when available."""
+    batters = []
+    if db is not None:
+        player_rows = (
+            db.query(BaseballPlayerMatchStats)
+            .filter_by(match_id=row.match_id, team_id=row.team_id)
+            .order_by(BaseballPlayerMatchStats.batting_order)
+            .all()
+        )
+        for p in player_rows:
+            batters.append(BatterOut(
+                name=p.player_name,
+                position=p.position or "—",
+                batting_order=p.batting_order or 0,
+                hand=p.hand or "R",
+                batting_avg=p.batting_avg,
+                obp=p.obp,
+                slg=p.slg,
+                ops=p.ops,
+                at_bats=p.at_bats,
+                runs=p.runs,
+                hits=p.hits,
+                rbi=p.rbi,
+                walks=p.walks,
+                strikeouts=p.strikeouts,
+                home_runs=p.home_runs,
+            ))
     return BaseballTeamBattingOut(
         team_id=row.team_id,
         team_name=team_name,
         is_home=row.is_home,
-        batters=[],
+        batters=batters,
         total_runs=row.runs,
         total_hits=row.hits,
         total_hr=row.home_runs,
@@ -658,8 +684,8 @@ def _mock_baseball_detail(
     starter_away = (_starter_from_stats(stats_away_row) or _mock_starter("away", seed + 3, is_finished)) if is_finished else _mock_starter("away", seed + 3, False)
     bullpen_home = _mock_bullpen(match.home_team_id, home_name, True, seed, is_finished)
     bullpen_away = _mock_bullpen(match.away_team_id, away_name, False, seed + 7, is_finished)
-    batting_home = (_batting_from_stats(stats_home_row, home_name) if stats_home_row else _mock_batting(match.home_team_id, home_name, True, home_runs, seed))
-    batting_away = (_batting_from_stats(stats_away_row, away_name) if stats_away_row else _mock_batting(match.away_team_id, away_name, False, away_runs, seed + 3))
+    batting_home = (_batting_from_stats(stats_home_row, home_name, db) if stats_home_row else _mock_batting(match.home_team_id, home_name, True, home_runs, seed))
+    batting_away = (_batting_from_stats(stats_away_row, away_name, db) if stats_away_row else _mock_batting(match.away_team_id, away_name, False, away_runs, seed + 3))
 
     # Real form from CoreMatch
     home_form_records = compute_team_form(db, "baseball", match.home_team_id, limit=5)
@@ -759,19 +785,19 @@ def _mock_baseball_detail(
         h2h=_h2h(db, match.home_team_id, match.away_team_id),
         context={"venue_name": "Yankee Stadium", "attendance": 42000 + (seed % 8000)},
         data_completeness={
-            "box_score": is_finished,
-            "pitching_line": is_finished,
-            "batting_line": is_finished,
-            "inning_events": is_finished,
+            "box_score": is_finished and (stats_home_row is not None or stats_away_row is not None),
+            "pitching_line": is_finished and (stats_home_row is not None or stats_away_row is not None),
+            "batting_line": is_finished and (stats_home_row is not None or stats_away_row is not None),
+            "inning_events": innings is not None,
             "elo_ratings": True,
-            "weather": True,
+            "weather": False,
             "h2h": True,
         },
-        batted_ball_home=_mock_batted_ball(match.id, match.home_team_id, home_name, "home"),
-        batted_ball_away=_mock_batted_ball(match.id, match.away_team_id, away_name, "away"),
-        situational_home=_mock_situational(match.id, match.home_team_id, home_name, "home"),
-        situational_away=_mock_situational(match.id, match.away_team_id, away_name, "away"),
-        umpire=_mock_umpire(match.id),
+        batted_ball_home=None,
+        batted_ball_away=None,
+        situational_home=None,
+        situational_away=None,
+        umpire=None,
         betting={
             "home_ml": round(1 / p_home, 2) if p_home > 0 else None,
             "away_ml": round(1 / p_away, 2) if p_away > 0 else None,

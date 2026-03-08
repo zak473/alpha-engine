@@ -264,6 +264,23 @@ def picks_stats(
     )
 
 
+@router.get("/recent-wins", response_model=list[PickOut])
+def recent_wins(
+    limit: int = Query(5, le=20),
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user),
+):
+    """Last N winning picks for the dashboard."""
+    picks = (
+        db.query(TrackedPick)
+        .filter(TrackedPick.user_id == user_id, TrackedPick.outcome == "won")
+        .order_by(TrackedPick.settled_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [_pick_out(p) for p in picks]
+
+
 @router.delete("/{pick_id}", status_code=204)
 def delete_pick(
     pick_id: str,

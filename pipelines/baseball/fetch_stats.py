@@ -56,12 +56,13 @@ def fetch_all(days_back: int = 7, dry_run: bool = False) -> int:
     import json as _json
     import os
     from db.models.mvp import CoreMatch, CoreTeam
-    from db.models.baseball import BaseballTeamMatchStats, EventContext
+    from db.models.baseball import BaseballTeamMatchStats, BaseballPlayerMatchStats, EventContext
 
     dsn = os.environ.get("POSTGRES_DSN", "postgresql://postgres:postgres@postgres:5432/alpha_engine")
     engine = create_engine(dsn)
 
     with Session(engine) as session:
+        from db.models.baseball import BaseballPlayerMatchStats
         existing_match_ids = {
             row.match_id
             for row in session.query(BaseballTeamMatchStats.match_id).distinct()
@@ -224,6 +225,50 @@ def fetch_all(days_back: int = 7, dry_run: bool = False) -> int:
                     existing.double_plays = _int(fielding.get("doublePlays"))
 
                     total_upserted += 1
+
+                # Per-batter stats
+                if not dry_run:
+                    session.query(BaseballPlayerMatchStats).filter_by(match_id=matched_match.id).delete()
+                    for side, is_home, core_team_id in [
+                        ("home", True, matched_match.home_team_id),
+                        ("away", False, matched_match.away_team_id),
+                    ]:
+                        team_data = boxscore.get("teams", {}).get(side, {})
+                        players_dict = team_data.get("players", {})
+                        batters_order = team_data.get("battingOrder", [])
+                        for order_idx, pid in enumerate(batters_order):
+                            p_info = players_dict.get(f"ID{pid}", {})
+                            person = p_info.get("person", {})
+                            stats = p_info.get("stats", {}).get("batting", {})
+                            season_stats = p_info.get("seasonStats", {}).get("batting", {})
+                            pos = p_info.get("position", {}).get("abbreviation")
+                            if not person.get("fullName"):
+                                continue
+                            session.add(BaseballPlayerMatchStats(
+                                match_id=matched_match.id,
+                                team_id=core_team_id,
+                                is_home=is_home,
+                                player_id=str(pid),
+                                player_name=person.get("fullName", ""),
+                                position=pos,
+                                batting_order=order_idx + 1,
+                                is_starter=True,
+                                at_bats=_int(stats.get("atBats")),
+                                runs=_int(stats.get("runs")),
+                                hits=_int(stats.get("hits")),
+                                doubles=_int(stats.get("doubles")),
+                                triples=_int(stats.get("triples")),
+                                home_runs=_int(stats.get("homeRuns")),
+                                rbi=_int(stats.get("rbi")),
+                                walks=_int(stats.get("baseOnBalls")),
+                                strikeouts=_int(stats.get("strikeOuts")),
+                                stolen_bases=_int(stats.get("stolenBases")),
+                                left_on_base=_int(stats.get("leftOnBase")),
+                                batting_avg=_float(season_stats.get("avg")),
+                                obp=_float(season_stats.get("obp")),
+                                slg=_float(season_stats.get("slg")),
+                                ops=_float(season_stats.get("ops")),
+                            ))
 
                 session.commit()
 
