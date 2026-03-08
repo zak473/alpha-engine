@@ -1,0 +1,265 @@
+"""
+Fetch and store tennis player profiles from Jeff Sackmann's open-source datasets.
+
+Sources (no API key required):
+  https://github.com/JeffSackmann/tennis_atp  (ATP players + match history)
+  https://github.com/JeffSackmann/tennis_wta  (WTA players + match history)
+
+What this pipeline does:
+  1. Downloads atp_players.csv + wta_players.csv from GitHub raw URLs
+  2. Upserts TennisPlayerProfile rows with nationality, hand, dob, height
+  3. Computes career stats (titles, grand slams, W/L) from CoreMatch history in DB
+  4. Links profiles to CoreTeam records by normalized name matching
+
+Usage:
+    docker compose exec api python -m pipelines.tennis.fetch_player_profiles
+    docker compose exec api python -m pipelines.tennis.fetch_player_profiles --dry-run
+"""
+from __future__ import annotations
+
+import argparse
+import csv
+import io
+import logging
+import os
+import re
+import unicodedata
+from datetime import date, datetime, timezone
+from typing import Optional
+
+import httpx
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+
+log = logging.getLogger(__name__)
+
+ATP_PLAYERS_URL = "https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_players.csv"
+WTA_PLAYERS_URL = "https://raw.githubusercontent.com/JeffSackmann/tennis_wta/master/wta_players.csv"
+
+# Sackmann hand codes → readable
+_HAND_MAP = {"R": "Right-handed", "L": "Left-handed", "U": None, "A": None}
+
+
+def _normalize(name: str) -> str:
+    """Lowercase, strip accents, remove non-alpha characters for fuzzy matching."""
+    nfkd = unicodedata.normalize("NFKD", name)
+    ascii_name = nfkd.encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z]", "", ascii_name.lower())
+
+
+def _norm_full(first: str, last: str) -> str:
+    """Canonical form: lastnorm_firstnorm (e.g. djokovic_novak)."""
+    return f"{_normalize(last)}_{_normalize(first)}"
+
+
+def _parse_dob(dob_str: str) -> Optional[datetime]:
+    """Parse YYYYMMDD string to datetime."""
+    if not dob_str or len(dob_str) != 8:
+        return None
+    try:
+        return datetime(int(dob_str[:4]), int(dob_str[4:6]), int(dob_str[6:8]))
+    except ValueError:
+        return None
+
+
+def _fetch_csv(url: str) -> list[dict]:
+    """Download a CSV file and return as list of dicts."""
+    resp = httpx.get(url, timeout=30, follow_redirects=True)
+    resp.raise_for_status()
+    reader = csv.DictReader(io.StringIO(resp.text))
+    return list(reader)
+
+
+def _compute_career_stats(session: Session, player_id: str) -> dict:
+    """Compute career W/L, titles, grand slams from CoreMatch + TennisMatch history."""
+    from db.models.mvp import CoreMatch
+    from db.models.tennis import TennisMatch
+
+    matches = (
+        session.query(CoreMatch)
+        .filter(
+            CoreMatch.sport == "tennis",
+            CoreMatch.status == "finished",
+            (CoreMatch.home_team_id == player_id) | (CoreMatch.away_team_id == player_id),
+        )
+        .all()
+    )
+
+    wins = losses = 0
+    titles = grand_slams = 0
+    year_start = datetime(date.today().year, 1, 1)
+    season_wins = season_losses = 0
+
+    for m in matches:
+        is_home = m.home_team_id == player_id
+        won = (is_home and m.outcome in ("H", "home_win")) or \
+              (not is_home and m.outcome in ("A", "away_win"))
+        if won:
+            wins += 1
+        else:
+            losses += 1
+
+        # Season stats
+        if m.kickoff_utc and m.kickoff_utc.replace(tzinfo=None) >= year_start:
+            if won:
+                season_wins += 1
+            else:
+                season_losses += 1
+
+        # Title / grand slam (round_name = "F" = final)
+        if won:
+            tm = session.get(TennisMatch, m.id)
+            if tm and tm.round_name and tm.round_name.upper() in ("F", "FINAL"):
+                titles += 1
+                if tm.tournament_level == "grand_slam":
+                    grand_slams += 1
+
+    total = wins + losses
+    return {
+        "career_wins": wins,
+        "career_losses": losses,
+        "career_win_pct": round(wins / total, 3) if total > 0 else None,
+        "career_titles": titles,
+        "career_grand_slams": grand_slams,
+        "season_wins": season_wins,
+        "season_losses": season_losses,
+    }
+
+
+def run(dry_run: bool = False) -> int:
+    """Download player profiles and upsert into TennisPlayerProfile table."""
+    from db.models.mvp import CoreTeam
+    from db.models.tennis import TennisPlayerProfile
+
+    dsn = os.environ.get("POSTGRES_DSN", "postgresql://postgres:postgres@postgres:5432/alpha_engine")
+    engine = create_engine(dsn)
+
+    # Download both CSVs
+    all_players: list[dict] = []
+    for url, tour in [(ATP_PLAYERS_URL, "atp"), (WTA_PLAYERS_URL, "wta")]:
+        try:
+            rows = _fetch_csv(url)
+            for r in rows:
+                r["_tour"] = tour
+            all_players.extend(rows)
+            log.info("Fetched %d %s players from Sackmann dataset", len(rows), tour.upper())
+        except Exception as exc:
+            log.warning("Failed to fetch %s players: %s", tour.upper(), exc)
+
+    if not all_players:
+        log.error("No player data fetched")
+        return 0
+
+    upserted = linked = 0
+
+    with Session(engine) as session:
+        # Build a name→CoreTeam.id index for fast matching
+        teams = session.query(CoreTeam).filter(CoreTeam.sport == "tennis").all()
+        team_by_norm: dict[str, str] = {}
+        for t in teams:
+            # Try "last_first" and "first_last" patterns
+            parts = t.name.strip().split()
+            if len(parts) >= 2:
+                # "Novak Djokovic" → djokovic_novak
+                first, last = parts[0], parts[-1]
+                team_by_norm[f"{_normalize(last)}_{_normalize(first)}"] = t.id
+                team_by_norm[f"{_normalize(first)}_{_normalize(last)}"] = t.id
+            # full name normalized
+            team_by_norm[_normalize(t.name)] = t.id
+
+        for row in all_players:
+            name_first = (row.get("name_first") or "").strip()
+            name_last = (row.get("name_last") or "").strip()
+            if not name_first or not name_last:
+                continue
+
+            atp_id = str(row.get("player_id") or "").strip()
+            hand_raw = (row.get("hand") or "").strip().upper()
+            hand = _HAND_MAP.get(hand_raw)
+            dob = _parse_dob((row.get("dob") or "").strip())
+            height_raw = (row.get("height") or "").strip()
+            height_cm = int(height_raw) if height_raw.isdigit() else None
+            nationality = (row.get("country_code") or "").strip().upper() or None
+
+            name_norm = _norm_full(name_first, name_last)
+
+            # Try to find existing profile
+            prof = session.query(TennisPlayerProfile).filter_by(name_normalized=name_norm).first()
+            if prof is None and atp_id:
+                prof = session.query(TennisPlayerProfile).filter_by(atp_id=atp_id).first()
+
+            if prof is None:
+                prof = TennisPlayerProfile(
+                    atp_id=atp_id,
+                    name_first=name_first,
+                    name_last=name_last,
+                    name_normalized=name_norm,
+                )
+                session.add(prof)
+
+            prof.atp_id = atp_id
+            prof.name_first = name_first
+            prof.name_last = name_last
+            prof.name_normalized = name_norm
+            prof.nationality = nationality
+            if hand:
+                prof.hand = hand
+            if dob:
+                prof.dob = dob
+            if height_cm:
+                prof.height_cm = height_cm
+
+            # Link to CoreTeam if not already linked
+            if prof.player_id is None:
+                matched_id = (
+                    team_by_norm.get(name_norm) or
+                    team_by_norm.get(f"{_normalize(name_last)}_{_normalize(name_first)}") or
+                    team_by_norm.get(_normalize(f"{name_first} {name_last}"))
+                )
+                if matched_id:
+                    # Check no other profile already claims this player_id
+                    existing = session.query(TennisPlayerProfile).filter_by(player_id=matched_id).first()
+                    if existing is None or existing.name_normalized == name_norm:
+                        prof.player_id = matched_id
+                        linked += 1
+
+            upserted += 1
+
+        if not dry_run:
+            session.flush()
+            log.info("Flushed %d profiles (%d linked to CoreTeam). Computing career stats...", upserted, linked)
+
+            # Second pass: compute career stats for linked profiles
+            linked_profiles = session.query(TennisPlayerProfile).filter(
+                TennisPlayerProfile.player_id.isnot(None)
+            ).all()
+            for prof in linked_profiles:
+                stats = _compute_career_stats(session, prof.player_id)
+                prof.career_wins = stats["career_wins"]
+                prof.career_losses = stats["career_losses"]
+                prof.career_win_pct = stats["career_win_pct"]
+                prof.career_titles = stats["career_titles"]
+                prof.career_grand_slams = stats["career_grand_slams"]
+                prof.season_wins = stats["season_wins"]
+                prof.season_losses = stats["season_losses"]
+
+            session.commit()
+            log.info("fetch_player_profiles: upserted %d, linked %d, career stats updated for %d.",
+                     upserted, linked, len(linked_profiles))
+        else:
+            log.info("[dry-run] Would upsert %d profiles, link %d", upserted, linked)
+
+    return upserted
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Fetch tennis player profiles from Jeff Sackmann dataset")
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
+    n = run(dry_run=args.dry_run)
+    print(f"Processed {n} player profiles.")
+
+
+if __name__ == "__main__":
+    main()

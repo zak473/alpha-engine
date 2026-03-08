@@ -228,6 +228,18 @@ def _job_fetch_stats() -> None:
     log.info("[scheduler] fetch_stats done.")
 
 
+def _job_fetch_player_profiles() -> None:
+    """Refresh tennis player profiles from Jeff Sackmann dataset (no API key needed)."""
+    log.info("[scheduler] Starting fetch_player_profiles job ...")
+    try:
+        from pipelines.tennis.fetch_player_profiles import run as fetch_profiles
+        n = fetch_profiles()
+        log.info("[scheduler] tennis player profiles: %d upserted.", n)
+    except Exception as exc:
+        log.error("[scheduler] fetch_player_profiles failed: %s", exc, exc_info=True)
+    log.info("[scheduler] fetch_player_profiles done.")
+
+
 # ---------------------------------------------------------------------------
 # Scheduler lifecycle
 # ---------------------------------------------------------------------------
@@ -299,8 +311,17 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
+    # Tennis player profiles refresh (weekly, Sunday 4 AM UTC)
+    _scheduler.add_job(
+        _job_fetch_player_profiles,
+        trigger=CronTrigger(day_of_week="sun", hour=4, minute=0, timezone="UTC"),
+        id="fetch_player_profiles",
+        name="Tennis player profiles from Sackmann dataset",
+        replace_existing=True,
+    )
+
     _scheduler.start()
-    log.info("[scheduler] Started. Jobs: expire_stale (5m), fetch_live (30m), fetch_odds (30m), predict_only (1h), fetch_stats (6h), update_elo (nightly 03:00 UTC).")
+    log.info("[scheduler] Started. Jobs: expire_stale (5m), fetch_live (30m), fetch_odds (30m), predict_only (1h), fetch_stats (6h), update_elo (nightly 03:00 UTC), fetch_player_profiles (weekly).")
     return _scheduler
 
 

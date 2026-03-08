@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException
@@ -38,163 +39,294 @@ from db.models.mvp import (
     PredMatch,
     RatingEloTeam,
 )
-from db.models.tennis import TennisMatch, TennisMatchStats, TennisPlayerForm
+from db.models.tennis import TennisMatch, TennisMatchStats, TennisPlayerForm, TennisPlayerProfile
 
 
-# ─── Mock helpers ──────────────────────────────────────────────────────────────
+# ─── Real tournament metadata lookups ─────────────────────────────────────────
 
-_PLAYER_PROFILES = {
-    "home": {
-        "nationality": "Serbian", "plays": "Right-handed", "backhand": "Two-handed",
-        "age": 36, "ranking": 1, "ranking_points": 11245, "height_cm": 188, "weight_kg": 80,
-        "coach": "Goran Ivanisevic", "career_titles": 98, "career_grand_slams": 24,
-        "turned_pro": 2003, "career_win_pct": 0.833, "highest_ranking": 1,
-    },
-    "away": {
-        "nationality": "Spanish", "plays": "Left-handed", "backhand": "Two-handed",
-        "age": 37, "ranking": 12, "ranking_points": 3010, "height_cm": 185, "weight_kg": 85,
-        "coach": "Carlos Moyá", "career_titles": 22, "career_grand_slams": 14,
-        "turned_pro": 2001, "career_win_pct": 0.830, "highest_ranking": 1,
-    },
+# Official ATP/WTA prize money by tournament level (2024/25 season)
+_PRIZE_BY_LEVEL: dict[str, int] = {
+    "grand_slam": 65_000_000,
+    "atp_finals": 15_250_000,
+    "wta_finals": 15_250_000,
+    "masters":     8_995_200,
+    "wta1000":     8_995_200,
+    "atp500":      2_098_620,
+    "wta500":      2_098_620,
+    "atp250":        661_825,
+    "wta250":        275_640,
+    "challenger":    132_000,
+    "itf":            15_000,
 }
 
-_NATIONALITIES = ["Serbian", "Spanish", "Russian", "German", "Italian", "British",
-                  "Australian", "American", "Greek", "Norwegian", "Danish", "Croatian"]
-_COACHES = ["Ivan Lendl", "Stefan Edberg", "Boris Becker", "Brad Gilbert",
-            "Carlos Moyá", "John McEnroe", "Gilles Cervara", "Severin Lüthi"]
-_BALLS = ["Wilson", "Penn", "Slazenger", "Dunlop", "Babolat"]
-_PRIZE_POOLS = [250_000, 500_000, 1_000_000, 2_000_000, 6_000_000, 8_500_000, 14_600_000]
-_RANKING_POINTS = [0, 10, 20, 45, 90, 180, 360, 720, 1200, 2000]
+# Official ATP singles ranking points for champion
+_POINTS_BY_LEVEL: dict[str, int] = {
+    "grand_slam":  2000,
+    "atp_finals":  1500,
+    "wta_finals":  1500,
+    "masters":     1000,
+    "wta1000":      900,
+    "atp500":       500,
+    "wta500":       430,
+    "atp250":       250,
+    "wta250":       280,
+    "challenger":    80,
+    "itf":           10,
+}
+
+# ITF/Tennis Abstract court speed index (0–100, higher = faster)
+_COURT_SPEED_BY_NAME: dict[str, float] = {
+    "Australian Open": 55.0, "Roland Garros": 25.0, "Wimbledon": 78.0,
+    "US Open": 58.0, "Indian Wells": 50.0, "Miami": 52.0,
+    "Monte Carlo": 22.0, "Madrid": 35.0, "Rome": 28.0,
+    "Canadian Open": 48.0, "Toronto": 48.0, "Montreal": 48.0,
+    "Cincinnati": 51.0, "Shanghai": 50.0, "Paris": 45.0,
+    "Vienna": 45.0, "Basel": 43.0, "Tokyo": 52.0,
+    "Doha": 48.0, "Dubai": 52.0, "Acapulco": 32.0,
+    "Halle": 74.0, "Queen's Club": 72.0, "'s-Hertogenbosch": 70.0,
+}
+_SPEED_BY_SURFACE: dict[str, float] = {
+    "clay": 28.0, "grass": 74.0, "hard": 52.0, "carpet": 55.0
+}
+
+# Official ball supplier per tournament
+_BALLS_BY_NAME: dict[str, str] = {
+    "Australian Open": "Dunlop", "Roland Garros": "Babolat",
+    "Wimbledon": "Slazenger", "US Open": "Wilson",
+    "Indian Wells": "Wilson", "Miami": "Penn",
+    "Monte Carlo": "Babolat", "Madrid": "Babolat", "Rome": "Babolat",
+    "Canadian Open": "Wilson", "Toronto": "Wilson", "Montreal": "Wilson",
+    "Cincinnati": "Penn", "Shanghai": "Wilson", "Paris": "Wilson",
+    "Vienna": "Head", "Basel": "Head", "Tokyo": "Wilson",
+    "Doha": "Wilson", "Dubai": "Wilson", "Halle": "Dunlop",
+    "Queen's Club": "Dunlop", "Acapulco": "Babolat",
+}
+_BALLS_BY_SURFACE: dict[str, str] = {
+    "clay": "Babolat", "grass": "Slazenger", "hard": "Wilson", "carpet": "Penn"
+}
+
+_DRAW_BY_LEVEL: dict[str, int] = {
+    "grand_slam": 128, "atp_finals": 8, "wta_finals": 8,
+    "masters": 64, "wta1000": 64,
+    "atp500": 48, "wta500": 56,
+    "atp250": 32, "wta250": 32,
+    "challenger": 32, "itf": 16,
+}
 
 
-def _mock_player_profile(match_id: str, player_id: str, player_name: str, side: str) -> TennisPlayerProfileOut:
-    seed = sum(ord(c) for c in match_id + side) % 100
-    rng = __import__("random").Random(seed)
-    base = _PLAYER_PROFILES.get(side, {})
-    ranking = base.get("ranking") or rng.randint(1, 200)
-    s_wins = rng.randint(10, 55)
-    s_losses = rng.randint(2, 25)
+def _enrich_match_info(info: TennisMatchInfoOut, league_name: str) -> TennisMatchInfoOut:
+    """Replace mock tournament metadata with real lookup-table values."""
+    if info is None:
+        return None
+    level = info.tournament_level or "atp250"
+    info.tournament_prize_pool_usd = _PRIZE_BY_LEVEL.get(level)
+    info.points_on_offer = _POINTS_BY_LEVEL.get(level)
+    info.draw_size = _DRAW_BY_LEVEL.get(level, 32)
+
+    # Balls: match tournament name against lookup, fallback to surface
+    balls = None
+    for t_name, brand in _BALLS_BY_NAME.items():
+        if t_name.lower() in league_name.lower():
+            balls = brand
+            break
+    info.balls_brand = balls or _BALLS_BY_SURFACE.get(info.surface or "hard", "Wilson")
+
+    # Court speed: match tournament name, fallback to surface
+    speed = None
+    for t_name, spd in _COURT_SPEED_BY_NAME.items():
+        if t_name.lower() in league_name.lower():
+            speed = spd
+            break
+    info.court_speed_index = speed or _SPEED_BY_SURFACE.get(info.surface or "hard", 52.0)
+
+    return info
+
+
+def _real_player_profile(
+    db: Session, player_id: str, player_name: str
+) -> TennisPlayerProfileOut:
+    """Fetch real player profile from TennisPlayerProfile table."""
+    import re
+    import unicodedata
+
+    def _norm(s: str) -> str:
+        nfkd = unicodedata.normalize("NFKD", s)
+        return re.sub(r"[^a-z]", "", nfkd.encode("ascii", "ignore").decode("ascii").lower())
+
+    prof = db.query(TennisPlayerProfile).filter_by(player_id=player_id).first()
+    if prof is None:
+        # Try name-based lookup
+        parts = player_name.strip().split()
+        if len(parts) >= 2:
+            first, last = parts[0], parts[-1]
+            norm = f"{_norm(last)}_{_norm(first)}"
+            prof = db.query(TennisPlayerProfile).filter_by(name_normalized=norm).first()
+
+    if prof is None:
+        return TennisPlayerProfileOut(player_id=player_id, player_name=player_name)
+
+    age = None
+    if prof.dob:
+        from datetime import date as _date
+        today = _date.today()
+        age = today.year - prof.dob.year - (
+            (today.month, today.day) < (prof.dob.month, prof.dob.day)
+        )
+
     return TennisPlayerProfileOut(
-        player_id=player_id, player_name=player_name,
-        nationality=base.get("nationality") or rng.choice(_NATIONALITIES),
-        age=base.get("age") or rng.randint(19, 38),
-        ranking=ranking,
-        ranking_points=base.get("ranking_points") or rng.randint(200, 11000),
-        ranking_change_week=rng.randint(-15, 15),
-        prize_money_ytd_usd=rng.randint(80_000, 4_500_000),
-        career_prize_money_usd=rng.randint(1_000_000, 120_000_000),
-        plays=base.get("plays") or rng.choice(["Right-handed", "Left-handed"]),
-        backhand=base.get("backhand") or rng.choice(["Two-handed", "One-handed"]),
-        turned_pro=base.get("turned_pro") or rng.randint(2000, 2018),
-        height_cm=base.get("height_cm") or rng.randint(175, 200),
-        weight_kg=base.get("weight_kg") or rng.randint(70, 95),
-        coach=base.get("coach") or rng.choice(_COACHES),
-        career_titles=base.get("career_titles") or rng.randint(0, 30),
-        career_grand_slams=base.get("career_grand_slams") or rng.randint(0, 4),
-        career_win_pct=base.get("career_win_pct") or round(rng.uniform(0.55, 0.82), 3),
-        season_wins=s_wins, season_losses=s_losses,
-        highest_ranking=base.get("highest_ranking") or rng.randint(1, ranking),
+        player_id=player_id,
+        player_name=player_name,
+        nationality=prof.nationality,
+        age=age,
+        height_cm=prof.height_cm,
+        plays=prof.hand,
+        turned_pro=prof.turned_pro,
+        career_titles=prof.career_titles,
+        career_grand_slams=prof.career_grand_slams,
+        career_win_pct=prof.career_win_pct,
+        season_wins=prof.season_wins,
+        season_losses=prof.season_losses,
     )
 
 
-def _mock_tiebreaks(match_id: str, sets_detail: list) -> TennisTiebreakOut:
-    seed = sum(ord(c) for c in match_id + "tb") % 100
-    rng = __import__("random").Random(seed)
+def _compute_extended_form(
+    form: TennisPlayerFormOut, db: Session, player_id: str, surface: str | None
+) -> TennisPlayerFormOut:
+    """Compute surface-specific stats, tiebreaks, titles, duration from DB history."""
+    if form is None:
+        return None
+
+    from datetime import date as _date, timedelta
+
+    year_start = datetime(_date.today().year, 1, 1, tzinfo=timezone.utc)
+
+    # Surface-specific win% — read from pre-computed TennisPlayerForm rows
+    for surf in ("hard", "clay", "grass"):
+        surf_row = (
+            db.query(TennisPlayerForm)
+            .filter_by(player_id=player_id, surface=surf, window_days=365)
+            .order_by(TennisPlayerForm.as_of_date.desc())
+            .first()
+        )
+        if surf_row and surf_row.win_pct is not None:
+            setattr(form, f"win_pct_{surf}", surf_row.win_pct)
+
+    # Historical TennisMatch rows for tiebreaks, duration, three-setters
+    hist_tm = (
+        db.query(TennisMatch)
+        .join(CoreMatch, CoreMatch.id == TennisMatch.match_id)
+        .filter(
+            CoreMatch.sport == "tennis",
+            CoreMatch.status == "finished",
+            (CoreMatch.home_team_id == player_id) | (CoreMatch.away_team_id == player_id),
+            TennisMatch.sets_json.isnot(None),
+        )
+        .limit(100)
+        .all()
+    )
+
+    tb_played = tb_won = 0
+    durations: list[float] = []
+    three_set_count = 0
+
+    for tm in hist_tm:
+        m = db.get(CoreMatch, tm.match_id)
+        if not m:
+            continue
+        is_player_a = m.home_team_id == player_id
+
+        if tm.match_duration_min:
+            durations.append(float(tm.match_duration_min))
+
+        try:
+            sets = json.loads(tm.sets_json) if isinstance(tm.sets_json, str) else (tm.sets_json or [])
+            if len(sets) >= 3:
+                three_set_count += 1
+            for s in sets:
+                a_g = s.get("a", 0)
+                b_g = s.get("b", 0)
+                if a_g == 7 or b_g == 7:
+                    tb_played += 1
+                    if (is_player_a and a_g == 7) or (not is_player_a and b_g == 7):
+                        tb_won += 1
+        except Exception:
+            pass
+
+    if tb_played > 0:
+        form.tiebreaks_played = tb_played
+        form.tiebreaks_won = tb_won
+        form.tiebreak_win_pct = round(tb_won / tb_played, 3)
+
+    if durations:
+        form.avg_match_duration_min = round(sum(durations) / len(durations), 1)
+
+    if hist_tm:
+        form.three_setters_pct = round(three_set_count / len(hist_tm), 3)
+
+    # Titles/finals YTD
+    ytd_matches = (
+        db.query(CoreMatch)
+        .join(TennisMatch, TennisMatch.match_id == CoreMatch.id)
+        .filter(
+            CoreMatch.sport == "tennis",
+            CoreMatch.status == "finished",
+            CoreMatch.kickoff_utc >= year_start,
+            TennisMatch.round_name.in_(("F", "Final")),
+            (CoreMatch.home_team_id == player_id) | (CoreMatch.away_team_id == player_id),
+        )
+        .all()
+    )
+    titles = sum(
+        1 for m in ytd_matches
+        if (m.home_team_id == player_id and m.outcome in ("H", "home_win")) or
+           (m.away_team_id == player_id and m.outcome in ("A", "away_win"))
+    )
+    form.titles_ytd = titles
+    form.finals_ytd = len(ytd_matches)
+
+    # Ranking trend: ELO change over last 28 days (positive = rising)
+    recent_elos = (
+        db.query(RatingEloTeam)
+        .filter(RatingEloTeam.team_id == player_id, RatingEloTeam.context == "global")
+        .order_by(RatingEloTeam.rated_at.desc())
+        .limit(10)
+        .all()
+    )
+    if len(recent_elos) >= 2:
+        form.ranking_trend = round(recent_elos[0].rating_after - recent_elos[-1].rating_after)
+
+    return form
+
+
+def _real_tiebreaks(sets_detail: list) -> TennisTiebreakOut:
+    """Extract tiebreak data from sets_detail using real tb_a/tb_b values."""
     tbs = []
     a_won = b_won = 0
     for s in (sets_detail or []):
-        # tiebreak happened if both players won 6 games
-        a_games = getattr(s, "a", None) or s.get("a", 0) if hasattr(s, "get") else getattr(s, "a", 0)
-        b_games = getattr(s, "b", None) or s.get("b", 0) if hasattr(s, "get") else getattr(s, "b", 0)
-        set_num = getattr(s, "set_num", None) or s.get("set_num", 1) if hasattr(s, "get") else getattr(s, "set_num", 1)
-        if a_games == 7 or b_games == 7:
-            winner = "a" if a_games > b_games else "b"
+        a_g = getattr(s, "a", None) if not hasattr(s, "get") else s.get("a", 0)
+        b_g = getattr(s, "b", None) if not hasattr(s, "get") else s.get("b", 0)
+        set_num = getattr(s, "set_num", 1) if not hasattr(s, "get") else s.get("set_num", 1)
+        tb_a = getattr(s, "tb_a", None) if not hasattr(s, "get") else s.get("tb_a")
+        tb_b = getattr(s, "tb_b", None) if not hasattr(s, "get") else s.get("tb_b")
+
+        if (a_g or 0) == 7 or (b_g or 0) == 7:
+            winner = "a" if (a_g or 0) > (b_g or 0) else "b"
             if winner == "a":
                 a_won += 1
-                score_a, score_b = rng.randint(7, 10), rng.randint(3, 6)
             else:
                 b_won += 1
-                score_b, score_a = rng.randint(7, 10), rng.randint(3, 6)
-            tbs.append({"set_num": set_num, "score_a": score_a, "score_b": score_b, "winner": winner})
+            tbs.append({
+                "set_num": set_num,
+                "score_a": tb_a,   # None when not yet stored from api-tennis
+                "score_b": tb_b,
+                "winner": winner,
+            })
+
     return TennisTiebreakOut(
         player_a_tiebreaks_won=a_won,
         player_b_tiebreaks_won=b_won,
         tiebreaks=tbs,
     )
-
-
-def _enhance_serve_stats(stats: TennisServeStatsOut, match_id: str, side: str) -> TennisServeStatsOut:
-    """Add extended serve/rally stats to an existing stats object."""
-    if stats is None:
-        return None
-    seed = sum(ord(c) for c in match_id + side + "srv") % 100
-    rng = __import__("random").Random(seed)
-    # Serve speeds depend on surface
-    fs_avg = round(rng.uniform(170, 195), 1)
-    fs_max = round(fs_avg + rng.uniform(8, 20), 1)
-    ss_avg = round(rng.uniform(135, 160), 1)
-    winners = rng.randint(12, 45)
-    ue = rng.randint(8, 38)
-    net_app = rng.randint(5, 35)
-    net_won = rng.randint(int(net_app * 0.45), int(net_app * 0.80))
-    svc_pts = rng.randint(50, 90)
-    svc_won = rng.randint(int(svc_pts * 0.55), int(svc_pts * 0.72))
-    ret_pts = rng.randint(50, 90)
-    ret_won = rng.randint(int(ret_pts * 0.28), int(ret_pts * 0.45))
-    stats.first_serve_avg_mph = fs_avg
-    stats.first_serve_max_mph = fs_max
-    stats.second_serve_avg_mph = ss_avg
-    stats.winners = winners
-    stats.unforced_errors = ue
-    stats.forced_errors = rng.randint(4, 20)
-    stats.winner_ue_ratio = round(winners / ue, 2) if ue > 0 else None
-    stats.net_approaches = net_app
-    stats.net_points_won = net_won
-    stats.net_win_pct = round(net_won / net_app, 3) if net_app > 0 else None
-    stats.rally_0_4_won_pct = round(rng.uniform(0.45, 0.65), 3)
-    stats.rally_5_8_won_pct = round(rng.uniform(0.40, 0.60), 3)
-    stats.rally_9plus_won_pct = round(rng.uniform(0.35, 0.60), 3)
-    stats.service_points_played = svc_pts
-    stats.service_points_won = svc_won
-    stats.return_points_played = ret_pts
-    stats.return_points_won = ret_won
-    stats.total_points_played = svc_pts + ret_pts
-    stats.total_points_won = svc_won + ret_won
-    return stats
-
-
-def _enhance_player_form(form: TennisPlayerFormOut, match_id: str, side: str) -> TennisPlayerFormOut:
-    if form is None:
-        return None
-    seed = sum(ord(c) for c in match_id + side + "form") % 100
-    rng = __import__("random").Random(seed)
-    tb_played = rng.randint(2, 18)
-    tb_won = rng.randint(1, tb_played)
-    form.win_pct_hard = round(rng.uniform(0.50, 0.85), 3)
-    form.win_pct_clay = round(rng.uniform(0.45, 0.82), 3)
-    form.win_pct_grass = round(rng.uniform(0.42, 0.78), 3)
-    form.tiebreaks_played = tb_played
-    form.tiebreaks_won = tb_won
-    form.tiebreak_win_pct = round(tb_won / tb_played, 3)
-    form.titles_ytd = rng.randint(0, 4)
-    form.finals_ytd = form.titles_ytd + rng.randint(0, 3)
-    form.ranking_trend = rng.randint(-30, 30)
-    form.avg_match_duration_min = round(rng.uniform(70, 160), 1)
-    form.three_setters_pct = round(rng.uniform(0.20, 0.55), 3)
-    return form
-
-
-def _enhance_match_info(info: TennisMatchInfoOut, match_id: str) -> TennisMatchInfoOut:
-    if info is None:
-        return None
-    seed = sum(ord(c) for c in match_id + "info") % 100
-    rng = __import__("random").Random(seed)
-    info.tournament_prize_pool_usd = _PRIZE_POOLS[seed % len(_PRIZE_POOLS)]
-    info.points_on_offer = _RANKING_POINTS[min(seed % 10, len(_RANKING_POINTS) - 1)]
-    info.draw_size = rng.choice([32, 64, 128])
-    info.balls_brand = rng.choice(_BALLS)
-    info.court_speed_index = round(rng.uniform(20, 80), 1)
-    return info
 
 
 # ─── DB helpers ───────────────────────────────────────────────────────────────
@@ -342,6 +474,18 @@ def _match_stats(db: Session, match_id: str, player_id: str, player_name: str) -
             first_serve_return_won_pct=row.first_serve_return_won_pct,
             second_serve_return_won_pct=row.second_serve_return_won_pct,
             total_points_won=row.total_points_won,
+            first_serve_avg_mph=row.first_serve_avg_mph,
+            first_serve_max_mph=row.first_serve_max_mph,
+            second_serve_avg_mph=row.second_serve_avg_mph,
+            winners=row.winners,
+            unforced_errors=row.unforced_errors,
+            forced_errors=row.forced_errors,
+            net_approaches=row.net_approaches,
+            net_points_won=row.net_points_won,
+            service_points_played=row.service_points_played,
+            service_points_won=row.service_points_won,
+            return_points_played=row.return_points_played,
+            return_points_won=row.return_points_won,
         )
     except Exception:
         return None
@@ -580,28 +724,54 @@ class TennisMatchService(BaseMatchListService):
                 n_train_samples=live_registry.n_train_samples,
             )
 
-        # Build stats + form, then enhance with mock extended data
+        # Serve/return stats — real from DB, extended fields populated by fetch_api_tennis
         stats_home = _match_stats(db, match_id, match.home_team_id, home_name)
         stats_away = _match_stats(db, match_id, match.away_team_id, away_name)
-        stats_home = _enhance_serve_stats(stats_home, match_id, "home")
-        stats_away = _enhance_serve_stats(stats_away, match_id, "away")
+        # Derive computed fields from raw DB values
+        if stats_home:
+            if stats_home.winners is not None and stats_home.unforced_errors:
+                stats_home.winner_ue_ratio = round(
+                    stats_home.winners / stats_home.unforced_errors, 2
+                ) if stats_home.unforced_errors > 0 else None
+            if stats_home.net_approaches and stats_home.net_points_won is not None:
+                stats_home.net_win_pct = round(
+                    stats_home.net_points_won / stats_home.net_approaches, 3
+                ) if stats_home.net_approaches > 0 else None
+            if stats_home.service_points_played and stats_home.return_points_played:
+                stats_home.total_points_played = (
+                    stats_home.service_points_played + stats_home.return_points_played
+                )
+        if stats_away:
+            if stats_away.winners is not None and stats_away.unforced_errors:
+                stats_away.winner_ue_ratio = round(
+                    stats_away.winners / stats_away.unforced_errors, 2
+                ) if stats_away.unforced_errors > 0 else None
+            if stats_away.net_approaches and stats_away.net_points_won is not None:
+                stats_away.net_win_pct = round(
+                    stats_away.net_points_won / stats_away.net_approaches, 3
+                ) if stats_away.net_approaches > 0 else None
+            if stats_away.service_points_played and stats_away.return_points_played:
+                stats_away.total_points_played = (
+                    stats_away.service_points_played + stats_away.return_points_played
+                )
 
+        # Player form — real from DB; extended fields computed from history
         form_home = _player_form(db, match.home_team_id, home_name, surface)
         form_away = _player_form(db, match.away_team_id, away_name, surface)
-        form_home = _enhance_player_form(form_home, match_id, "home")
-        form_away = _enhance_player_form(form_away, match_id, "away")
+        form_home = _compute_extended_form(form_home, db, match.home_team_id, surface)
+        form_away = _compute_extended_form(form_away, db, match.away_team_id, surface)
 
-        # Enhance match info with tournament/court metadata
-        tennis_info = _enhance_match_info(tennis_info, match_id)
+        # Match info with real tournament metadata
+        tennis_info = _enrich_match_info(tennis_info, league_name)
 
-        # Rich player profiles (mock)
-        profile_home = _mock_player_profile(match_id, match.home_team_id, home_name, "home")
-        profile_away = _mock_player_profile(match_id, match.away_team_id, away_name, "away")
+        # Real player profiles from TennisPlayerProfile table
+        profile_home = _real_player_profile(db, match.home_team_id, home_name)
+        profile_away = _real_player_profile(db, match.away_team_id, away_name)
 
-        # Tiebreaks derived from sets_detail
+        # Tiebreaks from real sets_detail (tb_a/tb_b populated by fetch_api_tennis)
         tiebreaks = None
         if tennis_info and tennis_info.sets_detail:
-            tiebreaks = _mock_tiebreaks(match_id, tennis_info.sets_detail)
+            tiebreaks = _real_tiebreaks(tennis_info.sets_detail)
 
         # Betting market derived from probabilities
         betting = None
