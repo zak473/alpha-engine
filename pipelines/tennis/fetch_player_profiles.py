@@ -154,7 +154,10 @@ def run(dry_run: bool = False) -> int:
 
     with Session(engine) as session:
         # Build a name→CoreTeam.id index for fast matching
-        teams = session.query(CoreTeam).filter(CoreTeam.sport == "tennis").all()
+        # Tennis players are stored with provider_id starting with "apitns-player-"
+        teams = session.query(CoreTeam).filter(
+            CoreTeam.provider_id.like("apitns-player-%")
+        ).all()
         team_by_norm: dict[str, str] = {}
         for t in teams:
             # Try "last_first" and "first_last" patterns
