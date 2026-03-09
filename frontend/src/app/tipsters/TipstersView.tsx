@@ -371,44 +371,6 @@ function TipsterCard({
 // ── Main view ─────────────────────────────────────────────────────────────────
 
 // Placeholder data — replace with real API calls once backend is ready
-const MOCK_TIPSTERS: TipsterProfile[] = [
-  {
-    id: "1", username: "TheCannon", bio: "Arsenal fan. Value bets only.",
-    followers: 406, is_following: false, weekly_win_rate: 0.61,
-    total_picks: 10, won_picks: 8, active_tips_count: 8,
-    recent_results: ["L", "W", "W", "L", "W", "W", "W", "W"],
-  },
-  {
-    id: "2", username: "Professor_M", bio: "Stats-driven. Patience is the edge.",
-    followers: 561, is_following: false, weekly_win_rate: 0.79,
-    total_picks: 13, won_picks: 12, active_tips_count: 2,
-    recent_results: ["W", "W", "W", "W", "W", "W", "W", "W"],
-  },
-  {
-    id: "3", username: "the_goat7", bio: "Living by the numbers.",
-    followers: 316, is_following: false, weekly_win_rate: 0.76,
-    total_picks: 26, won_picks: 25, active_tips_count: 1,
-    recent_results: ["W", "W", "W", "W", "W", "W", "W", "W"],
-  },
-  {
-    id: "4", username: "The_punisher_tips", bio: "High value, high risk.",
-    followers: 894, is_following: false, weekly_win_rate: 0.67,
-    total_picks: 8, won_picks: 6, active_tips_count: 4,
-    recent_results: ["W", "L", "W", "L", "W", "W", "W", "W"],
-  },
-  {
-    id: "5", username: "SharpEdge", bio: "ELO models + market movement.",
-    followers: 742, is_following: false, weekly_win_rate: 0.71,
-    total_picks: 21, won_picks: 16, active_tips_count: 3,
-    recent_results: ["W", "W", "L", "W", "W", "W", "L", "W"],
-  },
-  {
-    id: "6", username: "ValueKing99", bio: "Only post when the edge is real.",
-    followers: 289, is_following: false, weekly_win_rate: 0.58,
-    total_picks: 12, won_picks: 9, active_tips_count: 0,
-    recent_results: ["L", "W", "W", "W", "L", "W", "W", "W"],
-  },
-];
 
 type SortOpt = "followers" | "winrate" | "active";
 type Tab = "tipsters" | "leaderboard";
@@ -453,7 +415,7 @@ function LeaderboardView({ tipsters }: { tipsters: TipsterProfile[] }) {
 }
 
 export function TipstersView() {
-  const [tipsters, setTipsters] = useState<TipsterProfile[]>(MOCK_TIPSTERS);
+  const [tipsters, setTipsters] = useState<TipsterProfile[]>([]);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortOpt>("followers");
   const [tab, setTab] = useState<Tab>("tipsters");
@@ -462,7 +424,7 @@ export function TipstersView() {
   const [showPostModal, setShowPostModal] = useState(false);
 
   useEffect(() => {
-    getTipsters().then(setTipsters).catch(() => {/* keep mock data on error */});
+    getTipsters().then(setTipsters).catch(() => setTipsters([]));
   }, []);
 
   function handleOpenTipster(tipster: TipsterProfile) {

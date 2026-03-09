@@ -1,6 +1,6 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { MatchesTable } from "@/components/matches/MatchesTable";
-import { getPredictions, getMockMatches } from "@/lib/api";
+import { getPredictions } from "@/lib/api";
 import { mvpToMatch } from "@/lib/transforms";
 import type { Match } from "@/lib/types";
 
@@ -13,7 +13,7 @@ export default async function MatchesPage() {
     const data = await getPredictions({ limit: 100 });
     matches = data.items.map(mvpToMatch);
   } catch {
-    matches = getMockMatches();
+    matches = [];
   }
 
   return (

@@ -23,21 +23,7 @@ interface CalibrationChartProps {
   title?: string;
 }
 
-// Deterministic mock calibration bins (no Math.random)
-const MOCK_BINS: CalibrationBin[] = [
-  { bin: "0.1", predicted: 0.1, actual: 0.08 },
-  { bin: "0.2", predicted: 0.2, actual: 0.19 },
-  { bin: "0.3", predicted: 0.3, actual: 0.28 },
-  { bin: "0.4", predicted: 0.4, actual: 0.38 },
-  { bin: "0.5", predicted: 0.5, actual: 0.47 },
-  { bin: "0.6", predicted: 0.6, actual: 0.58 },
-  { bin: "0.7", predicted: 0.7, actual: 0.69 },
-  { bin: "0.8", predicted: 0.8, actual: 0.79 },
-  { bin: "0.9", predicted: 0.9, actual: 0.88 },
-  { bin: "1.0", predicted: 1.0, actual: 0.96 },
-];
-
-export function CalibrationChart({ data = MOCK_BINS, title }: CalibrationChartProps) {
+export function CalibrationChart({ data = [], title }: CalibrationChartProps) {
   return (
     <div className="chart-container">
       {title && (

@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { cn, fmtPct, sportColor, timeUntil } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
-import { getMockMarketOdds, computeEdge } from "@/lib/api";
 import type { MvpPrediction } from "@/lib/types";
 import type { QueueItem } from "./DecisionQueue";
 import {
@@ -32,13 +31,8 @@ function impliedPick(p: MvpPrediction): "home" | "draw" | "away" {
   return "draw";
 }
 
-function pickEdge(p: MvpPrediction): number {
-  const market = getMockMarketOdds()[p.event_id];
-  if (!market) return 0;
-  const { home_win, draw, away_win } = p.probabilities;
-  if (home_win >= away_win && home_win >= draw) return computeEdge(home_win, market.home_win);
-  if (away_win >= home_win && away_win >= draw) return computeEdge(away_win, market.away_win);
-  return computeEdge(draw, market.draw);
+function pickEdge(_p: MvpPrediction): number {
+  return 0;
 }
 
 function timePressure(p: MvpPrediction): { label: string; level: "urgent" | "soon" | "normal" } {
@@ -131,7 +125,7 @@ function MatchDrawer({ p }: { p: MvpPrediction }) {
   const edge = pickEdge(p);
   const pick = impliedPick(p);
   const vol = volatility(p);
-  const marketOdds = getMockMarketOdds()[p.event_id];
+  const marketOdds: { home_win?: number; draw?: number; away_win?: number } | undefined = undefined;
 
   return (
     <div className="bg-surface-base border-b border-surface-border px-3 pb-4 pt-3">

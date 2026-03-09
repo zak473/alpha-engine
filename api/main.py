@@ -131,6 +131,67 @@ app.include_router(esports_sport.router,     prefix=settings.API_PREFIX)
 app.include_router(basketball_sport.router,  prefix=settings.API_PREFIX)
 app.include_router(baseball_sport.router,    prefix=settings.API_PREFIX)
 
+# ─── Shared endpoints ─────────────────────────────────────────────────────
+
+@app.get("/api/v1/sports/elo-movers", tags=["ELO"])
+def get_elo_movers(limit: int = 10, db: Session = Depends(get_db)):
+    """Return top ELO rating movers (by absolute change) across all sports."""
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import func
+    from db.models.mvp import RatingEloTeam, CoreTeam, CoreMatch
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+
+    # Subquery: latest rating row per team within the window
+    latest_subq = (
+        db.query(
+            RatingEloTeam.team_id,
+            func.max(RatingEloTeam.rated_at).label("max_at"),
+        )
+        .filter(RatingEloTeam.context == "global", RatingEloTeam.rated_at >= cutoff)
+        .group_by(RatingEloTeam.team_id)
+        .subquery()
+    )
+    rows = (
+        db.query(RatingEloTeam, CoreTeam)
+        .join(latest_subq, (RatingEloTeam.team_id == latest_subq.c.team_id) & (RatingEloTeam.rated_at == latest_subq.c.max_at))
+        .join(CoreTeam, CoreTeam.id == RatingEloTeam.team_id)
+        .filter(RatingEloTeam.rating_before.isnot(None))
+        .order_by(func.abs(RatingEloTeam.rating_after - RatingEloTeam.rating_before).desc())
+        .limit(limit * 2)  # fetch extra to filter out player dupes
+        .all()
+    )
+
+    # Build sport lookup from most recent CoreMatch per team
+    team_ids = [team.id for _, team in rows]
+    sport_subq = (
+        db.query(CoreMatch.home_team_id, CoreMatch.sport, func.max(CoreMatch.kickoff_utc).label("latest"))
+        .filter(CoreMatch.home_team_id.in_(team_ids))
+        .group_by(CoreMatch.home_team_id, CoreMatch.sport)
+        .subquery()
+    )
+    sport_map: dict[str, str] = {}
+    for r in db.query(sport_subq).all():
+        if r.home_team_id not in sport_map:
+            sport_map[r.home_team_id] = r.sport
+
+    result = []
+    for elo, team in rows:
+        if len(result) >= limit:
+            break
+        change = round(elo.rating_after - elo.rating_before, 1) if elo.rating_before else None
+        sport = sport_map.get(team.id, "soccer")
+        result.append({
+            "entity_id": team.id,
+            "name": team.name,
+            "sport": sport,
+            "rating": round(elo.rating_after, 1),
+            "change": change,
+            "context": elo.context,
+        })
+    return result
+
+
 # ─── Health / readiness probes ────────────────────────────────────────────
 
 

@@ -5,27 +5,13 @@ import { FeatureDriverChart } from "@/components/charts/FeatureDriverChart";
 import { Badge, OutcomeBadge, StatusBadge } from "@/components/ui/Badge";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { getMatchPrediction, getMockMatches, getMockSimulationBuckets } from "@/lib/api";
-import { formatOdds, formatPercent, fmtRating } from "@/lib/utils";
+import { getMatchPrediction } from "@/lib/api";
+import { formatOdds, formatPercent } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import type { MvpPrediction, SimBucket } from "@/lib/types";
 import { BarChart2, Clock, Trophy } from "lucide-react";
 
 export const revalidate = 30;
-
-function mockEloHistory(homeBase: number, awayBase: number) {
-  const data = [];
-  let h = homeBase - 80;
-  let a = awayBase - 60;
-  for (let i = 0; i < 20; i++) {
-    const seed = (homeBase + awayBase + i * 37) % 100;
-    h += (seed / 100 - 0.48) * 12;
-    a += ((seed * 3 + 17) % 100) / 100 - 0.52 < 0 ? -6 : 6;
-    const date = new Date(Date.now() - (20 - i) * 7 * 86400 * 1000);
-    data.push({ date: date.toISOString().slice(0, 10), home: Math.round(h), away: Math.round(a) });
-  }
-  return data;
-}
 
 /* ── Reusable card primitives ───────────────────────────────────────────── */
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
@@ -131,33 +117,19 @@ export default async function MatchDetailPage({ params }: { params: { id: string
     status      = prediction.status;
     sport       = prediction.sport;
   } catch {
-    const matches = getMockMatches();
-    const match   = matches.find((m) => m.id === params.id);
-    if (!match) notFound();
-    homeName     = match.home_name;
-    awayName     = match.away_name;
-    competition  = match.competition;
-    status       = match.status;
-    sport        = match.sport;
-    homeScore    = match.home_score;
-    awayScore    = match.away_score;
-    matchOutcome = match.outcome;
+    notFound();
   }
 
-  const probs = prediction
-    ? {
-        p_home: prediction.probabilities.home_win,
-        p_draw: prediction.probabilities.draw,
-        p_away: prediction.probabilities.away_win,
-      }
-    : { p_home: 0.52, p_draw: 0.24, p_away: 0.24 };
+  const probs = {
+    p_home: prediction?.probabilities.home_win ?? 0,
+    p_draw: prediction?.probabilities.draw ?? 0,
+    p_away: prediction?.probabilities.away_win ?? 0,
+  };
 
-  const confidence   = prediction?.confidence ?? 68;
+  const confidence   = prediction?.confidence ?? 0;
   const modelVersion = prediction?.model?.version ?? "—";
 
-  const simBuckets: SimBucket[] = prediction?.simulation?.distribution?.length
-    ? prediction.simulation.distribution
-    : getMockSimulationBuckets();
+  const simBuckets: SimBucket[] = prediction?.simulation?.distribution ?? [];
 
   const drivers = prediction?.key_drivers?.length
     ? prediction.key_drivers
@@ -168,8 +140,6 @@ export default async function MatchDetailPage({ params }: { params: { id: string
         { feature: "h2h_home_win_pct", importance: 0.12, value: null },
         { feature: "rest_diff",        importance: 0.09, value: null },
       ];
-
-  const eloHistory = mockEloHistory(1780, 1740);
 
   const fairOdds = {
     home: probs.p_home > 0 ? formatOdds(1 / probs.p_home) : "—",
@@ -383,8 +353,6 @@ export default async function MatchDetailPage({ params }: { params: { id: string
                   { label: "Fair Odds H", value: fairOdds.home },
                   { label: "Fair Odds D", value: fairOdds.draw },
                   { label: "Fair Odds A", value: fairOdds.away },
-                  { label: "ELO (Home)",  value: fmtRating(1780) },
-                  { label: "ELO (Away)",  value: fmtRating(1740) },
                 ].map(({ label, value }, i, arr) => (
                   <div
                     key={label}
@@ -427,7 +395,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
               />
               <CardBody>
                 <EloComparisonChart
-                  data={eloHistory}
+                  data={[]}
                   homeLabel={homeName}
                   awayLabel={awayName}
                 />

@@ -9,18 +9,7 @@ import { formatDate } from "@/lib/utils";
 
 export const revalidate = 30;
 
-const MOCK_MODELS: MvpModelMetrics[] = [
-  { model_name: "soccer_xgb", version: "v1.0", algorithm: "XGBoost",  sport: "soccer",  is_live: true,  n_train_samples: 48230, accuracy: 0.571, brier_score: 0.231, log_loss: 0.648, ece: 0.024, trained_at: "2024-11-01T00:00:00Z", train_data_from: "2022-01-01", train_data_to: "2024-10-31", notes: null },
-  { model_name: "tennis_xgb", version: "v1.0", algorithm: "XGBoost",  sport: "tennis",  is_live: true,  n_train_samples: 31100, accuracy: 0.614, brier_score: 0.219, log_loss: 0.621, ece: 0.019, trained_at: "2024-11-01T00:00:00Z", train_data_from: "2022-01-01", train_data_to: "2024-10-31", notes: null },
-  { model_name: "esports_xgb",version: "v1.0", algorithm: "XGBoost",  sport: "esports", is_live: true,  n_train_samples: 12870, accuracy: 0.598, brier_score: 0.228, log_loss: 0.639, ece: 0.028, trained_at: "2024-11-01T00:00:00Z", train_data_from: "2022-01-01", train_data_to: "2024-10-31", notes: null },
-  { model_name: "soccer_lr",  version: "v0.9", algorithm: "Logistic",  sport: "soccer",  is_live: false, n_train_samples: 32000, accuracy: 0.542, brier_score: 0.244, log_loss: 0.691, ece: 0.041, trained_at: "2024-09-15T00:00:00Z", train_data_from: "2022-01-01", train_data_to: "2024-08-31", notes: "Archived" },
-];
-
-const BACKTESTS = [
-  { id: "bt-001", sport: "soccer",  strategy: "kelly_0.25", roi: "+7.8%", sharpe: "1.44", period: "Jan–Oct 2024" },
-  { id: "bt-002", sport: "tennis",  strategy: "flat",        roi: "+9.1%", sharpe: "1.61", period: "Jan–Oct 2024" },
-  { id: "bt-003", sport: "esports", strategy: "kelly_0.25", roi: "+5.9%", sharpe: "1.21", period: "Jan–Oct 2024" },
-];
+const BACKTESTS: { id: string; sport: string; strategy: string; roi: string; sharpe: string; period: string }[] = [];
 
 const API_ENDPOINTS = [
   "GET /soccer/predictions/:id",
@@ -39,27 +28,23 @@ export default async function AdminPage() {
   let apiOk = false;
   let dbOk = false;
   let apiEnv = "unknown";
-  let liveModels = MOCK_MODELS;
+  let liveModels: MvpModelMetrics[] = [];
 
-  try {
-    const [health, ready, perfData] = await Promise.allSettled([
-      getHealth(),
-      getReady(),
-      getPerformance(),
-    ]);
+  const [health, ready, perfData] = await Promise.allSettled([
+    getHealth(),
+    getReady(),
+    getPerformance(),
+  ]);
 
-    if (health.status === "fulfilled") {
-      apiOk  = health.value.status === "ok";
-      apiEnv = health.value.env;
-    }
-    if (ready.status === "fulfilled") {
-      dbOk = ready.value.db === true;
-    }
-    if (perfData.status === "fulfilled" && perfData.value.models.length > 0) {
-      liveModels = perfData.value.models;
-    }
-  } catch {
-    // silent — use mocks
+  if (health.status === "fulfilled") {
+    apiOk  = health.value.status === "ok";
+    apiEnv = health.value.env;
+  }
+  if (ready.status === "fulfilled") {
+    dbOk = ready.value.db === true;
+  }
+  if (perfData.status === "fulfilled") {
+    liveModels = perfData.value.models;
   }
 
   const liveCount = liveModels.filter((m) => m.is_live).length;

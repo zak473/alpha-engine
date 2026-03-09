@@ -1110,7 +1110,7 @@ function StatsTab({ match }: { match: MatchProps["match"] }) {
           const topA = la?.players.filter((p: any) => p.is_starter !== false).sort((a: any, b: any) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 3) ?? [];
           if (topH.length === 0 && topA.length === 0) return (
             <Panel title="Key Leaders">
-              <EmptyState icon={Users} title="Player data not available" desc="Lineup data populates after mock generation." />
+              <EmptyState icon={Users} title="Player data not available" desc="Lineup data not yet available." />
             </Panel>
           );
           return (

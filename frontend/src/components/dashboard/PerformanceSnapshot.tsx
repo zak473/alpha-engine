@@ -5,7 +5,7 @@ import { PanelCard } from "@/components/ui/PanelCard";
 import { StateTabs } from "@/components/ui/Tabs";
 import { SparklineChart } from "@/components/charts/SparklineChart";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { getMockPerformanceByWindow, type PerformanceWindow } from "@/lib/api";
+type PerformanceWindow = "7d" | "30d" | "season";
 import { cn, formatPercent } from "@/lib/utils";
 import type { MvpPerformance } from "@/lib/types";
 import { AlertTriangle, Info, ChevronDown } from "lucide-react";
@@ -24,20 +24,8 @@ const CHART_OPTIONS: { label: string; value: ChartMetric }[] = [
   { label: "Calib",  value: "calibration" },
 ];
 
-// ── Mock drill-down data ──────────────────────────────────────────────────────
-
-const DRILL_BY_SPORT = [
-  { label: "Soccer",  win: 0.592, brier: 0.204, count: 180 },
-  { label: "Tennis",  win: 0.628, brier: 0.191, count: 95  },
-  { label: "Esports", win: 0.544, brier: 0.233, count: 37  },
-];
-
-const DRILL_BY_CONF = [
-  { label: "60–70%", win: 0.531, brier: 0.228, count: 82 },
-  { label: "70–80%", win: 0.581, brier: 0.213, count: 109 },
-  { label: "80–90%", win: 0.641, brier: 0.194, count: 89  },
-  { label: "90%+",   win: 0.710, brier: 0.165, count: 32  },
-];
+const DRILL_BY_SPORT: { label: string; win: number; brier: number; count: number }[] = [];
+const DRILL_BY_CONF:  { label: string; win: number; brier: number; count: number }[] = [];
 
 type DrillMode = "sport" | "confidence";
 
@@ -128,24 +116,19 @@ export function PerformanceSnapshot({ performance, loading }: PerformanceSnapsho
     );
   }
 
-  const mockData = getMockPerformanceByWindow(window);
   const liveModel = performance?.models.find((m) => m.is_live);
 
-  const winRate    = liveModel?.accuracy ?? mockData.winRate;
-  const brierScore = liveModel?.brier_score ?? mockData.brierScore;
-  const calibration = brierScore < 0.21 ? "good" : brierScore < 0.24 ? "ok" : "poor";
+  const winRate    = liveModel?.accuracy ?? 0;
+  const brierScore = liveModel?.brier_score ?? 0;
+  const calibration = brierScore === 0 ? "ok" : brierScore < 0.21 ? "good" : brierScore < 0.24 ? "ok" : "poor";
   const calStyle = CALIBRATION_STYLES[calibration];
 
-  function getChartSeries(): { value: number }[] {
-    if (chartMetric === "winrate") return mockData.series;
-    if (chartMetric === "brier")   return mockData.series.map((s) => ({ value: 1 - s.value * 0.4 }));
-    return mockData.series.map((s, i) => ({ value: 0.5 + Math.sin(i * 0.8) * 0.15 * (1 - s.value) }));
-  }
-
-  const chartSeries = getChartSeries();
-  const chartAutoColor = chartMetric === "brier"
-    ? chartSeries[chartSeries.length - 1].value < chartSeries[0].value
-    : chartSeries[chartSeries.length - 1].value >= chartSeries[0].value;
+  const chartSeries: { value: number }[] = [];
+  const chartAutoColor = chartSeries.length > 1
+    ? chartMetric === "brier"
+      ? chartSeries[chartSeries.length - 1].value < chartSeries[0].value
+      : chartSeries[chartSeries.length - 1].value >= chartSeries[0].value
+    : true;
 
   return (
     <PanelCard
