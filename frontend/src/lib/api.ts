@@ -584,3 +584,65 @@ export async function getEloMovers(limit = 10): Promise<RatingEntry[]> {
   return request(`/sports/elo-movers?limit=${limit}`, { revalidate: 300 });
 }
 
+// ─── Picks ROI series ─────────────────────────────────────────────────────
+
+export type PerformanceWindow = "7d" | "30d" | "season";
+
+export interface RoiSeriesPoint {
+  date: string;
+  cumulative_pnl: number;
+  win_rate: number;
+  value: number;
+}
+
+export async function getPicksRoiSeries(window: PerformanceWindow = "30d"): Promise<{
+  series: RoiSeriesPoint[];
+  window: string;
+  n: number;
+}> {
+  const res = await fetch(`${BASE}/picks/roi-series?window=${window}`, { cache: "no-store" });
+  if (!res.ok) return { series: [], window, n: 0 };
+  return res.json();
+}
+
+// ─── Backtest ─────────────────────────────────────────────────────────────
+
+export interface BacktestRunResult {
+  sport: string;
+  staking: string;
+  n_predictions: number;
+  n_correct: number;
+  accuracy: number;
+  roi: number;
+  sharpe_ratio: number;
+  max_drawdown: number;
+  brier_score: number;
+  calibration_error: number;
+  pnl_units: number;
+  n_bets_placed?: number;
+  n_bets_won?: number;
+  message?: string;
+}
+
+export async function runBacktest(params?: {
+  sport?: string;
+  staking?: string;
+  min_edge?: number;
+}): Promise<BacktestRunResult> {
+  const qs = new URLSearchParams();
+  if (params?.sport)    qs.set("sport",    params.sport);
+  if (params?.staking)  qs.set("staking",  params.staking);
+  if (params?.min_edge !== undefined) qs.set("min_edge", String(params.min_edge));
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return request<BacktestRunResult>(`/backtest/run${suffix}`, { revalidate: 300 });
+}
+
+// ─── Edge utility ─────────────────────────────────────────────────────────
+
+/** Model edge = model probability − market implied probability (%). +ve = value bet. */
+export function computeEdge(modelProb: number, marketOdds: number): number {
+  if (marketOdds <= 1.0) return 0;
+  const marketProb = 1 / marketOdds;
+  return Math.round((modelProb - marketProb) * 1000) / 10;
+}
+

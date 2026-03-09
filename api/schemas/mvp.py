@@ -72,6 +72,7 @@ class PredictionSchema(BaseModel):
     participants: ParticipantsSchema
     probabilities: ProbabilitiesSchema
     fair_odds: FairOddsSchema
+    market_odds: Optional[FairOddsSchema] = None  # sharpest available bookmaker odds
     confidence: int = Field(..., ge=0, le=100)
     key_drivers: list[KeyDriverSchema]
     model: Optional[ModelMetaSchema]

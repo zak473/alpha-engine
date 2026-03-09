@@ -8,7 +8,7 @@ record + stats. Auto-settlement happens when match outcome is known.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from api.deps import get_db, get_current_user
 from db.models.picks import TrackedPick
 from db.models.mvp import CoreMatch
+from db.models.bankroll import BankrollSnapshot
 
 router = APIRouter(prefix="/picks", tags=["Picks"])
 
@@ -108,6 +109,7 @@ def _auto_settle(pick: TrackedPick, db: Session) -> None:
     Attempt auto-settlement: if the match is finished and the selection
     matches a simple home/away/draw pattern, mark outcome.
     Only handles moneyline-style markets — other markets remain pending.
+    Creates a BankrollSnapshot on settlement.
     """
     if pick.outcome is not None:
         return  # already settled
@@ -138,6 +140,41 @@ def _auto_settle(pick: TrackedPick, db: Session) -> None:
 
         if pick.outcome is not None:
             pick.settled_at = datetime.now(tz=timezone.utc)
+            _create_bankroll_snapshot(pick, db)
+
+
+def _create_bankroll_snapshot(pick: TrackedPick, db: Session) -> None:
+    """Create a bankroll snapshot when a pick settles (1-unit flat staking)."""
+    try:
+        stake = pick.stake_fraction or 1.0
+        if pick.outcome == "won":
+            pnl = round(stake * (pick.odds - 1.0), 4)
+        elif pick.outcome == "lost":
+            pnl = round(-stake, 4)
+        else:
+            return  # void — no bankroll impact
+
+        last = (
+            db.query(BankrollSnapshot)
+            .filter(BankrollSnapshot.user_id == pick.user_id)
+            .order_by(BankrollSnapshot.created_at.desc())
+            .first()
+        )
+        current_balance = last.balance if last else 0.0
+        new_balance = round(current_balance + pnl, 4)
+
+        snap = BankrollSnapshot(
+            id=str(uuid.uuid4()),
+            user_id=pick.user_id,
+            balance=new_balance,
+            event_type="pick_settled",
+            pick_id=pick.id,
+            pnl=pnl,
+            notes=f"{pick.match_label} — {pick.selection_label} @ {pick.odds} ({pick.outcome})",
+        )
+        db.add(snap)
+    except Exception:
+        pass  # settlement failure must never block pick persistence
 
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
@@ -279,6 +316,58 @@ def recent_wins(
         .all()
     )
     return [_pick_out(p) for p in picks]
+
+
+@router.get("/roi-series")
+def roi_series(
+    window: str = Query("30d", description="7d | 30d | season"),
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user),
+):
+    """
+    Return a time-series of cumulative PnL and rolling win-rate for the
+    PerformanceSnapshot sparkline. One data point per settled pick.
+
+    window: 7d | 30d | season (season = all time)
+    """
+    now = datetime.now(tz=timezone.utc)
+    if window == "7d":
+        cutoff = now - timedelta(days=7)
+    elif window == "30d":
+        cutoff = now - timedelta(days=30)
+    else:  # season / all-time
+        cutoff = datetime.min.replace(tzinfo=timezone.utc)
+
+    picks = (
+        db.query(TrackedPick)
+        .filter(
+            TrackedPick.user_id == user_id,
+            TrackedPick.outcome.in_(["won", "lost"]),
+            TrackedPick.settled_at >= cutoff,
+        )
+        .order_by(TrackedPick.settled_at.asc())
+        .all()
+    )
+
+    series = []
+    cum_pnl = 0.0
+    wins = 0
+    total = 0
+    for p in picks:
+        stake = p.stake_fraction or 1.0
+        pnl = stake * (p.odds - 1.0) if p.outcome == "won" else -stake
+        cum_pnl = round(cum_pnl + pnl, 4)
+        total += 1
+        if p.outcome == "won":
+            wins += 1
+        series.append({
+            "date": p.settled_at.strftime("%Y-%m-%d") if p.settled_at else "",
+            "cumulative_pnl": cum_pnl,
+            "win_rate": round(wins / total, 4),
+            "value": round(wins / total, 4),
+        })
+
+    return {"series": series, "window": window, "n": len(series)}
 
 
 @router.delete("/{pick_id}", status_code=204)

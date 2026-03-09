@@ -95,6 +95,14 @@ def _build_prediction_schema(
     if created_at is None:
         created_at = datetime.utcnow()
 
+    market_odds = None
+    if match.odds_home is not None or match.odds_away is not None:
+        market_odds = FairOddsSchema(
+            home_win=match.odds_home or 0.0,
+            draw=match.odds_draw or 0.0,
+            away_win=match.odds_away or 0.0,
+        )
+
     return PredictionSchema(
         event_id=match.id,
         sport=match.sport or "soccer",
@@ -116,6 +124,7 @@ def _build_prediction_schema(
             draw=pred.fair_odds_draw,
             away_win=pred.fair_odds_away,
         ),
+        market_odds=market_odds,
         confidence=pred.confidence,
         key_drivers=drivers,
         model=ModelMetaSchema(

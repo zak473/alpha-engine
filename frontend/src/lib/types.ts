@@ -110,6 +110,7 @@ export interface MvpPrediction {
   };
   probabilities: MvpProbabilities;
   fair_odds: MvpFairOdds;
+  market_odds: MvpFairOdds | null;
   confidence: number;
   key_drivers: MvpKeyDriver[];
   model: MvpModelMeta | null;

@@ -3,13 +3,11 @@ import { StatCard } from "@/components/ui/StatCard";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Badge } from "@/components/ui/Badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
-import { getHealth, getReady, getPerformance } from "@/lib/api";
+import { getHealth, getReady, getPerformance, runBacktest, type BacktestRunResult } from "@/lib/api";
 import type { MvpModelMetrics } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
-export const revalidate = 30;
-
-const BACKTESTS: { id: string; sport: string; strategy: string; roi: string; sharpe: string; period: string }[] = [];
+export const revalidate = 60;
 
 const API_ENDPOINTS = [
   "GET /soccer/predictions/:id",
@@ -29,11 +27,17 @@ export default async function AdminPage() {
   let dbOk = false;
   let apiEnv = "unknown";
   let liveModels: MvpModelMetrics[] = [];
+  let backtestResults: BacktestRunResult[] = [];
 
-  const [health, ready, perfData] = await Promise.allSettled([
+  const [health, ready, perfData, ...btResults] = await Promise.allSettled([
     getHealth(),
     getReady(),
     getPerformance(),
+    runBacktest({ sport: "soccer",     staking: "kelly" }),
+    runBacktest({ sport: "tennis",     staking: "kelly" }),
+    runBacktest({ sport: "esports",    staking: "kelly" }),
+    runBacktest({ sport: "basketball", staking: "kelly" }),
+    runBacktest({ sport: "baseball",   staking: "kelly" }),
   ]);
 
   if (health.status === "fulfilled") {
@@ -46,12 +50,17 @@ export default async function AdminPage() {
   if (perfData.status === "fulfilled") {
     liveModels = perfData.value.models;
   }
+  for (const r of btResults) {
+    if (r.status === "fulfilled" && r.value.n_predictions > 0) {
+      backtestResults.push(r.value);
+    }
+  }
 
   const liveCount = liveModels.filter((m) => m.is_live).length;
 
   const kpis = [
     { label: "Live Models",    value: String(liveCount) },
-    { label: "Total Backtests", value: "3"             },
+    { label: "Total Backtests", value: String(backtestResults.length) },
     { label: "API",            value: apiOk ? "OK" : "—", delta: apiOk ? 1 : -1 },
     { label: "Database",       value: dbOk ? "OK" : "—",  delta: dbOk ? 1 : -1  },
   ];
@@ -113,35 +122,45 @@ export default async function AdminPage() {
         {/* Backtest results */}
         <div className="card">
           <div className="px-4 pt-4 pb-1">
-            <SectionHeader title="Backtest Results" />
+            <SectionHeader title="Backtest Results" subtitle="Kelly staking, all-time" />
           </div>
           <Table>
             <TableHead>
               <tr>
                 <TableHeader>Sport</TableHeader>
-                <TableHeader>Strategy</TableHeader>
+                <TableHeader>Accuracy</TableHeader>
                 <TableHeader>ROI</TableHeader>
                 <TableHeader>Sharpe</TableHeader>
-                <TableHeader>Period</TableHeader>
+                <TableHeader>Brier</TableHeader>
+                <TableHeader>N</TableHeader>
               </tr>
             </TableHead>
             <TableBody>
-              {BACKTESTS.map((b) => (
-                <TableRow key={b.id}>
-                  <TableCell>
-                    <Badge sport={b.sport as "soccer" | "tennis" | "esports"}>{b.sport}</Badge>
+              {backtestResults.length === 0 ? (
+                <TableRow>
+                  <TableCell className="text-text-muted text-xs" colSpan={6}>
+                    No finished predictions yet
                   </TableCell>
-                  <TableCell className="font-mono text-text-muted text-xs">{b.strategy}</TableCell>
-                  <TableCell
-                    mono
-                    className={b.roi.startsWith("+") ? "text-accent-green font-medium" : "text-accent-red font-medium"}
-                  >
-                    {b.roi}
-                  </TableCell>
-                  <TableCell mono>{b.sharpe}</TableCell>
-                  <TableCell className="text-text-muted text-xs">{b.period}</TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                backtestResults.map((b) => {
+                  const roi = `${b.roi >= 0 ? "+" : ""}${(b.roi * 100).toFixed(1)}%`;
+                  return (
+                    <TableRow key={b.sport}>
+                      <TableCell>
+                        <Badge sport={b.sport as "soccer" | "tennis" | "esports"}>{b.sport}</Badge>
+                      </TableCell>
+                      <TableCell mono>{(b.accuracy * 100).toFixed(1)}%</TableCell>
+                      <TableCell mono className={b.roi >= 0 ? "text-accent-green font-medium" : "text-accent-red font-medium"}>
+                        {roi}
+                      </TableCell>
+                      <TableCell mono>{b.sharpe_ratio.toFixed(2)}</TableCell>
+                      <TableCell mono>{b.brier_score.toFixed(3)}</TableCell>
+                      <TableCell mono className="text-text-muted">{b.n_predictions}</TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
             </TableBody>
           </Table>
         </div>

@@ -5,7 +5,14 @@ import { FeatureDriverChart } from "@/components/charts/FeatureDriverChart";
 import { Badge, OutcomeBadge, StatusBadge } from "@/components/ui/Badge";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { getMatchPrediction } from "@/lib/api";
+import {
+  getMatchPrediction,
+  getSoccerTeamEloHistory,
+  getTennisPlayerEloHistory,
+  getEsportsTeamEloHistory,
+  getBasketballTeamEloHistory,
+  getBaseballTeamEloHistory,
+} from "@/lib/api";
 import { formatOdds, formatPercent } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import type { MvpPrediction, SimBucket } from "@/lib/types";
@@ -131,15 +138,37 @@ export default async function MatchDetailPage({ params }: { params: { id: string
 
   const simBuckets: SimBucket[] = prediction?.simulation?.distribution ?? [];
 
-  const drivers = prediction?.key_drivers?.length
-    ? prediction.key_drivers
-    : [
-        { feature: "elo_diff",         importance: 0.28, value: null },
-        { feature: "home_xg_avg",      importance: 0.19, value: null },
-        { feature: "away_xg_avg",      importance: 0.17, value: null },
-        { feature: "h2h_home_win_pct", importance: 0.12, value: null },
-        { feature: "rest_diff",        importance: 0.09, value: null },
-      ];
+  // Fetch real ELO history for both teams
+  const homeId = prediction?.participants.home.id ?? "";
+  const awayId = prediction?.participants.away.id ?? "";
+  async function fetchEloHistory(id: string, s: string) {
+    if (!id) return [];
+    try {
+      switch (s) {
+        case "tennis":    return await getTennisPlayerEloHistory(id, "global", 20);
+        case "esports":   return await getEsportsTeamEloHistory(id, undefined, 20);
+        case "basketball":return await getBasketballTeamEloHistory(id, 20);
+        case "baseball":  return await getBaseballTeamEloHistory(id, 20);
+        default:          return await getSoccerTeamEloHistory(id, 20);
+      }
+    } catch { return []; }
+  }
+  const [homeElo, awayElo] = await Promise.all([
+    fetchEloHistory(homeId, sport),
+    fetchEloHistory(awayId, sport),
+  ]);
+
+  // Merge into combined history keyed by date
+  const eloMap = new Map<string, { date: string; home: number; away: number }>();
+  homeElo.forEach((p) => eloMap.set(p.date, { date: p.date, home: p.rating, away: 0 }));
+  awayElo.forEach((p) => {
+    const existing = eloMap.get(p.date);
+    if (existing) existing.away = p.rating;
+    else eloMap.set(p.date, { date: p.date, home: 0, away: p.rating });
+  });
+  const eloHistory = Array.from(eloMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+  const drivers = prediction?.key_drivers ?? [];
 
   const fairOdds = {
     home: probs.p_home > 0 ? formatOdds(1 / probs.p_home) : "—",

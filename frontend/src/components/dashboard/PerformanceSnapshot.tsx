@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PanelCard } from "@/components/ui/PanelCard";
 import { StateTabs } from "@/components/ui/Tabs";
 import { SparklineChart } from "@/components/charts/SparklineChart";
 import { Skeleton } from "@/components/ui/Skeleton";
-type PerformanceWindow = "7d" | "30d" | "season";
+import { getPicksRoiSeries, type PerformanceWindow } from "@/lib/api";
 import { cn, formatPercent } from "@/lib/utils";
 import type { MvpPerformance } from "@/lib/types";
 import { AlertTriangle, Info, ChevronDown } from "lucide-react";
@@ -98,11 +98,18 @@ interface PerformanceSnapshotProps {
 }
 
 export function PerformanceSnapshot({ performance, loading }: PerformanceSnapshotProps) {
-  const [window, setWindow] = useState<PerformanceWindow>("7d");
+  const [window, setWindow] = useState<PerformanceWindow>("30d");
   const [chartMetric, setChartMetric] = useState<ChartMetric>("winrate");
   const [showBrierInfo, setShowBrierInfo] = useState(false);
   const [showDrill, setShowDrill] = useState(false);
   const [drillMode, setDrillMode] = useState<DrillMode>("sport");
+  const [roiSeries, setRoiSeries] = useState<{ value: number }[]>([]);
+
+  useEffect(() => {
+    getPicksRoiSeries(window)
+      .then((data) => setRoiSeries(data.series.map((p) => ({ value: p.value }))))
+      .catch(() => setRoiSeries([]));
+  }, [window]);
 
   if (loading) {
     return (
@@ -123,7 +130,7 @@ export function PerformanceSnapshot({ performance, loading }: PerformanceSnapsho
   const calibration = brierScore === 0 ? "ok" : brierScore < 0.21 ? "good" : brierScore < 0.24 ? "ok" : "poor";
   const calStyle = CALIBRATION_STYLES[calibration];
 
-  const chartSeries: { value: number }[] = [];
+  const chartSeries = roiSeries;
   const chartAutoColor = chartSeries.length > 1
     ? chartMetric === "brier"
       ? chartSeries[chartSeries.length - 1].value < chartSeries[0].value

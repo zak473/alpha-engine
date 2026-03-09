@@ -3,6 +3,7 @@
 import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { fmtPct, cn, timeUntil } from "@/lib/utils";
+import { computeEdge } from "@/lib/api";
 import type { MvpPrediction } from "@/lib/types";
 
 interface CompareModalProps {
@@ -20,8 +21,13 @@ function impliedPick(p: MvpPrediction): { label: string; pct: number } {
   return { label: "Draw", pct: Math.round(draw * 100) };
 }
 
-function pickEdge(_p: MvpPrediction): number {
-  return 0;
+function pickEdge(p: MvpPrediction): number {
+  const m = p.market_odds;
+  if (!m) return 0;
+  const { home_win, draw, away_win } = p.probabilities;
+  if (home_win >= away_win && home_win >= draw) return computeEdge(home_win, m.home_win);
+  if (away_win >= home_win && away_win >= draw) return computeEdge(away_win, m.away_win);
+  return computeEdge(draw, m.draw);
 }
 
 function volatility(p: MvpPrediction): "Stable" | "Swingy" | "—" {

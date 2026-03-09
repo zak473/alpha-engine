@@ -7,6 +7,7 @@ import { PanelCard } from "@/components/ui/PanelCard";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { computeEdge } from "@/lib/api";
 import type { MvpPrediction } from "@/lib/types";
 import { TimelineView } from "./TimelineView";
 import type { QueueItem } from "./DecisionQueue";
@@ -37,8 +38,13 @@ function impliedPick(p: MvpPrediction): { label: string; pct: number } {
   return { label: "Draw", pct: Math.round(draw * 100) };
 }
 
-function pickEdge(_p: MvpPrediction): number {
-  return 0;
+function pickEdge(p: MvpPrediction): number {
+  const m = p.market_odds;
+  if (!m) return 0;
+  const { home_win, draw, away_win } = p.probabilities;
+  if (home_win >= away_win && home_win >= draw) return computeEdge(home_win, m.home_win);
+  if (away_win >= home_win && away_win >= draw) return computeEdge(away_win, m.away_win);
+  return computeEdge(draw, m.draw);
 }
 
 function volatility(p: MvpPrediction): "Stable" | "Swingy" | null {
@@ -102,7 +108,7 @@ function MiniProbBar({ pH, pD, pA }: { pH: number; pD: number; pA: number }) {
 function PredictionDrawer({ p, mode }: { p: MvpPrediction; mode: SignalMode }) {
   const { probabilities: prob, fair_odds: odds, key_drivers: drivers, simulation: sim } = p;
   const [showExplain, setShowExplain] = useState(false);
-  const marketOdds: { home_win?: number; draw?: number; away_win?: number } | undefined = undefined;
+  const marketOdds = p.market_odds ?? undefined;
   const edge = pickEdge(p);
   const pick = impliedPick(p);
 
