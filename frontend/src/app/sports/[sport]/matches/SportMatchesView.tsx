@@ -22,6 +22,7 @@ interface SportMatchesViewProps {
 export function SportMatchesView({ sport, matches, total }: SportMatchesViewProps) {
   const [filter, setFilter] = useState<BettingFilter>(DEFAULT_BETTING_FILTER);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [mobileQueueOpen, setMobileQueueOpen] = useState(false);
 
   // Poll full match list every 30s — initialise with SSR snapshot (no flash)
   const liveItems = useLiveMatches(sport, matches);
@@ -112,7 +113,7 @@ export function SportMatchesView({ sport, matches, total }: SportMatchesViewProp
       </div>
 
       {/* Mobile queue drawer */}
-      <MobileQueueDrawer matches={mergedMatches} />
+      <MobileQueueDrawer open={mobileQueueOpen} onClose={() => setMobileQueueOpen(false)} matches={mergedMatches} />
     </div>
   );
 }

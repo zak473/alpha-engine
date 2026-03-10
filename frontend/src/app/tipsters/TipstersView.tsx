@@ -179,7 +179,7 @@ function TipsterModal({
 
 // ── Post tip modal ─────────────────────────────────────────────────────────────
 
-const SPORTS = ["soccer", "tennis", "basketball", "esports", "baseball"] as const;
+const SPORTS = ["soccer", "tennis", "basketball", "esports", "baseball", "hockey"] as const;
 
 function PostTipModal({ onClose, onPosted }: { onClose: () => void; onPosted: () => void }) {
   const [sport, setSport] = useState<SportSlug>("soccer");
@@ -370,13 +370,8 @@ function TipsterCard({
 
 // ── Main view ─────────────────────────────────────────────────────────────────
 
-// Placeholder data — replace with real API calls once backend is ready
-
 type SortOpt = "followers" | "winrate" | "active";
 type Tab = "tipsters" | "leaderboard";
-
-// Simulated "new tip" set — tipsters who posted since the user last visited
-const NEW_TIP_IDS = new Set(["1", "3"]);
 
 function LeaderboardView({ tipsters }: { tipsters: TipsterProfile[] }) {
   const ranked = [...tipsters].sort((a, b) => {
@@ -479,14 +474,11 @@ export function TipstersView() {
           <div className="mt-3 flex items-center gap-2 flex-wrap">
             <span className="text-[11px] text-text-muted">Following</span>
             {tipsters.filter(t => t.is_following).map(t => (
-              <div key={t.id} className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ background: "rgba(34,226,131,0.12)", color: "var(--positive)", border: "1px solid rgba(34,226,131,0.2)" }}>
+              <div key={t.id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ background: "rgba(34,226,131,0.12)", color: "var(--positive)", border: "1px solid rgba(34,226,131,0.2)" }}>
                 <span className="w-4 h-4 rounded-full text-[8px] font-bold flex items-center justify-center text-white" style={{ background: avatarColor(t.username) }}>
                   {initials(t.username)}
                 </span>
                 @{t.username}
-                {NEW_TIP_IDS.has(t.id) && (
-                  <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white" style={{ background: "var(--negative)" }} title="New tip posted" />
-                )}
               </div>
             ))}
           </div>
@@ -546,14 +538,33 @@ export function TipstersView() {
       {/* Grid */}
       <div className="px-4 py-5 lg:px-6">
         {filtered.length === 0 ? (
-          <div className="text-center py-20 text-text-muted text-sm">No tipsters found</div>
+          <div className="flex flex-col items-center justify-center py-20 gap-5">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full" style={{ background: "rgba(34,226,131,0.10)", border: "1px solid rgba(34,226,131,0.20)" }}>
+              <Users size={28} style={{ color: "var(--accent)" }} />
+            </div>
+            <div className="text-center max-w-xs">
+              <p className="text-base font-bold text-text-primary mb-1">
+                {search ? `No tipsters matching "${search}"` : "No tipsters yet"}
+              </p>
+              <p className="text-sm text-text-muted">
+                {search
+                  ? "Try a different search or clear the filter."
+                  : "Be the first to post a tip and build your reputation on the board."}
+              </p>
+            </div>
+            {!search && (
+              <button
+                onClick={() => setShowPostModal(true)}
+                className="btn btn-primary h-10 px-6 text-sm flex items-center gap-2"
+              >
+                <Plus size={14} /> Post your first tip
+              </button>
+            )}
+          </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map(t => (
-              <div key={t.id} className="relative">
-                {NEW_TIP_IDS.has(t.id) && (
-                  <span className="absolute top-3 right-3 z-10 w-2.5 h-2.5 rounded-full border-2" style={{ background: "var(--negative)", borderColor: "var(--bg1)" }} />
-                )}
+              <div key={t.id}>
               <TipsterCard
                 tipster={t}
                 onOpen={() => handleOpenTipster(t)}

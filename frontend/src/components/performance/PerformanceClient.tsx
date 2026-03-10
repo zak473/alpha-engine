@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ROIChart } from "@/components/charts/ROIChart";
 import type { RoiPoint } from "@/lib/types";
-import type { PicksStatsOut, PickOut, BankrollStatsOut } from "@/lib/api";
+import type { PicksStatsOut, PickOut, BankrollStatsOut, PredictionAccuracy } from "@/lib/api";
 import type { MvpModelMetrics } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { useState as useStateForm } from "react";
 import { depositBankroll, withdrawBankroll } from "@/lib/api";
 
 type Range = "7d" | "30d" | "90d" | "all";
@@ -37,6 +37,7 @@ interface PerformanceClientProps {
   models: MvpModelMetrics[];
   recentPicks: PickOut[];
   bankroll: BankrollStatsOut;
+  accuracy: PredictionAccuracy;
 }
 
 function fmt(n: number, decimals = 1) {
@@ -68,11 +69,14 @@ export function PerformanceClient({
   models,
   recentPicks,
   bankroll,
+  accuracy,
 }: PerformanceClientProps) {
+  const router = useRouter();
   const [range, setRange] = useState<Range>("all");
-  const [depositAmt, setDepositAmt] = useStateForm("");
-  const [withdrawAmt, setWithdrawAmt] = useStateForm("");
-  const [txBusy, setTxBusy] = useStateForm(false);
+  const [depositAmt, setDepositAmt] = useState("");
+  const [withdrawAmt, setWithdrawAmt] = useState("");
+  const [txBusy, setTxBusy] = useState(false);
+  const [txError, setTxError] = useState<string | null>(null);
 
   const filteredRoi = useMemo(() => {
     const days = RANGE_DAYS[range];
@@ -286,6 +290,59 @@ export function PerformanceClient({
         </div>
       )}
 
+      {/* Prediction accuracy */}
+      {accuracy.overall.n > 0 && (
+        <div
+          className="rounded-xl border overflow-hidden"
+          style={{ background: "var(--glass-bg)", borderColor: "var(--glass-border)" }}
+        >
+          <div className="px-4 py-3 border-b" style={{ borderColor: "var(--glass-border)" }}>
+            <p className="text-sm font-semibold text-text-primary">Prediction Accuracy</p>
+            <p className="text-[11px] text-text-muted mt-0.5">
+              Retroactive check — {accuracy.overall.n} finished matches · Overall{" "}
+              <span className={cn("font-semibold", (accuracy.overall.accuracy ?? 0) >= 0.55 ? "text-accent-green" : "text-text-primary")}>
+                {accuracy.overall.accuracy != null ? pct(accuracy.overall.accuracy) : "—"}
+              </span>
+              {" "}· Brier{" "}
+              <span className="font-semibold text-text-primary">
+                {accuracy.overall.avg_brier != null ? fmt(accuracy.overall.avg_brier, 3) : "—"}
+              </span>
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b" style={{ borderColor: "var(--glass-border)" }}>
+                  {["Sport", "Checked", "Correct", "Accuracy", "Avg Brier"].map((h, i) => (
+                    <th key={h} className={cn("px-4 py-2 text-[11px] font-medium text-text-muted", i === 0 ? "text-left" : "text-right")}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(accuracy.by_sport).map(([sport, stat]) => (
+                  <tr key={sport} className="border-b hover:bg-white/[0.02]" style={{ borderColor: "var(--glass-border)" }}>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: SPORT_COLOURS[sport] ?? "#71717a" }} />
+                        <span className="text-text-primary font-medium capitalize">{sport}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-right num text-text-muted">{stat.n}</td>
+                    <td className="px-4 py-2.5 text-right num text-text-muted">{stat.accuracy != null ? Math.round(stat.accuracy * stat.n) : "—"}</td>
+                    <td className="px-4 py-2.5 text-right num font-semibold">
+                      <span className={stat.accuracy != null && stat.accuracy >= 0.55 ? "text-accent-green" : "text-text-muted"}>
+                        {stat.accuracy != null ? pct(stat.accuracy) : "—"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right num text-text-muted">{stat.avg_brier != null ? fmt(stat.avg_brier, 3) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Bankroll tracker */}
       <div
         className="rounded-xl border overflow-hidden"
@@ -324,17 +381,19 @@ export function PerformanceClient({
                 disabled={!depositAmt || txBusy}
                 onClick={async () => {
                   if (!depositAmt) return;
-                  setTxBusy(true);
-                  await depositBankroll(parseFloat(depositAmt), "Starting bankroll").catch(() => null);
-                  setDepositAmt("");
-                  setTxBusy(false);
-                  window.location.reload();
+                  setTxBusy(true); setTxError(null);
+                  try { await depositBankroll(parseFloat(depositAmt), "Starting bankroll"); setDepositAmt(""); router.refresh(); }
+                  catch { setTxError("Failed to set bankroll. Please try again."); }
+                  finally { setTxBusy(false); }
                 }}
                 className="btn btn-md btn-primary"
               >
                 {txBusy ? "Saving…" : "Set bankroll"}
               </button>
             </div>
+            {txError && (
+              <p className="text-xs text-accent-red mt-1">{txError}</p>
+            )}
           </div>
         ) : (
           /* Stats grid + deposit/withdraw */
@@ -366,11 +425,10 @@ export function PerformanceClient({
                   disabled={!depositAmt || txBusy}
                   onClick={async () => {
                     if (!depositAmt) return;
-                    setTxBusy(true);
-                    await depositBankroll(parseFloat(depositAmt)).catch(() => null);
-                    setDepositAmt("");
-                    setTxBusy(false);
-                    window.location.reload();
+                    setTxBusy(true); setTxError(null);
+                    try { await depositBankroll(parseFloat(depositAmt)); setDepositAmt(""); router.refresh(); }
+                    catch { setTxError("Deposit failed. Please try again."); }
+                    finally { setTxBusy(false); }
                   }}
                   className="btn btn-sm btn-primary"
                 >
@@ -388,11 +446,10 @@ export function PerformanceClient({
                   disabled={!withdrawAmt || txBusy}
                   onClick={async () => {
                     if (!withdrawAmt) return;
-                    setTxBusy(true);
-                    await withdrawBankroll(parseFloat(withdrawAmt)).catch(() => null);
-                    setWithdrawAmt("");
-                    setTxBusy(false);
-                    window.location.reload();
+                    setTxBusy(true); setTxError(null);
+                    try { await withdrawBankroll(parseFloat(withdrawAmt)); setWithdrawAmt(""); router.refresh(); }
+                    catch { setTxError("Withdrawal failed. Please try again."); }
+                    finally { setTxBusy(false); }
                   }}
                   className="btn btn-sm btn-secondary"
                 >
@@ -400,6 +457,9 @@ export function PerformanceClient({
                 </button>
               </div>
             </div>
+            {txError && (
+              <p className="text-xs text-accent-red">{txError}</p>
+            )}
           </div>
         )}
       </div>

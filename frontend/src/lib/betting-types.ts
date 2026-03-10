@@ -4,7 +4,7 @@
  * map SportMatchListItem → BettingMatch so no backend changes are needed.
  */
 
-export type SportSlug = "soccer" | "tennis" | "esports" | "basketball" | "baseball";
+export type SportSlug = "soccer" | "tennis" | "esports" | "basketball" | "baseball" | "hockey";
 
 export type MatchStatus = "live" | "upcoming" | "finished" | "cancelled";
 
@@ -89,4 +89,5 @@ export const SPORT_CONFIG: Record<SportSlug, { label: string; color: string; ico
   esports:    { label: "Esports",    color: "#a855f7", icon: "🎮" },
   basketball: { label: "Basketball", color: "#f59e0b", icon: "🏀" },
   baseball:   { label: "Baseball",   color: "#ef4444", icon: "⚾" },
+  hockey:     { label: "Hockey",     color: "#06b6d4", icon: "🏒" },
 };

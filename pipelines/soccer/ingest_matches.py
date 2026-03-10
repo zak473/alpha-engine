@@ -60,7 +60,7 @@ def _upsert_match(session: Session, row: dict[str, Any], league_id: str, home_te
 
     match = session.query(CoreMatch).filter_by(provider_id=row["provider_id"]).first()
 
-    kickoff = datetime.fromisoformat(row["kickoff_utc"])
+    kickoff = datetime.fromisoformat(row["kickoff_utc"].replace("Z", "+00:00"))
     home_score = int(row["home_score"]) if row.get("home_score") else None
     away_score = int(row["away_score"]) if row.get("away_score") else None
     outcome = row.get("outcome") or None

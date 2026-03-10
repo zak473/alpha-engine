@@ -22,7 +22,7 @@ from core.types import MatchContext, Sport
 from db.models.mvp import CoreMatch, ModelRegistry, PredMatch, RatingEloTeam
 from db.session import SessionLocal
 from ratings.tennis_elo import TennisEloEngine
-from pipelines.common.feature_engineering import build_feature_vector
+from pipelines.tennis.feature_engineering import build_feature_vector
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 log = logging.getLogger(__name__)

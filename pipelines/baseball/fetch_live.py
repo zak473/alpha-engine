@@ -128,7 +128,12 @@ def fetch_all(dry_run: bool = False) -> int:
         return 0
 
     sports = _get("/sports", {"all": "false"})
-    active = [s for s in sports if s.get("group", "").lower() == "baseball"]
+    active = [
+        s for s in sports
+        if s.get("group", "").lower() == "baseball"
+        and not s.get("has_outrights", False)
+        and "_winner" not in s.get("key", "")
+    ]
 
     if not active:
         log.warning("No active baseball leagues found.")

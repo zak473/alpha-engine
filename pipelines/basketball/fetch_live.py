@@ -42,7 +42,12 @@ def _get(path: str, params: dict | None = None) -> Any:
 def _get_active_basketball_sports() -> list[dict]:
     try:
         sports = _get("/sports", {"all": "false"})
-        return [s for s in sports if s.get("group", "").lower() == "basketball"]
+        return [
+            s for s in sports
+            if s.get("group", "").lower() == "basketball"
+            and not s.get("has_outrights", False)
+            and "_winner" not in s.get("key", "")
+        ]
     except Exception as exc:
         log.warning("Could not fetch sports list: %s", exc)
         return []

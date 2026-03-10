@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 
 export const revalidate = 30;
 
-const VALID_SPORTS: SportSlug[] = ["soccer", "tennis", "esports", "basketball", "baseball"];
+const VALID_SPORTS: SportSlug[] = ["soccer", "tennis", "esports", "basketball", "baseball", "hockey"];
 
 const SPORT_LABELS: Record<SportSlug, string> = {
   soccer:     "Soccer",
@@ -14,6 +14,7 @@ const SPORT_LABELS: Record<SportSlug, string> = {
   esports:    "Esports",
   basketball: "Basketball",
   baseball:   "Baseball",
+  hockey:     "Hockey",
 };
 
 const SPORT_ICONS: Record<SportSlug, string> = {
@@ -22,6 +23,7 @@ const SPORT_ICONS: Record<SportSlug, string> = {
   esports:    "🎮",
   basketball: "🏀",
   baseball:   "⚾",
+  hockey:     "🏒",
 };
 
 interface PageProps {

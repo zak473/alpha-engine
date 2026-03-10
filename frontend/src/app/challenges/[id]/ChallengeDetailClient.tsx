@@ -4,11 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LeaderboardTable } from "@/components/challenges/LeaderboardTable";
 import { EntryFeed } from "@/components/challenges/EntryFeed";
-import { joinChallenge, leaveChallenge } from "@/lib/api";
+import { joinChallenge, leaveChallenge, submitChallengeEntry } from "@/lib/api";
 import type { Challenge, EntryFeedPage, LeaderboardOut } from "@/lib/types";
 import {
   Users, Calendar, Trophy, Target, Lock, Globe,
-  ArrowLeft, LogIn, LogOut,
+  ArrowLeft, LogIn, LogOut, Plus, X,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -208,21 +208,124 @@ function RulesTab({ challenge }: { challenge: Challenge }) {
   );
 }
 
+function SubmitEntryModal({
+  challengeId,
+  sportScope,
+  onClose,
+  onSubmitted,
+}: {
+  challengeId: string;
+  sportScope: string[];
+  onClose: () => void;
+  onSubmitted: () => void;
+}) {
+  const SPORTS = ["soccer", "tennis", "basketball", "baseball", "esports"] as const;
+  const availableSports = sportScope.length > 0 ? sportScope : [...SPORTS];
+  const [sport, setSport] = useState(availableSports[0] ?? "soccer");
+  const [matchLabel, setMatchLabel] = useState("");
+  const [pickType, setPickType] = useState("moneyline");
+  const [selection, setSelection] = useState("");
+  const [odds, setOdds] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!matchLabel.trim()) { setError("Enter a match or event"); return; }
+    if (!selection.trim()) { setError("Enter your selection"); return; }
+    const oddsNum = Number(odds);
+    if (!odds || isNaN(oddsNum) || oddsNum < 1.01) { setError("Enter valid decimal odds (≥ 1.01)"); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      await submitChallengeEntry(challengeId, {
+        event_id: matchLabel.trim().toLowerCase().replace(/\s+/g, "-"),
+        sport,
+        event_start_at: new Date(Date.now() + 86400000).toISOString(),
+        pick_type: pickType,
+        pick_payload: { selection, odds: oddsNum, match_label: matchLabel },
+        prediction_payload: {},
+      });
+      onSubmitted();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Submission failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+      <div className="w-full max-w-md rounded-2xl p-6 flex flex-col gap-4" style={{ background: "#fff", border: "1px solid var(--border0)" }}>
+        <div className="flex items-center justify-between">
+          <h2 style={{ fontSize: 15, fontWeight: 700 }}>Submit a Pick</h2>
+          <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-text-primary"><X size={16} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="label">Sport</label>
+            <div className="flex gap-1 flex-wrap">
+              {availableSports.map(s => (
+                <button key={s} type="button" onClick={() => setSport(s)}
+                  className="text-xs px-3 py-1 rounded-full border transition-all capitalize"
+                  style={sport === s
+                    ? { background: "var(--accent-dim)", borderColor: "rgba(34,226,131,0.35)", color: "var(--accent)" }
+                    : { background: "transparent", borderColor: "var(--border0)", color: "var(--text1)" }
+                  }>{s}</button>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="label">Match / Event</label>
+            <input value={matchLabel} onChange={e => setMatchLabel(e.target.value)} placeholder="e.g. Arsenal vs Chelsea" className="input-field" />
+          </div>
+          <div className="flex gap-3">
+            <div className="flex flex-col gap-1.5 flex-shrink-0">
+              <label className="label">Pick type</label>
+              <select value={pickType} onChange={e => setPickType(e.target.value)} className="input-field">
+                <option value="moneyline">Moneyline</option>
+                <option value="spread">Spread</option>
+                <option value="over_under">Over/Under</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5 flex-1">
+              <label className="label">Selection</label>
+              <input value={selection} onChange={e => setSelection(e.target.value)} placeholder="Home win, Over 2.5…" className="input-field" />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="label">Odds (decimal)</label>
+            <input type="number" step="0.01" min="1.01" value={odds} onChange={e => setOdds(e.target.value)} placeholder="e.g. 1.85" className="input-field" />
+          </div>
+          {error && <p style={{ fontSize: 12, color: "var(--negative)" }}>{error}</p>}
+          <button type="submit" className="btn btn-primary h-10" disabled={saving}>
+            {saving ? "Submitting…" : "Submit Pick"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function ChallengeDetailClient({ challenge, leaderboard, feedData }: Props) {
   const [tab, setTab] = useState<Tab>("overview");
   const [isMember, setIsMember] = useState(challenge.is_member);
   const [memberCount, setMemberCount] = useState(challenge.member_count);
   const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
   const router = useRouter();
 
   async function handleJoin() {
     setActionLoading(true);
+    setActionError(null);
     try {
       await joinChallenge(challenge.id);
       setIsMember(true);
       setMemberCount((n) => n + 1);
     } catch {
-      // error shown by router refresh
+      setActionError("Failed to join challenge. Please try again.");
     } finally {
       setActionLoading(false);
     }
@@ -230,16 +333,19 @@ export function ChallengeDetailClient({ challenge, leaderboard, feedData }: Prop
 
   async function handleLeave() {
     setActionLoading(true);
+    setActionError(null);
     try {
       await leaveChallenge(challenge.id);
       setIsMember(false);
       setMemberCount((n) => Math.max(0, n - 1));
     } catch {
-      // silently fail
+      setActionError("Failed to leave challenge. Please try again.");
     } finally {
       setActionLoading(false);
     }
   }
+
+  const isFull = !!challenge.max_members && memberCount >= challenge.max_members;
 
   const status = challengeStatus(challenge);
   const isOwner = challenge.user_role === "owner";
@@ -292,25 +398,42 @@ export function ChallengeDetailClient({ challenge, leaderboard, feedData }: Prop
 
           {/* Join / Leave */}
           {!isOwner && (
-            isMember ? (
-              <button
-                className="btn btn-md btn-ghost"
-                onClick={handleLeave}
-                disabled={actionLoading}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}
-              >
-                <LogOut size={13} /> Leave
-              </button>
-            ) : (
-              <button
-                className="btn btn-md btn-primary"
-                onClick={handleJoin}
-                disabled={actionLoading}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-              >
-                <LogIn size={14} /> {actionLoading ? "Joining…" : "Join challenge"}
-              </button>
-            )
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                {isMember && status.label === "Active" && (
+                  <button
+                    className="btn btn-md btn-primary"
+                    onClick={() => setShowSubmitModal(true)}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, background: "var(--positive)", borderColor: "var(--positive)" }}
+                  >
+                    <Plus size={13} /> Submit Pick
+                  </button>
+                )}
+                {isMember ? (
+                  <button
+                    className="btn btn-md btn-ghost"
+                    onClick={handleLeave}
+                    disabled={actionLoading}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}
+                  >
+                    <LogOut size={13} /> Leave
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-md btn-primary"
+                    onClick={handleJoin}
+                    disabled={actionLoading || isFull}
+                    title={isFull ? "Challenge is full" : undefined}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                  >
+                    <LogIn size={14} /> {actionLoading ? "Joining…" : isFull ? "Challenge full" : "Join challenge"}
+                  </button>
+                )}
+              </div>
+              {actionError && (
+                <p style={{ fontSize: 11, color: "var(--negative)", margin: 0 }}>{actionError}</p>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -358,6 +481,15 @@ export function ChallengeDetailClient({ challenge, leaderboard, feedData }: Prop
 
         {tab === "rules" && <RulesTab challenge={challenge} />}
       </div>
+
+      {showSubmitModal && (
+        <SubmitEntryModal
+          challengeId={challenge.id}
+          sportScope={challenge.sport_scope}
+          onClose={() => setShowSubmitModal(false)}
+          onSubmitted={() => router.refresh()}
+        />
+      )}
     </div>
   );
 }

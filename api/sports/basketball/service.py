@@ -251,15 +251,8 @@ def _mock_basketball_detail(
     status = match.status
     is_finished = status == "finished"
 
-    home_pts = match.home_score or (95 + (seed % 30) if is_finished else None)
-    away_pts = match.away_score or (95 + ((seed + 13) % 30) if is_finished else None)
-
-    # Quarter scores (mock split when score known)
-    if is_finished and home_pts and away_pts:
-        h_qs = _split_quarters(home_pts, seed)
-        a_qs = _split_quarters(away_pts, seed + 7)
-    else:
-        h_qs = a_qs = None
+    home_pts = match.home_score
+    away_pts = match.away_score
 
     # Real ELO ratings
     elo_home = _elo_snapshot(db, match.home_team_id, home_name)
@@ -282,8 +275,40 @@ def _mock_basketball_detail(
         ).first()
         box_home = _box_from_stats(stats_home, home_name, db) if stats_home else None
         box_away = _box_from_stats(stats_away, away_name, db) if stats_away else None
+
+        # Quarter scores: use real DB data if any quarter value is present, else None
+        if stats_home and any(
+            v is not None for v in [
+                stats_home.points_q1, stats_home.points_q2,
+                stats_home.points_q3, stats_home.points_q4,
+            ]
+        ):
+            h_qs = QuarterScore(
+                q1=stats_home.points_q1,
+                q2=stats_home.points_q2,
+                q3=stats_home.points_q3,
+                q4=stats_home.points_q4,
+            )
+        else:
+            h_qs = None
+
+        if stats_away and any(
+            v is not None for v in [
+                stats_away.points_q1, stats_away.points_q2,
+                stats_away.points_q3, stats_away.points_q4,
+            ]
+        ):
+            a_qs = QuarterScore(
+                q1=stats_away.points_q1,
+                q2=stats_away.points_q2,
+                q3=stats_away.points_q3,
+                q4=stats_away.points_q4,
+            )
+        else:
+            a_qs = None
     else:
         box_home = box_away = None
+        h_qs = a_qs = None
 
     # Real form from CoreMatch
     home_form_records = compute_team_form(db, "basketball", match.home_team_id, limit=5)

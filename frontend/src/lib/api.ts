@@ -50,12 +50,21 @@ export class ApiError extends Error {
 // ─── Auth token helper ────────────────────────────────────────────────────
 
 function getAuthHeaders(): Record<string, string> {
-  if (typeof window === "undefined") return {};
+  if (typeof window !== "undefined") {
+    try {
+      const token = localStorage.getItem("alpha_engine_token");
+      if (token) return { Authorization: `Bearer ${token}` };
+    } catch {}
+    return {};
+  }
+  // Server-side: read ae_token cookie from the active Next.js request context
   try {
-    const token = localStorage.getItem("alpha_engine_token");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { cookies } = require("next/headers") as { cookies: () => { get(k: string): { value: string } | undefined } };
+    const token = cookies().get("ae_token")?.value;
     if (token) return { Authorization: `Bearer ${token}` };
   } catch {
-    // ignore
+    // Outside request context (build time) — no auth available
   }
   return {};
 }
@@ -256,6 +265,17 @@ export async function leaveChallenge(id: string): Promise<void> {
   return mutate<void>(`/challenges/${id}/leave`, "POST");
 }
 
+export async function submitChallengeEntry(challengeId: string, data: {
+  event_id: string;
+  sport: string;
+  event_start_at: string;
+  pick_type: string;
+  pick_payload: Record<string, unknown>;
+  prediction_payload?: Record<string, unknown>;
+}): Promise<ChallengeEntry> {
+  return mutate<ChallengeEntry>(`/challenges/${challengeId}/entries`, "POST", data);
+}
+
 export async function getChallengeEntries(
   id: string,
   params?: { scope?: "feed" | "mine"; page?: number; page_size?: number }
@@ -274,7 +294,7 @@ export async function getLeaderboard(id: string): Promise<LeaderboardOut> {
 
 // ─── Sport-specific match endpoints ──────────────────────────────────────
 
-export type SportSlug = "soccer" | "tennis" | "esports" | "basketball" | "baseball";
+export type SportSlug = "soccer" | "tennis" | "esports" | "basketball" | "baseball" | "hockey";
 
 export async function getSportMatches(
   sport: SportSlug,
@@ -467,14 +487,14 @@ export async function getPicks(params?: {
   if (params?.limit)   qs.set("limit",   String(params.limit));
   if (params?.offset)  qs.set("offset",  String(params.offset));
   const suffix = qs.toString() ? `?${qs}` : "";
-  const res = await fetch(`${BASE}/picks${suffix}`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/picks${suffix}`, { cache: "no-store", headers: getAuthHeaders() });
   if (!res.ok) throw new ApiError(`API ${res.status}`, res.status, "/picks");
   return res.json();
 }
 
 export async function getPicksStats(sport?: string): Promise<PicksStatsOut> {
   const suffix = sport ? `?sport=${sport}` : "";
-  const res = await fetch(`${BASE}/picks/stats${suffix}`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/picks/stats${suffix}`, { cache: "no-store", headers: getAuthHeaders() });
   if (!res.ok) throw new ApiError(`API ${res.status}`, res.status, "/picks/stats");
   return res.json();
 }
@@ -483,14 +503,8 @@ export async function deletePick(id: string): Promise<void> {
   return mutate<void>(`/picks/${id}`, "DELETE");
 }
 
-export async function getPicksStats(): Promise<PicksStatsOut> {
-  const res = await fetch(`${BASE}/picks/stats`, { cache: "no-store" });
-  if (!res.ok) throw new ApiError(`API ${res.status}`, res.status, "/picks/stats");
-  return res.json();
-}
-
 export async function getRecentWins(limit = 5): Promise<PickOut[]> {
-  const res = await fetch(`${BASE}/picks/recent-wins?limit=${limit}`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/picks/recent-wins?limit=${limit}`, { cache: "no-store", headers: getAuthHeaders() });
   if (!res.ok) throw new ApiError(`API ${res.status}`, res.status, "/picks/recent-wins");
   return res.json();
 }
@@ -520,7 +534,7 @@ export interface BankrollStatsOut {
 }
 
 export async function getBankroll(): Promise<BankrollStatsOut> {
-  const res = await fetch(`${BASE}/bankroll`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/bankroll`, { cache: "no-store", headers: getAuthHeaders() });
   if (!res.ok) throw new ApiError(`API ${res.status}`, res.status, "/bankroll");
   return res.json();
 }
@@ -600,7 +614,7 @@ export async function getPicksRoiSeries(window: PerformanceWindow = "30d"): Prom
   window: string;
   n: number;
 }> {
-  const res = await fetch(`${BASE}/picks/roi-series?window=${window}`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/picks/roi-series?window=${window}`, { cache: "no-store", headers: getAuthHeaders() });
   if (!res.ok) return { series: [], window, n: 0 };
   return res.json();
 }
@@ -646,3 +660,68 @@ export function computeEdge(modelProb: number, marketOdds: number): number {
   return Math.round((modelProb - marketProb) * 1000) / 10;
 }
 
+
+// ─── Search ───────────────────────────────────────────────────────────────
+
+export interface SearchResult {
+  id: string;
+  type: "match" | "team";
+  sport: string;
+  title: string;
+  subtitle: string;
+  href: string;
+  status?: string | null;
+}
+
+export async function searchMatches(q: string, limit = 10): Promise<SearchResult[]> {
+  if (!q || q.trim().length < 2) return [];
+  const qs = new URLSearchParams({ q: q.trim(), limit: String(limit) });
+  return request<SearchResult[]>(`/matches/search?${qs}`, { revalidate: 0 });
+}
+
+// ─── Prediction accuracy ──────────────────────────────────────────────────
+
+export interface AccuracyStat { n: number; accuracy: number | null; avg_brier: number | null; }
+export interface PredictionAccuracy {
+  overall: AccuracyStat;
+  by_sport: Record<string, AccuracyStat>;
+  recent: { sport: string; kickoff: string; correct: boolean; predicted_prob: number; brier: number }[];
+}
+
+export async function getPredictionAccuracy(sport?: string): Promise<PredictionAccuracy> {
+  const qs = sport ? `?sport=${sport}` : "";
+  return request<PredictionAccuracy>(`/predictions/accuracy${qs}`, { revalidate: 300 });
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────
+
+export interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  message: string | null;
+  is_read: boolean;
+  created_at: string;
+  data: Record<string, unknown>;
+}
+
+export async function getNotifications(limit = 50): Promise<Notification[]> {
+  return request(`/notifications?limit=${limit}`, { revalidate: 0 });
+}
+
+export async function getUnreadNotificationCount(): Promise<number> {
+  const r = await request<{ count: number }>(`/notifications/unread-count`, { revalidate: 0 });
+  return r.count;
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  await fetch(`${BASE}/notifications/${id}/read`, { method: "POST", headers: getAuthHeaders() });
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  await fetch(`${BASE}/notifications/read-all`, { method: "POST", headers: getAuthHeaders() });
+}
+
+export async function updateProfile(data: { display_name?: string; current_password?: string; new_password?: string }): Promise<{ user_id: string; email: string; display_name: string | null }> {
+  return mutate("/auth/me", "PATCH", data);
+}

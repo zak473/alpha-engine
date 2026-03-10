@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     # Register at https://the-odds-api.com → Get API Key
     ODDS_API_KEY: str = ""
 
+    # Live data — Highlightly (soccer 950+ leagues, basketball, baseball, hockey)
+    # Register at https://highlightly.net → API key
+    HIGHLIGHTLY_API_KEY: str = ""
+
     # Auto-pick bot settings
     AUTO_PICK_USER_ID: str = "bot"          # user_id for auto-generated picks
     AUTO_PICK_MIN_EDGE: float = 0.03        # minimum edge to generate a pick (3%)

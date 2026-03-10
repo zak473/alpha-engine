@@ -15,7 +15,7 @@ from db.models.mvp import CoreMatch, CoreTeam, CoreLeague
 
 router = APIRouter(prefix="/matches", tags=["matches"])
 
-ALL_SPORTS = ["soccer", "tennis", "esports", "basketball", "baseball"]
+ALL_SPORTS = ["soccer", "tennis", "esports", "basketball", "baseball", "hockey"]
 
 
 class LiveMatchOut(BaseModel):
@@ -105,3 +105,86 @@ def get_live_matches(db: Session = Depends(get_db)):
                 result.append(_build_out(m, teams, leagues, is_live=False))
 
     return result
+
+
+class SearchResult(BaseModel):
+    id: str
+    type: str          # "match" | "team"
+    sport: str
+    title: str
+    subtitle: str
+    href: str
+    status: Optional[str] = None
+
+
+@router.get("/search", response_model=list[SearchResult])
+def search(
+    q: str,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+):
+    """Full-text search across matches and teams. Returns up to `limit` results."""
+    if not q or len(q.strip()) < 2:
+        return []
+
+    term = q.strip().lower()
+    results: list[SearchResult] = []
+
+    # Search teams
+    from sqlalchemy import or_
+    teams = (
+        db.query(CoreTeam)
+        .filter(
+            or_(
+                CoreTeam.name.ilike(f"%{term}%"),
+                CoreTeam.short_name.ilike(f"%{term}%"),
+            )
+        )
+        .limit(5)
+        .all()
+    )
+    for t in teams:
+        results.append(SearchResult(
+            id=t.id, type="team", sport="",
+            title=t.name,
+            subtitle=t.country or "",
+            href=f"/sports/soccer/matches?team={t.id}",
+        ))
+
+    # Search matches by team names
+    now = datetime.now(timezone.utc)
+    matches = (
+        db.query(CoreMatch)
+        .join(CoreTeam, CoreTeam.id == CoreMatch.home_team_id)
+        .filter(
+            or_(
+                CoreTeam.name.ilike(f"%{term}%"),
+                CoreMatch.home_team_id.in_(
+                    db.query(CoreTeam.id).filter(CoreTeam.name.ilike(f"%{term}%"))
+                ),
+                CoreMatch.away_team_id.in_(
+                    db.query(CoreTeam.id).filter(CoreTeam.name.ilike(f"%{term}%"))
+                ),
+            )
+        )
+        .order_by(CoreMatch.kickoff_utc.desc())
+        .limit(limit)
+        .all()
+    )
+
+    if matches:
+        team_ids = {m.home_team_id for m in matches} | {m.away_team_id for m in matches}
+        team_map = {t.id: t.name for t in db.query(CoreTeam).filter(CoreTeam.id.in_(team_ids)).all()}
+        for m in matches:
+            home = team_map.get(m.home_team_id, "")
+            away = team_map.get(m.away_team_id, "")
+            sport_slug = m.sport
+            results.append(SearchResult(
+                id=m.id, type="match", sport=sport_slug,
+                title=f"{home} vs {away}",
+                subtitle=f"{m.sport.capitalize()} · {m.kickoff_utc.strftime('%d %b %Y') if m.kickoff_utc else ''}",
+                href=f"/sports/{sport_slug}/matches/{m.id}",
+                status=m.status,
+            ))
+
+    return results[:limit]

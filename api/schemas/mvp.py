@@ -69,6 +69,9 @@ class PredictionSchema(BaseModel):
     season: Optional[str]
     start_time: datetime
     status: str
+    outcome: Optional[str] = None        # "home_win" | "draw" | "away_win" | None
+    home_score: Optional[int] = None
+    away_score: Optional[int] = None
     participants: ParticipantsSchema
     probabilities: ProbabilitiesSchema
     fair_odds: FairOddsSchema
@@ -98,6 +101,7 @@ class ModelMetricsSchema(BaseModel):
     sport: str
     is_live: bool
     n_train_samples: Optional[int]
+    n_predictions: Optional[int] = None   # live count of predictions in DB
     accuracy: Optional[float]
     brier_score: Optional[float]
     log_loss: Optional[float]

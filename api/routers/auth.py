@@ -15,7 +15,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -150,3 +150,44 @@ def get_token(body: TokenIn, db: Session = Depends(get_db)):
         email=user.email,
         display_name=user.display_name,
     )
+
+
+class UpdateProfileIn(BaseModel):
+    display_name: Optional[str] = None
+    current_password: Optional[str] = None
+    new_password: Optional[str] = None
+
+
+@router.patch("/me", response_model=UserOut)
+def update_profile(
+    body: UpdateProfileIn,
+    authorization: Optional[str] = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    """Update the current user's display name and/or password."""
+    from api.deps import _decode_jwt
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    user_id = _decode_jwt(authorization[7:])
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if body.display_name is not None:
+        user.display_name = body.display_name.strip() or None
+
+    if body.new_password:
+        if not body.current_password:
+            raise HTTPException(status_code=400, detail="Current password required to change password")
+        if not _verify_password(body.current_password, user.password_hash):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+        if len(body.new_password) < 6:
+            raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+        user.password_hash = _hash_password(body.new_password)
+
+    db.commit()
+    db.refresh(user)
+    return UserOut(user_id=user.id, email=user.email, display_name=user.display_name)

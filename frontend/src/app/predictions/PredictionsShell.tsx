@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTransition } from "react";
+import { useTransition, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, BrainCircuit, TrendingUp, Calendar, Zap } from "lucide-react";
 import type { MvpPrediction, MvpPredictionList } from "@/lib/types";
@@ -147,6 +147,14 @@ const RANGES = [
   { value: "30d",   label: "30 days" },
 ];
 
+const CONF_THRESHOLDS = [
+  { value: "0",   label: "All" },
+  { value: "0.5", label: "50%+" },
+  { value: "0.6", label: "60%+" },
+  { value: "0.7", label: "70%+" },
+  { value: "0.8", label: "80%+" },
+];
+
 function SegGroup<T extends string>({
   options, active, onChange,
 }: {
@@ -183,6 +191,7 @@ export function PredictionsShell({ initialData, initialSport, initialStatus, ini
   const router = useRouter();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
+  const [minConf, setMinConf] = useState("0");
 
   const sport = searchParams.get("sport") ?? initialSport;
   const status = searchParams.get("status") ?? initialStatus;
@@ -198,7 +207,10 @@ export function PredictionsShell({ initialData, initialSport, initialStatus, ini
     });
   }
 
-  const items = initialData.items;
+  const threshold = parseFloat(minConf);
+  const items = threshold > 0
+    ? initialData.items.filter((p) => p.confidence >= threshold)
+    : initialData.items;
 
   return (
     <div className="flex flex-col">
@@ -232,6 +244,14 @@ export function PredictionsShell({ initialData, initialSport, initialStatus, ini
               options={RANGES as { value: string; label: string }[]}
               active={range}
               onChange={(v) => navigate({ range: v })}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="label">Confidence</span>
+            <SegGroup
+              options={CONF_THRESHOLDS as { value: string; label: string }[]}
+              active={minConf}
+              onChange={setMinConf}
             />
           </div>
         </div>

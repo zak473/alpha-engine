@@ -475,9 +475,9 @@ export function RecordView() {
             <div className="text-center">
               <p className="text-sm font-semibold text-t0 mb-1">No picks tracked yet</p>
               <p className="text-xs text-t1 max-w-xs">
-                Browse{" "}
+                View{" "}
                 <Link href="/predictions" style={{ color: "var(--accent)" }}>predictions</Link>
-                {" "}and track picks to see your record here.
+                {" "}and track picks to build your record here.
               </p>
             </div>
           </div>

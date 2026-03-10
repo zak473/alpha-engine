@@ -15,7 +15,7 @@ export default async function PredictionsPage({
 
   // Date range
   let dateFrom: string | undefined;
-  const range = params.range ?? "today";
+  const range = params.range ?? "7d";
   const now = new Date();
   if (range === "today") {
     dateFrom = now.toISOString().slice(0, 10);

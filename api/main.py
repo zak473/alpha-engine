@@ -6,6 +6,16 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
+
+# Rate limiting (optional — degrades gracefully if slowapi not installed)
+_rate_limiter = None
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+    _rate_limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
+except ImportError:
+    pass
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -13,13 +23,19 @@ from sqlalchemy.orm import Session
 from api.deps import get_db
 from api.exceptions import register_exception_handlers
 from api.middleware import RequestLoggingMiddleware
-from api.routers import auth, backtest, challenges, esports, matches, picks, predictions, soccer, tennis, tipsters
+from api.routers import auth, backtest, basketball as basketball_router, baseball as baseball_router, challenges, esports, matches, notifications, picks, predictions, soccer, tennis, tipsters
 from api.sports.soccer import routes as soccer_sport
 from api.sports.tennis import routes as tennis_sport
 from api.sports.esports import routes as esports_sport
 from api.sports.basketball import routes as basketball_sport
 from api.sports.baseball import routes as baseball_sport
+from api.sports.hockey import routes as hockey_sport
 from config.settings import settings
+
+SECRET_KEY_IS_DEFAULT = (
+    not __import__("os").environ.get("JWT_SECRET")
+    or __import__("os").environ.get("JWT_SECRET") == "change-me-in-production-please"
+)
 
 # ─── Logging setup ────────────────────────────────────────────────────────
 
@@ -52,6 +68,37 @@ async def lifespan(app: FastAPI):
         logger.info("Startup: background fetch_live triggered.")
     except Exception as exc:
         logger.warning("Startup fetch_live failed to launch: %s", exc)
+
+    # ── API key health report ──────────────────────────────────────────────
+    KEY_MAP = {
+        "FOOTBALL_DATA_API_KEY": ("Soccer fixtures/results",     settings.FOOTBALL_DATA_API_KEY),
+        "TENNIS_API_KEY":        ("Tennis fixtures (Odds API)",   settings.TENNIS_API_KEY),
+        "TENNIS_LIVE_API_KEY":   ("Tennis live scores",           settings.TENNIS_LIVE_API_KEY),
+        "ESPORTS_API_KEY":       ("Esports (PandaScore)",         settings.ESPORTS_API_KEY),
+        "ODDS_API_KEY":          ("Real market odds + auto-pick", settings.ODDS_API_KEY),
+        "HIGHLIGHTLY_API_KEY":   ("Highlightly (soccer/basketball/baseball/hockey)", settings.HIGHLIGHTLY_API_KEY),
+    }
+    active   = [(k, desc) for k, (desc, val) in KEY_MAP.items() if val]
+    inactive = [(k, desc) for k, (desc, val) in KEY_MAP.items() if not val]
+
+    if active:
+        logger.info(
+            "Pipeline keys configured (%d/%d): %s",
+            len(active), len(KEY_MAP),
+            ", ".join(f"{k} ({desc})" for k, desc in active),
+        )
+    if inactive:
+        logger.warning(
+            "Pipeline keys missing (%d/%d) — those feeds disabled: %s",
+            len(inactive), len(KEY_MAP),
+            ", ".join(f"{k} ({desc})" for k, desc in inactive),
+        )
+
+    if settings.ENV == "production" and SECRET_KEY_IS_DEFAULT:
+        logger.critical(
+            "JWT_SECRET is set to the default value in production! "
+            "Set a strong JWT_SECRET environment variable immediately."
+        )
 
     if settings.SCHEDULER_ENABLED and settings.FOOTBALL_DATA_API_KEY:
         from pipelines.scheduler import start as start_scheduler
@@ -91,6 +138,14 @@ app = FastAPI(
     ],
 )
 
+# ─── Rate limiting ────────────────────────────────────────────────────────
+
+if _rate_limiter is not None:
+    app.state.limiter = _rate_limiter
+    from slowapi.errors import RateLimitExceeded
+    from slowapi import _rate_limit_exceeded_handler
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # ─── Middleware ────────────────────────────────────────────────────────────
 
 app.add_middleware(RequestLoggingMiddleware)
@@ -120,10 +175,13 @@ app.include_router(challenges.router,  prefix=settings.API_PREFIX)
 app.include_router(matches.router,     prefix=settings.API_PREFIX)
 app.include_router(picks.router,       prefix=settings.API_PREFIX)
 app.include_router(tipsters.router,    prefix=settings.API_PREFIX)
+app.include_router(notifications.router, prefix=settings.API_PREFIX)
 
 from api.routers import bankroll
 app.include_router(bankroll.router,    prefix=settings.API_PREFIX)
 app.include_router(backtest.router,    prefix=settings.API_PREFIX)
+app.include_router(basketball_router.router, prefix=settings.API_PREFIX)
+app.include_router(baseball_router.router,   prefix=settings.API_PREFIX)
 
 # ── Sport-specific match routes ────────────────────────────────────────────
 app.include_router(soccer_sport.router,      prefix=settings.API_PREFIX)
@@ -131,6 +189,7 @@ app.include_router(tennis_sport.router,      prefix=settings.API_PREFIX)
 app.include_router(esports_sport.router,     prefix=settings.API_PREFIX)
 app.include_router(basketball_sport.router,  prefix=settings.API_PREFIX)
 app.include_router(baseball_sport.router,    prefix=settings.API_PREFIX)
+app.include_router(hockey_sport.router,      prefix=settings.API_PREFIX)
 
 # ─── Shared endpoints ─────────────────────────────────────────────────────
 
@@ -242,6 +301,20 @@ def trigger_sync(background_tasks=None):
     t = threading.Thread(target=_run, daemon=True)
     t.start()
     return {"status": "sync started", "note": "Check server logs for progress."}
+
+
+@app.post("/api/v1/admin/sync-highlightly", tags=["Health"])
+def trigger_highlightly_sync(db: Session = Depends(get_db)):
+    """Manually trigger a Highlightly full sync and return row count."""
+    try:
+        from pipelines.highlightly.fetch_all import fetch_all as hl_fetch
+        n = hl_fetch()
+        from db.models.mvp import CoreMatch
+        total = db.query(CoreMatch).filter(CoreMatch.provider_id.like("hl-%")).count()
+        return {"status": "ok", "rows_ingested": n, "total_hl_matches_in_db": total}
+    except Exception as exc:
+        logger.error("[highlightly sync] failed: %s", exc, exc_info=True)
+        return {"status": "error", "detail": str(exc)}
 
 
 @app.get("/ready", tags=["Health"])

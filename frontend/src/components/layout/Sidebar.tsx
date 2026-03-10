@@ -22,6 +22,7 @@ const SPORTS = [
   { label: "Esports", href: "/sports/esports/matches", color: "#a855f7" },
   { label: "Basketball", href: "/sports/basketball/matches", color: "#f59e0b" },
   { label: "Baseball", href: "/sports/baseball/matches", color: "#ef4444" },
+  { label: "Hockey", href: "/sports/hockey/matches", color: "#06b6d4" },
 ];
 
 export function Sidebar() {

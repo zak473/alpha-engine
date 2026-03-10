@@ -104,6 +104,9 @@ export interface MvpPrediction {
   season: string | null;
   start_time: string;
   status: string;
+  outcome: string | null;       // "home_win" | "draw" | "away_win" | null
+  home_score: number | null;
+  away_score: number | null;
   participants: {
     home: MvpParticipant;
     away: MvpParticipant;
@@ -133,6 +136,7 @@ export interface MvpModelMetrics {
   sport: string;
   is_live: boolean;
   n_train_samples: number | null;
+  n_predictions: number | null;
   accuracy: number | null;
   brier_score: number | null;
   log_loss: number | null;

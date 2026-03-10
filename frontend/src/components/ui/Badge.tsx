@@ -22,9 +22,11 @@ const variantClass: Record<SemanticVariant, string> = {
 export function Badge({ children, sport, variant, className }: BadgeProps) {
   if (sport) {
     const colorMap: Record<string, string> = {
-      soccer:  colors.soccer,
-      tennis:  colors.tennis,
-      esports: colors.esports,
+      soccer:     colors.soccer,
+      tennis:     colors.tennis,
+      esports:    colors.esports,
+      basketball: colors.basketball,
+      baseball:   colors.baseball,
     };
     const color = colorMap[sport.toLowerCase()] ?? colors.text1;
     return (

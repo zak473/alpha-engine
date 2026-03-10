@@ -716,6 +716,7 @@ def fetch_all(dry_run: bool = False, days: int = 2) -> int:
 
     with Session(engine) as session:
         processed = 0
+        stats_failures = 0  # circuit breaker: stop trying stats after 3 consecutive failures
         for event in unique_events:
             try:
                 match_id = _upsert_match(session, event, dry_run=dry_run)
@@ -734,13 +735,20 @@ def fetch_all(dry_run: bool = False, days: int = 2) -> int:
                 # for scheduled/finished matches; live matches have real-time stats.
                 extended_stats = None
                 event_key = str(event.get("event_key", ""))
-                if event_key and event.get("event_live") == "1":
+                if event_key and event.get("event_live") == "1" and stats_failures < 3:
                     try:
                         stats_result = _get("get_match_statistics", {"event_id": event_key})
                         if stats_result:
                             extended_stats = _parse_match_statistics(stats_result)
+                            stats_failures = 0  # reset on success
+                        else:
+                            stats_failures += 1
                     except Exception as exc:
-                        log.debug("get_match_statistics failed for event %s: %s", event_key, exc)
+                        stats_failures += 1
+                        if stats_failures >= 3:
+                            log.warning("get_match_statistics returning errors — skipping stats for this run.")
+                        else:
+                            log.debug("get_match_statistics failed for event %s: %s", event_key, exc)
                     time.sleep(0.3)
 
                 if pointbypoint or extended_stats:

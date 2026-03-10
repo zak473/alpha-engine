@@ -1,13 +1,25 @@
-"""Tipster community API — profiles, tips, and follow state."""
+"""Tipster community API — profiles, tips, and follow state.
+
+All data is DB-backed. No hardcoded seed data.
+
+Tipster profiles are derived from the users table — any user who has posted
+at least one tip is surfaced as a tipster. Stats (win rate, follower count,
+active tips) are computed live from tipster_tips and tipster_follows.
+"""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from api.deps import get_db
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from api.deps import get_db, get_current_user
+from db.models.tipsters import TipsterFollow, TipsterTip
+from db.models.user import User
 
 router = APIRouter(prefix="/tipsters", tags=["Tipsters"])
 
@@ -27,14 +39,14 @@ class TipsterProfile(BaseModel):
     recent_results: list[str]
 
 
-class TipsterTip(BaseModel):
+class TipsterTipSchema(BaseModel):
     id: str
     sport: str
     match_label: str
     market_name: str
     selection_label: str
     odds: float
-    outcome: Optional[str] = None  # None | "won" | "lost" | "void"
+    outcome: Optional[str] = None
     start_time: str
     note: Optional[str] = None
 
@@ -45,97 +57,223 @@ class PostTipIn(BaseModel):
     selection_label: str
     market_name: str
     odds: float
+    start_time: Optional[str] = None
     note: Optional[str] = None
 
 
-# ─── Seed data ────────────────────────────────────────────────────────────────
-# Served from the backend so the frontend always loads it via API.
-# Replace this with a DB-backed tipster table when auth is available.
+# ─── Helpers ──────────────────────────────────────────────────────────────────
 
-_TIPSTERS: list[dict] = [
-    {
-        "id": "1", "username": "TheCannon", "bio": "Arsenal fan. Value bets only.",
-        "followers": 406, "is_following": False, "weekly_win_rate": 0.61,
-        "total_picks": 10, "won_picks": 8, "active_tips_count": 8,
-        "recent_results": ["L", "W", "W", "L", "W", "W", "W", "W"],
-    },
-    {
-        "id": "2", "username": "Professor_M", "bio": "Stats-driven. Patience is the edge.",
-        "followers": 561, "is_following": False, "weekly_win_rate": 0.79,
-        "total_picks": 13, "won_picks": 12, "active_tips_count": 2,
-        "recent_results": ["W", "W", "W", "W", "W", "W", "W", "W"],
-    },
-    {
-        "id": "3", "username": "the_goat7", "bio": "Living by the numbers.",
-        "followers": 316, "is_following": False, "weekly_win_rate": 0.76,
-        "total_picks": 26, "won_picks": 25, "active_tips_count": 1,
-        "recent_results": ["W", "W", "W", "W", "W", "W", "W", "W"],
-    },
-    {
-        "id": "4", "username": "The_punisher_tips", "bio": "High value, high risk.",
-        "followers": 894, "is_following": False, "weekly_win_rate": 0.67,
-        "total_picks": 8, "won_picks": 6, "active_tips_count": 4,
-        "recent_results": ["W", "L", "W", "L", "W", "W", "W", "W"],
-    },
-    {
-        "id": "5", "username": "SharpEdge", "bio": "ELO models + market movement.",
-        "followers": 742, "is_following": False, "weekly_win_rate": 0.71,
-        "total_picks": 21, "won_picks": 16, "active_tips_count": 3,
-        "recent_results": ["W", "W", "L", "W", "W", "W", "L", "W"],
-    },
-    {
-        "id": "6", "username": "ValueKing99", "bio": "Only post when the edge is real.",
-        "followers": 289, "is_following": False, "weekly_win_rate": 0.58,
-        "total_picks": 12, "won_picks": 9, "active_tips_count": 0,
-        "recent_results": ["L", "W", "W", "W", "L", "W", "W", "W"],
-    },
-]
+def _build_profile(
+    db: Session,
+    user: User,
+    current_user_id: Optional[str],
+) -> TipsterProfile:
+    """Compute stats for one tipster from DB."""
+    # Follower count
+    followers = db.query(func.count(TipsterFollow.id)).filter(
+        TipsterFollow.tipster_id == user.id
+    ).scalar() or 0
 
-_TIPS_BY_TIPSTER: dict[str, list[dict]] = {
-    "1": [
-        {"id": "t1a", "sport": "soccer", "match_label": "Arsenal vs Everton",
-         "market_name": "1X2", "selection_label": "Arsenal Win", "odds": 1.65,
-         "outcome": None, "start_time": "2026-03-08T15:00:00Z"},
-        {"id": "t1b", "sport": "soccer", "match_label": "Man City vs Tottenham",
-         "market_name": "Both Teams to Score", "selection_label": "Yes", "odds": 1.90,
-         "outcome": None, "start_time": "2026-03-08T17:30:00Z"},
-    ],
-    "2": [
-        {"id": "t2a", "sport": "tennis", "match_label": "Sinner vs Alcaraz",
-         "market_name": "Match Winner", "selection_label": "Sinner", "odds": 2.10,
-         "outcome": None, "start_time": "2026-03-09T13:00:00Z"},
-    ],
-    "4": [
-        {"id": "t4a", "sport": "basketball", "match_label": "Lakers vs Celtics",
-         "market_name": "Moneyline", "selection_label": "Celtics", "odds": 1.85,
-         "outcome": None, "start_time": "2026-03-08T00:00:00Z"},
-        {"id": "t4b", "sport": "soccer", "match_label": "Liverpool vs Chelsea",
-         "market_name": "1X2", "selection_label": "Draw", "odds": 3.40,
-         "outcome": None, "start_time": "2026-03-09T14:00:00Z"},
-    ],
-    "5": [
-        {"id": "t5a", "sport": "esports", "match_label": "NAVI vs FaZe",
-         "market_name": "Match Winner", "selection_label": "NAVI", "odds": 2.05,
-         "outcome": None, "start_time": "2026-03-08T18:00:00Z"},
-    ],
-}
+    # Is the requesting user following this tipster?
+    is_following = False
+    if current_user_id:
+        is_following = db.query(TipsterFollow).filter_by(
+            follower_id=current_user_id,
+            tipster_id=user.id,
+        ).first() is not None
+
+    # All-time pick counts
+    total_picks = db.query(func.count(TipsterTip.id)).filter(
+        TipsterTip.user_id == user.id
+    ).scalar() or 0
+
+    won_picks = db.query(func.count(TipsterTip.id)).filter(
+        TipsterTip.user_id == user.id,
+        TipsterTip.outcome == "won",
+    ).scalar() or 0
+
+    # Active (unsettled) tips
+    active_tips_count = db.query(func.count(TipsterTip.id)).filter(
+        TipsterTip.user_id == user.id,
+        TipsterTip.outcome.is_(None),
+    ).scalar() or 0
+
+    # Weekly win rate: settled picks in last 7 days
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    weekly_settled = db.query(func.count(TipsterTip.id)).filter(
+        TipsterTip.user_id == user.id,
+        TipsterTip.settled_at >= cutoff,
+        TipsterTip.outcome.in_(["won", "lost"]),
+    ).scalar() or 0
+
+    weekly_won = db.query(func.count(TipsterTip.id)).filter(
+        TipsterTip.user_id == user.id,
+        TipsterTip.settled_at >= cutoff,
+        TipsterTip.outcome == "won",
+    ).scalar() or 0
+
+    weekly_win_rate = (weekly_won / weekly_settled) if weekly_settled > 0 else 0.0
+
+    # Recent results: last 8 settled picks newest-first
+    recent_tips = (
+        db.query(TipsterTip)
+        .filter(
+            TipsterTip.user_id == user.id,
+            TipsterTip.outcome.in_(["won", "lost"]),
+        )
+        .order_by(TipsterTip.settled_at.desc())
+        .limit(8)
+        .all()
+    )
+    recent_results = ["W" if t.outcome == "won" else "L" for t in recent_tips]
+
+    return TipsterProfile(
+        id=user.id,
+        username=user.display_name or user.email.split("@")[0],
+        bio=None,
+        followers=followers,
+        is_following=is_following,
+        weekly_win_rate=round(weekly_win_rate, 4),
+        total_picks=total_picks,
+        won_picks=won_picks,
+        active_tips_count=active_tips_count,
+        recent_results=recent_results,
+    )
 
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("", response_model=list[TipsterProfile])
-def list_tipsters(db: Session = Depends(get_db)):
-    """Return all tipster profiles."""
-    return _TIPSTERS
+def list_tipsters(
+    db: Session = Depends(get_db),
+    current_user_id: Optional[str] = Query(None, alias="viewer_id"),
+):
+    """
+    Return all users who have posted at least one tip, with computed stats.
+    Pass ?viewer_id=<user_id> (or rely on auth middleware) to populate is_following.
+    """
+    # Find all user_ids that have posted tips
+    tipster_ids_q = db.query(TipsterTip.user_id).distinct().subquery()
+    users = db.query(User).filter(User.id.in_(tipster_ids_q)).all()
+
+    return [_build_profile(db, u, current_user_id) for u in users]
 
 
-@router.get("/{tipster_id}/tips", response_model=list[TipsterTip])
-def get_tipster_tips(tipster_id: str, db: Session = Depends(get_db)):
-    """Return active and recent tips for a tipster."""
-    return _TIPS_BY_TIPSTER.get(tipster_id, [])
+@router.get("/{tipster_id}", response_model=TipsterProfile)
+def get_tipster(
+    tipster_id: str,
+    db: Session = Depends(get_db),
+    current_user_id: Optional[str] = Query(None, alias="viewer_id"),
+):
+    """Return a single tipster's profile."""
+    user = db.get(User, tipster_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail=f"Tipster {tipster_id} not found")
+    return _build_profile(db, user, current_user_id)
 
 
-@router.post("/tips")
-def post_tip(body: PostTipIn, db: Session = Depends(get_db)):
-    """Accept a community tip post (stored in session for now)."""
-    return {"status": "ok", "message": "Tip received"}
+@router.get("/{tipster_id}/tips", response_model=list[TipsterTipSchema])
+def get_tipster_tips(
+    tipster_id: str,
+    include_settled: bool = Query(False),
+    db: Session = Depends(get_db),
+):
+    """Return tips for a tipster. Pending tips only by default."""
+    query = db.query(TipsterTip).filter(TipsterTip.user_id == tipster_id)
+    if not include_settled:
+        query = query.filter(TipsterTip.outcome.is_(None))
+    tips = query.order_by(TipsterTip.start_time.asc()).all()
+
+    return [
+        TipsterTipSchema(
+            id=t.id,
+            sport=t.sport,
+            match_label=t.match_label,
+            market_name=t.market_name,
+            selection_label=t.selection_label,
+            odds=t.odds,
+            outcome=t.outcome,
+            start_time=t.start_time.isoformat() if t.start_time else "",
+            note=t.note,
+        )
+        for t in tips
+    ]
+
+
+@router.post("/tips", status_code=201)
+def post_tip(
+    body: PostTipIn,
+    db: Session = Depends(get_db),
+    current_user_id: str = Depends(get_current_user),
+):
+    """Post a new tip as the authenticated user."""
+    # Verify the user exists
+    user = db.get(User, current_user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    start_time = (
+        datetime.fromisoformat(body.start_time.replace("Z", "+00:00"))
+        if body.start_time
+        else datetime.now(timezone.utc)
+    )
+
+    tip = TipsterTip(
+        user_id=current_user_id,
+        sport=body.sport,
+        match_label=body.match_label,
+        market_name=body.market_name,
+        selection_label=body.selection_label,
+        odds=body.odds,
+        start_time=start_time,
+        note=body.note,
+    )
+    db.add(tip)
+    db.commit()
+    db.refresh(tip)
+    return {"status": "ok", "id": tip.id}
+
+
+@router.post("/{tipster_id}/follow", status_code=200)
+def follow_tipster(
+    tipster_id: str,
+    db: Session = Depends(get_db),
+    current_user_id: str = Depends(get_current_user),
+):
+    """Follow a tipster. Idempotent."""
+    if current_user_id == tipster_id:
+        raise HTTPException(status_code=400, detail="Cannot follow yourself")
+
+    tipster = db.get(User, tipster_id)
+    if tipster is None:
+        raise HTTPException(status_code=404, detail=f"Tipster {tipster_id} not found")
+
+    existing = db.query(TipsterFollow).filter_by(
+        follower_id=current_user_id,
+        tipster_id=tipster_id,
+    ).first()
+
+    if not existing:
+        db.add(TipsterFollow(follower_id=current_user_id, tipster_id=tipster_id))
+        db.commit()
+
+    return {"status": "ok", "following": True}
+
+
+@router.delete("/{tipster_id}/follow", status_code=200)
+def unfollow_tipster(
+    tipster_id: str,
+    db: Session = Depends(get_db),
+    current_user_id: str = Depends(get_current_user),
+):
+    """Unfollow a tipster. Idempotent."""
+    existing = db.query(TipsterFollow).filter_by(
+        follower_id=current_user_id,
+        tipster_id=tipster_id,
+    ).first()
+
+    if existing:
+        db.delete(existing)
+        db.commit()
+
+    return {"status": "ok", "following": False}

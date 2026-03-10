@@ -117,12 +117,15 @@ export default async function MatchDetailPage({ params }: { params: { id: string
   let sport        = "soccer";
 
   try {
-    prediction  = await getMatchPrediction(params.id);
-    homeName    = prediction.participants.home.name;
-    awayName    = prediction.participants.away.name;
-    competition = prediction.league;
-    status      = prediction.status;
-    sport       = prediction.sport;
+    prediction   = await getMatchPrediction(params.id);
+    homeName     = prediction.participants.home.name;
+    awayName     = prediction.participants.away.name;
+    competition  = prediction.league;
+    status       = prediction.status;
+    sport        = prediction.sport;
+    matchOutcome = prediction.outcome ?? undefined;
+    homeScore    = prediction.home_score ?? undefined;
+    awayScore    = prediction.away_score ?? undefined;
   } catch {
     notFound();
   }
@@ -424,7 +427,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
               />
               <CardBody>
                 <EloComparisonChart
-                  data={[]}
+                  data={eloHistory}
                   homeLabel={homeName}
                   awayLabel={awayName}
                 />

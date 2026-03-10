@@ -24,6 +24,7 @@ import argparse
 import csv
 import io
 import logging
+import random
 import time
 import uuid
 from datetime import datetime
@@ -33,6 +34,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from db.models.mvp import CoreLeague, CoreMatch, CoreTeam
+from db.models.tennis import TennisMatch, TennisMatchStats
 from db.session import SessionLocal
 
 log = logging.getLogger(__name__)
@@ -59,6 +61,19 @@ TOURNEY_LEVEL_NAME = {
     "C": "Challenger",
     "S": "Satellite / ITF",
     "": "Tour",
+}
+
+# tourney_level → tournament_level value for TennisMatch
+TOURNEY_LEVEL_DB = {
+    "G": "grand_slam",
+    "M": "masters",
+    "A": "atp500",
+    "250": "atp250",
+    "D": "davis_cup",
+    "F": "tour_finals",
+    "C": "challenger",
+    "S": "itf",
+    "": "tour",
 }
 
 
@@ -90,6 +105,26 @@ def _parse_date(s: str) -> datetime | None:
         return datetime.strptime(s[:8], "%Y%m%d")
     except Exception:
         return None
+
+
+def _safe_int(val: Any, default: int | None = None) -> int | None:
+    """Parse a value to int, returning default on failure or empty string."""
+    if val is None or val == "":
+        return default
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_float(val: Any, default: float | None = None) -> float | None:
+    """Parse a value to float, returning default on failure or empty string."""
+    if val is None or val == "":
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
 
 
 def _upsert_league(db: Session, provider_id: str, name: str) -> str:
@@ -152,6 +187,68 @@ def _score_to_sets(score: str) -> tuple[int, int]:
     return winner_sets, loser_sets
 
 
+def _build_match_stats(
+    match_id: str,
+    player_id: str,
+    aces: int | None,
+    df: int | None,
+    svpt: int | None,
+    first_in: int | None,
+    first_won: int | None,
+    second_won: int | None,
+    sv_gms: int | None,
+    bp_saved: int | None,
+    bp_faced: int | None,
+    opp_bp_faced: int | None,
+    opp_bp_saved: int | None,
+) -> TennisMatchStats:
+    """Construct a TennisMatchStats row from raw Sackmann column values."""
+    # First serve in pct
+    first_serve_in_pct: float | None = None
+    if svpt and svpt > 0 and first_in is not None:
+        first_serve_in_pct = first_in / svpt
+
+    # First serve won pct
+    first_serve_won_pct: float | None = None
+    if first_in and first_in > 0 and first_won is not None:
+        first_serve_won_pct = first_won / first_in
+
+    # Second serve won pct
+    second_serve_won_pct: float | None = None
+    if svpt is not None and first_in is not None and second_won is not None:
+        second_serve_attempts = svpt - first_in
+        if second_serve_attempts > 0:
+            second_serve_won_pct = second_won / second_serve_attempts
+
+    # Break points created / converted (from opponent's perspective)
+    bp_created: int | None = opp_bp_faced
+    bp_converted: int | None = None
+    if opp_bp_faced is not None and opp_bp_saved is not None:
+        bp_converted = opp_bp_faced - opp_bp_saved
+
+    bp_conversion_pct: float | None = None
+    if bp_created and bp_created > 0 and bp_converted is not None:
+        bp_conversion_pct = bp_converted / bp_created
+
+    return TennisMatchStats(
+        match_id=match_id,
+        player_id=player_id,
+        aces=aces,
+        double_faults=df,
+        first_serve_in_pct=first_serve_in_pct,
+        first_serve_won_pct=first_serve_won_pct,
+        second_serve_won_pct=second_serve_won_pct,
+        service_games_played=sv_gms,
+        service_games_held=None,
+        service_hold_pct=None,
+        break_points_faced=bp_faced,
+        break_points_saved=bp_saved,
+        break_points_created=bp_created,
+        break_points_converted=bp_converted,
+        bp_conversion_pct=bp_conversion_pct,
+    )
+
+
 def run_tour(
     db: Session,
     base_url: str,
@@ -208,24 +305,123 @@ def run_tour(
                 if existing is None:
                     winner_sets, loser_sets = _score_to_sets(row.get("score", ""))
 
+                    # Randomly assign winner as home or away to avoid outcome bias
+                    winner_is_home = random.random() < 0.5
+                    home_id   = winner_id if winner_is_home else loser_id
+                    away_id   = loser_id  if winner_is_home else winner_id
+                    home_sets = winner_sets if winner_is_home else loser_sets
+                    away_sets = loser_sets  if winner_is_home else winner_sets
+                    outcome   = "H"       if winner_is_home else "A"
+
                     match = CoreMatch(
                         id=str(uuid.uuid4()),
                         provider_id=provider_id,
                         league_id=league_id,
                         sport="tennis",
                         season=str(year),
-                        home_team_id=winner_id,   # winner treated as "home"
-                        away_team_id=loser_id,
+                        home_team_id=home_id,
+                        away_team_id=away_id,
                         kickoff_utc=dt,
                         status="finished",
-                        home_score=winner_sets if winner_sets or loser_sets else None,
-                        away_score=loser_sets  if winner_sets or loser_sets else None,
-                        outcome="H",              # winner always wins
+                        home_score=home_sets if home_sets or away_sets else None,
+                        away_score=away_sets if home_sets or away_sets else None,
+                        outcome=outcome,
                         is_neutral=True,          # tennis has no home court
                     )
                     db.add(match)
                     db.flush()
                     inserted += 1
+                    match_id = match.id
+                    winner_sets_val, loser_sets_val = _score_to_sets(row.get("score", ""))
+                else:
+                    match_id = existing.id
+                    winner_sets_val, loser_sets_val = _score_to_sets(row.get("score", ""))
+
+                # Upsert TennisMatch if it doesn't exist yet
+                tennis_match_existing = db.query(TennisMatch).filter_by(match_id=match_id).first()
+                if tennis_match_existing is None:
+                    score_str = row.get("score", "")
+                    retired = "RET" in score_str or "W/O" in score_str
+
+                    best_of_raw = row.get("best_of", "3")
+                    best_of = _safe_int(best_of_raw, 3)
+
+                    duration = _safe_int(row.get("minutes", ""))
+
+                    tournament_level_db = TOURNEY_LEVEL_DB.get(level, "tour")
+
+                    tennis_match = TennisMatch(
+                        match_id=match_id,
+                        surface=surface,
+                        tournament_level=tournament_level_db,
+                        round_name=row.get("round", "") or None,
+                        best_of=best_of if best_of is not None else 3,
+                        player_a_sets=winner_sets_val if winner_sets_val or loser_sets_val else None,
+                        player_b_sets=loser_sets_val if winner_sets_val or loser_sets_val else None,
+                        match_duration_min=duration,
+                        retired=retired,
+                    )
+                    db.add(tennis_match)
+                    db.flush()
+
+                    # Parse serve stats for winner (w_*) and loser (l_*)
+                    w_ace     = _safe_int(row.get("w_ace"))
+                    w_df      = _safe_int(row.get("w_df"))
+                    w_svpt    = _safe_int(row.get("w_svpt"))
+                    w_1stIn   = _safe_int(row.get("w_1stIn"))
+                    w_1stWon  = _safe_int(row.get("w_1stWon"))
+                    w_2ndWon  = _safe_int(row.get("w_2ndWon"))
+                    w_SvGms   = _safe_int(row.get("w_SvGms"))
+                    w_bpSaved = _safe_int(row.get("w_bpSaved"))
+                    w_bpFaced = _safe_int(row.get("w_bpFaced"))
+
+                    l_ace     = _safe_int(row.get("l_ace"))
+                    l_df      = _safe_int(row.get("l_df"))
+                    l_svpt    = _safe_int(row.get("l_svpt"))
+                    l_1stIn   = _safe_int(row.get("l_1stIn"))
+                    l_1stWon  = _safe_int(row.get("l_1stWon"))
+                    l_2ndWon  = _safe_int(row.get("l_2ndWon"))
+                    l_SvGms   = _safe_int(row.get("l_SvGms"))
+                    l_bpSaved = _safe_int(row.get("l_bpSaved"))
+                    l_bpFaced = _safe_int(row.get("l_bpFaced"))
+
+                    # Winner stats: break_points_created = l_bpFaced (winner created breaks against loser)
+                    winner_stats = _build_match_stats(
+                        match_id=match_id,
+                        player_id=winner_id,
+                        aces=w_ace,
+                        df=w_df,
+                        svpt=w_svpt,
+                        first_in=w_1stIn,
+                        first_won=w_1stWon,
+                        second_won=w_2ndWon,
+                        sv_gms=w_SvGms,
+                        bp_saved=w_bpSaved,
+                        bp_faced=w_bpFaced,
+                        opp_bp_faced=l_bpFaced,
+                        opp_bp_saved=l_bpSaved,
+                    )
+                    db.add(winner_stats)
+
+                    # Loser stats: break_points_created = w_bpFaced (loser created breaks against winner)
+                    loser_stats = _build_match_stats(
+                        match_id=match_id,
+                        player_id=loser_id,
+                        aces=l_ace,
+                        df=l_df,
+                        svpt=l_svpt,
+                        first_in=l_1stIn,
+                        first_won=l_1stWon,
+                        second_won=l_2ndWon,
+                        sv_gms=l_SvGms,
+                        bp_saved=l_bpSaved,
+                        bp_faced=l_bpFaced,
+                        opp_bp_faced=w_bpFaced,
+                        opp_bp_saved=w_bpSaved,
+                    )
+                    db.add(loser_stats)
+
+                    db.flush()
 
             total += 1
 

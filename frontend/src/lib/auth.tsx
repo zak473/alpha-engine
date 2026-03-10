@@ -27,6 +27,15 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const TOKEN_KEY = "alpha_engine_token";
 const USER_KEY = "alpha_engine_user";
+const COOKIE_KEY = "ae_token";
+
+function setCookie(value: string) {
+  document.cookie = `${COOKIE_KEY}=${value}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+}
+
+function clearCookie() {
+  document.cookie = `${COOKIE_KEY}=; path=/; max-age=0; SameSite=Lax`;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -59,12 +68,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     localStorage.setItem(TOKEN_KEY, data.access_token);
     localStorage.setItem(USER_KEY, JSON.stringify(authUser));
+    setCookie(data.access_token);
     setUser(authUser);
   }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    clearCookie();
     setUser(null);
   }, []);
 
@@ -89,4 +100,10 @@ export function getStoredToken(): string | null {
   } catch {
     return null;
   }
+}
+
+/** Read ae_token cookie — usable in Next.js server components via `cookies()`. */
+export function getTokenFromCookieHeader(cookieHeader: string): string | null {
+  const match = cookieHeader.match(new RegExp(`(?:^|; *)${COOKIE_KEY}=([^;]+)`));
+  return match ? match[1] : null;
 }

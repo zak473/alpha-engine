@@ -97,7 +97,7 @@ export default async function AdminPage() {
                     <span className="text-text-subtle text-xs ml-1">{m.version}</span>
                   </TableCell>
                   <TableCell>
-                    <Badge sport={m.sport as "soccer" | "tennis" | "esports"}>{m.sport}</Badge>
+                    <Badge sport={m.sport }>{m.sport}</Badge>
                   </TableCell>
                   <TableCell className="text-text-muted">{m.algorithm}</TableCell>
                   <TableCell mono>
@@ -148,7 +148,7 @@ export default async function AdminPage() {
                   return (
                     <TableRow key={b.sport}>
                       <TableCell>
-                        <Badge sport={b.sport as "soccer" | "tennis" | "esports"}>{b.sport}</Badge>
+                        <Badge sport={b.sport }>{b.sport}</Badge>
                       </TableCell>
                       <TableCell mono>{(b.accuracy * 100).toFixed(1)}%</TableCell>
                       <TableCell mono className={b.roi >= 0 ? "text-accent-green font-medium" : "text-accent-red font-medium"}>

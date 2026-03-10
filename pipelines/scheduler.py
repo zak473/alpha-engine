@@ -228,6 +228,18 @@ def _job_fetch_stats() -> None:
     log.info("[scheduler] fetch_stats done.")
 
 
+def _job_build_soccer_features() -> None:
+    """Rebuild feat_soccer_match rows — required for soccer ML training."""
+    log.info("[scheduler] Starting build_soccer_features job ...")
+    try:
+        from pipelines.soccer.build_soccer_features import run as build_features
+        n = build_features()
+        log.info("[scheduler] build_soccer_features: %d rows upserted.", n)
+    except Exception as exc:
+        log.error("[scheduler] build_soccer_features failed: %s", exc, exc_info=True)
+    log.info("[scheduler] build_soccer_features done.")
+
+
 def _job_fetch_player_profiles() -> None:
     """Refresh tennis player profiles from Jeff Sackmann dataset (no API key needed)."""
     log.info("[scheduler] Starting fetch_player_profiles job ...")
@@ -238,6 +250,253 @@ def _job_fetch_player_profiles() -> None:
     except Exception as exc:
         log.error("[scheduler] fetch_player_profiles failed: %s", exc, exc_info=True)
     log.info("[scheduler] fetch_player_profiles done.")
+
+
+def _job_fetch_xg() -> None:
+    """Fetch xG data from Understat.com for all configured leagues/seasons."""
+    log.info("[scheduler] Starting fetch_xg job ...")
+    try:
+        from pipelines.soccer.fetch_understat_xg import fetch_all as fetch_xg
+        n = fetch_xg()
+        log.info("[scheduler] fetch_xg: %d rows written.", n)
+    except Exception as exc:
+        log.error("[scheduler] fetch_xg failed: %s", exc, exc_info=True)
+    log.info("[scheduler] fetch_xg done.")
+
+
+def _job_settle_pending_picks() -> None:
+    """Batch-settle all pending moneyline picks whose match is now finished."""
+    from datetime import datetime, timezone
+    import uuid as _uuid
+    from db.session import SessionLocal
+    from db.models.mvp import CoreMatch
+    from db.models.picks import TrackedPick
+    from db.models.bankroll import BankrollSnapshot
+
+    db = SessionLocal()
+    settled = 0
+    try:
+        pending = db.query(TrackedPick).filter(TrackedPick.outcome.is_(None)).all()
+        for pick in pending:
+            match = db.query(CoreMatch).filter(CoreMatch.id == pick.match_id).first()
+            if not match or match.status != "finished" or not match.outcome:
+                continue
+
+            market = pick.market_name.lower()
+            if not any(kw in market for kw in ("moneyline", "match winner", "1x2", "to win")):
+                continue
+
+            label = pick.selection_label.lower()
+            home_name = pick.match_label.split(" vs ")[0].lower() if " vs " in pick.match_label else ""
+            away_name = pick.match_label.split(" vs ")[-1].lower() if " vs " in pick.match_label else ""
+
+            is_home = label in ("home", "1") or (home_name and home_name in label)
+            is_away = label in ("away", "2") or (away_name and away_name in label)
+            is_draw = label in ("draw", "x")
+
+            result = match.outcome
+            if is_home:
+                pick.outcome = "won" if result == "home_win" else "lost"
+            elif is_away:
+                pick.outcome = "won" if result == "away_win" else "lost"
+            elif is_draw:
+                pick.outcome = "won" if result == "draw" else "lost"
+
+            if pick.outcome is not None:
+                pick.settled_at = datetime.now(tz=timezone.utc)
+                try:
+                    stake = pick.stake_fraction or 1.0
+                    pnl = round(stake * (pick.odds - 1.0), 4) if pick.outcome == "won" else round(-stake, 4)
+                    last_snap = (
+                        db.query(BankrollSnapshot)
+                        .filter(BankrollSnapshot.user_id == pick.user_id)
+                        .order_by(BankrollSnapshot.created_at.desc())
+                        .first()
+                    )
+                    current_bal = last_snap.balance if last_snap else 0.0
+                    db.add(BankrollSnapshot(
+                        id=str(_uuid.uuid4()),
+                        user_id=pick.user_id,
+                        balance=round(current_bal + pnl, 4),
+                        event_type="pick_settled",
+                        pick_id=pick.id,
+                        pnl=pnl,
+                        notes=f"{pick.match_label} — {pick.selection_label} @ {pick.odds} ({pick.outcome})",
+                    ))
+                except Exception:
+                    pass
+                settled += 1
+                try:
+                    from api.routers.notifications import create_notification
+                    outcome_emoji = "✅" if pick.outcome == "won" else "❌"
+                    create_notification(
+                        db,
+                        user_id=pick.user_id,
+                        type="pick_settled",
+                        title=f"{outcome_emoji} Pick {pick.outcome}: {pick.match_label}",
+                        message=f"{pick.selection_label} @ {pick.odds:.2f}",
+                        data={"pick_id": pick.id, "outcome": pick.outcome, "odds": pick.odds},
+                    )
+                except Exception:
+                    pass
+
+        db.commit()
+        if settled:
+            log.info("[scheduler] settle_pending_picks: settled %d picks.", settled)
+    except Exception as exc:
+        db.rollback()
+        log.error("[scheduler] settle_pending_picks failed: %s", exc)
+    finally:
+        db.close()
+
+
+def _job_retrain_models() -> None:
+    """Retrain ML models for all sports that have sufficient data. Runs weekly."""
+    log.info("[scheduler] Starting retrain_models job ...")
+
+    for sport, module_path, fn_name in [
+        ("soccer",     "pipelines.soccer.train_soccer_model",        "main"),
+        ("basketball", "pipelines.basketball.train_basketball_model", "main"),
+        ("baseball",   "pipelines.baseball.train_baseball_model",    "main"),
+        ("tennis",     "pipelines.tennis.train_tennis_model",         "main"),
+        ("esports",    "pipelines.esports.train_esports_model",       "main"),
+    ]:
+        try:
+            import importlib
+            mod = importlib.import_module(module_path)
+            getattr(mod, fn_name)()
+            log.info("[scheduler] %s model retrained.", sport)
+        except Exception as exc:
+            log.error("[scheduler] %s retrain failed: %s", sport, exc, exc_info=True)
+
+    log.info("[scheduler] retrain_models done.")
+
+
+def _job_generate_weekly_challenges() -> None:
+    """Auto-generate sport weekly challenges every Monday if fewer than 3 active ones exist."""
+    from datetime import datetime, timedelta, timezone
+    import uuid
+    from db.session import SessionLocal
+    from db.models.challenges import Challenge
+
+    now = datetime.now(timezone.utc)
+    # Week window: Mon 00:00 → Sun 23:59
+    week_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_end = week_start + timedelta(days=7)
+
+    SYSTEM_USER = "system"
+    SPORTS = ["soccer", "tennis", "basketball", "baseball", "esports", "hockey"]
+    TEMPLATES = [
+        {
+            "sport": "soccer",
+            "name": "Weekly Soccer Challenge",
+            "description": "Pick your best soccer bets this week and compete for the top spot on the leaderboard.",
+        },
+        {
+            "sport": "tennis",
+            "name": "Weekly Tennis Challenge",
+            "description": "Submit your tennis match predictions and track your accuracy across the week.",
+        },
+        {
+            "sport": "basketball",
+            "name": "Weekly Basketball Challenge",
+            "description": "Back the best basketball value bets and rise up the weekly rankings.",
+        },
+        {
+            "sport": "baseball",
+            "name": "Weekly Baseball Challenge",
+            "description": "MLB picks of the week — submit your top moneyline and run-line selections.",
+        },
+        {
+            "sport": "esports",
+            "name": "Weekly Esports Challenge",
+            "description": "Esports predictions for the week — track your map-level accuracy.",
+        },
+        {
+            "sport": None,
+            "name": "Weekly All-Sports Challenge",
+            "description": "Open challenge — submit picks from any sport and compete for the weekly crown.",
+        },
+    ]
+
+    db = SessionLocal()
+    try:
+        # Count challenges that overlap this week
+        active_count = (
+            db.query(Challenge)
+            .filter(
+                Challenge.visibility == "public",
+                Challenge.start_at <= week_end,
+                Challenge.end_at >= week_start,
+            )
+            .count()
+        )
+
+        if active_count >= 3:
+            log.info("[scheduler] generate_weekly_challenges: %d active challenges, skipping.", active_count)
+            return
+
+        created = 0
+        for tmpl in TEMPLATES:
+            if active_count + created >= 3:
+                break
+            # Check if a same-name challenge already covers this week
+            existing = (
+                db.query(Challenge)
+                .filter(
+                    Challenge.name == tmpl["name"],
+                    Challenge.start_at <= week_end,
+                    Challenge.end_at >= week_start,
+                )
+                .first()
+            )
+            if existing:
+                continue
+
+            challenge = Challenge(
+                id=str(uuid.uuid4()),
+                name=tmpl["name"],
+                description=tmpl["description"],
+                visibility="public",
+                sport_scope=[tmpl["sport"]] if tmpl["sport"] else [],
+                start_at=week_start,
+                end_at=week_end,
+                max_members=None,
+                entry_limit_per_day=5,
+                scoring_type="points",
+                created_by=SYSTEM_USER,
+            )
+            db.add(challenge)
+            created += 1
+
+        db.commit()
+        log.info("[scheduler] generate_weekly_challenges: created %d new challenges.", created)
+    except Exception as exc:
+        db.rollback()
+        log.error("[scheduler] generate_weekly_challenges failed: %s", exc)
+    finally:
+        db.close()
+
+
+def _job_highlightly_live() -> None:
+    """Fetch today's live scores from Highlightly every 30 seconds."""
+    from pipelines.highlightly.fetch_all import fetch_today
+    try:
+        n = fetch_today()
+        if n:
+            log.debug("[scheduler] highlightly_live: %d rows updated.", n)
+    except Exception as exc:
+        log.error("[scheduler] highlightly_live failed: %s", exc, exc_info=True)
+
+
+def _job_fetch_highlightly() -> None:
+    """Full Highlightly sync (yesterday + today) every 15 minutes."""
+    from pipelines.highlightly.fetch_all import fetch_all as hl_fetch
+    try:
+        n = hl_fetch()
+        log.info("[scheduler] highlightly_fetch: %d rows ingested.", n)
+    except Exception as exc:
+        log.error("[scheduler] highlightly_fetch failed: %s", exc, exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -254,7 +513,11 @@ def start() -> BackgroundScheduler:
         log.warning("[scheduler] Already running — skipping start().")
         return _scheduler
 
-    _scheduler = BackgroundScheduler(job_defaults={"coalesce": True, "max_instances": 1})
+    from apscheduler.executors.pool import ThreadPoolExecutor as APThreadPoolExecutor
+    _scheduler = BackgroundScheduler(
+        executors={"default": APThreadPoolExecutor(max_workers=20)},
+        job_defaults={"coalesce": True, "max_instances": 1},
+    )
 
     # Expire stale live matches every 5 minutes
     _scheduler.add_job(
@@ -292,6 +555,15 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
+    # Settle pending picks every 15 minutes
+    _scheduler.add_job(
+        _job_settle_pending_picks,
+        trigger=IntervalTrigger(minutes=15),
+        id="settle_pending_picks",
+        name="Settle pending picks",
+        replace_existing=True,
+    )
+
     # Fetch real box score stats every 6 hours
     _scheduler.add_job(
         _job_fetch_stats,
@@ -311,6 +583,15 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
+    # Build soccer features daily at 3:30 AM UTC (after ELO update at 3:00)
+    _scheduler.add_job(
+        _job_build_soccer_features,
+        trigger=CronTrigger(hour=3, minute=30, timezone="UTC"),
+        id="build_soccer_features",
+        name="Build feat_soccer_match feature table",
+        replace_existing=True,
+    )
+
     # Tennis player profiles refresh (weekly, Sunday 4 AM UTC)
     _scheduler.add_job(
         _job_fetch_player_profiles,
@@ -320,8 +601,63 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
+    # Fetch Understat xG data weekly (Monday 1 AM UTC — after weekend matches)
+    _scheduler.add_job(
+        _job_fetch_xg,
+        trigger=CronTrigger(day_of_week="mon", hour=1, minute=0, timezone="UTC"),
+        id="fetch_xg",
+        name="Fetch Understat xG data (soccer)",
+        replace_existing=True,
+    )
+
+    # Retrain ML models weekly (Saturday 2 AM UTC — after ELO update)
+    _scheduler.add_job(
+        _job_retrain_models,
+        trigger=CronTrigger(day_of_week="sat", hour=2, minute=0, timezone="UTC"),
+        id="retrain_models",
+        name="Weekly ML model retraining (soccer, basketball, baseball)",
+        replace_existing=True,
+    )
+
+    # Auto-generate weekly challenges every Monday at 00:05 UTC
+    _scheduler.add_job(
+        _job_generate_weekly_challenges,
+        trigger=CronTrigger(day_of_week="mon", hour=0, minute=5, timezone="UTC"),
+        id="generate_weekly_challenges",
+        name="Auto-generate public weekly sport challenges",
+        replace_existing=True,
+    )
+
+    # Highlightly live score poll every 30 seconds (run immediately on startup)
+    from datetime import datetime as _dt, timezone as _tz
+    _scheduler.add_job(
+        _job_highlightly_live,
+        trigger=IntervalTrigger(seconds=30),
+        id="highlightly_live",
+        name="Highlightly live score poll (30s)",
+        replace_existing=True,
+        next_run_time=_dt.now(_tz.utc),
+    )
+
+    # Highlightly full fixture sync every 15 minutes (run immediately on startup)
+    _scheduler.add_job(
+        _job_fetch_highlightly,
+        trigger=IntervalTrigger(minutes=15),
+        id="fetch_highlightly",
+        name="Highlightly full sync (soccer, basketball, baseball, hockey)",
+        replace_existing=True,
+        next_run_time=_dt.now(_tz.utc),
+    )
+
     _scheduler.start()
-    log.info("[scheduler] Started. Jobs: expire_stale (5m), fetch_live (30m), fetch_odds (30m), predict_only (1h), fetch_stats (6h), update_elo (nightly 03:00 UTC), fetch_player_profiles (weekly).")
+    log.info(
+        "[scheduler] Started. Jobs: expire_stale (5m), fetch_live (30m), fetch_odds (30m), "
+        "highlightly_live (30s), fetch_highlightly (15m), settle_picks (15m), predict_only (1h), fetch_stats (6h), "
+        "update_elo (nightly 03:00 UTC), build_soccer_features (nightly 03:30 UTC), "
+        "fetch_player_profiles (weekly Sun), fetch_xg (weekly Mon), "
+        "retrain_models (weekly Sat), generate_weekly_challenges (weekly Mon 00:05). "
+        "Executor: ThreadPoolExecutor(20 workers)."
+    )
     return _scheduler
 
 

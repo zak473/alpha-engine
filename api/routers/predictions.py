@@ -16,6 +16,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from api.deps import get_db
@@ -33,7 +34,7 @@ from api.schemas.mvp import (
     ScorelineSchema,
     SimulationSchema,
 )
-from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, ModelRegistry, PredMatch
+from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, ModelRegistry, PredMatch, RatingEloTeam
 
 router = APIRouter(prefix="/predictions", tags=["predictions"])
 
@@ -110,6 +111,9 @@ def _build_prediction_schema(
         season=match.season,
         start_time=match.kickoff_utc,
         status=match.status,
+        outcome=match.outcome,
+        home_score=match.home_score,
+        away_score=match.away_score,
         participants=ParticipantsSchema(
             home=ParticipantSchema(id=match.home_team_id, name=home_team.name),
             away=ParticipantSchema(id=match.away_team_id, name=away_team.name),
@@ -140,11 +144,50 @@ def _build_prediction_schema(
 # Endpoints
 # ---------------------------------------------------------------------------
 
+def _elo_probs(session: Session, match: CoreMatch):
+    """Compute win probabilities from ELO ratings. Returns (probs, fair_odds, confidence) or None."""
+    kickoff = match.kickoff_utc
+    home_row = (
+        session.query(RatingEloTeam)
+        .filter(RatingEloTeam.team_id == match.home_team_id, RatingEloTeam.rated_at < kickoff)
+        .order_by(RatingEloTeam.rated_at.desc())
+        .first()
+    )
+    away_row = (
+        session.query(RatingEloTeam)
+        .filter(RatingEloTeam.team_id == match.away_team_id, RatingEloTeam.rated_at < kickoff)
+        .order_by(RatingEloTeam.rated_at.desc())
+        .first()
+    )
+    if not home_row or not away_row:
+        return None, None, None
+    r_home = home_row.rating_after
+    r_away = away_row.rating_after
+    p_home = round(1 / (1 + 10 ** ((r_away - r_home) / 400)), 4)
+    p_away = round(1 - p_home, 4)
+    # Soccer has draws; other sports are head-to-head (no draw)
+    p_draw = 0.0
+    probs = ProbabilitiesSchema(home_win=p_home, draw=p_draw, away_win=p_away)
+    fair_odds = FairOddsSchema(
+        home_win=round(1 / p_home, 3) if p_home > 0 else 99.0,
+        draw=99.0,
+        away_win=round(1 / p_away, 3) if p_away > 0 else 99.0,
+    )
+    confidence = int(round(max(0, min(100, abs(p_home - 0.5) * 200))))
+    return probs, fair_odds, confidence
+
+
 def _build_fixture_schema(session: Session, match: CoreMatch) -> PredictionSchema:
-    """Build a prediction schema for a match that has no model prediction yet."""
+    """Build a prediction schema for a match that has no model prediction yet (ELO fallback)."""
     home_team = _get_team(session, match.home_team_id)
     away_team = _get_team(session, match.away_team_id)
     league = _get_league(session, match.league_id)
+
+    probs, fair_odds, confidence = _elo_probs(session, match)
+    if probs is None:
+        probs = ProbabilitiesSchema(home_win=0.5, draw=0.0, away_win=0.5)
+        fair_odds = FairOddsSchema(home_win=2.0, draw=99.0, away_win=2.0)
+        confidence = 0
 
     return PredictionSchema(
         event_id=match.id,
@@ -153,13 +196,16 @@ def _build_fixture_schema(session: Session, match: CoreMatch) -> PredictionSchem
         season=match.season,
         start_time=match.kickoff_utc,
         status=match.status,
+        outcome=match.outcome,
+        home_score=match.home_score,
+        away_score=match.away_score,
         participants=ParticipantsSchema(
             home=ParticipantSchema(id=match.home_team_id, name=home_team.name),
             away=ParticipantSchema(id=match.away_team_id, name=away_team.name),
         ),
-        probabilities=ProbabilitiesSchema(home_win=0.333, draw=0.333, away_win=0.334),
-        fair_odds=FairOddsSchema(home_win=3.0, draw=3.0, away_win=3.0),
-        confidence=0,
+        probabilities=probs,
+        fair_odds=fair_odds,
+        confidence=confidence,
         key_drivers=[],
         model=None,
         simulation=None,
@@ -195,6 +241,8 @@ def list_predictions(
             .join(ModelRegistry, ModelRegistry.model_name == PredMatch.model_version)
             .filter(ModelRegistry.is_live == True)
         )
+        if sport:
+            query = query.filter(CoreMatch.sport == sport)
         if date_from:
             query = query.filter(CoreMatch.kickoff_utc >= date_from)
         if date_to:
@@ -217,7 +265,8 @@ def list_predictions(
             query = query.filter(CoreMatch.kickoff_utc <= date_to)
         if status:
             query = query.filter(CoreMatch.status == status)
-        else:
+        elif not date_from and not date_to:
+            # Default: only show upcoming matches when no date range or status is specified
             query = query.filter(CoreMatch.kickoff_utc >= datetime.utcnow())
 
         total = query.count()
@@ -268,13 +317,21 @@ def get_performance(
 ):
     """
     Model performance metrics from the model_registry.
-    Returns all registered models for the given sport (or all sports).
+    Returns only live (is_live=True) models — one per sport.
     """
-    query = session.query(ModelRegistry)
+    query = session.query(ModelRegistry).filter(ModelRegistry.is_live == True)
     if sport:
         query = query.filter(ModelRegistry.sport == sport)
 
     models = query.order_by(ModelRegistry.trained_at.desc()).all()
+
+    # Live prediction counts per sport (join PredMatch → CoreMatch for sport)
+    pred_counts: dict[str, int] = dict(
+        session.query(CoreMatch.sport, func.count(PredMatch.id))
+        .join(PredMatch, PredMatch.match_id == CoreMatch.id)
+        .group_by(CoreMatch.sport)
+        .all()
+    )
 
     def _metric(m: ModelRegistry, key: str):
         return m.metrics.get(key) if m.metrics else None
@@ -289,6 +346,7 @@ def get_performance(
                 sport=m.sport,
                 is_live=m.is_live,
                 n_train_samples=m.n_train_samples,
+                n_predictions=pred_counts.get(m.sport, 0),
                 accuracy=_metric(m, "accuracy"),
                 brier_score=_metric(m, "brier_score"),
                 log_loss=_metric(m, "log_loss"),
@@ -301,3 +359,88 @@ def get_performance(
             for m in models
         ],
     )
+
+
+# ---------------------------------------------------------------------------
+# Prediction accuracy tracker
+# ---------------------------------------------------------------------------
+
+@router.get("/accuracy")
+def get_prediction_accuracy(
+    sport: Optional[str] = Query(None),
+    limit: int = Query(500, ge=1, le=2000),
+    session: Session = Depends(get_db),
+):
+    """
+    Retroactively checks model predictions against finished match outcomes.
+    Returns overall + per-sport calibration stats.
+    """
+    query = (
+        session.query(CoreMatch, PredMatch)
+        .join(PredMatch, PredMatch.match_id == CoreMatch.id)
+        .join(ModelRegistry, ModelRegistry.model_name == PredMatch.model_version)
+        .filter(
+            ModelRegistry.is_live == True,
+            CoreMatch.status == "finished",
+            CoreMatch.outcome.isnot(None),
+            CoreMatch.outcome != "",
+        )
+    )
+    if sport:
+        query = query.filter(CoreMatch.sport == sport)
+
+    rows = query.order_by(CoreMatch.kickoff_utc.desc()).limit(limit).all()
+
+    def _check(match: CoreMatch, pred: PredMatch) -> Optional[dict]:
+        outcome = match.outcome
+        if not outcome:
+            return None
+        if outcome in ("home_win", "H"):
+            predicted = pred.p_home
+            actual_label = "home"
+        elif outcome in ("away_win", "A"):
+            predicted = pred.p_away
+            actual_label = "away"
+        elif outcome in ("draw", "D"):
+            predicted = pred.p_draw or 0.0
+            actual_label = "draw"
+        else:
+            return None
+
+        top_prob = max(pred.p_home, pred.p_away, pred.p_draw or 0.0)
+        top_label = (
+            "home" if top_prob == pred.p_home else
+            "away" if top_prob == pred.p_away else "draw"
+        )
+        correct = top_label == actual_label
+        brier = (predicted - 1.0) ** 2 + ((pred.p_home if actual_label != "home" else 0) ** 2)
+
+        return {
+            "sport": match.sport,
+            "kickoff": match.kickoff_utc.isoformat(),
+            "correct": correct,
+            "predicted_prob": round(predicted, 4),
+            "brier": round((pred.p_home - (1 if actual_label == "home" else 0)) ** 2 +
+                           (pred.p_away - (1 if actual_label == "away" else 0)) ** 2 +
+                           ((pred.p_draw or 0) - (1 if actual_label == "draw" else 0)) ** 2, 4),
+        }
+
+    checked = [r for m, p in rows if (r := _check(m, p))]
+
+    def _stats(items):
+        if not items:
+            return {"n": 0, "accuracy": None, "avg_brier": None}
+        n = len(items)
+        acc = sum(1 for i in items if i["correct"]) / n
+        avg_brier = sum(i["brier"] for i in items) / n
+        return {"n": n, "accuracy": round(acc, 4), "avg_brier": round(avg_brier, 4)}
+
+    by_sport: dict[str, list] = {}
+    for item in checked:
+        by_sport.setdefault(item["sport"], []).append(item)
+
+    return {
+        "overall": _stats(checked),
+        "by_sport": {s: _stats(items) for s, items in sorted(by_sport.items())},
+        "recent": checked[:50],
+    }

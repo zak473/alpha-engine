@@ -1,12 +1,12 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { PerformanceClient } from "@/components/performance/PerformanceClient";
-import { getPicks, getPicksStats, getPerformance, getBankroll } from "@/lib/api";
-import type { PickOut, PicksStatsOut, BankrollStatsOut } from "@/lib/api";
+import { getPicks, getPicksStats, getPerformance, getBankroll, getPredictionAccuracy } from "@/lib/api";
+import type { PickOut, PicksStatsOut, BankrollStatsOut, PredictionAccuracy } from "@/lib/api";
 import type { RoiPoint, MvpPerformance } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const SPORTS = ["soccer", "tennis", "esports", "basketball", "baseball"] as const;
+const SPORTS = ["soccer", "tennis", "esports", "basketball", "baseball", "hockey"] as const;
 
 function buildRoiSeries(picks: PickOut[]): RoiPoint[] {
   const settled = picks
@@ -28,7 +28,7 @@ function buildRoiSeries(picks: PickOut[]): RoiPoint[] {
 
 export default async function PerformancePage() {
   // Fetch everything in parallel, gracefully degrade on failure
-  const [picks, overallStats, perfData, bankroll, ...sportStatsList] = await Promise.all([
+  const [picks, overallStats, perfData, bankroll, accuracy, ...sportStatsList] = await Promise.all([
     getPicks({ limit: 500 }).catch((): PickOut[] => []),
     getPicksStats().catch((): PicksStatsOut => ({
       total: 0, settled: 0, pending: 0, won: 0, lost: 0, void: 0,
@@ -39,6 +39,11 @@ export default async function PerformancePage() {
       current_balance: 0, starting_balance: 0, peak_balance: 0,
       total_deposited: 0, total_withdrawn: 0, total_pnl: 0,
       roi: 0, max_drawdown: 0, sharpe: null, snapshots: [],
+    })),
+    getPredictionAccuracy().catch((): PredictionAccuracy => ({
+      overall: { n: 0, accuracy: null, avg_brier: null },
+      by_sport: {},
+      recent: [],
     })),
     ...SPORTS.map((s) =>
       getPicksStats(s).catch((): PicksStatsOut & { sport: string } => ({
@@ -62,6 +67,7 @@ export default async function PerformancePage() {
         models={perfData.models}
         recentPicks={recentPicks}
         bankroll={bankroll}
+        accuracy={accuracy}
       />
     </AppShell>
   );

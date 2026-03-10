@@ -6,7 +6,7 @@ import type { BettingMatch } from "@/lib/betting-types";
 
 export const dynamic = "force-dynamic";
 
-const SPORTS: SportSlug[] = ["soccer", "basketball", "tennis", "esports", "baseball"];
+const SPORTS: SportSlug[] = ["soccer", "basketball", "tennis", "esports", "baseball", "hockey"];
 
 async function getMatches(): Promise<BettingMatch[]> {
   const results = await Promise.allSettled(

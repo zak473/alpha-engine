@@ -132,6 +132,18 @@ def get_bankroll(
         .order_by(BankrollSnapshot.created_at.asc())
         .all()
     )
+    if not snaps:
+        snap = BankrollSnapshot(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            balance=1000.0,
+            event_type="deposit",
+            pnl=None,
+            notes="Starting balance",
+        )
+        db.add(snap)
+        db.commit()
+        snaps = [snap]
     return _compute_stats(snaps)
 
 

@@ -77,6 +77,12 @@ SPORT_MAP: dict[str, str] = {
     "tennis_atp_vienna":             "tennis",
     "tennis_atp_basel":              "tennis",
     "tennis_atp_stockholm":          "tennis",
+    # Esports
+    "esports_lol":                   "esports",
+    "esports_csgo":                  "esports",
+    "esports_dota2":                 "esports",
+    "esports_valorant":              "esports",
+    "esports_r6":                    "esports",
 }
 
 # Preferred bookmakers for sharpest lines (in priority order)

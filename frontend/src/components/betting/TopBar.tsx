@@ -2,7 +2,7 @@
 
 import { Bell, Menu, Search, LogIn } from "lucide-react";
 import Link from "next/link";
-import { useSidebar } from "./SidebarContext";
+import { useSidebar } from "@/components/layout/SidebarContext";
 import { useAuth } from "@/lib/auth";
 
 const ENV = process.env.NEXT_PUBLIC_ENV ?? "development";
@@ -140,10 +140,10 @@ export function TopBar({ title, subtitle }: TopBarProps) {
         {isLoggedIn ? (
           <div className="flex items-center gap-2 rounded-full border px-2 py-1.5" style={{ borderColor: "var(--border0)", background: "var(--bg1)" }}>
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[linear-gradient(135deg,#30e06a,#179447)] text-[11px] font-bold text-white">
-              {(user?.name ?? "A").slice(0, 1).toUpperCase()}
+              {(user?.displayName ?? user?.email ?? "A").slice(0, 1).toUpperCase()}
             </div>
             <div className="hidden sm:block pr-1">
-              <div className="text-[12px] font-semibold" style={{ color: "var(--text0)" }}>{user?.name ?? "Analyst"}</div>
+              <div className="text-[12px] font-semibold" style={{ color: "var(--text0)" }}>{user?.displayName ?? user?.email ?? "Analyst"}</div>
               <button onClick={logout} className="text-[10px] text-text-muted" style={{ color: "var(--text1)" }}>
                 Sign out
               </button>

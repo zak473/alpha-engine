@@ -5,7 +5,7 @@ import { PanelCard } from "@/components/ui/PanelCard";
 import { StateTabs } from "@/components/ui/Tabs";
 import { SparklineChart } from "@/components/charts/SparklineChart";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { getPicksRoiSeries, type PerformanceWindow } from "@/lib/api";
+import { getPicksRoiSeries, type PerformanceWindow, type RoiSeriesPoint } from "@/lib/api";
 import { cn, formatPercent } from "@/lib/utils";
 import type { MvpPerformance } from "@/lib/types";
 import { AlertTriangle, Info, ChevronDown } from "lucide-react";
@@ -16,48 +16,29 @@ const CALIBRATION_STYLES = {
   poor: { label: "Needs review",    color: "var(--negative)", bgColor: "var(--negative-dim)", borderColor: "var(--negative)" },
 };
 
-type ChartMetric = "winrate" | "brier" | "calibration";
+type ChartMetric = "winrate" | "pnl";
 
 const CHART_OPTIONS: { label: string; value: ChartMetric }[] = [
-  { label: "Win %",  value: "winrate"     },
-  { label: "Brier",  value: "brier"       },
-  { label: "Calib",  value: "calibration" },
+  { label: "Win %", value: "winrate" },
+  { label: "PnL",   value: "pnl"    },
 ];
 
-const DRILL_BY_SPORT: { label: string; win: number; brier: number; count: number }[] = [];
-const DRILL_BY_CONF:  { label: string; win: number; brier: number; count: number }[] = [];
-
-type DrillMode = "sport" | "confidence";
-
 function DrillTable({ rows }: { rows: { label: string; win: number; brier: number; count: number }[] }) {
+  if (rows.length === 0) {
+    return (
+      <p className="text-xs py-3 text-center" style={{ color: "var(--text2)" }}>
+        No data yet
+      </p>
+    );
+  }
   return (
     <table className="data-table w-full text-xs">
       <thead>
         <tr style={{ borderBottom: "1px solid var(--border0)" }}>
-          <th
-            className="text-left py-1.5 font-medium"
-            style={{ color: "var(--text2)" }}
-          >
-            Segment
-          </th>
-          <th
-            className="text-right py-1.5 font-medium num"
-            style={{ color: "var(--text2)" }}
-          >
-            Win %
-          </th>
-          <th
-            className="text-right py-1.5 font-medium num"
-            style={{ color: "var(--text2)" }}
-          >
-            Brier
-          </th>
-          <th
-            className="text-right py-1.5 font-medium num"
-            style={{ color: "var(--text2)" }}
-          >
-            N
-          </th>
+          <th className="text-left py-1.5 font-medium" style={{ color: "var(--text2)" }}>Segment</th>
+          <th className="text-right py-1.5 font-medium num" style={{ color: "var(--text2)" }}>Win %</th>
+          <th className="text-right py-1.5 font-medium num" style={{ color: "var(--text2)" }}>Brier</th>
+          <th className="text-right py-1.5 font-medium num" style={{ color: "var(--text2)" }}>N</th>
         </tr>
       </thead>
       <tbody>
@@ -69,7 +50,7 @@ function DrillTable({ rows }: { rows: { label: string; win: number; brier: numbe
             onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg3)")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "")}
           >
-            <td className="py-1.5" style={{ color: "var(--text1)" }}>{r.label}</td>
+            <td className="py-1.5 capitalize" style={{ color: "var(--text1)" }}>{r.label}</td>
             <td
               className="py-1.5 text-right num font-medium"
               style={{ color: r.win >= 0.6 ? "var(--positive)" : r.win >= 0.55 ? "var(--warning)" : "var(--negative)" }}
@@ -80,9 +61,11 @@ function DrillTable({ rows }: { rows: { label: string; win: number; brier: numbe
               className="py-1.5 text-right num"
               style={{ color: r.brier < 0.21 ? "var(--positive)" : r.brier < 0.24 ? "var(--warning)" : "var(--negative)" }}
             >
-              {r.brier.toFixed(3)}
+              {r.brier > 0 ? r.brier.toFixed(3) : "—"}
             </td>
-            <td className="py-1.5 text-right num" style={{ color: "var(--text1)" }}>{r.count}</td>
+            <td className="py-1.5 text-right num" style={{ color: "var(--text1)" }}>
+              {r.count > 0 ? r.count : "—"}
+            </td>
           </tr>
         ))}
       </tbody>
@@ -102,13 +85,12 @@ export function PerformanceSnapshot({ performance, loading }: PerformanceSnapsho
   const [chartMetric, setChartMetric] = useState<ChartMetric>("winrate");
   const [showBrierInfo, setShowBrierInfo] = useState(false);
   const [showDrill, setShowDrill] = useState(false);
-  const [drillMode, setDrillMode] = useState<DrillMode>("sport");
-  const [roiSeries, setRoiSeries] = useState<{ value: number }[]>([]);
+  const [series, setSeries] = useState<RoiSeriesPoint[]>([]);
 
   useEffect(() => {
     getPicksRoiSeries(window)
-      .then((data) => setRoiSeries(data.series.map((p) => ({ value: p.value }))))
-      .catch(() => setRoiSeries([]));
+      .then((data) => setSeries(data.series))
+      .catch(() => setSeries([]));
   }, [window]);
 
   if (loading) {
@@ -130,12 +112,30 @@ export function PerformanceSnapshot({ performance, loading }: PerformanceSnapsho
   const calibration = brierScore === 0 ? "ok" : brierScore < 0.21 ? "good" : brierScore < 0.24 ? "ok" : "poor";
   const calStyle = CALIBRATION_STYLES[calibration];
 
-  const chartSeries = roiSeries;
-  const chartAutoColor = chartSeries.length > 1
-    ? chartMetric === "brier"
-      ? chartSeries[chartSeries.length - 1].value < chartSeries[0].value
-      : chartSeries[chartSeries.length - 1].value >= chartSeries[0].value
-    : true;
+  // Map series to the selected metric
+  const chartSeries = series.map((p) => ({
+    value: chartMetric === "pnl" ? p.cumulative_pnl : p.win_rate,
+  }));
+
+  const lastVal  = chartSeries.length > 1 ? chartSeries[chartSeries.length - 1].value : null;
+  const firstVal = chartSeries.length > 1 ? chartSeries[0].value : null;
+  const chartAutoColor =
+    lastVal === null || firstVal === null ? true :
+    chartMetric === "pnl" ? lastVal >= 0 :          // PnL: green if net positive
+    lastVal >= firstVal;                              // win rate: green if improving
+
+  // Drill-down by sport: from model registry
+  const drillBySport = (performance?.models ?? [])
+    .filter((m) => m.accuracy != null || m.brier_score != null)
+    .map((m) => ({
+      label: m.sport,
+      win:   m.accuracy ?? 0,
+      brier: m.brier_score ?? 0,
+      count: m.n_predictions ?? 0,
+    }));
+
+  const chartLabel =
+    chartMetric === "pnl" ? "Cumulative PnL trend" : "Win rate trend";
 
   return (
     <PanelCard
@@ -229,9 +229,7 @@ export function PerformanceSnapshot({ performance, loading }: PerformanceSnapsho
       {/* Metric toggle + sparkline */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
-          <p className="label">
-            {chartMetric === "winrate" ? "Win rate trend" : chartMetric === "brier" ? "Brier score trend" : "Calibration trend"}
-          </p>
+          <p className="label">{chartLabel}</p>
           <div className="flex items-center gap-1">
             {CHART_OPTIONS.map((opt) => (
               <button
@@ -271,42 +269,13 @@ export function PerformanceSnapshot({ performance, loading }: PerformanceSnapsho
         onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text1)")}
       >
         <ChevronDown size={12} className={cn("transition-transform", showDrill && "rotate-180")} />
-        {showDrill ? "Hide breakdown" : "Breakdown by sport / confidence"}
+        {showDrill ? "Hide breakdown" : "Breakdown by sport"}
       </button>
 
       {/* Drill-down table */}
       {showDrill && (
-        <div className="mt-3 space-y-3">
-          <div className="flex items-center gap-2">
-            {(["sport", "confidence"] as DrillMode[]).map((m) => (
-              <button
-                key={m}
-                onClick={() => setDrillMode(m)}
-                className="text-2xs px-2.5 py-1 rounded-md transition-colors capitalize"
-                style={
-                  drillMode === m
-                    ? {
-                        background: "var(--bg2)",
-                        border: "1px solid var(--border0)",
-                        color: "var(--text0)",
-                      }
-                    : {
-                        border: "1px solid transparent",
-                        color: "var(--text1)",
-                      }
-                }
-                onMouseEnter={(e) => {
-                  if (drillMode !== m) e.currentTarget.style.color = "var(--text0)";
-                }}
-                onMouseLeave={(e) => {
-                  if (drillMode !== m) e.currentTarget.style.color = "var(--text1)";
-                }}
-              >
-                By {m}
-              </button>
-            ))}
-          </div>
-          <DrillTable rows={drillMode === "sport" ? DRILL_BY_SPORT : DRILL_BY_CONF} />
+        <div className="mt-3">
+          <DrillTable rows={drillBySport} />
         </div>
       )}
     </PanelCard>

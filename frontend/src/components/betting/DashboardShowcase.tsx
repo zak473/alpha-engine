@@ -6,15 +6,8 @@ import { ArrowUpRight, BarChart3, Flame, Plus, Radio, Sparkles, Star, Trophy, Us
 import type { BettingFilter, BettingMatch, SportSlug } from "@/lib/betting-types";
 import { SPORT_CONFIG } from "@/lib/betting-types";
 import { cn } from "@/lib/utils";
-import type { PickOut, PicksStatsOut } from "@/lib/api";
-import { getPicksStats, getRecentWins } from "@/lib/api";
-
-const TIPSTERS = [
-  { name: "Jack", specialty: "Soccer Specialist", winRate: 58, roi: 19.3, streak: 5, picks: 32 },
-  { name: "Mason", specialty: "Tennis Value Picks", winRate: 61, roi: 25.0, streak: 4, picks: 28 },
-  { name: "Luca", specialty: "NBA Edges", winRate: 55, roi: 14.4, streak: 3, picks: 26 },
-  { name: "Rio", specialty: "Esports Props", winRate: 62, roi: 21.9, streak: 6, picks: 18 },
-];
+import type { PickOut, PicksStatsOut, TipsterProfile } from "@/lib/api";
+import { getPicksStats, getRecentWins, getTipsters } from "@/lib/api";
 
 function getSportSummary(matches: BettingMatch[], sport: SportSlug) {
   const sportMatches = matches.filter((m) => m.sport === sport && m.status !== "finished" && m.status !== "cancelled");
@@ -96,42 +89,42 @@ function SportAccessCard({
   );
 }
 
-function TipsterCard({ tipster }: { tipster: (typeof TIPSTERS)[number] }) {
-  const initials = tipster.name.slice(0, 2).toUpperCase();
+function TipsterRow({ tipster, rank }: { tipster: TipsterProfile; rank: number }) {
+  const initials = tipster.username.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2).toUpperCase();
+  const winRate = Math.round(tipster.weekly_win_rate * 100);
+  const streak = tipster.recent_results.filter((r) => r === "W").length;
+  const rankColors = ["#f59e0b", "#94a3b8", "#cd7c3a"];
   return (
-    <div className="rounded-[22px] border p-4" style={{ background: "#ffffff", borderColor: "rgba(17,33,23,0.08)" }}>
-      <div className="flex items-center gap-3">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#dff7e7] text-lg font-semibold text-[#166534]">{initials}</div>
-        <div>
-          <div className="text-[30px] font-semibold leading-none text-[#18211c]">{tipster.name}</div>
-          <div className="mt-1 text-sm text-[#6d786f]">{tipster.specialty}</div>
-        </div>
+    <div className="flex items-center gap-3 px-3 py-3 transition hover:bg-[#f7faf7] rounded-xl">
+      {/* Rank */}
+      <span className="w-5 shrink-0 text-center text-xs font-bold" style={{ color: rankColors[rank - 1] ?? "#b0bab3" }}>
+        {rank}
+      </span>
+      {/* Avatar */}
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#dff7e7] text-[11px] font-bold text-[#166534]">
+        {initials}
       </div>
-
-      <div className="mt-5 grid grid-cols-3 gap-2">
-        <div className="rounded-2xl bg-[#f4f8f4] px-3 py-3">
-          <div className="text-[11px] uppercase tracking-[0.18em] text-[#7b887e]">Win rate</div>
-          <div className="mt-1 text-2xl font-semibold text-[#18211c]">{tipster.winRate}%</div>
-        </div>
-        <div className="rounded-2xl bg-[#eff9f1] px-3 py-3">
-          <div className="text-[11px] uppercase tracking-[0.18em] text-[#7b887e]">ROI</div>
-          <div className="mt-1 text-2xl font-semibold text-[#166534]">+{tipster.roi}%</div>
-        </div>
-        <div className="rounded-2xl bg-[#fff8ec] px-3 py-3">
-          <div className="text-[11px] uppercase tracking-[0.18em] text-[#7b887e]">Streak</div>
-          <div className="mt-1 text-2xl font-semibold text-[#9a6700]">{tipster.streak}</div>
-        </div>
+      {/* Name */}
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-semibold text-[#18211c]">@{tipster.username}</div>
+        <div className="truncate text-[11px] text-[#8a9690]">{tipster.bio ?? "Community analyst"}</div>
       </div>
-
-      <div className="mt-4 flex items-center justify-between rounded-2xl border px-3 py-3" style={{ borderColor: "rgba(17,33,23,0.07)", background: "#fbfcfb" }}>
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.18em] text-[#7b887e]">Weekly picks</div>
-          <div className="mt-1 text-sm font-medium text-[#18211c]">{tipster.picks} active selections</div>
-        </div>
-        <button className="inline-flex items-center gap-2 rounded-full bg-[#1fd06a] px-4 py-2 text-sm font-semibold text-[#10311d] transition hover:brightness-95">
-          <Plus size={15} /> Follow
-        </button>
+      {/* Win % */}
+      <div className="hidden w-12 shrink-0 text-right sm:block">
+        <div className="text-sm font-semibold text-[#18211c]">{winRate}%</div>
       </div>
+      {/* W–L */}
+      <div className="hidden w-14 shrink-0 text-right md:block">
+        <div className="text-sm font-semibold text-[#166534]">{tipster.won_picks}–{tipster.total_picks - tipster.won_picks}</div>
+      </div>
+      {/* Streak */}
+      <div className="hidden w-10 shrink-0 text-right lg:block">
+        <div className="text-sm font-semibold text-[#9a6700]">{streak}</div>
+      </div>
+      {/* Follow */}
+      <button className="w-16 shrink-0 rounded-full bg-[#1fd06a] py-1.5 text-xs font-semibold text-[#0e2e1a] transition hover:brightness-95">
+        Follow
+      </button>
     </div>
   );
 }
@@ -156,33 +149,56 @@ function PerformanceCard({ matches }: { matches: BettingMatch[] }) {
         ["Win %", "—"],
       ];
 
+  const hasData = stats !== null && stats.total > 0;
+
   return (
     <div className="rounded-[28px] border p-5" style={{ background: "#ffffff", borderColor: "rgba(17,33,23,0.08)" }}>
       <div className="flex items-center gap-2 text-[#18211c]">
         <BarChart3 size={18} />
         <h3 className="text-[30px] font-semibold leading-none">Performance Snapshot</h3>
       </div>
-      <div className="mt-5 space-y-4">
-        {rows.map(([label, value]) => (
-          <div key={label} className="flex items-center justify-between border-b pb-3" style={{ borderColor: "rgba(17,33,23,0.07)" }}>
-            <span className="text-sm text-[#677269]">{label}</span>
-            <span className="text-2xl font-semibold text-[#18211c]">{value}</span>
-          </div>
-        ))}
-      </div>
 
-      <div className="mt-5 rounded-[22px] bg-[#f5faf6] p-4">
-        <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.18em] text-[#738076]">
-          <Radio size={14} /> Tracked picks
+      {!hasData ? (
+        <div className="mt-5 flex flex-col items-center gap-3 rounded-[22px] bg-[#f5faf6] py-7 px-4 text-center">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#dff7e7]">
+            <Plus size={18} className="text-[#166534]" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-[#18211c]">No picks tracked yet</p>
+            <p className="mt-1 text-xs text-[#748076]">Head to Tip Finder to track your first bet</p>
+          </div>
+          <Link
+            href="/predictions"
+            className="mt-1 rounded-full bg-[#1fd06a] px-4 py-2 text-sm font-semibold text-[#10311d] transition hover:brightness-95"
+          >
+            Find tips
+          </Link>
         </div>
-        <div className="mt-4 h-3 overflow-hidden rounded-full bg-[#dbe8de]">
-          <div className="h-full rounded-full bg-[#2edb6c]" style={{ width: stats && stats.total > 0 ? `${Math.min(90, Math.round(stats.win_rate * 100))}%` : "0%" }} />
-        </div>
-        <div className="mt-3 flex items-center justify-between text-sm text-[#4d594f]">
-          <span>{liveCount} live</span>
-          <span>{stats ? stats.settled : 0} graded</span>
-        </div>
-      </div>
+      ) : (
+        <>
+          <div className="mt-5 space-y-4">
+            {rows.map(([label, value]) => (
+              <div key={label} className="flex items-center justify-between border-b pb-3" style={{ borderColor: "rgba(17,33,23,0.07)" }}>
+                <span className="text-sm text-[#677269]">{label}</span>
+                <span className="text-2xl font-semibold text-[#18211c]">{value}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 rounded-[22px] bg-[#f5faf6] p-4">
+            <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.18em] text-[#738076]">
+              <Radio size={14} /> Your picks
+            </div>
+            <div className="mt-4 h-3 overflow-hidden rounded-full bg-[#dbe8de]">
+              <div className="h-full rounded-full bg-[#2edb6c]" style={{ width: `${Math.min(90, Math.round(stats.win_rate * 100))}%` }} />
+            </div>
+            <div className="mt-3 flex items-center justify-between text-sm text-[#4d594f]">
+              <span>{liveCount} live</span>
+              <span>{stats.settled} graded</span>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -196,6 +212,9 @@ function TopPicksCard({ matches }: { matches: BettingMatch[] }) {
         <h3 className="text-[30px] font-semibold leading-none">Top Picks Today</h3>
       </div>
       <div className="mt-5 space-y-3">
+        {picks.length === 0 && (
+          <p className="py-4 text-center text-sm text-[#748076]">No value picks identified right now — check back soon.</p>
+        )}
         {picks.slice(0, 3).map((pick) => (
           <div key={`${pick.match.id}-${pick.market.id}-${pick.selection.id}`} className="rounded-[20px] border p-4" style={{ borderColor: "rgba(17,33,23,0.07)", background: "#fbfcfb" }}>
             <div className="flex items-start justify-between gap-3">
@@ -206,15 +225,15 @@ function TopPicksCard({ matches }: { matches: BettingMatch[] }) {
               <div className="rounded-full bg-[#eff9f1] px-3 py-1 text-sm font-semibold text-[#166534]">+{pick.edge.toFixed(1)}%</div>
             </div>
             <div className="mt-3 flex items-center justify-between text-sm">
-              <span className="text-[#728074]">Odds {pick.selection.odds.toFixed(2)}</span>
+              <span className="text-[#728074]">Odds {pick.selection.odds?.toFixed(2) ?? "—"}</span>
               <span className="font-medium text-[#18211c]">{SPORT_CONFIG[pick.match.sport].label}</span>
             </div>
           </div>
         ))}
       </div>
-      <button className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-[#edf9f1] px-4 py-3 text-sm font-semibold text-[#166534] transition hover:brightness-95">
-        See top matches
-      </button>
+      <Link href="/predictions" className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-[#edf9f1] px-4 py-3 text-sm font-semibold text-[#166534] transition hover:brightness-95">
+        View all predictions
+      </Link>
     </div>
   );
 }
@@ -230,11 +249,14 @@ function LastWinningPicks() {
     <div className="rounded-[28px] border p-5" style={{ background: "#ffffff", borderColor: "rgba(17,33,23,0.08)" }}>
       <div className="flex items-center gap-2 text-[#18211c]">
         <Trophy size={18} />
-        <h3 className="text-[30px] font-semibold leading-none">Last 5 winning picks</h3>
+        <h3 className="text-[30px] font-semibold leading-none">Recent Wins</h3>
       </div>
       <div className="mt-5 space-y-3">
         {picks.length === 0 ? (
-          <p className="text-sm text-[#748076] text-center py-4">No winning picks tracked yet</p>
+          <div className="py-6 text-center">
+            <p className="text-sm font-medium text-[#18211c]">No wins recorded yet</p>
+            <p className="mt-1 text-xs text-[#748076]">Track picks from the <Link href="/predictions" className="underline underline-offset-2">Predictions</Link> page to get started</p>
+          </div>
         ) : (
           picks.map((pick) => (
             <div key={pick.id} className="flex items-center justify-between rounded-[18px] border px-4 py-3" style={{ borderColor: "rgba(17,33,23,0.07)", background: "#fbfcfb" }}>
@@ -267,6 +289,11 @@ export function DashboardShowcase({
   onSelectSport: (sport: SportSlug) => void;
   onSetInPlay: () => void;
 }) {
+  const [tipsters, setTipsters] = useState<TipsterProfile[]>([]);
+  useEffect(() => {
+    getTipsters().then(setTipsters).catch(() => {});
+  }, []);
+
   const inPlayActive = filter.status === "live";
   const featuredSports: SportSlug[] = ["soccer", "basketball", "baseball", "tennis", "esports"];
   const visibleSports = featuredSports.slice(0, 2);
@@ -285,7 +312,7 @@ export function DashboardShowcase({
           <div className="ml-auto flex flex-wrap items-center gap-5 text-sm text-[#536157]">
             <span className="inline-flex items-center gap-2"><Flame size={15} className="text-[#17b357]" /> {matches.filter((m) => m.status === "live").length} live</span>
             <span>{matches.length} markets</span>
-            <span className="font-semibold text-[#166534]">+{Math.max(...matches.map((m) => m.edgePercent ?? 0), 0).toFixed(1)}% top edge</span>
+            <span className="font-semibold text-[#166534]">{matches.length > 0 ? `+${Math.max(...matches.map((m) => m.edgePercent ?? 0)).toFixed(1)}% top edge` : "—"}</span>
           </div>
         </div>
 
@@ -317,17 +344,49 @@ export function DashboardShowcase({
 
       <div className="grid gap-5 xl:grid-cols-[1.65fr_0.95fr]">
         <div className="rounded-[30px] border p-5 lg:p-6" style={{ background: "#ffffff", borderColor: "rgba(17,33,23,0.08)", boxShadow: "0 18px 40px rgba(15,23,42,0.04)" }}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-[38px] font-semibold leading-none text-[#18211c]">Follow Our Tipsters</div>
-              <p className="mt-2 max-w-2xl text-base text-[#68756b]">See who’s in form, track their performance, and follow the analysts behind the strongest picks.</p>
+          {/* Header */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#dff7e7]">
+                <Users size={18} className="text-[#166534]" />
+              </div>
+              <div>
+                <div className="text-lg font-semibold text-[#18211c]">Follow Our Tipsters</div>
+                <div className="text-sm text-[#8a9690]">Top analysts ranked by weekly performance</div>
+              </div>
             </div>
-            <button className="inline-flex items-center gap-2 rounded-full border px-5 py-3 text-base font-semibold text-[#166534]" style={{ borderColor: "rgba(31,208,106,0.30)", background: "#edf9f1" }}>
-              <Star size={17} /> Follow
-            </button>
+            <Link href="/tipsters" className="shrink-0 rounded-full border px-4 py-2 text-sm font-semibold text-[#166534] transition hover:bg-[#f0faf3]" style={{ borderColor: "rgba(31,208,106,0.35)", background: "#edf9f1" }}>
+              View all
+            </Link>
           </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
-            {TIPSTERS.map((tipster) => <TipsterCard key={tipster.name} tipster={tipster} />)}
+
+          {/* Column headers */}
+          <div className="mt-5 flex items-center gap-3 px-3">
+            <span className="w-5 shrink-0" />
+            <span className="w-8 shrink-0" />
+            <span className="flex-1 text-[10px] uppercase tracking-widest text-[#a0aba3]">Analyst</span>
+            <span className="hidden w-12 shrink-0 text-right text-[10px] uppercase tracking-widest text-[#a0aba3] sm:block">Win %</span>
+            <span className="hidden w-14 shrink-0 text-right text-[10px] uppercase tracking-widest text-[#a0aba3] md:block">W–L</span>
+            <span className="hidden w-10 shrink-0 text-right text-[10px] uppercase tracking-widest text-[#a0aba3] lg:block">Streak</span>
+            <span className="w-16 shrink-0" />
+          </div>
+
+          {/* Tipster rows */}
+          <div className="mt-1 divide-y divide-[rgba(17,33,23,0.05)]">
+            {tipsters.length === 0 ? (
+              <div className="py-8 text-center text-sm text-[#8a9690]">No tipsters yet — be the first to <Link href="/tipsters" className="underline underline-offset-2">join</Link>.</div>
+            ) : (
+              <>
+                {tipsters.slice(0, 3).map((tipster, i) => (
+                  <TipsterRow key={tipster.id} tipster={tipster} rank={i + 1} />
+                ))}
+                <div className="px-3 py-3">
+                  <Link href="/tipsters" className="flex items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-semibold text-[#166634] transition hover:bg-[#f0faf3]" style={{ borderColor: "rgba(31,208,106,0.25)", background: "#f7fbf8" }}>
+                    See all tipsters <ArrowUpRight size={14} />
+                  </Link>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -359,7 +418,7 @@ export function DashboardShowcase({
                 <div className="mt-5 flex items-center justify-between">
                   <div>
                     <div className="text-[11px] uppercase tracking-[0.18em] text-[#7c897f]">Odds</div>
-                    <div className="mt-1 text-2xl font-semibold text-[#18211c]">{pick.selection.odds.toFixed(2)}</div>
+                    <div className="mt-1 text-2xl font-semibold text-[#18211c]">{pick.selection.odds?.toFixed(2) ?? "—"}</div>
                   </div>
                   <div className="rounded-full bg-[#eff9f1] px-3 py-1.5 text-sm font-semibold text-[#166534]">+{pick.edge.toFixed(1)}% edge</div>
                 </div>

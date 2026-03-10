@@ -232,6 +232,9 @@ export function adaptToMatchCard(item: SportMatchListItem, sport: SportSlug): Be
     case "baseball":
       featuredMarkets = baseballMarkets(pHome, pAway, item.home_name, item.away_name);
       break;
+    case "hockey":
+      featuredMarkets = basketballMarkets(pHome, pAway, item.home_name, item.away_name);
+      break;
   }
 
   const status: BettingMatch["status"] =

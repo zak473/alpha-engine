@@ -186,6 +186,11 @@ def track_picks(
     user_id: str = Depends(get_current_user),
 ):
     """Track a batch of queue selections from the bet slip."""
+    for p in body.picks:
+        if p.odds <= 1.0:
+            raise HTTPException(status_code=400, detail=f"Odds must be > 1.0, got {p.odds}")
+        if not p.market_name.strip():
+            raise HTTPException(status_code=400, detail="market_name cannot be empty")
     created = []
     for p in body.picks:
         pick = TrackedPick(

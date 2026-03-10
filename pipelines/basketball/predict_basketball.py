@@ -25,10 +25,16 @@ from core.types import MatchContext, Sport
 from db.models.mvp import CoreMatch, ModelRegistry, PredMatch, RatingEloTeam
 from db.session import SessionLocal
 from ratings.basketball_elo import BasketballEloEngine
-from pipelines.common.feature_engineering import (
-    FEATURE_NAMES,
-    build_feature_vector,
-)
+try:
+    from pipelines.basketball.feature_engineering import (
+        FEATURE_NAMES,
+        build_feature_vector,
+    )
+except ImportError:
+    from pipelines.common.feature_engineering import (
+        FEATURE_NAMES,
+        build_feature_vector,
+    )
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 log = logging.getLogger(__name__)

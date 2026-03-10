@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useId } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronUp, Shield, Timer, TrendingUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Shield, Timer, TrendingUp, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BettingMatch, Market, Selection, SportSlug } from "@/lib/betting-types";
 import { SPORT_CONFIG } from "@/lib/betting-types";
@@ -171,7 +171,15 @@ function MatchCardIdentity({ match, cfg }: { match: BettingMatch; cfg: (typeof S
             <div className="truncate text-sm font-medium text-text-primary">{match.league}</div>
           </div>
         </div>
-        <LiveBadge match={match} />
+        <div className="flex items-center gap-1.5">
+          {(match.edgePercent ?? 0) >= 5 && (
+            <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em]"
+              style={{ borderColor: "rgba(251,191,36,0.30)", background: "rgba(251,191,36,0.12)", color: "#f59e0b" }}>
+              <Flame size={9} /> Value
+            </span>
+          )}
+          <LiveBadge match={match} />
+        </div>
       </div>
 
       <div className="grid gap-4 px-5 py-4 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
