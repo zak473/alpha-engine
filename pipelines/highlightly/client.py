@@ -21,9 +21,13 @@ SPORT_HOSTS: dict[str, str] = {
 
 
 def _headers() -> dict[str, str]:
-    """Return auth headers for the Highlightly direct API."""
+    """
+    Auth headers for the Highlightly direct API (soccer.highlightly.net).
+    Uses x-rapidapi-key — this is the correct header for both direct and RapidAPI access.
+    Do NOT set x-rapidapi-host for the direct API (only needed for RapidAPI marketplace).
+    """
     return {
-        "x-api-key": settings.HIGHLIGHTLY_API_KEY,
+        "x-rapidapi-key": settings.HIGHLIGHTLY_API_KEY,
         "Accept": "application/json",
     }
 

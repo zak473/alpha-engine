@@ -351,25 +351,28 @@ def test_highlightly_connection():
 
     results = {}
 
-    # Try every URL format Highlightly might use
+    # Try every URL + header combination. Per docs, x-rapidapi-key is correct for direct API.
     candidates = [
-        ("subdomain_direct",   f"https://soccer.highlightly.net/matches",       {"date": "2026-03-10", "limit": 1}),
-        ("subdomain_v2",       f"https://soccer.highlightly.net/v2/matches",     {"date": "2026-03-10", "limit": 1}),
-        ("api_dot",            f"https://api.highlightly.net/matches",           {"sport": "soccer", "date": "2026-03-10", "limit": 1}),
-        ("api_dot_v1",         f"https://api.highlightly.net/v1/matches",        {"sport": "soccer", "date": "2026-03-10", "limit": 1}),
-        ("api_dot_soccer",     f"https://api.highlightly.net/soccer/matches",    {"date": "2026-03-10", "limit": 1}),
+        ("soccer.highlightly.net/matches",                {"date": "2026-03-10", "limit": 1}),
+        ("soccer.highlightly.net/v2/matches",             {"date": "2026-03-10", "limit": 1}),
+        ("api.highlightly.net/matches",                   {"sport": "soccer", "date": "2026-03-10", "limit": 1}),
+        ("football-highlights-api.p.rapidapi.com/matches",{"date": "2026-03-10", "limit": 1}),
     ]
 
     working_url = None
-    for name, url, params in candidates:
-        for header_key in ("x-api-key", "x-rapidapi-key"):
+    for host, params in candidates:
+        for header_key in ("x-rapidapi-key", "x-api-key"):
+            headers = {header_key: key, "Accept": "application/json"}
+            if "rapidapi.com" in host:
+                headers["x-rapidapi-host"] = host
+            url = f"https://{host}/matches"
             try:
-                resp = httpx.get(url, params=params, headers={header_key: key, "Accept": "application/json"}, timeout=8)
-                results[f"{name}_{header_key}"] = resp.status_code
-                if resp.status_code == 200:
-                    working_url = {"url": url, "header": header_key, "params": params}
+                resp = httpx.get(f"https://{host}/matches", params=params, headers=headers, timeout=8)
+                results[f"{host}__{header_key}"] = resp.status_code
+                if resp.status_code == 200 and not working_url:
+                    working_url = {"url": f"https://{host}/matches", "header": header_key}
             except Exception as e:
-                results[f"{name}_{header_key}"] = str(e)[:60]
+                results[f"{host}__{header_key}"] = str(e)[:80]
 
     return {
         "key_in_railway": masked_key,
