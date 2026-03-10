@@ -479,7 +479,7 @@ def _job_generate_weekly_challenges() -> None:
 
 
 def _job_highlightly_live() -> None:
-    """Fetch today's live scores from Highlightly every 30 seconds."""
+    """Fetch today's live scores, lineups, events and highlights from Highlightly every 2 minutes."""
     from pipelines.highlightly.fetch_all import fetch_today
     try:
         n = fetch_today()
@@ -490,13 +490,35 @@ def _job_highlightly_live() -> None:
 
 
 def _job_fetch_highlightly() -> None:
-    """Full Highlightly sync (yesterday + today) every 15 minutes."""
+    """Full Highlightly sync every 15 minutes — recent + upcoming only."""
     from pipelines.highlightly.fetch_all import fetch_all as hl_fetch
     try:
-        n = hl_fetch()
+        n = hl_fetch(days_back=7, days_ahead=14)
         log.info("[scheduler] highlightly_fetch: %d rows ingested.", n)
     except Exception as exc:
         log.error("[scheduler] highlightly_fetch failed: %s", exc, exc_info=True)
+
+
+def _job_fetch_highlightly_historical() -> None:
+    """Daily Highlightly historical sync — pulls 90 days of results for form data."""
+    from pipelines.highlightly.fetch_all import fetch_all as hl_fetch
+    log.info("[scheduler] Starting highlightly_historical job ...")
+    try:
+        n = hl_fetch(days_back=90, days_ahead=3)
+        log.info("[scheduler] highlightly_historical: %d rows ingested.", n)
+    except Exception as exc:
+        log.error("[scheduler] highlightly_historical failed: %s", exc, exc_info=True)
+    log.info("[scheduler] highlightly_historical done.")
+
+
+def _job_sync_standings() -> None:
+    """Sync league standings for all active Highlightly leagues — runs every 6 hours."""
+    from pipelines.highlightly.fetch_all import fetch_standings
+    try:
+        n = fetch_standings()
+        log.info("[scheduler] sync_standings: %d rows synced.", n)
+    except Exception as exc:
+        log.error("[scheduler] sync_standings failed: %s", exc, exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -630,12 +652,12 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
-    # Highlightly live score poll every 30 seconds (run immediately on startup)
+    # Highlightly live score poll every 2 minutes (run immediately on startup)
     _scheduler.add_job(
         _job_highlightly_live,
-        trigger=IntervalTrigger(seconds=30),
+        trigger=IntervalTrigger(minutes=2),
         id="highlightly_live",
-        name="Highlightly live score poll (30s)",
+        name="Highlightly live score poll (2m)",
         replace_existing=True,
         next_run_time=_dt.now(_tz.utc),
     )
@@ -645,15 +667,36 @@ def start() -> BackgroundScheduler:
         _job_fetch_highlightly,
         trigger=IntervalTrigger(minutes=15),
         id="fetch_highlightly",
-        name="Highlightly full sync (soccer, basketball, baseball, hockey)",
+        name="Highlightly full sync (logos, lineups, stats, events, highlights)",
         replace_existing=True,
         next_run_time=_dt.now(_tz.utc),
+    )
+
+    # Standings sync every 6 hours (run immediately on startup)
+    _scheduler.add_job(
+        _job_sync_standings,
+        trigger=IntervalTrigger(hours=6),
+        id="sync_standings",
+        name="Highlightly league standings sync",
+        replace_existing=True,
+        next_run_time=_dt.now(_tz.utc),
+    )
+
+    # Highlightly historical sync once daily at 4:00 AM UTC — 90 days of results for form data
+    _scheduler.add_job(
+        _job_fetch_highlightly_historical,
+        trigger=CronTrigger(hour=4, minute=0, timezone="UTC"),
+        id="highlightly_historical",
+        name="Highlightly 90-day historical sync (form data)",
+        replace_existing=True,
+        next_run_time=_dt.now(_tz.utc),  # run immediately on startup to populate form data
     )
 
     _scheduler.start()
     log.info(
         "[scheduler] Started. Jobs: expire_stale (5m), fetch_live (30m), fetch_odds (30m), "
-        "highlightly_live (30s), fetch_highlightly (15m), settle_picks (15m), predict_only (1h), fetch_stats (6h), "
+        "highlightly_live (2m), fetch_highlightly (15m), highlightly_historical (daily 04:00), "
+        "settle_picks (15m), predict_only (1h), fetch_stats (6h), "
         "update_elo (nightly 03:00 UTC), build_soccer_features (nightly 03:30 UTC), "
         "fetch_player_profiles (weekly Sun), fetch_xg (weekly Mon), "
         "retrain_models (weekly Sat), generate_weekly_challenges (weekly Mon 00:05). "

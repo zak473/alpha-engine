@@ -187,12 +187,33 @@ export function MatchesTable({ sport, matches, total, initialStatus }: MatchesTa
                         {formatKickoff(m.kickoff_utc)}
                       </td>
                       <td>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-t0 font-semibold text-sm leading-tight">{m.home_name}</span>
-                          <span className="text-t1 text-xs">vs {m.away_name}</span>
+                        <div className="flex items-center gap-2">
+                          {(m as any).home_logo ? (
+                            <img src={(m as any).home_logo} alt={m.home_name} className="w-6 h-6 rounded-full object-contain bg-white/5 shrink-0" />
+                          ) : (
+                            <div className="w-6 h-6 rounded-full bg-white/[0.06] flex items-center justify-center text-[9px] font-bold text-t2 shrink-0">
+                              {m.home_name.slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-t0 font-semibold text-sm leading-tight">{m.home_name}</span>
+                            <div className="flex items-center gap-1.5">
+                              {(m as any).away_logo ? (
+                                <img src={(m as any).away_logo} alt={m.away_name} className="w-4 h-4 rounded-full object-contain bg-white/5 shrink-0" />
+                              ) : null}
+                              <span className="text-t1 text-xs">vs {m.away_name}</span>
+                            </div>
+                          </div>
                         </div>
                       </td>
-                      <td className="text-t1 text-xs hidden md:table-cell">{m.league}</td>
+                      <td className="text-t1 text-xs hidden md:table-cell">
+                        <div className="flex items-center gap-1.5">
+                          {(m as any).league_logo && (
+                            <img src={(m as any).league_logo} alt={m.league} className="w-4 h-4 rounded object-contain" />
+                          )}
+                          {m.league}
+                        </div>
+                      </td>
                       <td className="col-right hidden md:table-cell">{eloDiffChip(m.elo_home, m.elo_away)}</td>
                       <td className="col-right">{probBar(m.p_home, m.p_away)}</td>
                       <td className="col-right hidden lg:table-cell">

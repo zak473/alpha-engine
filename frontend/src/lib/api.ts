@@ -23,6 +23,7 @@ import type {
   Sport,
   SportMatchListItem,
   SportMatchDetail,
+  StandingsResponse,
   TennisMatchDetail,
   EsportsMatchDetail,
   BasketballMatchDetail,
@@ -724,4 +725,19 @@ export async function markAllNotificationsRead(): Promise<void> {
 
 export async function updateProfile(data: { display_name?: string; current_password?: string; new_password?: string }): Promise<{ user_id: string; email: string; display_name: string | null }> {
   return mutate("/auth/me", "PATCH", data);
+}
+
+// ─── Standings ─────────────────────────────────────────────────────────────
+
+export async function getStandingsBySport(sport: string, season?: string): Promise<StandingsResponse[]> {
+  const suffix = season ? `?season=${encodeURIComponent(season)}` : "";
+  return request<StandingsResponse[]>(`/standings/${sport}${suffix}`, { revalidate: 300 });
+}
+
+export async function getStandingsForMatch(matchId: string): Promise<StandingsResponse | null> {
+  try {
+    return await request<StandingsResponse>(`/standings/match/${matchId}`, { revalidate: 300 });
+  } catch {
+    return null;
+  }
 }

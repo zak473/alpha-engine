@@ -53,6 +53,99 @@ def get_odds(sport: str, match_id: str | int) -> dict[str, Any]:
     return data
 
 
+def get_extras(sport: str, match_id: str | int) -> dict[str, Any]:
+    """
+    Fetch lineups, statistics, and events for a single match.
+    Returns a combined dict with keys "lineups", "statistics", "events".
+    Each key is absent if the endpoint fails or returns no data.
+    """
+    extras: dict[str, Any] = {}
+    for endpoint in ("lineups", "statistics", "events"):
+        try:
+            data = get(sport, endpoint, {"matchId": str(match_id)})
+            payload = data.get("data") or data
+            if payload:
+                extras[endpoint] = payload
+        except Exception as exc:
+            log.debug("[highlightly:extras] %s %s/%s failed: %s", sport, endpoint, match_id, exc)
+    return extras
+
+
+def get_highlights(sport: str, match_id: str | int) -> list[dict[str, Any]]:
+    """Fetch highlight clips for a single match. Returns list of clip dicts."""
+    try:
+        data = get(sport, "highlights", {"matchId": str(match_id)})
+        payload = data.get("data") or data
+        if isinstance(payload, list):
+            return payload
+        if isinstance(payload, dict):
+            return payload.get("highlights") or payload.get("clips") or []
+    except Exception as exc:
+        log.debug("[highlightly:highlights] %s match %s failed: %s", sport, match_id, exc)
+    return []
+
+
+def get_standings(sport: str, league_id: str | int, season: str | None = None) -> list[dict[str, Any]]:
+    """
+    Fetch league standings for a given league.
+    Returns list of standing rows (each row = one team in the table).
+    """
+    params: dict[str, Any] = {"leagueId": str(league_id)}
+    if season:
+        params["season"] = season
+    try:
+        data = get(sport, "standings", params)
+        payload = data.get("data") or data
+        # Highlightly may return [{group_name, standings: [...]}, ...]  or flat list
+        if isinstance(payload, list):
+            rows: list[dict] = []
+            for item in payload:
+                if isinstance(item, dict):
+                    if "standings" in item:
+                        # grouped standings: [{group_name, standings: [...]}, ...]
+                        group = item.get("group") or item.get("group_name") or item.get("name") or ""
+                        for row in (item.get("standings") or []):
+                            if isinstance(row, dict):
+                                row["_group"] = group
+                                rows.append(row)
+                    else:
+                        rows.append(item)
+            return rows
+        if isinstance(payload, dict):
+            return payload.get("standings") or []
+    except Exception as exc:
+        log.debug("[highlightly:standings] %s league %s failed: %s", sport, league_id, exc)
+    return []
+
+
+def get_leagues(sport: str) -> list[dict[str, Any]]:
+    """Fetch all leagues (with logos) for a sport."""
+    try:
+        data = get(sport, "leagues", {})
+        payload = data.get("data") or data
+        if isinstance(payload, list):
+            return payload
+        if isinstance(payload, dict):
+            return payload.get("leagues") or []
+    except Exception as exc:
+        log.debug("[highlightly:leagues] %s failed: %s", sport, exc)
+    return []
+
+
+def get_countries(sport: str) -> list[dict[str, Any]]:
+    """Fetch all countries (with flags) for a sport."""
+    try:
+        data = get(sport, "countries", {})
+        payload = data.get("data") or data
+        if isinstance(payload, list):
+            return payload
+        if isinstance(payload, dict):
+            return payload.get("countries") or []
+    except Exception as exc:
+        log.debug("[highlightly:countries] %s failed: %s", sport, exc)
+    return []
+
+
 def extract_odds(
     match: dict[str, Any], sport: str
 ) -> tuple[float | None, float | None, float | None]:

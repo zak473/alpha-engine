@@ -24,7 +24,9 @@ from api.sports.soccer.schemas import (
     FairOddsOut,
     FormStatsOut,
     H2HRecordOut,
+    HighlightClipOut,
     KeyDriverOut,
+    MatchEventOut,
     ModelMetaOut,
     ParticipantOut,
     ProbabilitiesOut,
@@ -175,6 +177,83 @@ def _team_stats_out(
     )
 
 
+_NORM_OUTCOME = {
+    "H": "home_win", "D": "draw", "A": "away_win",
+    "home_win": "home_win", "draw": "draw", "away_win": "away_win",
+}
+_FLIP_OUTCOME = {"home_win": "away_win", "away_win": "home_win", "draw": "draw"}
+
+
+def _compute_form_from_db(
+    db: Session, team_id: str, before_kickoff, team_name: str
+) -> FormStatsOut | None:
+    """Compute last-5 form directly from CoreMatch — used when FeatSoccerMatch is missing."""
+    from datetime import timezone
+    ko = before_kickoff
+    if ko and ko.tzinfo is None:
+        ko = ko.replace(tzinfo=timezone.utc)
+
+    recent = (
+        db.query(CoreMatch)
+        .filter(
+            CoreMatch.sport == "soccer",
+            CoreMatch.status == "finished",
+            CoreMatch.kickoff_utc < ko,
+            (CoreMatch.home_team_id == team_id) | (CoreMatch.away_team_id == team_id),
+        )
+        .order_by(CoreMatch.kickoff_utc.desc())
+        .limit(5)
+        .all()
+    )
+    if not recent:
+        return None
+
+    pts = w = d = l = 0
+    gf_list: list[float] = []
+    ga_list: list[float] = []
+    last_kickoff = None
+
+    for m in recent:
+        is_home = (m.home_team_id == team_id)
+        if last_kickoff is None:
+            last_kickoff = m.kickoff_utc
+        gf = (m.home_score if is_home else m.away_score) or 0
+        ga = (m.away_score if is_home else m.home_score) or 0
+        gf_list.append(gf)
+        ga_list.append(ga)
+        norm = _NORM_OUTCOME.get(m.outcome or "", None)
+        outcome = norm if is_home else _FLIP_OUTCOME.get(norm or "", None)
+        if outcome == "home_win":
+            pts += 3; w += 1
+        elif outcome == "draw":
+            pts += 1; d += 1
+        elif outcome == "away_win":
+            l += 1
+
+    days_rest: float | None = None
+    if last_kickoff:
+        lk = last_kickoff
+        if lk.tzinfo is None:
+            lk = lk.replace(tzinfo=timezone.utc)
+        days_rest = max(0.0, (ko - lk).total_seconds() / 86400.0)
+
+    gf_avg = sum(gf_list) / len(gf_list) if gf_list else None
+    ga_avg = sum(ga_list) / len(ga_list) if ga_list else None
+
+    raw_form = (["W"] * w + ["D"] * d + ["L"] * l)[:5]
+    return FormStatsOut(
+        team_name=team_name,
+        form_pts=float(pts),
+        wins=w,
+        draws=d,
+        losses=l,
+        goals_scored_avg=round(gf_avg, 2) if gf_avg is not None else None,
+        goals_conceded_avg=round(ga_avg, 2) if ga_avg is not None else None,
+        days_rest=round(days_rest, 1) if days_rest is not None else None,
+        form_last_5=raw_form if raw_form else None,
+    )
+
+
 def _form_stats(feat: FeatSoccerMatch, team_name: str, side: str, match_id: str = "") -> FormStatsOut | None:
     """Build FormStatsOut for home or away side from a FeatSoccerMatch row."""
     if feat is None:
@@ -214,6 +293,10 @@ def _form_stats(feat: FeatSoccerMatch, team_name: str, side: str, match_id: str 
             xga_avg=feat.away_xga_avg,
             days_rest=feat.away_days_rest,
         )
+
+    # If all form fields are null, return None so the live fallback can be used
+    if wins is None and draws is None and losses is None and form.goals_scored_avg is None:
+        return None
 
     # Enhance with derived fields (no mock data)
     clean_sheets = wins if wins else 0
@@ -302,6 +385,300 @@ def _real_league_context(db: Session, match: CoreMatch, home_id: str, away_id: s
 
 
 
+def _parse_highlights(highlights_json: list | None) -> list[HighlightClipOut]:
+    """Parse Highlightly highlight clips into HighlightClipOut list."""
+    if not highlights_json or not isinstance(highlights_json, list):
+        return []
+    clips = []
+    for item in highlights_json:
+        if not isinstance(item, dict):
+            continue
+        url = (
+            item.get("url") or item.get("link") or item.get("videoUrl") or
+            item.get("embedUrl") or item.get("hlsUrl") or ""
+        )
+        if not url:
+            continue
+        clips.append(HighlightClipOut(
+            title=item.get("title") or item.get("name"),
+            url=url,
+            thumbnail=item.get("thumbnail") or item.get("image") or item.get("preview"),
+            duration=item.get("duration"),
+            source=item.get("source") or item.get("provider"),
+            event_type=item.get("type") or item.get("eventType"),
+            minute=item.get("minute") or item.get("time"),
+        ))
+    return clips
+
+
+def _parse_lineup(extras_lineup: dict | None, team_id: str, team_name: str) -> Optional[SoccerLineupOut]:
+    """
+    Parse a Highlightly lineups payload into SoccerLineupOut.
+    Handles both {"home": {...}, "away": {...}} and flat list shapes.
+    """
+    if not extras_lineup:
+        return None
+
+    # Determine which side to parse based on team position (called separately for home/away)
+    # We expect the caller to pass the correct sub-dict
+    if not isinstance(extras_lineup, dict):
+        return None
+
+    formation = extras_lineup.get("formation") or extras_lineup.get("formationName")
+    raw_players = extras_lineup.get("players") or extras_lineup.get("lineups") or []
+
+    players = []
+    for p in raw_players:
+        if not isinstance(p, dict):
+            continue
+        name = p.get("name") or p.get("playerName") or p.get("shortName") or ""
+        if not name:
+            continue
+        pos = p.get("position") or p.get("pos") or p.get("fieldPosition") or ""
+        jersey_raw = p.get("jerseyNumber") or p.get("jersey") or p.get("shirtNumber")
+        try:
+            jersey = int(jersey_raw) if jersey_raw is not None else None
+        except (ValueError, TypeError):
+            jersey = None
+        is_starter = bool(p.get("isStarting", p.get("isStarter", p.get("lineup", True))))
+        stats = p.get("statistics") or p.get("stats") or {}
+        players.append(SoccerPlayerOut(
+            player_id=str(p.get("id") or p.get("playerId") or ""),
+            name=name,
+            position=str(pos).upper() if pos else None,
+            jersey=jersey,
+            is_starter=is_starter,
+            goals=stats.get("goals"),
+            assists=stats.get("goalAssist") or stats.get("assists"),
+            shots=stats.get("totalShot") or stats.get("shots"),
+            shots_on_target=stats.get("shotOnTarget") or stats.get("shotsOnTarget"),
+            yellow_cards=stats.get("yellowCard") or stats.get("yellowCards"),
+            red_cards=stats.get("redCard") or stats.get("redCards"),
+            rating=stats.get("rating"),
+        ))
+
+    if not players and not formation:
+        return None
+
+    return SoccerLineupOut(
+        team_id=team_id,
+        team_name=team_name,
+        formation=str(formation) if formation else None,
+        players=players,
+    )
+
+
+def _extract_lineups(
+    extras: dict | None, home_id: str, home_name: str, away_id: str, away_name: str
+) -> tuple[Optional[SoccerLineupOut], Optional[SoccerLineupOut]]:
+    """Extract home and away lineups from extras_json."""
+    if not extras:
+        return None, None
+    raw = extras.get("lineups")
+    if not raw:
+        return None, None
+
+    # Shape 1: {"home": {...}, "away": {...}}
+    if isinstance(raw, dict):
+        home_data = raw.get("home") or raw.get("homeTeam")
+        away_data = raw.get("away") or raw.get("awayTeam")
+        return (
+            _parse_lineup(home_data, home_id, home_name),
+            _parse_lineup(away_data, away_id, away_name),
+        )
+
+    # Shape 2: [{"teamId": ..., "players": [...]}, ...]
+    if isinstance(raw, list):
+        home_lineup = away_lineup = None
+        for side in raw:
+            if not isinstance(side, dict):
+                continue
+            tname = str(side.get("teamName") or side.get("name") or side.get("team_name") or "").lower()
+            # Fuzzy name match: either name contains the other
+            if (home_name.lower() in tname or tname in home_name.lower()) and tname:
+                home_lineup = _parse_lineup(side, home_id, home_name)
+            elif (away_name.lower() in tname or tname in away_name.lower()) and tname:
+                away_lineup = _parse_lineup(side, away_id, away_name)
+        # Positional fallback: Highlightly always sends home first, away second
+        if home_lineup is None and away_lineup is None and len(raw) >= 2:
+            home_lineup = _parse_lineup(raw[0], home_id, home_name)
+            away_lineup = _parse_lineup(raw[1], away_id, away_name)
+        return home_lineup, away_lineup
+
+    return None, None
+
+
+def _extract_events(extras: dict | None, home_name: str, away_name: str) -> list[MatchEventOut]:
+    """Parse Highlightly events payload into MatchEventOut list."""
+    if not extras:
+        return []
+    raw = extras.get("events") or extras.get("incidents") or []
+    if isinstance(raw, dict):
+        # Some shapes: {"home": [...], "away": [...]}
+        raw = raw.get("events") or raw.get("incidents") or []
+    if not isinstance(raw, list):
+        return []
+
+    events: list[MatchEventOut] = []
+    _TYPE_MAP = {
+        "goal": "goal", "score": "goal", "penalty": "goal",
+        "yellow": "yellow_card", "yellowcard": "yellow_card", "yellow_card": "yellow_card",
+        "red": "red_card", "redcard": "red_card", "red_card": "red_card",
+        "yellowred": "red_card",  # second yellow
+        "sub": "substitution", "substitution": "substitution",
+        "var": "var", "penaltymissed": "penalty_missed", "missed_penalty": "penalty_missed",
+    }
+
+    for ev in raw:
+        if not isinstance(ev, dict):
+            continue
+        raw_type = str(ev.get("type") or ev.get("eventType") or ev.get("incident") or "").lower().replace(" ", "")
+        ev_type = _TYPE_MAP.get(raw_type, raw_type) or "unknown"
+
+        # Team assignment
+        team_raw = str(ev.get("team") or ev.get("teamId") or ev.get("side") or "").lower()
+        if "home" in team_raw or team_raw == "1":
+            team = "home"
+        elif "away" in team_raw or team_raw == "2":
+            team = "away"
+        else:
+            # Fallback: match player team name against home/away
+            p_team = str(ev.get("teamName") or "").lower()
+            team = "home" if (home_name.lower() in p_team or p_team in home_name.lower()) else "away"
+
+        # Minute parsing — handle "45+2" format
+        raw_min = ev.get("minute") or ev.get("time") or ev.get("elapsed") or ev.get("min")
+        minute = minute_extra = None
+        if raw_min is not None:
+            try:
+                s = str(raw_min).replace("'", "").strip()
+                if "+" in s:
+                    parts = s.split("+", 1)
+                    minute = int(parts[0])
+                    minute_extra = int(parts[1]) if parts[1].isdigit() else None
+                else:
+                    minute = int(float(s))
+            except (ValueError, TypeError):
+                pass
+
+        player_name = (
+            ev.get("playerName") or ev.get("player") or ev.get("name") or
+            (ev.get("player") or {}).get("name") if isinstance(ev.get("player"), dict) else None
+        )
+        player_out = (
+            ev.get("playerOutName") or ev.get("playerOut") or
+            (ev.get("playerOut") or {}).get("name") if isinstance(ev.get("playerOut"), dict) else None
+        )
+
+        score = ev.get("score") or ev.get("result") or {}
+        score_h = score.get("home") or score.get("homeScore") if isinstance(score, dict) else None
+        score_a = score.get("away") or score.get("awayScore") if isinstance(score, dict) else None
+
+        events.append(MatchEventOut(
+            minute=minute,
+            minute_extra=minute_extra,
+            type=ev_type,
+            team=team,
+            player_name=str(player_name) if player_name else None,
+            player_out=str(player_out) if player_out else None,
+            description=ev.get("description") or ev.get("detail"),
+            is_penalty=bool(ev.get("isPenalty") or ev.get("ispenalty") or "penalty" in ev_type),
+            is_own_goal=bool(ev.get("isOwnGoal") or ev.get("ownGoal") or "own" in str(ev.get("description") or "").lower()),
+            score_home=int(score_h) if score_h is not None else None,
+            score_away=int(score_a) if score_a is not None else None,
+        ))
+
+    return sorted(events, key=lambda e: (e.minute or 0, e.minute_extra or 0))
+
+
+_HL_STAT_MAP: dict[str, str] = {
+    # Highlightly type string → snake_case key expected by frontend
+    "ball possession": "possession_pct",
+    "possession": "possession_pct",
+    "total shots": "shots_total",
+    "shots total": "shots_total",
+    "shots on target": "shots_on_target",
+    "on target": "shots_on_target",
+    "shots off target": "shots_off_target",
+    "fouls": "fouls",
+    "total fouls": "fouls",
+    "yellow cards": "yellow_cards",
+    "red cards": "red_cards",
+    "corners": "corners",
+    "corner kicks": "corners",
+    "offsides": "offsides",
+    "offside": "offsides",
+    "expected goals": "xg",
+    "xg": "xg",
+    "expected goals (xg)": "xg",
+    "blocked shots": "blocks",
+    "goalkeeper saves": "saves",
+    "saves": "saves",
+    "passes": "passes_completed",
+    "total passes": "passes_completed",
+    "pass accuracy": "pass_accuracy_pct",
+    "tackles": "tackles_won",
+}
+
+
+def _normalise_hl_stats(raw_dict: dict) -> dict:
+    """Convert Highlightly string-keyed stats into snake_case frontend keys."""
+    out: dict = {}
+    for key, val in raw_dict.items():
+        normalised = _HL_STAT_MAP.get(key.lower().strip())
+        if normalised:
+            # Strip trailing % and convert to float
+            try:
+                out[normalised] = float(str(val).replace("%", "").strip())
+            except (ValueError, TypeError):
+                out[normalised] = val
+        else:
+            out[key] = val
+    return out
+
+
+def _extract_live_stats(extras: dict | None) -> tuple[dict | None, dict | None]:
+    """Extract home/away statistics from extras_json normalised for the frontend."""
+    if not extras:
+        return None, None
+    raw = extras.get("statistics") or extras.get("stats")
+    if not raw:
+        return None, None
+
+    def _parse_list(stats_list: list) -> dict:
+        parsed = {s["type"]: s.get("value") for s in stats_list if isinstance(s, dict) and s.get("type")}
+        return _normalise_hl_stats(parsed)
+
+    # Shape 1: [{"team": "home", "statistics": [{"type": "Ball Possession", "value": "55%"}, ...]}, ...]
+    if isinstance(raw, list):
+        home_stats = away_stats = None
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            side = str(item.get("team") or item.get("teamId") or item.get("side") or "").lower()
+            stats_list = item.get("statistics") or item.get("stats") or []
+            parsed = _parse_list(stats_list)
+            if "home" in side or side == "1":
+                home_stats = parsed
+            elif "away" in side or side == "2":
+                away_stats = parsed
+        return home_stats, away_stats
+
+    # Shape 2: {"home": [...], "away": [...]}
+    if isinstance(raw, dict):
+        def _parse(lst) -> dict | None:
+            if isinstance(lst, list):
+                return _parse_list(lst)
+            if isinstance(lst, dict):
+                return _normalise_hl_stats(lst)
+            return None
+        home = raw.get("home") or raw.get("homeTeam")
+        away = raw.get("away") or raw.get("awayTeam")
+        return _parse(home), _parse(away)
+
+    return None, None
+
+
 class SoccerMatchService(BaseMatchListService):
 
     def get_match_list(
@@ -351,18 +728,33 @@ class SoccerMatchService(BaseMatchListService):
             )
             feat_map = {f.match_id: f for f in feats}
 
+        # Batch-load teams and leagues for logos
+        all_team_ids = {m.home_team_id for m in rows} | {m.away_team_id for m in rows}
+        all_league_ids = {m.league_id for m in rows if m.league_id}
+        team_map = {t.id: t for t in db.query(CoreTeam).filter(CoreTeam.id.in_(all_team_ids)).all()} if all_team_ids else {}
+        league_map = {lg.id: lg for lg in db.query(CoreLeague).filter(CoreLeague.id.in_(all_league_ids)).all()} if all_league_ids else {}
+
         items = []
         for m in rows:
-            league_name = _league_name(db, m.league_id)
-            home_name = _team_name(db, m.home_team_id)
-            away_name = _team_name(db, m.away_team_id)
+            league_obj = league_map.get(m.league_id)
+            league_name = league_obj.name if league_obj else "Unknown"
+            league_logo = league_obj.logo_url if league_obj else None
+            home_t = team_map.get(m.home_team_id)
+            away_t = team_map.get(m.away_team_id)
+            home_name = home_t.name if home_t else m.home_team_id
+            away_name = away_t.name if away_t else m.away_team_id
+            home_logo = home_t.logo_url if home_t else None
+            away_logo = away_t.logo_url if away_t else None
             pred = pred_map.get(m.id)
             feat = feat_map.get(m.id)
 
             items.append(SoccerMatchListItem(
                 id=m.id,
                 league=league_name,
+                league_logo=league_logo,
                 season=m.season,
+                home_logo=home_logo,
+                away_logo=away_logo,
                 kickoff_utc=m.kickoff_utc,
                 status=m.status,
                 home_id=m.home_team_id,
@@ -393,9 +785,15 @@ class SoccerMatchService(BaseMatchListService):
         if match is None or match.sport != "soccer":
             raise HTTPException(status_code=404, detail=f"Soccer match {match_id} not found")
 
-        home_name = _team_name(db, match.home_team_id)
-        away_name = _team_name(db, match.away_team_id)
-        league_name = _league_name(db, match.league_id)
+        home_team = db.get(CoreTeam, match.home_team_id)
+        away_team = db.get(CoreTeam, match.away_team_id)
+        home_name = home_team.name if home_team else match.home_team_id
+        away_name = away_team.name if away_team else match.away_team_id
+        home_logo = home_team.logo_url if home_team else None
+        away_logo = away_team.logo_url if away_team else None
+        league_obj = db.get(CoreLeague, match.league_id) if match.league_id else None
+        league_name = league_obj.name if league_obj else "Unknown League"
+        league_logo = league_obj.logo_url if league_obj else None
 
         # Prediction
         live_registry = db.query(ModelRegistry).filter_by(is_live=True).first()
@@ -490,15 +888,28 @@ class SoccerMatchService(BaseMatchListService):
                 neutral_site=match.is_neutral or False,
             )
 
+        # Parse lineups from Highlightly extras
+        lineup_home, lineup_away = _extract_lineups(
+            match.extras_json,
+            match.home_team_id, home_name,
+            match.away_team_id, away_name,
+        )
+
+        # Parse highlights, events, live stats
+        highlights = _parse_highlights(match.highlights_json)
+        events = _extract_events(match.extras_json, home_name, away_name)
+        stats_home_live, stats_away_live = _extract_live_stats(match.extras_json)
+
         return SoccerMatchDetail(
             id=match.id,
             sport="soccer",
             league=league_name,
+            league_logo=league_logo,
             season=match.season,
             kickoff_utc=match.kickoff_utc,
             status=match.status,
-            home=ParticipantOut(id=match.home_team_id, name=home_name),
-            away=ParticipantOut(id=match.away_team_id, name=away_name),
+            home=ParticipantOut(id=match.home_team_id, name=home_name, logo_url=home_logo),
+            away=ParticipantOut(id=match.away_team_id, name=away_name, logo_url=away_logo),
             home_score=match.home_score,
             away_score=match.away_score,
             outcome=match.outcome,
@@ -514,16 +925,20 @@ class SoccerMatchService(BaseMatchListService):
             elo_away=elo_away,
             stats_home=_team_stats_out(db, match_id, match.home_team_id, home_name, True),
             stats_away=_team_stats_out(db, match_id, match.away_team_id, away_name, False),
-            form_home=_form_stats(feat, home_name, "home", match_id),
-            form_away=_form_stats(feat, away_name, "away", match_id),
+            form_home=_form_stats(feat, home_name, "home", match_id) or _compute_form_from_db(db, match.home_team_id, match.kickoff_utc, home_name),
+            form_away=_form_stats(feat, away_name, "away", match_id) or _compute_form_from_db(db, match.away_team_id, match.kickoff_utc, away_name),
             simulation=simulation,
             h2h=_h2h(db, match.home_team_id, match.away_team_id, home_name, away_name),
             context=match_context,
-            lineup_home=None,
-            lineup_away=None,
+            lineup_home=lineup_home,
+            lineup_away=lineup_away,
             injuries_home=[],
             injuries_away=[],
             referee=None,
+            highlights=highlights,
+            events=events,
+            stats_home_live=stats_home_live,
+            stats_away_live=stats_away_live,
             league_context=_real_league_context(db, match, match.home_team_id, match.away_team_id),
             adv_home=None,
             adv_away=None,

@@ -56,7 +56,14 @@ function OverviewTab({ match }: { match: SportMatchDetail }) {
       {/* Score / status */}
       <Section title="Result">
         <div className="flex items-center justify-between">
-          <div className="text-right flex-1">
+          <div className="text-right flex-1 flex flex-col items-end gap-1">
+            {match.home.logo_url ? (
+              <img src={match.home.logo_url} alt={match.home.name} className="w-12 h-12 rounded-full object-contain bg-white/5" />
+            ) : (
+              <div className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold bg-white/[0.06] text-text-muted">
+                {match.home.name.slice(0, 2).toUpperCase()}
+              </div>
+            )}
             <div className="text-text-primary font-semibold text-sm">{match.home.name}</div>
             <div className="text-3xl font-bold text-text-primary tabular-nums">
               {match.home_score != null ? match.home_score : (match.status === "live" ? "–" : "—")}
@@ -75,7 +82,14 @@ function OverviewTab({ match }: { match: SportMatchDetail }) {
               <span className="text-text-subtle text-xs uppercase tracking-widest">vs</span>
             )}
           </div>
-          <div className="text-left flex-1">
+          <div className="text-left flex-1 flex flex-col items-start gap-1">
+            {match.away.logo_url ? (
+              <img src={match.away.logo_url} alt={match.away.name} className="w-12 h-12 rounded-full object-contain bg-white/5" />
+            ) : (
+              <div className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold bg-white/[0.06] text-text-muted">
+                {match.away.name.slice(0, 2).toUpperCase()}
+              </div>
+            )}
             <div className="text-text-primary font-semibold text-sm">{match.away.name}</div>
             <div className="text-3xl font-bold text-text-primary tabular-nums">
               {match.away_score != null ? match.away_score : (match.status === "live" ? "–" : "—")}

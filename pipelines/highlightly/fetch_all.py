@@ -15,7 +15,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from config.settings import settings
-from pipelines.highlightly.client import extract_odds, get_matches, get_odds
+import json as _json
+
+from pipelines.highlightly.client import (
+    extract_odds, get_extras, get_highlights, get_leagues,
+    get_matches, get_odds, get_standings,
+)
 from pipelines.soccer.ingest_matches import ingest_from_dicts
 
 log = logging.getLogger(__name__)
@@ -91,6 +96,17 @@ def _derive_outcome(home_score: str, away_score: str, sport: str) -> str:
 _DRAW_SPORTS = {"soccer"}
 
 
+def _logo(obj: dict | None) -> str | None:
+    """Extract logo/image URL from a Highlightly entity dict (team, league, country)."""
+    if not obj:
+        return None
+    return (
+        obj.get("logo") or obj.get("image") or obj.get("imageUrl") or
+        obj.get("logoUrl") or obj.get("flag") or obj.get("badge") or
+        obj.get("emblem") or obj.get("crest")
+    ) or None
+
+
 def _transform(match: dict[str, Any], sport: str) -> dict[str, Any] | None:
     home = (match.get("homeTeam") or {})
     away = (match.get("awayTeam") or {})
@@ -110,6 +126,11 @@ def _transform(match: dict[str, Any], sport: str) -> dict[str, Any] | None:
     league_id = league_data.get("id", "unknown")
     league_name = league_data.get("name") or country_data.get("name") or sport.title()
 
+    # Logos
+    home_logo = _logo(home)
+    away_logo = _logo(away)
+    league_logo = _logo(league_data) or _logo(country_data)
+
     status = _map_status(description)
 
     # Score parsing
@@ -118,6 +139,32 @@ def _transform(match: dict[str, Any], sport: str) -> dict[str, Any] | None:
     outcome = ""
     if status == "finished":
         outcome = _derive_outcome(home_score, away_score, sport)
+
+    # Live clock + period extraction
+    live_clock: str | None = None
+    current_period: int | None = None
+    if status == "live":
+        elapsed = (
+            state.get("elapsed") or state.get("minute") or
+            state.get("clock") or state.get("timer")
+        )
+        if elapsed is not None:
+            live_clock = f"{elapsed}'"
+        elif description:
+            live_clock = description  # e.g. "Half Time", "45+2'"
+
+        d_lower = description.lower().strip() if description else ""
+        if any(k in d_lower for k in ("1st half", "first half")):
+            current_period = 1
+        elif any(k in d_lower for k in ("2nd half", "second half")):
+            current_period = 2
+        elif d_lower in ("ht", "half time", "half-time"):
+            current_period = 0
+        elif any(k in d_lower for k in ("extra time", "et", "overtime", "ot")):
+            current_period = 3
+        elif elapsed is not None:
+            elapsed_int = int(elapsed) if str(elapsed).isdigit() else 0
+            current_period = 1 if elapsed_int <= 45 else 2
 
     season = kickoff[:4] if kickoff else datetime.now(timezone.utc).strftime("%Y")
     sport_slug = home_name.lower().replace(" ", "-").replace(".", "")
@@ -144,10 +191,17 @@ def _transform(match: dict[str, Any], sport: str) -> dict[str, Any] | None:
         "away_score":             away_score,
         "outcome":                outcome,
         "season":                 season,
-        "venue":                  "",
+        "venue":                  state.get("venue") or match.get("venue") or "",
+        "live_clock":             live_clock,
+        "current_period":         current_period,
         "odds_home":              odds_home,
         "odds_draw":              odds_draw,
         "odds_away":              odds_away,
+        "home_team_logo_url":     home_logo,
+        "away_team_logo_url":     away_logo,
+        "league_logo_url":        league_logo,
+        "_hl_match_id":           match_id,  # temp: used for extras enrichment, not stored in DB
+        "_hl_league_id":          league_id,  # temp: used for standings sync
     }
 
 
@@ -177,13 +231,64 @@ def _fetch_and_attach_odds(matches: list[dict], sport: str) -> None:
             log.debug("[highlightly:odds] fetch failed for match %s (%s): %s", match_id, sport, exc)
 
 
+# ── Extras enrichment (lineups, statistics, events) ───────────────────────────
+
+def _should_enrich(row: dict) -> bool:
+    """Return True for live, very recent (≤48h), or upcoming (≤72h) matches."""
+    status = row.get("status", "")
+    if status == "live":
+        return True
+    kickoff_str = row.get("kickoff_utc", "")
+    if not kickoff_str:
+        return False
+    try:
+        kickoff = datetime.fromisoformat(kickoff_str.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        return (now - timedelta(hours=48)) <= kickoff <= (now + timedelta(hours=72))
+    except (ValueError, TypeError):
+        return False
+
+
+def _enrich_rows_with_extras(rows: list[dict], sport: str) -> None:
+    """
+    Fetch lineups, statistics, events, and highlights from Highlightly for applicable
+    matches and attach them to the row dict (mutates in-place).
+    JSON fields are serialized to strings so the CSV round-trip in ingest_from_dicts works.
+    Only enriches live, recent, or upcoming matches to keep API calls reasonable.
+    """
+    for row in rows:
+        hl_id = row.get("_hl_match_id")
+        if not hl_id:
+            continue
+        status = row.get("status", "")
+        if _should_enrich(row):
+            # Lineups / statistics / events
+            try:
+                extras = get_extras(sport, hl_id)
+                if extras:
+                    row["extras_json"] = _json.dumps(extras)
+                time.sleep(0.1)
+            except Exception as exc:
+                log.debug("[highlightly:enrich] %s match %s extras failed: %s", sport, hl_id, exc)
+
+        # Highlights: fetch for recently finished or live matches
+        if status in ("finished", "live"):
+            try:
+                clips = get_highlights(sport, hl_id)
+                if clips:
+                    row["highlights_json"] = _json.dumps(clips)
+                time.sleep(0.1)
+            except Exception as exc:
+                log.debug("[highlightly:enrich] %s match %s highlights failed: %s", sport, hl_id, exc)
+
+
 # ── Main fetch ─────────────────────────────────────────────────────────────────
 
 SPORTS = ["soccer", "basketball", "baseball", "hockey"]
 
 
 def fetch_today(dry_run: bool = False) -> int:
-    """Fetch today + tomorrow — used by the 30-second live-score job."""
+    """Fetch today + tomorrow — used by the 2-minute live-score job."""
     if not settings.HIGHLIGHTLY_API_KEY:
         return 0
 
@@ -192,16 +297,20 @@ def fetch_today(dry_run: bool = False) -> int:
     all_rows: list[dict] = []
 
     for sport in SPORTS:
+        sport_rows: list[dict] = []
         for date in dates:
             try:
                 matches = get_matches(sport, date)
                 # Attempt to attach odds via separate API call for any match missing them
                 _fetch_and_attach_odds(matches, sport)
                 rows = [r for m in matches if (r := _transform(m, sport))]
-                all_rows.extend(rows)
+                sport_rows.extend(rows)
                 time.sleep(0.1)
             except Exception as exc:
                 log.warning("[highlightly:live] %s %s failed: %s", sport, date, exc)
+        # Enrich live and upcoming matches with lineups/stats/events
+        _enrich_rows_with_extras(sport_rows, sport)
+        all_rows.extend(sport_rows)
 
     if not all_rows or dry_run:
         return len(all_rows)
@@ -209,7 +318,8 @@ def fetch_today(dry_run: bool = False) -> int:
     return ingest_from_dicts(all_rows)
 
 
-def fetch_all(dry_run: bool = False, days_back: int = 2, days_ahead: int = 7) -> int:
+def fetch_all(dry_run: bool = False, days_back: int = 14, days_ahead: int = 7) -> int:
+    """Regular sync — used by the 15-minute scheduler job."""
     if not settings.HIGHLIGHTLY_API_KEY:
         log.error("[highlightly] HIGHLIGHTLY_API_KEY not set — skipping.")
         return 0
@@ -223,18 +333,21 @@ def fetch_all(dry_run: bool = False, days_back: int = 2, days_ahead: int = 7) ->
     all_rows: list[dict] = []
 
     for sport in SPORTS:
+        sport_rows: list[dict] = []
         for date in dates:
             try:
                 log.info("[highlightly] Fetching %s matches for %s ...", sport, date)
                 matches = get_matches(sport, date)
-                # Attempt to attach odds via separate API call for any match missing them
                 _fetch_and_attach_odds(matches, sport)
                 rows = [r for m in matches if (r := _transform(m, sport))]
                 log.info("[highlightly]   → %d rows for %s %s", len(rows), sport, date)
-                all_rows.extend(rows)
+                sport_rows.extend(rows)
                 time.sleep(0.2)
             except Exception as exc:
                 log.warning("[highlightly] %s %s failed: %s", sport, date, exc)
+        # Enrich live, recent, and upcoming matches with lineups/stats/events
+        _enrich_rows_with_extras(sport_rows, sport)
+        all_rows.extend(sport_rows)
 
     log.info("[highlightly] Total rows to ingest: %d", len(all_rows))
     if not all_rows:
@@ -248,12 +361,194 @@ def fetch_all(dry_run: bool = False, days_back: int = 2, days_ahead: int = 7) ->
     return ingested
 
 
+def fetch_historical(dry_run: bool = False, days_back: int = 730) -> int:
+    """
+    One-time historical backfill — fetches up to `days_back` days of past results.
+    Skips odds (irrelevant for finished matches) and sleeps longer to avoid rate limits.
+    On 429, backs off for 60 s before retrying once.
+
+    730 days ≈ 2 years × 4 sports = ~2920 requests at ~0.5 s each ≈ 25 minutes.
+    """
+    if not settings.HIGHLIGHTLY_API_KEY:
+        log.error("[highlightly] HIGHLIGHTLY_API_KEY not set — skipping.")
+        return 0
+
+    now = datetime.now(timezone.utc)
+    # Only past dates — no need to refetch upcoming fixtures
+    dates = [
+        (now - timedelta(days=i)).strftime("%Y-%m-%d")
+        for i in range(1, days_back + 1)
+    ]
+
+    all_rows: list[dict] = []
+    total_requests = 0
+
+    for sport in SPORTS:
+        sport_rows = 0
+        for date in dates:
+            for attempt in range(2):
+                try:
+                    matches = get_matches(sport, date)
+                    total_requests += 1
+                    rows = [r for m in matches if (r := _transform(m, sport))]
+                    all_rows.extend(rows)
+                    sport_rows += len(rows)
+                    time.sleep(0.5)
+                    break
+                except Exception as exc:
+                    msg = str(exc)
+                    if "429" in msg and attempt == 0:
+                        log.warning("[highlightly:history] 429 on %s %s — backing off 60s", sport, date)
+                        time.sleep(60)
+                        continue
+                    log.debug("[highlightly:history] %s %s failed: %s", sport, date, exc)
+                    break
+
+        log.info("[highlightly:history] %s: %d rows (%d dates)", sport, sport_rows, len(dates))
+
+    log.info("[highlightly:history] Total rows: %d (from %d API calls)", len(all_rows), total_requests)
+    if not all_rows:
+        return 0
+    if dry_run:
+        log.info("[highlightly:history] DRY RUN — skipping ingest.")
+        return len(all_rows)
+
+    ingested = ingest_from_dicts(all_rows)
+    log.info("[highlightly:history] Ingested %d rows.", ingested)
+    return ingested
+
+
+def fetch_standings(dry_run: bool = False) -> int:
+    """
+    Sync league standings for all active Highlightly leagues.
+    Queries core_leagues for known HL leagues, fetches standings, upserts into core_standings.
+    Called by the daily scheduler job. Returns total rows upserted.
+    """
+    if not settings.HIGHLIGHTLY_API_KEY:
+        log.error("[highlightly:standings] HIGHLIGHTLY_API_KEY not set — skipping.")
+        return 0
+
+    from db.session import SessionLocal
+    from db.models.mvp import CoreLeague, CoreTeam, CoreStanding
+
+    db = SessionLocal()
+    total = 0
+    try:
+        # Pull all Highlightly-sourced leagues (provider_id starts with "hl-league-")
+        hl_leagues = (
+            db.query(CoreLeague)
+            .filter(CoreLeague.provider_id.like("hl-league-%"))
+            .all()
+        )
+        log.info("[highlightly:standings] Found %d HL leagues to sync.", len(hl_leagues))
+
+        for league in hl_leagues:
+            # provider_id format: "hl-league-{sport}-{league_id}"
+            parts = (league.provider_id or "").split("-")
+            if len(parts) < 4:
+                continue
+            sport = parts[2]
+            hl_league_id = parts[3]
+            if sport not in SPORTS:
+                continue
+
+            season = str(datetime.now(timezone.utc).year)
+            rows = get_standings(sport, hl_league_id, season)
+            if not rows:
+                time.sleep(0.2)
+                continue
+
+            log.info("[highlightly:standings] %s %s: %d rows", sport, league.name, len(rows))
+
+            if dry_run:
+                total += len(rows)
+                time.sleep(0.2)
+                continue
+
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                team_name = (
+                    (row.get("team") or {}).get("name") or
+                    row.get("teamName") or row.get("team_name") or ""
+                )
+                if not team_name:
+                    continue
+
+                team_obj = row.get("team") or {}
+                team_logo = _logo(team_obj) or None
+                hl_team_id = team_obj.get("id") or row.get("teamId")
+                team_id: str | None = None
+                if hl_team_id:
+                    t = db.query(CoreTeam).filter_by(
+                        provider_id=f"hl-{sport}-team-{hl_team_id}"
+                    ).first()
+                    if t:
+                        team_id = t.id
+
+                def _int(v: Any) -> int | None:
+                    try:
+                        return int(v) if v is not None else None
+                    except (ValueError, TypeError):
+                        return None
+
+                existing = (
+                    db.query(CoreStanding)
+                    .filter_by(league_id=league.id, season=season, team_name=team_name)
+                    .first()
+                )
+                if existing is None:
+                    existing = CoreStanding(
+                        league_id=league.id,
+                        season=season,
+                        sport=sport,
+                        team_name=team_name,
+                    )
+                    db.add(existing)
+
+                existing.team_id = team_id
+                existing.team_logo = team_logo
+                existing.position = _int(row.get("position") or row.get("rank") or row.get("pos"))
+                existing.played = _int(row.get("played") or row.get("gamesPlayed") or row.get("mp"))
+                existing.won = _int(row.get("won") or row.get("wins") or row.get("w"))
+                existing.drawn = _int(row.get("drawn") or row.get("draws") or row.get("d"))
+                existing.lost = _int(row.get("lost") or row.get("losses") or row.get("l"))
+                existing.goals_for = _int(row.get("goalsFor") or row.get("goals_for") or row.get("gf"))
+                existing.goals_against = _int(row.get("goalsAgainst") or row.get("goals_against") or row.get("ga"))
+                existing.goal_diff = _int(
+                    row.get("goalDifference") or row.get("goal_diff") or row.get("gd")
+                )
+                existing.points = _int(row.get("points") or row.get("pts"))
+                existing.form = str(row.get("form") or row.get("recentForm") or "")[:20] or None
+                existing.group_name = str(row.get("_group") or row.get("group") or "")[:100] or None
+                total += 1
+
+            db.commit()
+            time.sleep(0.3)
+
+    except Exception as exc:
+        db.rollback()
+        log.error("[highlightly:standings] Failed: %s", exc, exc_info=True)
+    finally:
+        db.close()
+
+    log.info("[highlightly:standings] Synced %d standing rows.", total)
+    return total
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fetch Highlightly sports fixtures + scores")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--days-back", type=int, default=14,
+                        help="Days of history for regular fetch (default 14). Use --historical for full backfill.")
+    parser.add_argument("--historical", action="store_true",
+                        help="Run full historical backfill (up to --days-back, default 730)")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
-    n = fetch_all(dry_run=args.dry_run)
+    if args.historical:
+        n = fetch_historical(dry_run=args.dry_run, days_back=args.days_back if args.days_back != 14 else 730)
+    else:
+        n = fetch_all(dry_run=args.dry_run, days_back=args.days_back)
     print(f"Done. {n} rows processed.")
 
 

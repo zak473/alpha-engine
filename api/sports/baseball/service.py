@@ -214,7 +214,8 @@ def _build_baseball_form(
 
 
 def _mock_baseball_detail(
-    match: CoreMatch, home_name: str, away_name: str, league: str, db: Session
+    match: CoreMatch, home_name: str, away_name: str, league: str, db: Session,
+    home_logo: str | None = None, away_logo: str | None = None,
 ) -> BaseballMatchDetail:
     seed = sum(ord(c) for c in match.id) % 100
     is_finished = match.status == "finished"
@@ -279,8 +280,8 @@ def _mock_baseball_detail(
         season=match.season,
         kickoff_utc=match.kickoff_utc,
         status=match.status,
-        home=ParticipantOut(id=match.home_team_id, name=home_name),
-        away=ParticipantOut(id=match.away_team_id, name=away_name),
+        home=ParticipantOut(id=match.home_team_id, name=home_name, logo_url=home_logo),
+        away=ParticipantOut(id=match.away_team_id, name=away_name, logo_url=away_logo),
         home_score=match.home_score,
         away_score=match.away_score,
         outcome=match.outcome,
@@ -366,10 +367,19 @@ class BaseballMatchService(BaseMatchListService):
         status_order = case({"live": 0, "scheduled": 1, "finished": 2}, value=CoreMatch.status, else_=3)
         rows = q.order_by(status_order, CoreMatch.kickoff_utc.asc()).offset(offset).limit(limit).all()
 
+        # Batch-load teams and leagues for logos
+        all_team_ids = {m.home_team_id for m in rows} | {m.away_team_id for m in rows}
+        all_league_ids = {m.league_id for m in rows if m.league_id}
+        team_map = {t.id: t for t in db.query(CoreTeam).filter(CoreTeam.id.in_(all_team_ids)).all()} if all_team_ids else {}
+        league_map = {lg.id: lg for lg in db.query(CoreLeague).filter(CoreLeague.id.in_(all_league_ids)).all()} if all_league_ids else {}
+
         items = []
         for m in rows:
-            home_name = _name(db, m.home_team_id)
-            away_name = _name(db, m.away_team_id)
+            ht = team_map.get(m.home_team_id)
+            at = team_map.get(m.away_team_id)
+            lg = league_map.get(m.league_id)
+            home_name = ht.name if ht else m.home_team_id
+            away_name = at.name if at else m.away_team_id
             elo_h = _elo_snapshot(db, m.home_team_id, home_name)
             elo_a = _elo_snapshot(db, m.away_team_id, away_name)
             seed = sum(ord(c) for c in m.id) % 100
@@ -378,7 +388,7 @@ class BaseballMatchService(BaseMatchListService):
             p_home = _elo_win_prob(r_home, r_away, 24.0)
             items.append(BaseballMatchListItem(
                 id=m.id,
-                league=_league_name(db, m.league_id),
+                league=lg.name if lg else "Unknown",
                 season=m.season,
                 kickoff_utc=m.kickoff_utc,
                 status=m.status,
@@ -400,6 +410,9 @@ class BaseballMatchService(BaseMatchListService):
                 away_starter=None,
                 odds_home=m.odds_home,
                 odds_away=m.odds_away,
+                home_logo=ht.logo_url if ht else None,
+                away_logo=at.logo_url if at else None,
+                league_logo=lg.logo_url if lg else None,
             ))
         return BaseballMatchListResponse(items=items, total=total)
 
@@ -408,11 +421,16 @@ class BaseballMatchService(BaseMatchListService):
         if match is None or match.sport != "baseball":
             raise HTTPException(status_code=404, detail=f"Baseball match {match_id} not found")
 
-        home_name = _name(db, match.home_team_id)
-        away_name = _name(db, match.away_team_id)
+        home_team = db.get(CoreTeam, match.home_team_id)
+        away_team = db.get(CoreTeam, match.away_team_id)
+        home_name = home_team.name if home_team else match.home_team_id
+        away_name = away_team.name if away_team else match.away_team_id
+        home_logo = home_team.logo_url if home_team else None
+        away_logo = away_team.logo_url if away_team else None
         league = _league_name(db, match.league_id)
 
-        return _mock_baseball_detail(match, home_name, away_name, league, db)
+        return _mock_baseball_detail(match, home_name, away_name, league, db,
+                                     home_logo=home_logo, away_logo=away_logo)
 
     def get_elo_history(self, team_id: str, limit: int, db: Session) -> list[EloHistoryPoint]:
         rows = (

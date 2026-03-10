@@ -13,6 +13,7 @@ from pydantic import BaseModel
 class ParticipantOut(BaseModel):
     id: str
     name: str
+    logo_url: Optional[str] = None
 
 
 class ProbabilitiesOut(BaseModel):
@@ -369,6 +370,9 @@ class BaseballMatchListItem(BaseModel):
     odds_home: Optional[float] = None
     odds_away: Optional[float] = None
     game_type: str = "baseball"
+    home_logo: Optional[str] = None
+    away_logo: Optional[str] = None
+    league_logo: Optional[str] = None
 
 
 class BaseballMatchListResponse(BaseModel):

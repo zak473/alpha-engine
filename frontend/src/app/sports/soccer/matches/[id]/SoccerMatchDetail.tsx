@@ -13,13 +13,16 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip as RechartTooltip,
   CartesianGrid, ResponsiveContainer, BarChart, Bar, Cell,
 } from "recharts";
-import type { SportMatchDetail } from "@/lib/types";
+import type { SportMatchDetail, StandingsResponse } from "@/lib/types";
+import { getStandingsForMatch } from "@/lib/api";
 import { SoccerLivePanel } from "@/components/live/LiveMatchPanel";
 import { cn } from "@/lib/utils";
 import { chartDefaults, colors } from "@/lib/tokens";
 import { FormStreak } from "@/components/charts/FormStreak";
 import { TeamRadarChart, norm } from "@/components/charts/TeamRadarChart";
 import { SoccerPitchSVG } from "@/components/charts/SoccerPitchSVG";
+import HighlightsSection from "@/components/match/HighlightsSection";
+import StandingsTable from "@/components/match/StandingsTable";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -262,21 +265,26 @@ function SideCol({ children }: { children: React.ReactNode }) {
 
 // ─── Match Header 3-Column ───────────────────────────────────────────────────
 
-function TeamBlock({ name, elo, form, side }: {
+function TeamBlock({ name, elo, form, side, logoUrl }: {
   name: string;
   elo: { rating: number; rating_change: number | null } | null | undefined;
   form: { wins?: number | null; draws?: number | null; losses?: number | null; days_rest?: number | null; form_pts?: number | null } | null | undefined;
   side: "home" | "away";
+  logoUrl?: string | null;
 }) {
   const isHome = side === "home";
   const col = isHome ? "text-info" : "text-warning";
   return (
     <div className={cn("flex flex-col gap-1.5 min-w-0", isHome ? "items-start" : "items-end")}>
-      {/* Initial / crest placeholder */}
-      <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold border",
-        isHome ? "bg-info/10 border-info/20 text-info" : "bg-warning/10 border-warning/20 text-warning")}>
-        {name.slice(0, 2).toUpperCase()}
-      </div>
+      {/* Crest / initial placeholder */}
+      {logoUrl ? (
+        <img src={logoUrl} alt={name} className={cn("w-12 h-12 rounded-lg object-contain", isHome ? "bg-info/5" : "bg-warning/5")} />
+      ) : (
+        <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold border",
+          isHome ? "bg-info/10 border-info/20 text-info" : "bg-warning/10 border-warning/20 text-warning")}>
+          {name.slice(0, 2).toUpperCase()}
+        </div>
+      )}
 
       <p className={cn("font-semibold text-sm text-t0 leading-tight", !isHome && "text-right")}>{name}</p>
 
@@ -337,7 +345,7 @@ function MatchHeader({ match }: { match: MatchProps["match"] }) {
       {/* 3-column main header */}
       <div className="grid grid-cols-[1fr_auto_1fr] gap-3 px-4 pb-4 items-start">
         {/* Home */}
-        <TeamBlock name={match.home.name} elo={match.elo_home} form={match.form_home} side="home" />
+        <TeamBlock name={match.home.name} elo={match.elo_home} form={match.form_home} side="home" logoUrl={match.home.logo_url} />
 
         {/* Center: score block */}
         <div className="flex flex-col items-center gap-1.5 pt-1 min-w-[120px]">
@@ -416,7 +424,7 @@ function MatchHeader({ match }: { match: MatchProps["match"] }) {
         </div>
 
         {/* Away */}
-        <TeamBlock name={match.away.name} elo={match.elo_away} form={match.form_away} side="away" />
+        <TeamBlock name={match.away.name} elo={match.elo_away} form={match.form_away} side="away" logoUrl={match.away.logo_url} />
       </div>
     </div>
   );
@@ -964,9 +972,9 @@ function LineupsTab({ match }: { match: MatchProps["match"] }) {
 
 function StatsTab({ match }: { match: MatchProps["match"] }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sh = match.stats_home as any;
+  const sh = (match.stats_home ?? match.stats_home_live) as any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sa = match.stats_away as any;
+  const sa = (match.stats_away ?? match.stats_away_live) as any;
   const fh = match.form_home; const fa = match.form_away;
   const hasMatchStats = sh || sa;
 
@@ -1207,10 +1215,20 @@ function eventBorderColor(type: string | null | undefined): string {
   return "border-l-t2";
 }
 
+function eventIcon(type: string): string {
+  const t = type.toLowerCase();
+  if (t === "goal") return "⚽";
+  if (t === "yellow_card") return "🟨";
+  if (t === "red_card") return "🟥";
+  if (t === "substitution") return "🔄";
+  if (t === "penalty_missed") return "❌";
+  if (t === "var") return "📺";
+  return "•";
+}
+
 function TimelineTab({ match }: { match: MatchProps["match"] }) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const timeline = (match as any).timeline as Array<any> | null | undefined;
-  const hasEvents = timeline && timeline.length > 0;
+  const events = match.events;
+  const hasEvents = events && events.length > 0;
 
   return (
     <SideGrid>
@@ -1220,18 +1238,48 @@ function TimelineTab({ match }: { match: MatchProps["match"] }) {
             <EmptyState icon={Clock} title="Match hasn't started" desc="Events will stream once the match is underway." />
           ) : hasEvents ? (
             <div className="flex flex-col gap-1">
-              {timeline.map((ev: any, i: number) => (
-                <div key={i} className={cn("flex items-start gap-3 py-2 pl-3 border-l-2 border-b border-b0 last:border-b-0", eventBorderColor(ev.event_type))}>
-                  <span className="font-mono text-xs text-t2 w-8 shrink-0 tabular-nums">{ev.minute ?? "—"}&apos;</span>
-                  <div className="flex flex-col gap-0.5 min-w-0">
-                    <span className="text-xs text-t0">{ev.player ?? ev.description ?? ev.event_type ?? "Event"}</span>
-                    {ev.team && <span className="text-2xs text-t2">{ev.team}</span>}
+              {events.map((ev, i) => {
+                const minuteStr = ev.minute != null
+                  ? ev.minute_extra != null ? `${ev.minute}+${ev.minute_extra}` : `${ev.minute}`
+                  : "—";
+                const isHome = ev.team === "home";
+                const label = ev.player_name ?? ev.description ?? ev.type ?? "Event";
+                const scoreStr = ev.score_home != null && ev.score_away != null
+                  ? `${ev.score_home}–${ev.score_away}`
+                  : null;
+                return (
+                  <div key={i} className={cn("grid grid-cols-[1fr_auto_1fr] items-start gap-2 py-2 border-b border-b0 last:border-b-0")}>
+                    {/* Home side */}
+                    <div className={cn("flex flex-col items-start gap-0.5", !isHome && "opacity-0")}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-base leading-none">{eventIcon(ev.type)}</span>
+                        <span className="text-xs text-t0 font-medium">{label}</span>
+                        {ev.is_own_goal && <span className="text-2xs text-negative">(OG)</span>}
+                        {ev.is_penalty && <span className="text-2xs text-t2">(P)</span>}
+                      </div>
+                      {ev.player_out && <span className="text-2xs text-t2 pl-6">↑ {ev.player_out}</span>}
+                    </div>
+                    {/* Center minute + score */}
+                    <div className="flex flex-col items-center gap-0.5 shrink-0">
+                      <span className={cn("font-mono text-xs font-bold tabular-nums px-2 py-0.5 rounded", eventBorderColor(ev.type).replace("border-l-", "text-"))}>{minuteStr}&apos;</span>
+                      {scoreStr && <span className="font-mono text-2xs text-t2 tabular-nums">{scoreStr}</span>}
+                    </div>
+                    {/* Away side */}
+                    <div className={cn("flex flex-col items-end gap-0.5", isHome && "opacity-0")}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-t0 font-medium">{label}</span>
+                        <span className="text-base leading-none">{eventIcon(ev.type)}</span>
+                        {ev.is_own_goal && <span className="text-2xs text-negative">(OG)</span>}
+                        {ev.is_penalty && <span className="text-2xs text-t2">(P)</span>}
+                      </div>
+                      {ev.player_out && <span className="text-2xs text-t2 pr-6">↑ {ev.player_out}</span>}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
-            <EmptyState icon={Activity} title="No event data" desc="Minute-by-minute events require a real-time data provider (Opta, StatsBomb)." />
+            <EmptyState icon={Activity} title="No event data" desc="Events will appear for live and finished matches." />
           )}
         </Panel>
       </MainCol>
@@ -1825,10 +1873,17 @@ function ContextTab(props: MatchProps) {
 
 export function SoccerMatchDetail({ match, eloHome, eloAway }: MatchProps) {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [standings, setStandings] = useState<StandingsResponse | null>(null);
   const router = useRouter();
   const isLive = match.status === "live";
   const tick = useLiveRefresh(isLive);
   useEffect(() => { if (tick > 0) router.refresh(); }, [tick, router]);
+
+  useEffect(() => {
+    getStandingsForMatch(match.id).then(setStandings).catch(() => {});
+  }, [match.id]);
+
+  const highlights = match.highlights ?? [];
 
   return (
     <div className="match-page-shell flex flex-col min-h-screen bg-bg0 max-w-screen-2xl mx-auto w-full px-3 md:px-4 py-4">
@@ -1853,7 +1908,25 @@ export function SoccerMatchDetail({ match, eloHome, eloAway }: MatchProps) {
 
       {/* Tab content */}
       <div className="match-content-wrap flex-1 p-3 md:p-4 max-w-screen-2xl mx-auto w-full">
-        {activeTab === "overview"  && <OverviewTab  match={match} />}
+        {activeTab === "overview"  && (
+          <div className="flex flex-col gap-6">
+            <OverviewTab match={match} />
+            {standings && (
+              <div className="card p-5">
+                <StandingsTable
+                  standings={standings}
+                  homeTeamId={match.home.id}
+                  awayTeamId={match.away.id}
+                />
+              </div>
+            )}
+            {highlights.length > 0 && (
+              <div className="card p-5">
+                <HighlightsSection highlights={highlights} />
+              </div>
+            )}
+          </div>
+        )}
         {activeTab === "lineups"   && <LineupsTab   match={match} />}
         {activeTab === "stats"     && <StatsTab     match={match} />}
         {activeTab === "timeline"  && <TimelineTab  match={match} />}

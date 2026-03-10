@@ -56,62 +56,165 @@ function LivePanel({ label, children }: { label: string; children: React.ReactNo
 
 // ── Soccer ────────────────────────────────────────────────────────────────
 
+function soccerEventIcon(type: string): string {
+  const t = type.toLowerCase();
+  if (t === "goal") return "⚽";
+  if (t === "yellow_card") return "🟨";
+  if (t === "red_card") return "🟥";
+  if (t === "substitution") return "🔄";
+  if (t === "penalty_missed") return "❌";
+  return "•";
+}
+
+type SoccerMatchWithLive = SportMatchDetail & {
+  events?: Array<{
+    minute?: number | null;
+    minute_extra?: number | null;
+    type: string;
+    team: string;
+    player_name?: string | null;
+    is_penalty?: boolean;
+    is_own_goal?: boolean;
+    score_home?: number | null;
+    score_away?: number | null;
+  }>;
+  stats_home_live?: Record<string, unknown> | null;
+  stats_away_live?: Record<string, unknown> | null;
+};
+
 export function SoccerLivePanel({ match }: { match: SportMatchDetail }) {
+  const m = match as SoccerMatchWithLive;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const state = match.current_state as { minute?: number; ht_home?: number; ht_away?: number } | null;
   const htHome = state?.ht_home;
   const htAway = state?.ht_away;
 
-  const period = match.current_period === 1 ? "1st Half" : match.current_period === 2 ? "2nd Half" : null;
-  const label = [match.live_clock ?? "In Progress", period].filter(Boolean).join("  •  ");
+  const periodLabel = match.current_period === 0 ? "HT"
+    : match.current_period === 1 ? "1st Half"
+    : match.current_period === 2 ? "2nd Half"
+    : match.current_period === 3 ? "Extra Time"
+    : null;
+  const label = [match.live_clock ?? "In Progress", periodLabel].filter(Boolean).join("  •  ");
+
+  // Recent events — last 5, most recent first
+  const allEvents = m.events ?? [];
+  const recentEvents = [...allEvents].reverse().slice(0, 5);
+
+  // Live stats
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sh = m.stats_home_live as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sa = m.stats_away_live as any;
+  const possH = sh?.possession_pct != null ? Number(sh.possession_pct) : null;
+  const possA = sa?.possession_pct != null ? Number(sa.possession_pct) : null;
+  const shotsH = sh?.shots_total ?? null;
+  const shotsA = sa?.shots_total ?? null;
+  const onTargetH = sh?.shots_on_target ?? null;
+  const onTargetA = sa?.shots_on_target ?? null;
+  const xgH = sh?.xg ?? m.form_home?.xg_avg ?? null;
+  const xgA = sa?.xg ?? m.form_away?.xg_avg ?? null;
+  const hasLiveStats = possH != null || shotsH != null || xgH != null;
 
   return (
     <LivePanel label={label}>
-      {/* Score */}
+      {/* Score row */}
       <div className="flex items-center gap-4 mb-4">
         <div className="flex-1 text-center">
           <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text1)" }}>{match.home.name}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <span style={{ fontSize: 32, fontWeight: 800, color: "var(--text0)", fontFamily: "monospace" }}>
-            {match.home_score ?? 0}
-          </span>
-          <span style={{ fontSize: 20, color: "var(--text2)" }}>–</span>
-          <span style={{ fontSize: 32, fontWeight: 800, color: "var(--text0)", fontFamily: "monospace" }}>
-            {match.away_score ?? 0}
-          </span>
+        <div className="flex flex-col items-center gap-0.5">
+          <div className="flex items-center gap-2">
+            <span style={{ fontSize: 36, fontWeight: 800, color: "var(--text0)", fontFamily: "monospace" }}>
+              {match.home_score ?? 0}
+            </span>
+            <span style={{ fontSize: 22, color: "var(--text2)" }}>–</span>
+            <span style={{ fontSize: 36, fontWeight: 800, color: "var(--text0)", fontFamily: "monospace" }}>
+              {match.away_score ?? 0}
+            </span>
+          </div>
+          {htHome != null && htAway != null && (
+            <span style={{ fontSize: 10, color: "var(--text2)" }}>HT {htHome}–{htAway}</span>
+          )}
         </div>
         <div className="flex-1 text-center">
           <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text1)" }}>{match.away.name}</p>
         </div>
       </div>
 
-      {/* Half-time / xG bar */}
-      <div className="flex items-center gap-6 text-xs">
-        {htHome != null && htAway != null && (
-          <span style={{ color: "var(--text2)" }}>
-            HT: {htHome}–{htAway}
-          </span>
-        )}
-        {match.form_home?.xg_avg != null && match.form_away?.xg_avg != null && (
-          <div className="flex items-center gap-2 flex-1">
-            <span className="font-mono text-[10px]" style={{ color: "#3b82f6" }}>
-              xG {match.form_home.xg_avg.toFixed(1)}
-            </span>
-            <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-white/10">
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${(match.form_home.xg_avg / (match.form_home.xg_avg + match.form_away.xg_avg)) * 100}%`,
-                  background: "linear-gradient(90deg, #3b82f6 0%, #22d3ee 100%)",
-                }}
-              />
+      {/* Live stats bars */}
+      {hasLiveStats && (
+        <div className="flex flex-col gap-1.5 mb-3">
+          {possH != null && possA != null && (
+            <div>
+              <div className="flex justify-between text-[10px] mb-0.5" style={{ color: "var(--text2)" }}>
+                <span style={{ color: "#3b82f6", fontWeight: 600 }}>{Math.round(possH)}%</span>
+                <span style={{ letterSpacing: "0.06em" }}>POSS</span>
+                <span style={{ color: "#f59e0b", fontWeight: 600 }}>{Math.round(possA)}%</span>
+              </div>
+              <div className="flex h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
+                <div style={{ width: `${possH}%`, background: "#3b82f6" }} />
+                <div style={{ flex: 1, background: "#f59e0b" }} />
+              </div>
             </div>
-            <span className="font-mono text-[10px]" style={{ color: "#f59e0b" }}>
-              {match.form_away.xg_avg.toFixed(1)} xG
-            </span>
-          </div>
-        )}
-      </div>
+          )}
+          {shotsH != null && shotsA != null && (
+            <div className="flex justify-between text-[11px]">
+              <span className="font-mono font-bold" style={{ color: "#3b82f6" }}>{shotsH}</span>
+              <span style={{ color: "var(--text2)", fontSize: 10 }}>
+                Shots{onTargetH != null ? ` (${onTargetH} on tgt)` : ""}
+              </span>
+              <span className="font-mono font-bold" style={{ color: "#f59e0b" }}>{shotsA}</span>
+            </div>
+          )}
+          {xgH != null && xgA != null && (
+            <div>
+              <div className="flex justify-between text-[10px] mb-0.5" style={{ color: "var(--text2)" }}>
+                <span style={{ color: "#3b82f6", fontWeight: 600 }}>{Number(xgH).toFixed(2)}</span>
+                <span style={{ letterSpacing: "0.06em" }}>xG</span>
+                <span style={{ color: "#f59e0b", fontWeight: 600 }}>{Number(xgA).toFixed(2)}</span>
+              </div>
+              <div className="flex h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
+                <div style={{ width: `${(Number(xgH) / (Number(xgH) + Number(xgA) + 0.01)) * 100}%`, background: "#3b82f6" }} />
+                <div style={{ flex: 1, background: "#f59e0b" }} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Recent events feed */}
+      {recentEvents.length > 0 && (
+        <div className="flex flex-col gap-0.5 border-t pt-2" style={{ borderColor: "rgba(239,68,68,0.15)" }}>
+          <p style={{ fontSize: 9, color: "var(--text2)", letterSpacing: "0.07em", marginBottom: 4 }}>RECENT EVENTS</p>
+          {recentEvents.map((ev, i) => {
+            const isHome = ev.team === "home";
+            const minuteStr = ev.minute != null
+              ? ev.minute_extra != null ? `${ev.minute}+${ev.minute_extra}'` : `${ev.minute}'`
+              : "";
+            return (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                {isHome ? (
+                  <>
+                    <span style={{ fontSize: 12 }}>{soccerEventIcon(ev.type)}</span>
+                    <span style={{ color: "#3b82f6", fontWeight: 500 }}>{ev.player_name ?? ev.type}</span>
+                    {ev.is_own_goal && <span style={{ fontSize: 9, color: "#ef4444" }}>OG</span>}
+                    {ev.is_penalty && <span style={{ fontSize: 9, color: "var(--text2)" }}>P</span>}
+                    <span style={{ marginLeft: "auto", color: "var(--text2)", fontFamily: "monospace", fontSize: 10 }}>{minuteStr}</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ marginRight: "auto", color: "var(--text2)", fontFamily: "monospace", fontSize: 10 }}>{minuteStr}</span>
+                    {ev.is_penalty && <span style={{ fontSize: 9, color: "var(--text2)" }}>P</span>}
+                    {ev.is_own_goal && <span style={{ fontSize: 9, color: "#ef4444" }}>OG</span>}
+                    <span style={{ color: "#f59e0b", fontWeight: 500 }}>{ev.player_name ?? ev.type}</span>
+                    <span style={{ fontSize: 12 }}>{soccerEventIcon(ev.type)}</span>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </LivePanel>
   );
 }

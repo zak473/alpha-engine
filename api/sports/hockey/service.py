@@ -169,33 +169,36 @@ class HockeyMatchService(BaseMatchListService):
         preds = db.query(PredMatch).filter(PredMatch.match_id.in_(match_ids)).all()
         pred_map = {p.match_id: p for p in preds}
 
-        # League names
+        # League names + logos
         league_ids = {m.league_id for m in matches if m.league_id}
-        leagues = {lg.id: lg.name for lg in db.query(CoreLeague).filter(CoreLeague.id.in_(league_ids)).all()} if league_ids else {}
+        league_objs = {lg.id: lg for lg in db.query(CoreLeague).filter(CoreLeague.id.in_(league_ids)).all()} if league_ids else {}
 
-        # Team names
+        # Team names + logos
         all_team_ids = {m.home_team_id for m in matches} | {m.away_team_id for m in matches}
-        teams = {t.id: t.name for t in db.query(CoreTeam).filter(CoreTeam.id.in_(all_team_ids)).all()} if all_team_ids else {}
+        team_objs = {t.id: t for t in db.query(CoreTeam).filter(CoreTeam.id.in_(all_team_ids)).all()} if all_team_ids else {}
 
         items = []
         for m in matches:
             pred = pred_map.get(m.id)
             elo_h = elo_map.get(m.home_team_id)
             elo_a = elo_map.get(m.away_team_id)
-            p_home = pred.prob_home if pred else None
-            p_away = pred.prob_away if pred else None
+            p_home = pred.p_home if pred else None
+            p_away = pred.p_away if pred else None
             confidence = int(round(max(p_home or 0, p_away or 0) * 100)) if (p_home or p_away) else None
 
+            lg_obj = league_objs.get(m.league_id)
+            ht_obj = team_objs.get(m.home_team_id)
+            at_obj = team_objs.get(m.away_team_id)
             items.append(HockeyMatchListItem(
                 id=m.id,
-                league=leagues.get(m.league_id, "Unknown"),
+                league=lg_obj.name if lg_obj else "Unknown",
                 season=m.season,
                 kickoff_utc=m.kickoff_utc,
                 status=m.status,
                 home_id=m.home_team_id,
-                home_name=teams.get(m.home_team_id, m.home_team_id),
+                home_name=ht_obj.name if ht_obj else m.home_team_id,
                 away_id=m.away_team_id,
-                away_name=teams.get(m.away_team_id, m.away_team_id),
+                away_name=at_obj.name if at_obj else m.away_team_id,
                 home_score=m.home_score,
                 away_score=m.away_score,
                 outcome=m.outcome,
@@ -206,6 +209,9 @@ class HockeyMatchService(BaseMatchListService):
                 confidence=confidence,
                 odds_home=m.odds_home,
                 odds_away=m.odds_away,
+                home_logo=ht_obj.logo_url if ht_obj else None,
+                away_logo=at_obj.logo_url if at_obj else None,
+                league_logo=lg_obj.logo_url if lg_obj else None,
             ))
 
         return HockeyMatchListResponse(items=items, total=total)
@@ -215,9 +221,14 @@ class HockeyMatchService(BaseMatchListService):
         if not m:
             raise HTTPException(status_code=404, detail="Hockey match not found")
 
-        home_name = _name(db, m.home_team_id)
-        away_name = _name(db, m.away_team_id)
-        league = _league_name(db, m.league_id) if m.league_id else "Unknown League"
+        home_team = db.get(CoreTeam, m.home_team_id)
+        away_team = db.get(CoreTeam, m.away_team_id)
+        home_name = home_team.name if home_team else m.home_team_id
+        away_name = away_team.name if away_team else m.away_team_id
+        home_logo = home_team.logo_url if home_team else None
+        away_logo = away_team.logo_url if away_team else None
+        league_obj = db.get(CoreLeague, m.league_id) if m.league_id else None
+        league = league_obj.name if league_obj else "Unknown League"
 
         # ELO
         elo_h = _elo_snapshot(db, m.home_team_id, home_name)
@@ -225,7 +236,7 @@ class HockeyMatchService(BaseMatchListService):
 
         # Predictions
         from db.models.mvp import PredMatch
-        pred = db.query(PredMatch).filter(PredMatch.match_id == match_id).order_by(PredMatch.generated_at.desc()).first()
+        pred = db.query(PredMatch).filter(PredMatch.match_id == match_id).order_by(PredMatch.created_at.desc()).first()
 
         probs = None
         fair_odds = None
@@ -233,12 +244,12 @@ class HockeyMatchService(BaseMatchListService):
         key_drivers = None
         model_meta = None
         if pred:
-            probs = ProbabilitiesOut(home_win=pred.prob_home or 0.0, away_win=pred.prob_away or 0.0)
-            confidence = int(round(max(pred.prob_home or 0, pred.prob_away or 0) * 100))
-            if pred.prob_home and pred.prob_away:
+            probs = ProbabilitiesOut(home_win=pred.p_home or 0.0, away_win=pred.p_away or 0.0)
+            confidence = int(round(max(pred.p_home or 0, pred.p_away or 0) * 100))
+            if pred.p_home and pred.p_away:
                 fair_odds = FairOddsOut(
-                    home_win=round(1 / pred.prob_home, 2) if pred.prob_home > 0 else None,
-                    away_win=round(1 / pred.prob_away, 2) if pred.prob_away > 0 else None,
+                    home_win=round(1 / pred.p_home, 2) if pred.p_home > 0 else None,
+                    away_win=round(1 / pred.p_away, 2) if pred.p_away > 0 else None,
                 )
 
         h2h = _h2h(db, m.home_team_id, m.away_team_id)
@@ -250,8 +261,8 @@ class HockeyMatchService(BaseMatchListService):
             season=m.season,
             kickoff_utc=m.kickoff_utc,
             status=m.status,
-            home=ParticipantOut(id=m.home_team_id, name=home_name),
-            away=ParticipantOut(id=m.away_team_id, name=away_name),
+            home=ParticipantOut(id=m.home_team_id, name=home_name, logo_url=home_logo),
+            away=ParticipantOut(id=m.away_team_id, name=away_name, logo_url=away_logo),
             home_score=m.home_score,
             away_score=m.away_score,
             outcome=m.outcome,

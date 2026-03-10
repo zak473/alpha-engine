@@ -300,13 +300,16 @@ export interface H2HRecordOut {
 export interface SportMatchListItem {
   id: string;
   league: string;
+  league_logo?: string | null;
   season: string | null;
   kickoff_utc: string;
   status: string;
   home_id: string;
   home_name: string;
+  home_logo?: string | null;
   away_id: string;
   away_name: string;
+  away_logo?: string | null;
   home_score: number | null;
   away_score: number | null;
   outcome: string | null;
@@ -324,15 +327,53 @@ export interface SportMatchListItem {
   odds_draw?: number | null;
 }
 
+export interface HighlightClip {
+  title?: string | null;
+  url: string;
+  thumbnail?: string | null;
+  duration?: number | null;
+  source?: string | null;
+  event_type?: string | null;
+  minute?: number | null;
+}
+
+export interface StandingRow {
+  position?: number | null;
+  team_id?: string | null;
+  team_name: string;
+  team_logo?: string | null;
+  played?: number | null;
+  won?: number | null;
+  drawn?: number | null;
+  lost?: number | null;
+  goals_for?: number | null;
+  goals_against?: number | null;
+  goal_diff?: number | null;
+  points?: number | null;
+  form?: string | null;
+  group_name?: string | null;
+}
+
+export interface StandingsResponse {
+  league_id: string;
+  league_name: string;
+  league_logo?: string | null;
+  season: string;
+  sport: string;
+  table: StandingRow[];
+  updated_at?: string | null;
+}
+
 export interface SportMatchDetail {
   id: string;
   sport: string;
   league: string;
+  league_logo?: string | null;
   season: string | null;
   kickoff_utc: string;
   status: string;
-  home: { id: string; name: string };
-  away: { id: string; name: string };
+  home: { id: string; name: string; logo_url?: string | null };
+  away: { id: string; name: string; logo_url?: string | null };
   home_score: number | null;
   away_score: number | null;
   outcome: string | null;
@@ -366,6 +407,22 @@ export interface SportMatchDetail {
     mean_away_goals?: number | null;
   } | null;
   betting?: Record<string, number | null> | null;
+  highlights?: HighlightClip[];
+  events?: Array<{
+    minute?: number | null;
+    minute_extra?: number | null;
+    type: string;
+    team: string;
+    player_name?: string | null;
+    player_out?: string | null;
+    description?: string | null;
+    is_penalty?: boolean;
+    is_own_goal?: boolean;
+    score_home?: number | null;
+    score_away?: number | null;
+  }>;
+  stats_home_live?: Record<string, unknown> | null;
+  stats_away_live?: Record<string, unknown> | null;
 }
 
 // Soccer-specific ELO history point

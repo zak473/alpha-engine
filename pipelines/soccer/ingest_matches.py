@@ -32,25 +32,41 @@ log = logging.getLogger(__name__)
 # upsert helpers
 # ---------------------------------------------------------------------------
 
-def _upsert_league(session: Session, provider_id: str, name: str, sport: str = "soccer") -> str:
-    """Return CoreLeague.id for provider_id, inserting if missing."""
+def _upsert_league(
+    session: Session, provider_id: str, name: str, sport: str = "soccer",
+    logo_url: str | None = None,
+) -> str:
+    """Return CoreLeague.id for provider_id, inserting if missing. Updates logo if provided."""
     league = session.query(CoreLeague).filter_by(provider_id=provider_id).first()
     if league is None:
-        league = CoreLeague(name=name, provider_id=provider_id, sport=sport, tier=1, is_active=True)
+        league = CoreLeague(
+            name=name, provider_id=provider_id, sport=sport, tier=1,
+            is_active=True, logo_url=logo_url,
+        )
         session.add(league)
         session.flush()
         log.info("  [+] league  %s (%s)", name, league.id)
+    elif logo_url and not league.logo_url:
+        league.logo_url = logo_url
     return league.id
 
 
-def _upsert_team(session: Session, provider_id: str, name: str, league_id: str) -> str:
-    """Return CoreTeam.id for provider_id, inserting if missing."""
+def _upsert_team(
+    session: Session, provider_id: str, name: str, league_id: str,
+    logo_url: str | None = None,
+) -> str:
+    """Return CoreTeam.id for provider_id, inserting if missing. Updates logo if provided."""
     team = session.query(CoreTeam).filter_by(provider_id=provider_id).first()
     if team is None:
-        team = CoreTeam(name=name, provider_id=provider_id, league_id=league_id, is_active=True)
+        team = CoreTeam(
+            name=name, provider_id=provider_id, league_id=league_id,
+            is_active=True, logo_url=logo_url,
+        )
         session.add(team)
         session.flush()
         log.info("  [+] team    %s (%s)", name, team.id)
+    elif logo_url and not team.logo_url:
+        team.logo_url = logo_url
     return team.id
 
 
@@ -88,6 +104,32 @@ def _upsert_match(session: Session, row: dict[str, Any], league_id: str, home_te
     else:
         current_state_json = None
 
+    # extras_json: lineups, statistics, events from Highlightly
+    raw_extras = row.get("extras_json")
+    if raw_extras not in (None, "", "None"):
+        if isinstance(raw_extras, dict):
+            extras_json = raw_extras
+        else:
+            try:
+                extras_json = _json.loads(raw_extras)
+            except Exception:
+                extras_json = None
+    else:
+        extras_json = None
+
+    # highlights_json: video highlight clips from Highlightly
+    raw_highlights = row.get("highlights_json")
+    if raw_highlights not in (None, "", "None"):
+        if isinstance(raw_highlights, (list, dict)):
+            highlights_json = raw_highlights
+        else:
+            try:
+                highlights_json = _json.loads(raw_highlights)
+            except Exception:
+                highlights_json = None
+    else:
+        highlights_json = None
+
     if match is None:
         match = CoreMatch(
             provider_id=row["provider_id"],
@@ -109,6 +151,8 @@ def _upsert_match(session: Session, row: dict[str, Any], league_id: str, home_te
             live_clock=live_clock,
             current_period=current_period,
             current_state_json=current_state_json,
+            extras_json=extras_json,
+            highlights_json=highlights_json,
         )
         session.add(match)
         log.info("  [+] match   %s  %s vs %s  (%s)", row["provider_id"], row["home_team_name"], row["away_team_name"], status)
@@ -128,6 +172,11 @@ def _upsert_match(session: Session, row: dict[str, Any], league_id: str, home_te
         match.live_clock = live_clock
         match.current_period = current_period
         match.current_state_json = current_state_json
+        # Only overwrite JSON blobs if new data provided (don't wipe existing enrichment)
+        if extras_json is not None:
+            match.extras_json = extras_json
+        if highlights_json is not None:
+            match.highlights_json = highlights_json
         log.debug("  [~] match   %s  updated", row["provider_id"])
 
 
@@ -147,9 +196,18 @@ def ingest_from_csv(csv_path: Path, dry_run: bool = False) -> int:
             reader = csv.DictReader(fh)
             for row in reader:
                 sport      = row.get("sport", "soccer")
-                league_id  = _upsert_league(session, row["league_provider_id"], row["league_name"], sport)
-                home_id    = _upsert_team(session, row["home_team_provider_id"], row["home_team_name"], league_id)
-                away_id    = _upsert_team(session, row["away_team_provider_id"], row["away_team_name"], league_id)
+                league_id  = _upsert_league(
+                    session, row["league_provider_id"], row["league_name"], sport,
+                    logo_url=row.get("league_logo_url") or None,
+                )
+                home_id    = _upsert_team(
+                    session, row["home_team_provider_id"], row["home_team_name"], league_id,
+                    logo_url=row.get("home_team_logo_url") or None,
+                )
+                away_id    = _upsert_team(
+                    session, row["away_team_provider_id"], row["away_team_name"], league_id,
+                    logo_url=row.get("away_team_logo_url") or None,
+                )
                 _upsert_match(session, row, league_id, home_id, away_id)
                 count += 1
 

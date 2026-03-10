@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from api.deps import get_db
 from api.exceptions import register_exception_handlers
 from api.middleware import RequestLoggingMiddleware
-from api.routers import auth, backtest, basketball as basketball_router, baseball as baseball_router, challenges, esports, matches, notifications, picks, predictions, soccer, tennis, tipsters
+from api.routers import auth, backtest, basketball as basketball_router, baseball as baseball_router, challenges, esports, matches, notifications, picks, predictions, soccer, standings as standings_router, tennis, tipsters
 from api.sports.soccer import routes as soccer_sport
 from api.sports.tennis import routes as tennis_sport
 from api.sports.esports import routes as esports_sport
@@ -69,15 +69,26 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Startup fetch_live failed to launch: %s", exc)
 
-    # Highlightly startup fetch — runs regardless of other API keys
+    # Highlightly historical backfill — runs only when DB has < 1000 finished matches
+    # (first deploy or fresh DB). Skips on subsequent restarts.
     if settings.HIGHLIGHTLY_API_KEY:
         try:
             import threading as _th
-            from pipelines.scheduler import _job_fetch_highlightly
-            _th.Thread(target=_job_fetch_highlightly, daemon=True, name="startup-highlightly").start()
-            logger.info("Startup: background Highlightly fetch triggered.")
+            from db.session import SessionLocal
+            from db.models.mvp import CoreMatch
+            _db = SessionLocal()
+            try:
+                _finished = _db.query(CoreMatch).filter(CoreMatch.status == "finished").count()
+            finally:
+                _db.close()
+            if _finished < 1000:
+                logger.info("Startup: DB has %d finished matches — triggering historical backfill (730 days).", _finished)
+                from pipelines.highlightly.fetch_all import fetch_historical
+                _th.Thread(target=fetch_historical, kwargs={"days_back": 730}, daemon=True, name="hl-history").start()
+            else:
+                logger.info("Startup: DB has %d finished matches — skipping historical backfill.", _finished)
         except Exception as exc:
-            logger.warning("Startup Highlightly fetch failed to launch: %s", exc)
+            logger.warning("Startup historical backfill failed to launch: %s", exc)
 
     # ── API key health report ──────────────────────────────────────────────
     KEY_MAP = {
@@ -188,6 +199,7 @@ app.include_router(notifications.router, prefix=settings.API_PREFIX)
 
 from api.routers import bankroll
 app.include_router(bankroll.router,    prefix=settings.API_PREFIX)
+app.include_router(standings_router.router)
 app.include_router(backtest.router,    prefix=settings.API_PREFIX)
 app.include_router(basketball_router.router, prefix=settings.API_PREFIX)
 app.include_router(baseball_router.router,   prefix=settings.API_PREFIX)
@@ -327,17 +339,73 @@ def trigger_odds_sync(db: Session = Depends(get_db)):
 
 
 @app.post("/api/v1/admin/sync-highlightly", tags=["Health"])
-def trigger_highlightly_sync(db: Session = Depends(get_db)):
+def trigger_highlightly_sync(days_back: int = 90, db: Session = Depends(get_db)):
     """Manually trigger a Highlightly full sync and return row count."""
     try:
         from pipelines.highlightly.fetch_all import fetch_all as hl_fetch
-        n = hl_fetch()
+        n = hl_fetch(days_back=days_back, days_ahead=14)
         from db.models.mvp import CoreMatch
         total = db.query(CoreMatch).filter(CoreMatch.provider_id.like("hl-%")).count()
         return {"status": "ok", "rows_ingested": n, "total_hl_matches_in_db": total}
     except Exception as exc:
         logger.error("[highlightly sync] failed: %s", exc, exc_info=True)
         return {"status": "error", "detail": str(exc)}
+
+
+@app.post("/api/v1/admin/sync-standings", tags=["Health"])
+def trigger_standings_sync():
+    """Manually trigger a Highlightly standings sync for all active leagues."""
+    import threading as _th
+    def _run():
+        try:
+            from pipelines.highlightly.fetch_all import fetch_standings
+            n = fetch_standings()
+            logger.info("[standings sync] Done — %d rows synced.", n)
+        except Exception as exc:
+            logger.error("[standings sync] failed: %s", exc, exc_info=True)
+    _th.Thread(target=_run, daemon=True, name="standings-sync").start()
+    return {"status": "started", "note": "Check server logs for progress."}
+
+
+@app.post("/api/v1/admin/sync-highlightly-history", tags=["Health"])
+def trigger_highlightly_history(days_back: int = 730):
+    """
+    Trigger a one-time Highlightly historical backfill in the background.
+    Fetches up to `days_back` days of past results for H2H data population.
+    Default 730 days (≈ 2 years). Runs in background — check logs for progress.
+    """
+    import threading as _th
+    def _run():
+        try:
+            from pipelines.highlightly.fetch_all import fetch_historical
+            n = fetch_historical(days_back=days_back)
+            logger.info("[history sync] Done — %d rows ingested.", n)
+        except Exception as exc:
+            logger.error("[history sync] failed: %s", exc, exc_info=True)
+    _th.Thread(target=_run, daemon=True, name="highlightly-history").start()
+    return {
+        "status": "started",
+        "days_back": days_back,
+        "note": f"Fetching ~{days_back * 4} date/sport combinations. Check logs for progress.",
+    }
+
+
+@app.post("/api/v1/admin/rebuild-soccer-features", tags=["Health"])
+def trigger_rebuild_soccer_features():
+    """
+    Rebuild feat_soccer_match rows from core_matches history.
+    Run this after a historical sync to populate form data for all matches.
+    """
+    import threading as _th
+    def _run():
+        try:
+            from pipelines.soccer.build_soccer_features import run as build_features
+            n = build_features()
+            logger.info("[soccer-features] Done — %d rows upserted.", n)
+        except Exception as exc:
+            logger.error("[soccer-features] failed: %s", exc, exc_info=True)
+    _th.Thread(target=_run, daemon=True, name="soccer-features").start()
+    return {"status": "started", "note": "Rebuilding feat_soccer_match. Check logs for progress."}
 
 
 @app.get("/ready", tags=["Health"])

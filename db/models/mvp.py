@@ -45,6 +45,7 @@ class CoreLeague(Base):
     tier: Mapped[int] = mapped_column(Integer, default=1)
     provider_id: Mapped[str] = mapped_column(String(200), nullable=True, unique=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    logo_url: Mapped[str] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
@@ -66,6 +67,7 @@ class CoreTeam(Base):
     country: Mapped[str] = mapped_column(String(100), nullable=True)
     provider_id: Mapped[str] = mapped_column(String(200), nullable=True, unique=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    logo_url: Mapped[str] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
@@ -107,6 +109,8 @@ class CoreMatch(Base):
     live_clock: Mapped[str] = mapped_column(String(20), nullable=True)           # "34'", "HT", "Q3", "Top 5th", "Map 2 R17"
     current_period: Mapped[int] = mapped_column(Integer, nullable=True)           # 1-based: half/quarter/inning/set/map
     current_state_json: Mapped[dict] = mapped_column(JSON, nullable=True)         # sport-specific live state blob
+    extras_json: Mapped[dict] = mapped_column(JSON, nullable=True)                # Highlightly enrichment: lineups, statistics, events
+    highlights_json: Mapped[dict] = mapped_column(JSON, nullable=True)            # Highlightly highlight clips
 
     __table_args__ = (
         Index("ix_core_matches_kickoff", "kickoff_utc"),
@@ -339,4 +343,45 @@ class ModelRegistry(Base):
 
     __table_args__ = (
         Index("ix_model_registry_sport_live", "sport", "is_live"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# core_standings
+# ---------------------------------------------------------------------------
+
+class CoreStanding(Base):
+    """
+    League table row — one row per team per league per season.
+    Upsert key: (league_id, season, team_name).
+    Updated by the Highlightly standings sync job.
+    """
+    __tablename__ = "core_standings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    league_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    season: Mapped[str] = mapped_column(String(20), nullable=False)
+    sport: Mapped[str] = mapped_column(String(20), nullable=False)
+    team_id: Mapped[str] = mapped_column(String(36), nullable=True)       # may be null before team upsert
+    team_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    team_logo: Mapped[str] = mapped_column(String(500), nullable=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=True)
+    played: Mapped[int] = mapped_column(Integer, nullable=True)
+    won: Mapped[int] = mapped_column(Integer, nullable=True)
+    drawn: Mapped[int] = mapped_column(Integer, nullable=True)
+    lost: Mapped[int] = mapped_column(Integer, nullable=True)
+    goals_for: Mapped[int] = mapped_column(Integer, nullable=True)
+    goals_against: Mapped[int] = mapped_column(Integer, nullable=True)
+    goal_diff: Mapped[int] = mapped_column(Integer, nullable=True)
+    points: Mapped[int] = mapped_column(Integer, nullable=True)
+    form: Mapped[str] = mapped_column(String(20), nullable=True)          # "WWDLW"
+    group_name: Mapped[str] = mapped_column(String(100), nullable=True)   # group stage label
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("league_id", "season", "team_name", name="uq_standings_league_season_team"),
+        Index("ix_standings_league_season", "league_id", "season"),
+        Index("ix_standings_sport", "sport"),
     )

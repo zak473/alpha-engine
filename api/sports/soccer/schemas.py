@@ -18,6 +18,7 @@ from pydantic import BaseModel
 class ParticipantOut(BaseModel):
     id: str
     name: str
+    logo_url: Optional[str] = None
 
 
 class ProbabilitiesOut(BaseModel):
@@ -225,6 +226,58 @@ class SoccerLeagueContextOut(BaseModel):
     away_form_rank: Optional[int] = None
 
 
+class MatchEventOut(BaseModel):
+    """A single in-match event: goal, card, substitution, var, etc."""
+    minute: Optional[int] = None
+    minute_extra: Optional[int] = None   # e.g. 45+2 → minute=45, minute_extra=2
+    type: str   # "goal" | "yellow_card" | "red_card" | "substitution" | "var" | "penalty_missed"
+    team: str   # "home" | "away"
+    player_name: Optional[str] = None
+    player_out: Optional[str] = None     # substitution: player coming off
+    description: Optional[str] = None
+    is_penalty: bool = False
+    is_own_goal: bool = False
+    score_home: Optional[int] = None     # score after this event
+    score_away: Optional[int] = None
+
+
+class HighlightClipOut(BaseModel):
+    title: Optional[str] = None
+    url: str
+    thumbnail: Optional[str] = None
+    duration: Optional[int] = None      # seconds
+    source: Optional[str] = None        # "youtube", "highlightly", etc.
+    event_type: Optional[str] = None    # "goal", "red_card", "save", "full_match"
+    minute: Optional[int] = None        # match minute
+
+
+class StandingRowOut(BaseModel):
+    position: Optional[int] = None
+    team_id: Optional[str] = None
+    team_name: str
+    team_logo: Optional[str] = None
+    played: Optional[int] = None
+    won: Optional[int] = None
+    drawn: Optional[int] = None
+    lost: Optional[int] = None
+    goals_for: Optional[int] = None
+    goals_against: Optional[int] = None
+    goal_diff: Optional[int] = None
+    points: Optional[int] = None
+    form: Optional[str] = None
+    group_name: Optional[str] = None
+
+
+class StandingsResponse(BaseModel):
+    league_id: str
+    league_name: str
+    league_logo: Optional[str] = None
+    season: str
+    sport: str
+    table: list[StandingRowOut]
+    updated_at: Optional[str] = None
+
+
 class SoccerAdvancedTeamStatsOut(BaseModel):
     team_id: str
     team_name: str
@@ -253,13 +306,16 @@ class SoccerAdvancedTeamStatsOut(BaseModel):
 class SoccerMatchListItem(BaseModel):
     id: str
     league: str
+    league_logo: Optional[str] = None
     season: Optional[str] = None
     kickoff_utc: datetime
     status: str
     home_id: str
     home_name: str
+    home_logo: Optional[str] = None
     away_id: str
     away_name: str
+    away_logo: Optional[str] = None
     home_score: Optional[int] = None
     away_score: Optional[int] = None
     outcome: Optional[str] = None
@@ -289,6 +345,7 @@ class SoccerMatchDetail(BaseModel):
     id: str
     sport: str = "soccer"
     league: str
+    league_logo: Optional[str] = None
     season: Optional[str] = None
     kickoff_utc: datetime
     status: str
@@ -334,5 +391,12 @@ class SoccerMatchDetail(BaseModel):
     # Advanced team stats
     adv_home: Optional[SoccerAdvancedTeamStatsOut] = None
     adv_away: Optional[SoccerAdvancedTeamStatsOut] = None
+    # Match events (goals, cards, subs from Highlightly)
+    events: list[MatchEventOut] = []
+    # In-match statistics from Highlightly (alternative to CoreTeamMatchStats)
+    stats_home_live: Optional[dict] = None   # raw Highlightly statistics dict
+    stats_away_live: Optional[dict] = None
+    # Highlights
+    highlights: list[HighlightClipOut] = []
     # Betting market
     betting: Optional[dict] = None  # {spread, total, home_ml, away_ml, draw_ml}
