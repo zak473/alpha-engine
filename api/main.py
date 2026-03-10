@@ -303,6 +303,20 @@ def trigger_sync(background_tasks=None):
     return {"status": "sync started", "note": "Check server logs for progress."}
 
 
+@app.post("/api/v1/admin/sync-odds", tags=["Health"])
+def trigger_odds_sync(db: Session = Depends(get_db)):
+    """Manually trigger fetch_odds and return how many matches were updated."""
+    try:
+        from pipelines.odds.fetch_odds import fetch_all as fetch_odds
+        n = fetch_odds()
+        from db.models.mvp import CoreMatch
+        with_odds = db.query(CoreMatch).filter(CoreMatch.odds_home.isnot(None)).count()
+        return {"status": "ok", "matches_updated": n, "total_matches_with_odds": with_odds}
+    except Exception as exc:
+        logger.error("[odds sync] failed: %s", exc, exc_info=True)
+        return {"status": "error", "detail": str(exc)}
+
+
 @app.post("/api/v1/admin/sync-highlightly", tags=["Health"])
 def trigger_highlightly_sync(db: Session = Depends(get_db)):
     """Manually trigger a Highlightly full sync and return row count."""

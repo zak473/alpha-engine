@@ -35,12 +35,27 @@ def _get(path: str, params: dict | None = None) -> Any:
     return resp.json()
 
 
+def _extract_h2h_odds(event: dict[str, Any]) -> tuple[str, str]:
+    """Extract best available h2h home/away decimal odds from an Odds API event."""
+    for bm in (event.get("bookmakers") or []):
+        for mkt in (bm.get("markets") or []):
+            if mkt.get("key") != "h2h":
+                continue
+            outcomes = {o["name"]: o["price"] for o in (mkt.get("outcomes") or [])}
+            h = outcomes.get(event.get("home_team", "")) or outcomes.get("home")
+            a = outcomes.get(event.get("away_team", "")) or outcomes.get("away")
+            if h and a:
+                return str(h), str(a)
+    return "", ""
+
+
 def _transform_fixture(event: dict[str, Any], sport_title: str, sport_key: str) -> dict[str, Any] | None:
     home = (event.get("home_team") or "").strip()
     away = (event.get("away_team") or "").strip()
     if not home or not away:
         return None
     kickoff = event.get("commence_time", "")
+    odds_home, odds_away = _extract_h2h_odds(event)
     return {
         "sport":                  "baseball",
         "provider_id":            f"odds-bb-{event['id']}",
@@ -57,6 +72,8 @@ def _transform_fixture(event: dict[str, Any], sport_title: str, sport_key: str) 
         "outcome":                "",
         "season":                 kickoff[:4] if kickoff else "",
         "venue":                  "",
+        "odds_home":              odds_home,
+        "odds_away":              odds_away,
     }
 
 

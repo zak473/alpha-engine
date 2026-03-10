@@ -546,13 +546,14 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
-    # Fetch real market odds + run auto-pick bot every 30 minutes
+    # Fetch real market odds + run auto-pick bot every 30 minutes (run immediately on startup)
     _scheduler.add_job(
         _job_fetch_odds,
         trigger=IntervalTrigger(minutes=30),
         id="fetch_odds",
         name="Fetch real odds + auto-pick bot",
         replace_existing=True,
+        next_run_time=_dt.now(_tz.utc),
     )
 
     # Settle pending picks every 15 minutes
