@@ -233,53 +233,49 @@ def _fetch_and_attach_odds(matches: list[dict], sport: str) -> None:
 
 # ── Extras enrichment (lineups, statistics, events) ───────────────────────────
 
-def _should_enrich(row: dict) -> bool:
-    """Return True for live, very recent (≤48h), or upcoming (≤72h) matches."""
-    status = row.get("status", "")
-    if status == "live":
-        return True
-    kickoff_str = row.get("kickoff_utc", "")
-    if not kickoff_str:
-        return False
-    try:
-        kickoff = datetime.fromisoformat(kickoff_str.replace("Z", "+00:00"))
-        now = datetime.now(timezone.utc)
-        return (now - timedelta(hours=48)) <= kickoff <= (now + timedelta(hours=72))
-    except (ValueError, TypeError):
-        return False
-
-
-def _enrich_rows_with_extras(rows: list[dict], sport: str) -> None:
+def _enrich_live_rows(rows: list[dict], sport: str) -> None:
     """
-    Fetch lineups, statistics, events, and highlights from Highlightly for applicable
-    matches and attach them to the row dict (mutates in-place).
-    JSON fields are serialized to strings so the CSV round-trip in ingest_from_dicts works.
-    Only enriches live, recent, or upcoming matches to keep API calls reasonable.
+    Fetch extras (lineups, statistics, events) ONLY for currently live matches.
+    Called sparingly — not on every poll cycle.
+    Each live match costs 3 API calls. With 10 live matches = 30 calls.
     """
     for row in rows:
+        if row.get("status") != "live":
+            continue
         hl_id = row.get("_hl_match_id")
         if not hl_id:
             continue
-        status = row.get("status", "")
-        if _should_enrich(row):
-            # Lineups / statistics / events
-            try:
-                extras = get_extras(sport, hl_id)
-                if extras:
-                    row["extras_json"] = _json.dumps(extras)
-                time.sleep(0.1)
-            except Exception as exc:
-                log.debug("[highlightly:enrich] %s match %s extras failed: %s", sport, hl_id, exc)
+        try:
+            extras = get_extras(sport, hl_id)
+            if extras:
+                row["extras_json"] = _json.dumps(extras)
+            time.sleep(0.3)
+        except Exception as exc:
+            log.warning("[highlightly:enrich] %s match %s extras failed: %s", sport, hl_id, exc)
 
-        # Highlights: fetch for recently finished or live matches
-        if status in ("finished", "live"):
-            try:
-                clips = get_highlights(sport, hl_id)
-                if clips:
-                    row["highlights_json"] = _json.dumps(clips)
-                time.sleep(0.1)
-            except Exception as exc:
-                log.debug("[highlightly:enrich] %s match %s highlights failed: %s", sport, hl_id, exc)
+
+def _enrich_finished_highlights(rows: list[dict], sport: str, max_matches: int = 5) -> None:
+    """
+    Fetch highlights for recently finished matches only. Capped at max_matches per call
+    to avoid burning quota. Called once per hour max.
+    """
+    count = 0
+    for row in rows:
+        if count >= max_matches:
+            break
+        if row.get("status") != "finished":
+            continue
+        hl_id = row.get("_hl_match_id")
+        if not hl_id:
+            continue
+        try:
+            clips = get_highlights(sport, hl_id)
+            if clips:
+                row["highlights_json"] = _json.dumps(clips)
+            count += 1
+            time.sleep(0.3)
+        except Exception as exc:
+            log.warning("[highlightly:enrich] %s match %s highlights failed: %s", sport, hl_id, exc)
 
 
 # ── Main fetch ─────────────────────────────────────────────────────────────────
@@ -288,7 +284,39 @@ SPORTS = ["soccer", "basketball", "baseball", "hockey"]
 
 
 def fetch_today(dry_run: bool = False) -> int:
-    """Fetch today + tomorrow — used by the 2-minute live-score job."""
+    """
+    Fetch today's scores only — used by the 10-minute live-score job.
+    SCORES ONLY: no extras (lineups/stats/events), no odds, no highlights.
+    Cost: 4 sports × 1 date = 4 API calls per run.
+    """
+    if not settings.HIGHLIGHTLY_API_KEY:
+        return 0
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    all_rows: list[dict] = []
+
+    for sport in SPORTS:
+        try:
+            matches = get_matches(sport, today)
+            rows = [r for m in matches if (r := _transform(m, sport))]
+            all_rows.extend(rows)
+            time.sleep(0.3)
+        except Exception as exc:
+            log.warning("[highlightly:live] %s %s failed: %s", sport, today, exc)
+
+    if not all_rows or dry_run:
+        return len(all_rows)
+    return ingest_from_dicts(all_rows)
+
+
+def fetch_with_extras(dry_run: bool = False) -> int:
+    """
+    Fetch today + tomorrow with live extras (lineups, stats, events).
+    Used by the 30-minute job. Only fetches extras for LIVE matches.
+    Cost: 4 sports × 2 dates = 8 /matches calls
+          + ~10 live matches × 3 endpoints = ~30 extras calls
+          Total: ~38 API calls per run × 48 runs/day = ~1,800 calls/day.
+    """
     if not settings.HIGHLIGHTLY_API_KEY:
         return 0
 
@@ -301,25 +329,27 @@ def fetch_today(dry_run: bool = False) -> int:
         for date in dates:
             try:
                 matches = get_matches(sport, date)
-                # Attempt to attach odds via separate API call for any match missing them
-                _fetch_and_attach_odds(matches, sport)
                 rows = [r for m in matches if (r := _transform(m, sport))]
                 sport_rows.extend(rows)
-                time.sleep(0.1)
+                time.sleep(0.3)
             except Exception as exc:
-                log.warning("[highlightly:live] %s %s failed: %s", sport, date, exc)
-        # Enrich live and upcoming matches with lineups/stats/events
-        _enrich_rows_with_extras(sport_rows, sport)
+                log.warning("[highlightly:extras] %s %s failed: %s", sport, date, exc)
+        # Only enrich live matches — not upcoming/recent
+        _enrich_live_rows(sport_rows, sport)
         all_rows.extend(sport_rows)
 
     if not all_rows or dry_run:
         return len(all_rows)
-
     return ingest_from_dicts(all_rows)
 
 
 def fetch_all(dry_run: bool = False, days_back: int = 14, days_ahead: int = 7) -> int:
-    """Regular sync — used by the 15-minute scheduler job."""
+    """
+    Fixture sync — used by the hourly scheduler job.
+    Fetches match listings for a date window. No extras (too expensive for bulk).
+    Cost: 4 sports × (days_back + days_ahead) API calls per run.
+    Default: 4 × 21 = 84 calls per run × 24 runs/day = 2,016 calls/day.
+    """
     if not settings.HIGHLIGHTLY_API_KEY:
         log.error("[highlightly] HIGHLIGHTLY_API_KEY not set — skipping.")
         return 0
@@ -333,32 +363,21 @@ def fetch_all(dry_run: bool = False, days_back: int = 14, days_ahead: int = 7) -
     all_rows: list[dict] = []
 
     for sport in SPORTS:
-        sport_rows: list[dict] = []
         for date in dates:
             try:
-                log.info("[highlightly] Fetching %s matches for %s ...", sport, date)
                 matches = get_matches(sport, date)
-                _fetch_and_attach_odds(matches, sport)
                 rows = [r for m in matches if (r := _transform(m, sport))]
-                log.info("[highlightly]   → %d rows for %s %s", len(rows), sport, date)
-                sport_rows.extend(rows)
-                time.sleep(0.2)
+                all_rows.extend(rows)
+                time.sleep(0.3)
             except Exception as exc:
                 log.warning("[highlightly] %s %s failed: %s", sport, date, exc)
-        # Enrich live, recent, and upcoming matches with lineups/stats/events
-        _enrich_rows_with_extras(sport_rows, sport)
-        all_rows.extend(sport_rows)
 
-    log.info("[highlightly] Total rows to ingest: %d", len(all_rows))
+    log.info("[highlightly] fetch_all: %d rows across %d dates", len(all_rows), len(dates))
     if not all_rows:
         return 0
     if dry_run:
-        log.info("[highlightly] DRY RUN — skipping ingest.")
         return len(all_rows)
-
-    ingested = ingest_from_dicts(all_rows)
-    log.info("[highlightly] Ingested %d rows.", ingested)
-    return ingested
+    return ingest_from_dicts(all_rows)
 
 
 def fetch_historical(dry_run: bool = False, days_back: int = 730) -> int:

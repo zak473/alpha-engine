@@ -479,7 +479,10 @@ def _job_generate_weekly_challenges() -> None:
 
 
 def _job_highlightly_live() -> None:
-    """Fetch today's live scores, lineups, events and highlights from Highlightly every 2 minutes."""
+    """
+    10-minute live score refresh — scores only, no extras.
+    Cost: 4 API calls per run × 144 runs/day = 576 calls/day.
+    """
     from pipelines.highlightly.fetch_all import fetch_today
     try:
         n = fetch_today()
@@ -490,17 +493,23 @@ def _job_highlightly_live() -> None:
 
 
 def _job_fetch_highlightly() -> None:
-    """Full Highlightly sync every 15 minutes — recent + upcoming only."""
-    from pipelines.highlightly.fetch_all import fetch_all as hl_fetch
+    """
+    30-minute sync — today + tomorrow with live extras (lineups/stats/events).
+    Cost: ~38 API calls per run × 48 runs/day = ~1,800 calls/day.
+    """
+    from pipelines.highlightly.fetch_all import fetch_with_extras
     try:
-        n = hl_fetch(days_back=7, days_ahead=14)
+        n = fetch_with_extras()
         log.info("[scheduler] highlightly_fetch: %d rows ingested.", n)
     except Exception as exc:
         log.error("[scheduler] highlightly_fetch failed: %s", exc, exc_info=True)
 
 
 def _job_fetch_highlightly_historical() -> None:
-    """Daily Highlightly historical sync — pulls 90 days of results for form data."""
+    """
+    Daily fixture sync — 90 days back for form/H2H. No extras.
+    Cost: 4 × 93 = 372 API calls. Runs at 3 AM UTC.
+    """
     from pipelines.highlightly.fetch_all import fetch_all as hl_fetch
     log.info("[scheduler] Starting highlightly_historical job ...")
     try:
@@ -652,44 +661,43 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
-    # Highlightly live score poll every 2 minutes (delayed 5 min on startup to avoid quota burn)
+    # Highlightly live scores every 10 minutes — scores only, 4 calls/run
     _scheduler.add_job(
         _job_highlightly_live,
-        trigger=IntervalTrigger(minutes=2),
+        trigger=IntervalTrigger(minutes=10),
         id="highlightly_live",
-        name="Highlightly live score poll (2m)",
+        name="Highlightly live scores (10m, scores only)",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=5),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=2),
     )
 
-    # Highlightly full fixture sync every 15 minutes (delayed 5 min on startup)
+    # Highlightly full sync every 30 minutes — today+tomorrow with live extras
     _scheduler.add_job(
         _job_fetch_highlightly,
-        trigger=IntervalTrigger(minutes=15),
+        trigger=IntervalTrigger(minutes=30),
         id="fetch_highlightly",
-        name="Highlightly full sync (logos, lineups, stats, events, highlights)",
+        name="Highlightly sync with live extras (30m)",
         replace_existing=True,
         next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=5),
     )
 
-    # Standings sync every 6 hours (delayed 10 min on startup)
+    # Standings sync every 12 hours
     _scheduler.add_job(
         _job_sync_standings,
-        trigger=IntervalTrigger(hours=6),
+        trigger=IntervalTrigger(hours=12),
         id="sync_standings",
-        name="Highlightly league standings sync",
+        name="Highlightly standings sync (12h)",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=10),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=15),
     )
 
-    # Highlightly historical sync once daily at 4:00 AM UTC
+    # Historical fixture sync daily at 3:00 AM UTC — 90 days back, no extras
     _scheduler.add_job(
         _job_fetch_highlightly_historical,
-        trigger=CronTrigger(hour=4, minute=0, timezone="UTC"),
+        trigger=CronTrigger(hour=3, minute=0, timezone="UTC"),
         id="highlightly_historical",
-        name="Highlightly 90-day historical sync (form data)",
+        name="Highlightly 90-day historical sync (3 AM UTC)",
         replace_existing=True,
-        # No immediate run — let the key settle; runs tonight at 4 AM UTC
     )
 
     _scheduler.start()
