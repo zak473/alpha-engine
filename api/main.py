@@ -341,16 +341,41 @@ def trigger_odds_sync(db: Session = Depends(get_db)):
 @app.get("/api/v1/admin/test-highlightly", tags=["Health"])
 def test_highlightly_connection():
     """
-    Test the Highlightly API key. Returns connection status without touching the DB.
-    Call this first after changing the HIGHLIGHTLY_API_KEY env var.
+    Test the Highlightly API key. Tries multiple URL formats to find the right one.
     """
-    try:
-        from pipelines.highlightly.client import test_connection
-        result = test_connection()
-        return {"status": "ok", **result}
-    except Exception as exc:
-        logger.error("[highlightly test] %s", exc)
-        return {"status": "error", "detail": str(exc)}
+    import httpx
+    from config.settings import settings
+
+    key = settings.HIGHLIGHTLY_API_KEY
+    masked_key = f"{key[:8]}...{key[-4:]}" if len(key) > 12 else "(not set)"
+
+    results = {}
+
+    # Try every URL format Highlightly might use
+    candidates = [
+        ("subdomain_direct",   f"https://soccer.highlightly.net/matches",       {"date": "2026-03-10", "limit": 1}),
+        ("subdomain_v2",       f"https://soccer.highlightly.net/v2/matches",     {"date": "2026-03-10", "limit": 1}),
+        ("api_dot",            f"https://api.highlightly.net/matches",           {"sport": "soccer", "date": "2026-03-10", "limit": 1}),
+        ("api_dot_v1",         f"https://api.highlightly.net/v1/matches",        {"sport": "soccer", "date": "2026-03-10", "limit": 1}),
+        ("api_dot_soccer",     f"https://api.highlightly.net/soccer/matches",    {"date": "2026-03-10", "limit": 1}),
+    ]
+
+    working_url = None
+    for name, url, params in candidates:
+        for header_key in ("x-api-key", "x-rapidapi-key"):
+            try:
+                resp = httpx.get(url, params=params, headers={header_key: key, "Accept": "application/json"}, timeout=8)
+                results[f"{name}_{header_key}"] = resp.status_code
+                if resp.status_code == 200:
+                    working_url = {"url": url, "header": header_key, "params": params}
+            except Exception as e:
+                results[f"{name}_{header_key}"] = str(e)[:60]
+
+    return {
+        "key_in_railway": masked_key,
+        "working_url": working_url,
+        "all_attempts": results,
+    }
 
 
 @app.post("/api/v1/admin/sync-highlightly", tags=["Health"])
