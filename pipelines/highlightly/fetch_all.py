@@ -35,16 +35,24 @@ LIVE_DESCRIPTIONS = {
 }
 
 
+_PRE_MATCH_DESCRIPTIONS = {
+    "not started", "scheduled", "tbd", "postponed", "cancelled",
+    "suspended", "abandoned", "delayed", "fixture", "upcoming",
+    "to be announced", "to be determined",
+}
+
+
 def _map_status(description: str | None) -> str:
     if not description:
         return "scheduled"
     d = description.lower().strip()
     if d in FINISHED_DESCRIPTIONS or d.startswith("final"):
         return "finished"
-    if d in LIVE_DESCRIPTIONS or d not in ("not started", "scheduled", "tbd", "postponed", "cancelled", "suspended"):
-        # Any active description that isn't clearly pre-match
-        if d not in ("not started", "scheduled", "tbd", "postponed", "cancelled", "suspended", "abandoned"):
-            return "live"
+    if d in LIVE_DESCRIPTIONS:
+        return "live"
+    if d in _PRE_MATCH_DESCRIPTIONS:
+        return "scheduled"
+    # Unknown description: treat as scheduled to avoid false "live" matches
     return "scheduled"
 
 

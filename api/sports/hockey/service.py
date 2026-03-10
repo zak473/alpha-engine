@@ -75,18 +75,29 @@ def _h2h(db: Session, home_id: str, away_id: str) -> H2HRecordOut:
         .limit(10)
         .all()
     )
-    home_wins = sum(1 for m in rows if (m.home_team_id == home_id and m.outcome == "H") or (m.away_team_id == home_id and m.outcome == "A"))
-    away_wins = sum(1 for m in rows if (m.home_team_id == away_id and m.outcome == "H") or (m.away_team_id == away_id and m.outcome == "A"))
+    _norm = {"H": "home_win", "A": "away_win", "D": "draw",
+             "home_win": "home_win", "away_win": "away_win", "draw": "draw"}
+    _flip = {"home_win": "away_win", "away_win": "home_win", "draw": "draw"}
+    home_wins = away_wins = 0
     recent = []
-    for m in rows[:5]:
-        recent.append({
-            "id": m.id,
-            "date": m.kickoff_utc.isoformat() if m.kickoff_utc else "",
-            "home": _name(db, m.home_team_id),
-            "away": _name(db, m.away_team_id),
-            "score": f"{m.home_score or 0} - {m.away_score or 0}",
-            "outcome": m.outcome,
-        })
+    for m in rows:
+        if m.home_team_id == home_id:
+            result = _norm.get(m.outcome or "", "")
+            hs, as_ = m.home_score, m.away_score
+        else:
+            result = _flip.get(_norm.get(m.outcome or "", ""), "")
+            hs, as_ = m.away_score, m.home_score
+        if result == "home_win":
+            home_wins += 1
+        elif result == "away_win":
+            away_wins += 1
+        if len(recent) < 5:
+            recent.append({
+                "date": m.kickoff_utc.isoformat() if m.kickoff_utc else "",
+                "home_score": hs,
+                "away_score": as_,
+                "outcome": result,
+            })
     return H2HRecordOut(total_matches=len(rows), home_wins=home_wins, away_wins=away_wins, recent_matches=recent)
 
 

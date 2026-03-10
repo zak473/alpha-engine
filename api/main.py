@@ -69,6 +69,16 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Startup fetch_live failed to launch: %s", exc)
 
+    # Highlightly startup fetch — runs regardless of other API keys
+    if settings.HIGHLIGHTLY_API_KEY:
+        try:
+            import threading as _th
+            from pipelines.scheduler import _job_fetch_highlightly
+            _th.Thread(target=_job_fetch_highlightly, daemon=True, name="startup-highlightly").start()
+            logger.info("Startup: background Highlightly fetch triggered.")
+        except Exception as exc:
+            logger.warning("Startup Highlightly fetch failed to launch: %s", exc)
+
     # ── API key health report ──────────────────────────────────────────────
     KEY_MAP = {
         "FOOTBALL_DATA_API_KEY": ("Soccer fixtures/results",     settings.FOOTBALL_DATA_API_KEY),
@@ -100,18 +110,17 @@ async def lifespan(app: FastAPI):
             "Set a strong JWT_SECRET environment variable immediately."
         )
 
-    if settings.SCHEDULER_ENABLED and settings.FOOTBALL_DATA_API_KEY:
+    if settings.SCHEDULER_ENABLED:
         from pipelines.scheduler import start as start_scheduler
         start_scheduler()
         logger.info("Background data scheduler started.")
-    else:
         if not settings.FOOTBALL_DATA_API_KEY:
-            logger.warning(
-                "FOOTBALL_DATA_API_KEY is not set — live data fetching disabled. "
-                "Add your free key from football-data.org to .env to enable it."
+            logger.info(
+                "FOOTBALL_DATA_API_KEY not set — football-data.org soccer feed disabled. "
+                "Using Highlightly + other configured APIs instead."
             )
-        else:
-            logger.info("Scheduler disabled via SCHEDULER_ENABLED=false.")
+    else:
+        logger.info("Scheduler disabled via SCHEDULER_ENABLED=false.")
     yield
     # Shutdown
     try:

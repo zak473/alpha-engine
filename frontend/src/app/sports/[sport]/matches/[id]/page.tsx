@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 
 export const revalidate = 30;
 
-const VALID_SPORTS: SportSlug[] = ["soccer", "tennis", "esports", "basketball", "baseball"];
+const VALID_SPORTS: SportSlug[] = ["soccer", "tennis", "esports", "basketball", "baseball", "hockey"];
 
 interface PageProps {
   params: { sport: string; id: string };
