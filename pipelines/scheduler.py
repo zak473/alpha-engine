@@ -661,24 +661,24 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
-    # Highlightly live scores every 10 minutes — scores only, 4 calls/run
+    # Highlightly live scores every 1 minute — scores only, 4 calls/run
     _scheduler.add_job(
         _job_highlightly_live,
-        trigger=IntervalTrigger(minutes=10),
+        trigger=IntervalTrigger(minutes=1),
         id="highlightly_live",
-        name="Highlightly live scores (10m, scores only)",
+        name="Highlightly live scores (1m, scores only)",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=2),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=1),
     )
 
-    # Highlightly full sync every 30 minutes — today+tomorrow with live extras
+    # Highlightly full sync every 1 minute — today+tomorrow with live extras
     _scheduler.add_job(
         _job_fetch_highlightly,
-        trigger=IntervalTrigger(minutes=30),
+        trigger=IntervalTrigger(minutes=1),
         id="fetch_highlightly",
-        name="Highlightly sync with live extras (30m)",
+        name="Highlightly sync with live extras (1m)",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=5),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=2),
     )
 
     # Standings sync every 12 hours
