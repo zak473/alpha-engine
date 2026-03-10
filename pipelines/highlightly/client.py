@@ -45,3 +45,146 @@ def get_matches(sport: str, date: str, limit: int = 100, offset: int = 0) -> lis
             break
         current_offset += limit
     return all_matches
+
+
+def get_odds(sport: str, match_id: str | int) -> dict[str, Any]:
+    """Fetch odds for a single match from the Highlightly odds endpoint."""
+    data = get(sport, "odds", {"matchId": str(match_id)})
+    return data
+
+
+def extract_odds(
+    match: dict[str, Any], sport: str
+) -> tuple[float | None, float | None, float | None]:
+    """
+    Extract (home_odds, draw_odds, away_odds) from a Highlightly match or odds response.
+    Handles multiple response shapes defensively and logs the raw structure on first encounter.
+
+    Supported shapes (tried in order):
+      1. match["odds"] = [{"bookmaker": ..., "outcomes": {"home": 1.8, "draw": 3.5, "away": 4.2}}]
+      2. match["odds"] = [{"outcomes": [{"name": "home", "odd": 1.8}, ...]}]
+      3. match["odds"] = {"1": 1.8, "X": 3.5, "2": 4.2}
+      4. match["odds"] = {"home": 1.8, "draw": 3.5, "away": 4.2}
+      5. match["odds"] = [{"1": 1.8, "X": 3.5, "2": 4.2}]  (list of bookmaker flat dicts)
+      6. match["data"] = [...]  (raw /odds endpoint response, same structures inside)
+    """
+    raw = match.get("odds") or match.get("data")
+    if not raw:
+        return None, None, None
+
+    # Log the structure once per sport so we can confirm the actual format
+    _log_odds_structure(raw, sport)
+
+    # --- Shape 3/4: top-level dict with numeric or named keys ---
+    if isinstance(raw, dict):
+        return _extract_from_dict(raw)
+
+    # --- Shape 1/2/5: list of bookmaker objects ---
+    if isinstance(raw, list):
+        # Prefer pinnacle/bet365/betfair first; fall back to first bookmaker
+        sorted_bms = _sort_bookmakers(raw)
+        for bm in sorted_bms:
+            if isinstance(bm, dict):
+                result = _extract_from_bookmaker(bm)
+                if result[0] is not None:
+                    return result
+
+    return None, None, None
+
+
+# ── Shape-specific parsers ────────────────────────────────────────────────────
+
+_SHARP_BOOKS = {"pinnacle", "betfair", "draftkings", "fanduel", "bet365", "betway"}
+
+
+def _sort_bookmakers(bms: list) -> list:
+    """Sort bookmakers: sharp books first, rest unchanged."""
+    def _rank(bm: dict) -> int:
+        name = str(bm.get("bookmaker") or bm.get("name") or "").lower()
+        return 0 if any(s in name for s in _SHARP_BOOKS) else 1
+    return sorted(bms, key=_rank)
+
+
+def _extract_from_dict(d: dict) -> tuple[float | None, float | None, float | None]:
+    """Parse a flat dict like {"1": 1.8, "X": 3.5, "2": 4.2} or {"home": 1.8, ...}."""
+    def _f(v: Any) -> float | None:
+        try:
+            f = float(v)
+            return f if f > 1.0 else None
+        except (TypeError, ValueError):
+            return None
+
+    home = _f(d.get("home") or d.get("1") or d.get("homeWin") or d.get("home_win"))
+    draw = _f(d.get("draw") or d.get("X") or d.get("x") or d.get("tie"))
+    away = _f(d.get("away") or d.get("2") or d.get("awayWin") or d.get("away_win"))
+    return home, draw, away
+
+
+def _extract_from_bookmaker(bm: dict) -> tuple[float | None, float | None, float | None]:
+    """Parse a single bookmaker object. Tries outcomes dict, outcomes list, and flat keys."""
+    outcomes = bm.get("outcomes") or bm.get("markets")
+
+    # Shape 1: outcomes is a dict {"home": 1.8, "draw": 3.5, "away": 4.2}
+    if isinstance(outcomes, dict):
+        return _extract_from_dict(outcomes)
+
+    # Shape 2: outcomes is a list [{"name": "home", "odd": 1.8}, ...]
+    if isinstance(outcomes, list):
+        # Could also be [{"name": "Match Winner", "outcomes": [...]}] (nested markets)
+        if outcomes and isinstance(outcomes[0], dict):
+            if "outcomes" in outcomes[0] or "odd" not in outcomes[0]:
+                # Nested markets — find "Match Winner" / "1x2" / "moneyline"
+                for mkt in outcomes:
+                    mkt_name = str(mkt.get("name") or mkt.get("key") or "").lower()
+                    if any(k in mkt_name for k in ("match winner", "1x2", "moneyline", "winner", "result")):
+                        inner = mkt.get("outcomes") or []
+                        return _parse_outcome_list(inner)
+                # Fallback: try first market
+                if outcomes:
+                    inner = outcomes[0].get("outcomes") or []
+                    return _parse_outcome_list(inner)
+            else:
+                return _parse_outcome_list(outcomes)
+
+    # Shape 5: bookmaker is itself a flat dict {"1": 1.8, "X": 3.5, "2": 4.2}
+    return _extract_from_dict(bm)
+
+
+def _parse_outcome_list(lst: list) -> tuple[float | None, float | None, float | None]:
+    """Parse [{"name": "home", "odd": 1.8}, {"name": "draw", "odd": 3.5}, ...]."""
+    home = draw = away = None
+    for o in lst:
+        if not isinstance(o, dict):
+            continue
+        name = str(o.get("name") or o.get("label") or "").lower()
+        val = o.get("odd") or o.get("price") or o.get("odds") or o.get("value")
+        try:
+            f = float(val) if val is not None else None
+            if f and f > 1.0:
+                if name in ("home", "1", "home win", "home_win"):
+                    home = f
+                elif name in ("draw", "x", "tie"):
+                    draw = f
+                elif name in ("away", "2", "away win", "away_win"):
+                    away = f
+        except (TypeError, ValueError):
+            pass
+    return home, draw, away
+
+
+# ── Debug logger (fires once per structure shape per sport) ───────────────────
+
+_logged_shapes: set[str] = set()
+
+
+def _log_odds_structure(raw: Any, sport: str) -> None:
+    key = f"{sport}:{type(raw).__name__}"
+    if key in _logged_shapes:
+        return
+    _logged_shapes.add(key)
+    import json
+    try:
+        sample = raw if not isinstance(raw, list) else raw[:1]
+        log.info("[highlightly:odds] %s raw structure sample: %s", sport, json.dumps(sample, default=str)[:500])
+    except Exception:
+        log.info("[highlightly:odds] %s raw structure: %s", sport, type(raw))

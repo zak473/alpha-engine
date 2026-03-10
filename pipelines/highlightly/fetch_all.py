@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from config.settings import settings
-from pipelines.highlightly.client import get_matches
+from pipelines.highlightly.client import extract_odds, get_matches, get_odds
 from pipelines.soccer.ingest_matches import ingest_from_dicts
 
 log = logging.getLogger(__name__)
@@ -87,6 +87,10 @@ def _derive_outcome(home_score: str, away_score: str, sport: str) -> str:
 
 # ── Transform functions ─────────────────────────────────────────────────────────
 
+# Sports where a draw is a valid outcome
+_DRAW_SPORTS = {"soccer"}
+
+
 def _transform(match: dict[str, Any], sport: str) -> dict[str, Any] | None:
     home = (match.get("homeTeam") or {})
     away = (match.get("awayTeam") or {})
@@ -119,6 +123,12 @@ def _transform(match: dict[str, Any], sport: str) -> dict[str, Any] | None:
     sport_slug = home_name.lower().replace(" ", "-").replace(".", "")
     away_slug = away_name.lower().replace(" ", "-").replace(".", "")
 
+    # Extract odds that may be embedded directly in the match response
+    odds_home, odds_draw, odds_away = extract_odds(match, sport)
+    # For non-draw sports, clear the draw odds even if API returned something
+    if sport not in _DRAW_SPORTS:
+        odds_draw = None
+
     return {
         "sport":                  sport,
         "provider_id":            f"hl-{sport}-{match_id}",
@@ -135,7 +145,36 @@ def _transform(match: dict[str, Any], sport: str) -> dict[str, Any] | None:
         "outcome":                outcome,
         "season":                 season,
         "venue":                  "",
+        "odds_home":              odds_home,
+        "odds_draw":              odds_draw,
+        "odds_away":              odds_away,
     }
+
+
+def _fetch_and_attach_odds(matches: list[dict], sport: str) -> None:
+    """
+    For matches without inline odds, attempt a separate /odds?matchId={id} call.
+    Mutates the match dicts in-place by setting an 'odds' key.
+    Only called for upcoming/live matches (not finished — odds irrelevant post-match).
+    """
+    for match in matches:
+        # Skip if odds already embedded
+        if match.get("odds"):
+            continue
+        status_desc = (match.get("state") or {}).get("description") or ""
+        if _map_status(status_desc) == "finished":
+            continue
+        match_id = match.get("id")
+        if not match_id:
+            continue
+        try:
+            odds_data = get_odds(sport, match_id)
+            # Attach under the "odds" key so extract_odds() picks it up
+            if odds_data:
+                match["odds"] = odds_data.get("data") or odds_data
+            time.sleep(0.05)
+        except Exception as exc:
+            log.debug("[highlightly:odds] fetch failed for match %s (%s): %s", match_id, sport, exc)
 
 
 # ── Main fetch ─────────────────────────────────────────────────────────────────
@@ -156,6 +195,8 @@ def fetch_today(dry_run: bool = False) -> int:
         for date in dates:
             try:
                 matches = get_matches(sport, date)
+                # Attempt to attach odds via separate API call for any match missing them
+                _fetch_and_attach_odds(matches, sport)
                 rows = [r for m in matches if (r := _transform(m, sport))]
                 all_rows.extend(rows)
                 time.sleep(0.1)
@@ -186,6 +227,8 @@ def fetch_all(dry_run: bool = False, days_back: int = 2, days_ahead: int = 7) ->
             try:
                 log.info("[highlightly] Fetching %s matches for %s ...", sport, date)
                 matches = get_matches(sport, date)
+                # Attempt to attach odds via separate API call for any match missing them
+                _fetch_and_attach_odds(matches, sport)
                 rows = [r for m in matches if (r := _transform(m, sport))]
                 log.info("[highlightly]   → %d rows for %s %s", len(rows), sport, date)
                 all_rows.extend(rows)
