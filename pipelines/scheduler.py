@@ -535,7 +535,7 @@ def start() -> BackgroundScheduler:
         log.warning("[scheduler] Already running — skipping start().")
         return _scheduler
 
-    from datetime import datetime as _dt, timezone as _tz
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _timedelta
     from apscheduler.executors.pool import ThreadPoolExecutor as APThreadPoolExecutor
     _scheduler = BackgroundScheduler(
         executors={"default": APThreadPoolExecutor(max_workers=20)},
@@ -652,44 +652,44 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
-    # Highlightly live score poll every 2 minutes (run immediately on startup)
+    # Highlightly live score poll every 2 minutes (delayed 5 min on startup to avoid quota burn)
     _scheduler.add_job(
         _job_highlightly_live,
         trigger=IntervalTrigger(minutes=2),
         id="highlightly_live",
         name="Highlightly live score poll (2m)",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=5),
     )
 
-    # Highlightly full fixture sync every 15 minutes (run immediately on startup)
+    # Highlightly full fixture sync every 15 minutes (delayed 5 min on startup)
     _scheduler.add_job(
         _job_fetch_highlightly,
         trigger=IntervalTrigger(minutes=15),
         id="fetch_highlightly",
         name="Highlightly full sync (logos, lineups, stats, events, highlights)",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=5),
     )
 
-    # Standings sync every 6 hours (run immediately on startup)
+    # Standings sync every 6 hours (delayed 10 min on startup)
     _scheduler.add_job(
         _job_sync_standings,
         trigger=IntervalTrigger(hours=6),
         id="sync_standings",
         name="Highlightly league standings sync",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=10),
     )
 
-    # Highlightly historical sync once daily at 4:00 AM UTC — 90 days of results for form data
+    # Highlightly historical sync once daily at 4:00 AM UTC
     _scheduler.add_job(
         _job_fetch_highlightly_historical,
         trigger=CronTrigger(hour=4, minute=0, timezone="UTC"),
         id="highlightly_historical",
         name="Highlightly 90-day historical sync (form data)",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc),  # run immediately on startup to populate form data
+        # No immediate run — let the key settle; runs tonight at 4 AM UTC
     )
 
     _scheduler.start()
