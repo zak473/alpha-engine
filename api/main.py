@@ -338,6 +338,21 @@ def trigger_odds_sync(db: Session = Depends(get_db)):
         return {"status": "error", "detail": str(exc)}
 
 
+@app.get("/api/v1/admin/test-highlightly", tags=["Health"])
+def test_highlightly_connection():
+    """
+    Test the Highlightly API key. Returns connection status without touching the DB.
+    Call this first after changing the HIGHLIGHTLY_API_KEY env var.
+    """
+    try:
+        from pipelines.highlightly.client import test_connection
+        result = test_connection()
+        return {"status": "ok", **result}
+    except Exception as exc:
+        logger.error("[highlightly test] %s", exc)
+        return {"status": "error", "detail": str(exc)}
+
+
 @app.post("/api/v1/admin/sync-highlightly", tags=["Health"])
 def trigger_highlightly_sync(days_back: int = 90, db: Session = Depends(get_db)):
     """Manually trigger a Highlightly full sync and return row count."""

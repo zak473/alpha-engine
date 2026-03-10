@@ -1,4 +1,9 @@
-"""Highlightly sports data API client."""
+"""Highlightly sports data API client.
+
+Auth: Direct API keys from https://highlightly.net/dashboard use the
+`x-api-key` header. Do NOT use x-rapidapi-key — that is only for the
+RapidAPI marketplace variant and will return 401 for dashboard keys.
+"""
 from __future__ import annotations
 import logging
 from typing import Any
@@ -15,20 +20,52 @@ SPORT_HOSTS: dict[str, str] = {
 }
 
 
+def _headers() -> dict[str, str]:
+    """Return auth headers for the Highlightly direct API."""
+    return {
+        "x-api-key": settings.HIGHLIGHTLY_API_KEY,
+        "Accept": "application/json",
+    }
+
+
 def get(sport: str, endpoint: str, params: dict | None = None, timeout: int = 15) -> dict[str, Any]:
     """Make a GET request to the Highlightly API for the given sport."""
+    if not settings.HIGHLIGHTLY_API_KEY:
+        raise RuntimeError("HIGHLIGHTLY_API_KEY is not set")
     host = SPORT_HOSTS[sport]
-    resp = httpx.get(
-        f"https://{host}/{endpoint}",
-        params=params or {},
-        headers={
-            "x-rapidapi-key": settings.HIGHLIGHTLY_API_KEY,
-            "x-rapidapi-host": host,
-        },
-        timeout=timeout,
-    )
+    url = f"https://{host}/{endpoint}"
+    resp = httpx.get(url, params=params or {}, headers=_headers(), timeout=timeout)
+    if resp.status_code == 401:
+        raise RuntimeError(
+            f"Highlightly 401 Unauthorized — check HIGHLIGHTLY_API_KEY is correct "
+            f"and was obtained from highlightly.net/dashboard (not RapidAPI). "
+            f"URL: {url}"
+        )
+    if resp.status_code == 403:
+        raise RuntimeError(
+            f"Highlightly 403 Forbidden — your plan may not include this endpoint. "
+            f"URL: {url}"
+        )
+    if resp.status_code == 429:
+        raise RuntimeError(
+            f"Highlightly 429 Too Many Requests — rate limit hit. URL: {url}"
+        )
     resp.raise_for_status()
     return resp.json()
+
+
+def test_connection() -> dict[str, Any]:
+    """
+    Verify the API key works. Fetches one soccer match for today.
+    Returns {"ok": True, "sport": "soccer", "sample_count": N} or raises.
+    """
+    from datetime import date
+    today = date.today().isoformat()
+    data = get("soccer", "matches", {"date": today, "limit": 1})
+    count = len(data.get("data", []))
+    total = data.get("pagination", {}).get("totalCount", 0)
+    log.info("[highlightly:test] Connection OK — soccer matches today: %d total", total)
+    return {"ok": True, "sport": "soccer", "sample_count": count, "total_today": total}
 
 
 def get_matches(sport: str, date: str, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
@@ -67,7 +104,7 @@ def get_extras(sport: str, match_id: str | int) -> dict[str, Any]:
             if payload:
                 extras[endpoint] = payload
         except Exception as exc:
-            log.debug("[highlightly:extras] %s %s/%s failed: %s", sport, endpoint, match_id, exc)
+            log.warning("[highlightly:extras] %s %s/%s failed: %s", sport, endpoint, match_id, exc)
     return extras
 
 
@@ -81,7 +118,7 @@ def get_highlights(sport: str, match_id: str | int) -> list[dict[str, Any]]:
         if isinstance(payload, dict):
             return payload.get("highlights") or payload.get("clips") or []
     except Exception as exc:
-        log.debug("[highlightly:highlights] %s match %s failed: %s", sport, match_id, exc)
+        log.warning("[highlightly:highlights] %s match %s failed: %s", sport, match_id, exc)
     return []
 
 
@@ -114,7 +151,7 @@ def get_standings(sport: str, league_id: str | int, season: str | None = None) -
         if isinstance(payload, dict):
             return payload.get("standings") or []
     except Exception as exc:
-        log.debug("[highlightly:standings] %s league %s failed: %s", sport, league_id, exc)
+        log.warning("[highlightly:standings] %s league %s failed: %s", sport, league_id, exc)
     return []
 
 
@@ -128,7 +165,7 @@ def get_leagues(sport: str) -> list[dict[str, Any]]:
         if isinstance(payload, dict):
             return payload.get("leagues") or []
     except Exception as exc:
-        log.debug("[highlightly:leagues] %s failed: %s", sport, exc)
+        log.warning("[highlightly:leagues] %s failed: %s", sport, exc)
     return []
 
 
@@ -142,7 +179,7 @@ def get_countries(sport: str) -> list[dict[str, Any]]:
         if isinstance(payload, dict):
             return payload.get("countries") or []
     except Exception as exc:
-        log.debug("[highlightly:countries] %s failed: %s", sport, exc)
+        log.warning("[highlightly:countries] %s failed: %s", sport, exc)
     return []
 
 
