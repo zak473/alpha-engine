@@ -398,6 +398,8 @@ class BaseballMatchService(BaseMatchListService):
                 confidence=None,
                 home_starter=None,
                 away_starter=None,
+                odds_home=m.odds_home,
+                odds_away=m.odds_away,
             ))
         return BaseballMatchListResponse(items=items, total=total)
 

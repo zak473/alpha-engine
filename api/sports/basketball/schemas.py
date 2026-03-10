@@ -328,6 +328,8 @@ class BasketballMatchListItem(BaseModel):
     confidence: Optional[int] = None
     home_back_to_back: Optional[bool] = None
     away_back_to_back: Optional[bool] = None
+    odds_home: Optional[float] = None
+    odds_away: Optional[float] = None
     game_type: str = "basketball"
 
 

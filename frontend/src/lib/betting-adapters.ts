@@ -52,11 +52,13 @@ function calcEdge(modelProb: number, bookOdds: number): number {
 
 function soccerMarkets(
   pHome: number, pDraw: number, pAway: number,
-  homeName: string, awayName: string
+  homeName: string, awayName: string,
+  realOddsHome?: number | null, realOddsDraw?: number | null, realOddsAway?: number | null,
 ): Market[] {
-  const hOdds = probToOdds(pHome);
-  const dOdds = probToOdds(pDraw);
-  const aOdds = probToOdds(pAway);
+  const useReal = realOddsHome != null && realOddsHome > 1.0 && realOddsAway != null && realOddsAway > 1.0;
+  const hOdds = useReal ? realOddsHome! : probToOdds(pHome);
+  const dOdds = (useReal && realOddsDraw != null && realOddsDraw > 1.0) ? realOddsDraw : probToOdds(pDraw);
+  const aOdds = useReal ? realOddsAway! : probToOdds(pAway);
   return [
     {
       id: "1x2",
@@ -88,10 +90,12 @@ function soccerMarkets(
 
 function basketballMarkets(
   pHome: number, pAway: number,
-  homeName: string, awayName: string
+  homeName: string, awayName: string,
+  realOddsHome?: number | null, realOddsAway?: number | null,
 ): Market[] {
-  const hOdds = probToOdds(pHome, 0.04);
-  const aOdds = probToOdds(pAway, 0.04);
+  const useReal = realOddsHome != null && realOddsHome > 1.0 && realOddsAway != null && realOddsAway > 1.0;
+  const hOdds = useReal ? realOddsHome! : probToOdds(pHome, 0.04);
+  const aOdds = useReal ? realOddsAway! : probToOdds(pAway, 0.04);
   const spreadFav = pHome > 0.5 ? toShortName(homeName) : toShortName(awayName);
   return [
     {
@@ -123,10 +127,12 @@ function basketballMarkets(
 
 function tennisMarkets(
   pHome: number, pAway: number,
-  homeName: string, awayName: string
+  homeName: string, awayName: string,
+  realOddsHome?: number | null, realOddsAway?: number | null,
 ): Market[] {
-  const hOdds = probToOdds(pHome, 0.04);
-  const aOdds = probToOdds(pAway, 0.04);
+  const useReal = realOddsHome != null && realOddsHome > 1.0 && realOddsAway != null && realOddsAway > 1.0;
+  const hOdds = useReal ? realOddsHome! : probToOdds(pHome, 0.04);
+  const aOdds = useReal ? realOddsAway! : probToOdds(pAway, 0.04);
   return [
     {
       id: "winner",
@@ -149,10 +155,12 @@ function tennisMarkets(
 
 function esportsMarkets(
   pHome: number, pAway: number,
-  homeName: string, awayName: string
+  homeName: string, awayName: string,
+  realOddsHome?: number | null, realOddsAway?: number | null,
 ): Market[] {
-  const hOdds = probToOdds(pHome, 0.05);
-  const aOdds = probToOdds(pAway, 0.05);
+  const useReal = realOddsHome != null && realOddsHome > 1.0 && realOddsAway != null && realOddsAway > 1.0;
+  const hOdds = useReal ? realOddsHome! : probToOdds(pHome, 0.05);
+  const aOdds = useReal ? realOddsAway! : probToOdds(pAway, 0.05);
   return [
     {
       id: "winner",
@@ -175,10 +183,12 @@ function esportsMarkets(
 
 function baseballMarkets(
   pHome: number, pAway: number,
-  homeName: string, awayName: string
+  homeName: string, awayName: string,
+  realOddsHome?: number | null, realOddsAway?: number | null,
 ): Market[] {
-  const hOdds = probToOdds(pHome, 0.04);
-  const aOdds = probToOdds(pAway, 0.04);
+  const useReal = realOddsHome != null && realOddsHome > 1.0 && realOddsAway != null && realOddsAway > 1.0;
+  const hOdds = useReal ? realOddsHome! : probToOdds(pHome, 0.04);
+  const aOdds = useReal ? realOddsAway! : probToOdds(pAway, 0.04);
   return [
     {
       id: "ml",
@@ -218,22 +228,22 @@ export function adaptToMatchCard(item: SportMatchListItem, sport: SportSlug): Be
   let featuredMarkets: Market[] = [];
   switch (sport) {
     case "soccer":
-      featuredMarkets = soccerMarkets(pHome, pDraw, pAway, item.home_name, item.away_name);
+      featuredMarkets = soccerMarkets(pHome, pDraw, pAway, item.home_name, item.away_name, item.odds_home, item.odds_draw, item.odds_away);
       break;
     case "basketball":
-      featuredMarkets = basketballMarkets(pHome, pAway, item.home_name, item.away_name);
+      featuredMarkets = basketballMarkets(pHome, pAway, item.home_name, item.away_name, item.odds_home, item.odds_away);
       break;
     case "tennis":
-      featuredMarkets = tennisMarkets(pHome, pAway, item.home_name, item.away_name);
+      featuredMarkets = tennisMarkets(pHome, pAway, item.home_name, item.away_name, item.odds_home, item.odds_away);
       break;
     case "esports":
-      featuredMarkets = esportsMarkets(pHome, pAway, item.home_name, item.away_name);
+      featuredMarkets = esportsMarkets(pHome, pAway, item.home_name, item.away_name, item.odds_home, item.odds_away);
       break;
     case "baseball":
-      featuredMarkets = baseballMarkets(pHome, pAway, item.home_name, item.away_name);
+      featuredMarkets = baseballMarkets(pHome, pAway, item.home_name, item.away_name, item.odds_home, item.odds_away);
       break;
     case "hockey":
-      featuredMarkets = basketballMarkets(pHome, pAway, item.home_name, item.away_name);
+      featuredMarkets = basketballMarkets(pHome, pAway, item.home_name, item.away_name, item.odds_home, item.odds_away);
       break;
   }
 

@@ -11,7 +11,7 @@ const SPORTS: SportSlug[] = ["soccer", "basketball", "tennis", "esports", "baseb
 async function getMatches(): Promise<BettingMatch[]> {
   const results = await Promise.allSettled(
     SPORTS.map((sport) =>
-      getSportMatches(sport, { limit: 50 })
+      getSportMatches(sport, { limit: 100 })
         .then((res) => res.items.map((item) => adaptToMatchCard(item, sport)))
     )
   );

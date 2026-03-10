@@ -95,6 +95,8 @@ class HockeyMatchListItem(BaseModel):
     p_home: Optional[float] = None
     p_away: Optional[float] = None
     confidence: Optional[int] = None
+    odds_home: Optional[float] = None
+    odds_away: Optional[float] = None
     game_type: str = "hockey"
 
 

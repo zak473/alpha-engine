@@ -272,6 +272,9 @@ class SoccerMatchListItem(BaseModel):
     p_home: Optional[float] = None
     p_draw: Optional[float] = None
     p_away: Optional[float] = None
+    odds_home: Optional[float] = None
+    odds_away: Optional[float] = None
+    odds_draw: Optional[float] = None
 
 
 class SoccerMatchListResponse(BaseModel):

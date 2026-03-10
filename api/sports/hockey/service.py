@@ -193,6 +193,8 @@ class HockeyMatchService(BaseMatchListService):
                 p_home=round(p_home, 3) if p_home else None,
                 p_away=round(p_away, 3) if p_away else None,
                 confidence=confidence,
+                odds_home=m.odds_home,
+                odds_away=m.odds_away,
             ))
 
         return HockeyMatchListResponse(items=items, total=total)

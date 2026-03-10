@@ -226,6 +226,8 @@ class EsportsMatchService(BaseMatchListService):
                 p_home=p_home,
                 p_away=p_away,
                 confidence=52 + (seed % 28),
+                odds_home=m.odds_home,
+                odds_away=m.odds_away,
             ))
         return EsportsMatchListResponse(items=items, total=total)
 

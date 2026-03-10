@@ -476,6 +476,8 @@ class BasketballMatchService(BaseMatchListService):
                 confidence=None,
                 home_back_to_back=False,
                 away_back_to_back=False,
+                odds_home=m.odds_home,
+                odds_away=m.odds_away,
             ))
         return BasketballMatchListResponse(items=items, total=total)
 

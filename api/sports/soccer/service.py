@@ -381,6 +381,9 @@ class SoccerMatchService(BaseMatchListService):
                 p_home=round(pred.p_home, 4) if pred else None,
                 p_draw=round(pred.p_draw, 4) if pred else None,
                 p_away=round(pred.p_away, 4) if pred else None,
+                odds_home=m.odds_home,
+                odds_away=m.odds_away,
+                odds_draw=m.odds_draw,
             ))
 
         return SoccerMatchListResponse(items=items, total=total)

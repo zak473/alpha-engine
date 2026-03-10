@@ -319,6 +319,9 @@ export interface SportMatchListItem {
   confidence: number | null;
   live_clock?: string | null;
   current_period?: number | null;
+  odds_home?: number | null;
+  odds_away?: number | null;
+  odds_draw?: number | null;
 }
 
 export interface SportMatchDetail {
