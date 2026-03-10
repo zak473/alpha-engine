@@ -130,10 +130,15 @@ function ScoreBlock({ match }: { match: BettingMatch }) {
 }
 
 function ModelBar({ match }: { match: BettingMatch }) {
-  const p = match.pHome ?? 0.5;
-  const pct = Math.round(p * 100);
+  // Only render when we have a real model prediction
+  if (match.pHome == null) {
+    return (
+      <div className="text-[11px] text-text-muted italic">No model prediction yet</div>
+    );
+  }
+  const pct = Math.round(match.pHome * 100);
   const edge = match.edgePercent ?? 0;
-  const confidence = Math.round((match.modelConfidence ?? 0.5) * 100);
+  const confidence = match.modelConfidence != null ? Math.round(match.modelConfidence * 100) : null;
 
   return (
     <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
@@ -146,14 +151,16 @@ function ModelBar({ match }: { match: BettingMatch }) {
           <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "var(--accent)" }} />
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-[11px]">
-        <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-text-muted" style={{ borderColor: "var(--border0)", background: "#fff" }}>
-          <Shield size={12} /> {confidence}% confidence
-        </span>
-        <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-semibold" style={{ borderColor: edge >= 3 ? "rgba(34,197,94,0.2)" : "rgba(245,158,11,0.2)", background: edge >= 3 ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.10)", color: edge >= 3 ? "var(--positive)" : "var(--warning)" }}>
-          <TrendingUp size={12} /> {edge > 0 ? "+" : ""}{edge.toFixed(1)}% edge
-        </span>
-      </div>
+      {confidence != null && (
+        <div className="flex flex-wrap items-center gap-2 text-[11px]">
+          <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-text-muted" style={{ borderColor: "var(--border0)", background: "#fff" }}>
+            <Shield size={12} /> {confidence}% confidence
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-semibold" style={{ borderColor: edge >= 3 ? "rgba(34,197,94,0.2)" : "rgba(245,158,11,0.2)", background: edge >= 3 ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.10)", color: edge >= 3 ? "var(--positive)" : "var(--warning)" }}>
+            <TrendingUp size={12} /> {edge > 0 ? "+" : ""}{edge.toFixed(1)}% edge
+          </span>
+        </div>
+      )}
     </div>
   );
 }
