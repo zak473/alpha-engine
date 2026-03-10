@@ -513,6 +513,7 @@ def start() -> BackgroundScheduler:
         log.warning("[scheduler] Already running — skipping start().")
         return _scheduler
 
+    from datetime import datetime as _dt, timezone as _tz
     from apscheduler.executors.pool import ThreadPoolExecutor as APThreadPoolExecutor
     _scheduler = BackgroundScheduler(
         executors={"default": APThreadPoolExecutor(max_workers=20)},
@@ -630,7 +631,6 @@ def start() -> BackgroundScheduler:
     )
 
     # Highlightly live score poll every 30 seconds (run immediately on startup)
-    from datetime import datetime as _dt, timezone as _tz
     _scheduler.add_job(
         _job_highlightly_live,
         trigger=IntervalTrigger(seconds=30),

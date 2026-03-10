@@ -34,55 +34,91 @@ BASE_URL = "https://api.the-odds-api.com/v4"
 
 # The Odds API sport keys → our sport slugs
 SPORT_MAP: dict[str, str] = {
-    # Soccer
-    "soccer_epl":                    "soccer",
-    "soccer_spain_la_liga":          "soccer",
-    "soccer_germany_bundesliga":     "soccer",
-    "soccer_italy_serie_a":          "soccer",
-    "soccer_france_ligue_one":       "soccer",
-    "soccer_uefa_champs_league":     "soccer",
-    "soccer_uefa_europa_league":     "soccer",
-    "soccer_uefa_conference_league": "soccer",
-    "soccer_netherlands_eredivisie": "soccer",
-    "soccer_portugal_primeira_liga": "soccer",
-    "soccer_turkey_super_league":    "soccer",
+    # Soccer — Top 5 + Europe
+    "soccer_epl":                         "soccer",
+    "soccer_spain_la_liga":               "soccer",
+    "soccer_germany_bundesliga":          "soccer",
+    "soccer_italy_serie_a":               "soccer",
+    "soccer_france_ligue_one":            "soccer",
+    "soccer_uefa_champs_league":          "soccer",
+    "soccer_uefa_europa_league":          "soccer",
+    "soccer_uefa_conference_league":      "soccer",
+    "soccer_netherlands_eredivisie":      "soccer",
+    "soccer_portugal_primeira_liga":      "soccer",
+    "soccer_turkey_super_league":         "soccer",
+    "soccer_belgium_first_div":           "soccer",
+    "soccer_scotland_premiership":        "soccer",
+    "soccer_russia_premier_league":       "soccer",
+    "soccer_austria_bundesliga":          "soccer",
+    "soccer_switzerland_superleague":     "soccer",
+    "soccer_greece_super_league":         "soccer",
+    # Soccer — England lower tiers
+    "soccer_efl_champ":                   "soccer",
+    "soccer_england_league1":             "soccer",
+    "soccer_england_league2":             "soccer",
+    "soccer_fa_cup":                      "soccer",
+    "soccer_league_cup":                  "soccer",
+    # Soccer — Americas
+    "soccer_brazil_campeonato":           "soccer",
+    "soccer_argentina_primera_division":  "soccer",
+    "soccer_mexico_ligamx":               "soccer",
+    "soccer_colombia_primera_a":          "soccer",
+    "soccer_chile_primera_division":      "soccer",
+    "soccer_conmebol_copa_libertadores":  "soccer",
+    # Soccer — Asia / Other
+    "soccer_australia_aleague":           "soccer",
+    "soccer_japan_j_league":              "soccer",
+    "soccer_usa_mls":                     "soccer",
     # Basketball
-    "basketball_nba":                "basketball",
-    "basketball_euroleague":         "basketball",
-    "basketball_nbl":                "basketball",
+    "basketball_nba":                     "basketball",
+    "basketball_euroleague":              "basketball",
+    "basketball_nbl":                     "basketball",
+    "basketball_ncaab":                   "basketball",
     # Baseball
-    "baseball_mlb":                  "baseball",
+    "baseball_mlb":                       "baseball",
+    "baseball_mlb_preseason":             "baseball",
+    "baseball_ncaa":                      "baseball",
+    # Hockey
+    "icehockey_nhl":                      "hockey",
+    "icehockey_ahl":                      "hockey",
+    "icehockey_sweden_hockey_league":     "hockey",
+    "icehockey_sweden_allsvenskan":       "hockey",
+    "icehockey_liiga":                    "hockey",
+    "icehockey_mestis":                   "hockey",
+    "icehockey_czech_extraliga":          "hockey",
+    "icehockey_slovakia_extraliga":       "hockey",
+    "icehockey_kdhl":                     "hockey",
     # Tennis — Grand Slams
-    "tennis_atp_aus_open":           "tennis",
-    "tennis_wta_aus_open":           "tennis",
-    "tennis_atp_french_open":        "tennis",
-    "tennis_wta_french_open":        "tennis",
-    "tennis_atp_wimbledon":          "tennis",
-    "tennis_wta_wimbledon":          "tennis",
-    "tennis_atp_us_open":            "tennis",
-    "tennis_wta_us_open":            "tennis",
+    "tennis_atp_aus_open":                "tennis",
+    "tennis_wta_aus_open":                "tennis",
+    "tennis_atp_french_open":             "tennis",
+    "tennis_wta_french_open":             "tennis",
+    "tennis_atp_wimbledon":               "tennis",
+    "tennis_wta_wimbledon":               "tennis",
+    "tennis_atp_us_open":                 "tennis",
+    "tennis_wta_us_open":                 "tennis",
     # Tennis — Masters / WTA 1000
-    "tennis_atp_miami_open":         "tennis",
-    "tennis_wta_miami_open":         "tennis",
-    "tennis_atp_madrid_open":        "tennis",
-    "tennis_wta_madrid_open":        "tennis",
-    "tennis_atp_rome":               "tennis",
-    "tennis_wta_rome":               "tennis",
-    "tennis_atp_monte_carlo":        "tennis",
-    "tennis_atp_canadian_open":      "tennis",
-    "tennis_wta_canadian_open":      "tennis",
-    "tennis_atp_cincinnati":         "tennis",
-    "tennis_wta_cincinnati":         "tennis",
-    "tennis_atp_paris":              "tennis",
-    "tennis_atp_vienna":             "tennis",
-    "tennis_atp_basel":              "tennis",
-    "tennis_atp_stockholm":          "tennis",
+    "tennis_atp_miami_open":              "tennis",
+    "tennis_wta_miami_open":              "tennis",
+    "tennis_atp_madrid_open":             "tennis",
+    "tennis_wta_madrid_open":             "tennis",
+    "tennis_atp_rome":                    "tennis",
+    "tennis_wta_rome":                    "tennis",
+    "tennis_atp_monte_carlo":             "tennis",
+    "tennis_atp_canadian_open":           "tennis",
+    "tennis_wta_canadian_open":           "tennis",
+    "tennis_atp_cincinnati":              "tennis",
+    "tennis_wta_cincinnati":              "tennis",
+    "tennis_atp_paris":                   "tennis",
+    "tennis_atp_vienna":                  "tennis",
+    "tennis_atp_basel":                   "tennis",
+    "tennis_atp_stockholm":               "tennis",
     # Esports
-    "esports_lol":                   "esports",
-    "esports_csgo":                  "esports",
-    "esports_dota2":                 "esports",
-    "esports_valorant":              "esports",
-    "esports_r6":                    "esports",
+    "esports_lol":                        "esports",
+    "esports_csgo":                       "esports",
+    "esports_dota2":                      "esports",
+    "esports_valorant":                   "esports",
+    "esports_r6":                         "esports",
 }
 
 # Preferred bookmakers for sharpest lines (in priority order)
@@ -106,15 +142,29 @@ def _get(path: str, params: dict | None = None) -> Any:
 
 # ── Match fuzzy-linking ────────────────────────────────────────────────────────
 
+# Common suffixes/prefixes that differ between data sources
+_STRIP = {"fc", "cf", "ac", "sc", "sk", "bk", "fk", "if", "ik", "bv", "sv", "vv", "rv",
+          "afc", "fbc", "utd", "united", "city", "town", "club", "sporting", "athletic",
+          "atletico", "athletico", "deportivo", "real", "cd", "ud", "sd", "ca", "as", "us"}
+
+
 def _norm(name: str) -> str:
-    """Normalise team name for fuzzy matching."""
-    return name.lower().replace("-", " ").replace(".", "").strip()
+    """Normalise team name for fuzzy matching — remove punctuation and common suffixes."""
+    s = name.lower()
+    for ch in ("-", ".", "'", "&"):
+        s = s.replace(ch, " ")
+    # Remove accents roughly
+    for a, b in [("á","a"),("é","e"),("í","i"),("ó","o"),("ú","u"),("ü","u"),("ñ","n"),("ć","c"),("č","c"),("š","s"),("ž","z")]:
+        s = s.replace(a, b)
+    words = [w for w in s.split() if w not in _STRIP]
+    return " ".join(words).strip() or s.strip()
 
 
 def _find_match(db, home: str, away: str, sport: str, kickoff: datetime) -> CoreMatch | None:
-    """Find CoreMatch by team name + sport + kickoff window (±6 hours)."""
-    window_lo = kickoff - timedelta(hours=6)
-    window_hi = kickoff + timedelta(hours=6)
+    """Find CoreMatch by team name + sport + kickoff window (±12 hours)."""
+    from db.models.mvp import CoreTeam
+    window_lo = kickoff - timedelta(hours=12)
+    window_hi = kickoff + timedelta(hours=12)
 
     candidates = (
         db.query(CoreMatch)
@@ -128,18 +178,37 @@ def _find_match(db, home: str, away: str, sport: str, kickoff: datetime) -> Core
     )
 
     nh, na = _norm(home), _norm(away)
+    nh_words = set(nh.split())
+    na_words = set(na.split())
+
+    best: CoreMatch | None = None
+    best_score = 0
+
     for m in candidates:
-        from db.models.mvp import CoreTeam
         ht = db.get(CoreTeam, m.home_team_id)
         at = db.get(CoreTeam, m.away_team_id)
         if not ht or not at:
             continue
-        if _norm(ht.name) == nh and _norm(at.name) == na:
+        dh = _norm(ht.name)
+        da = _norm(at.name)
+
+        # Exact match
+        if dh == nh and da == na:
             return m
-        # Partial match — first word of team name
-        if nh.split()[0] in _norm(ht.name) and na.split()[0] in _norm(at.name):
-            return m
-    return None
+
+        # Word overlap score
+        dh_words = set(dh.split())
+        da_words = set(da.split())
+        h_overlap = len(nh_words & dh_words)
+        a_overlap = len(na_words & da_words)
+        score = h_overlap + a_overlap
+
+        # Both sides must have at least one word match
+        if h_overlap >= 1 and a_overlap >= 1 and score > best_score:
+            best_score = score
+            best = m
+
+    return best
 
 
 # ── Odds extraction ────────────────────────────────────────────────────────────

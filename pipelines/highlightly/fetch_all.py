@@ -136,21 +136,23 @@ SPORTS = ["soccer", "basketball", "baseball", "hockey"]
 
 
 def fetch_today(dry_run: bool = False) -> int:
-    """Fetch only today's matches — used by the 30-second live-score job."""
+    """Fetch today + tomorrow — used by the 30-second live-score job."""
     if not settings.HIGHLIGHTLY_API_KEY:
         return 0
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now = datetime.now(timezone.utc)
+    dates = [now.strftime("%Y-%m-%d"), (now + timedelta(days=1)).strftime("%Y-%m-%d")]
     all_rows: list[dict] = []
 
     for sport in SPORTS:
-        try:
-            matches = get_matches(sport, today)
-            rows = [r for m in matches if (r := _transform(m, sport))]
-            all_rows.extend(rows)
-            time.sleep(0.1)
-        except Exception as exc:
-            log.warning("[highlightly:live] %s failed: %s", sport, exc)
+        for date in dates:
+            try:
+                matches = get_matches(sport, date)
+                rows = [r for m in matches if (r := _transform(m, sport))]
+                all_rows.extend(rows)
+                time.sleep(0.1)
+            except Exception as exc:
+                log.warning("[highlightly:live] %s %s failed: %s", sport, date, exc)
 
     if not all_rows or dry_run:
         return len(all_rows)
@@ -158,14 +160,16 @@ def fetch_today(dry_run: bool = False) -> int:
     return ingest_from_dicts(all_rows)
 
 
-def fetch_all(dry_run: bool = False) -> int:
+def fetch_all(dry_run: bool = False, days_back: int = 2, days_ahead: int = 7) -> int:
     if not settings.HIGHLIGHTLY_API_KEY:
         log.error("[highlightly] HIGHLIGHTLY_API_KEY not set — skipping.")
         return 0
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-    dates = [yesterday, today]
+    now = datetime.now(timezone.utc)
+    dates = [
+        (now + timedelta(days=i)).strftime("%Y-%m-%d")
+        for i in range(-days_back, days_ahead + 1)
+    ]
 
     all_rows: list[dict] = []
 
