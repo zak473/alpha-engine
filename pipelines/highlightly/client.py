@@ -51,9 +51,12 @@ def get(sport: str, endpoint: str, params: dict | None = None, timeout: int = 15
             f"URL: {url}"
         )
     if resp.status_code == 429:
-        raise RuntimeError(
-            f"Highlightly 429 Too Many Requests — rate limit hit. URL: {url}"
-        )
+        # Rate limited — wait and retry once
+        import time
+        retry_after = int(resp.headers.get("retry-after", 60))
+        log.warning("[highlightly] 429 rate limit on %s — retrying after %ds", url, retry_after)
+        time.sleep(retry_after)
+        resp = httpx.get(url, params=params or {}, headers=_headers(), timeout=timeout)
     resp.raise_for_status()
     return resp.json()
 

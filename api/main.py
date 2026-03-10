@@ -341,44 +341,16 @@ def trigger_odds_sync(db: Session = Depends(get_db)):
 @app.get("/api/v1/admin/test-highlightly", tags=["Health"])
 def test_highlightly_connection():
     """
-    Test the Highlightly API key. Tries multiple URL formats to find the right one.
+    Test the Highlightly API key with a single request (avoids burning rate limit quota).
+    429 = key is valid but rate limited. 200 = fully working.
     """
-    import httpx
-    from config.settings import settings
-
-    key = settings.HIGHLIGHTLY_API_KEY
-    masked_key = f"{key[:8]}...{key[-4:]}" if len(key) > 12 else "(not set)"
-
-    results = {}
-
-    # Try every URL + header combination. Per docs, x-rapidapi-key is correct for direct API.
-    candidates = [
-        ("soccer.highlightly.net/matches",                {"date": "2026-03-10", "limit": 1}),
-        ("soccer.highlightly.net/v2/matches",             {"date": "2026-03-10", "limit": 1}),
-        ("api.highlightly.net/matches",                   {"sport": "soccer", "date": "2026-03-10", "limit": 1}),
-        ("football-highlights-api.p.rapidapi.com/matches",{"date": "2026-03-10", "limit": 1}),
-    ]
-
-    working_url = None
-    for host, params in candidates:
-        for header_key in ("x-rapidapi-key", "x-api-key"):
-            headers = {header_key: key, "Accept": "application/json"}
-            if "rapidapi.com" in host:
-                headers["x-rapidapi-host"] = host
-            url = f"https://{host}/matches"
-            try:
-                resp = httpx.get(f"https://{host}/matches", params=params, headers=headers, timeout=8)
-                results[f"{host}__{header_key}"] = resp.status_code
-                if resp.status_code == 200 and not working_url:
-                    working_url = {"url": f"https://{host}/matches", "header": header_key}
-            except Exception as e:
-                results[f"{host}__{header_key}"] = str(e)[:80]
-
-    return {
-        "key_in_railway": masked_key,
-        "working_url": working_url,
-        "all_attempts": results,
-    }
+    try:
+        from pipelines.highlightly.client import test_connection
+        result = test_connection()
+        return {"status": "ok", **result}
+    except Exception as exc:
+        logger.error("[highlightly test] %s", exc)
+        return {"status": "error", "detail": str(exc)}
 
 
 @app.post("/api/v1/admin/sync-highlightly", tags=["Health"])
