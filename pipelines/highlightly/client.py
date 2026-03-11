@@ -1,7 +1,7 @@
 """Highlightly Sport API client.
 
 Base URL: https://sports.highlightly.net
-Auth:     x-api-key: {HIGHLIGHTLY_API_KEY}   (direct API, not RapidAPI)
+Auth:     x-rapidapi-key + x-rapidapi-host: sport-highlights-api.p.rapidapi.com
 
 Endpoint paths follow /{sport}/{resource}, e.g.:
   /football/matches, /hockey/matches, /baseball/matches, /basketball/matches
@@ -34,6 +34,7 @@ log = logging.getLogger(__name__)
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 BASE_URL = "https://sports.highlightly.net"
+RAPIDAPI_HOST = "sport-highlights-api.p.rapidapi.com"
 
 # Internal slug → API path prefix
 SPORT_PREFIX: dict[str, str] = {
@@ -53,8 +54,9 @@ _EXTRAS_SPORT_OVERRIDE: dict[str, str] = {
 
 def _headers() -> dict[str, str]:
     return {
-        "x-api-key": settings.HIGHLIGHTLY_API_KEY,
-        "Accept":    "application/json",
+        "x-rapidapi-key":  settings.HIGHLIGHTLY_API_KEY,
+        "x-rapidapi-host": RAPIDAPI_HOST,
+        "Accept":          "application/json",
     }
 
 
