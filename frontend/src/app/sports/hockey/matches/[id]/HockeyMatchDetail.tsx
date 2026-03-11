@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useLiveRefresh } from "@/lib/hooks/useLiveRefresh";
 import {
   LineChart,
@@ -538,14 +539,12 @@ interface Props {
 }
 
 export function HockeyMatchDetail({ match: initialMatch, eloHomeHistory, eloAwayHistory }: Props) {
-  const { data: match } = useLiveRefresh<TMatch>(
-    initialMatch,
-    `/sports/hockey/matches/${initialMatch.id}`,
-    initialMatch.status === "live" ? 30000 : 0
-  );
-
+  const match = initialMatch;
+  const router = useRouter();
   const isLive = match.status === "live";
   const isFinished = match.status === "finished";
+  const tick = useLiveRefresh(isLive);
+  useEffect(() => { if (tick > 0) router.refresh(); }, [tick, router]);
 
   return (
     <div className="max-w-6xl mx-auto p-4 space-y-4">
