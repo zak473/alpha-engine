@@ -560,24 +560,60 @@ def _h2h_from_hl(hl_matches: list[dict], home_name: str, away_name: str) -> H2HR
 
 
 def _h2h(db: Session, home_id: str, away_id: str, home_name: str = "", away_name: str = "") -> H2HRecordOut:
+    from sqlalchemy import or_, and_
     matches = (
         db.query(CoreMatch)
         .filter(
             CoreMatch.sport == "tennis",
             CoreMatch.status == "finished",
-            (
-                ((CoreMatch.home_team_id == home_id) & (CoreMatch.away_team_id == away_id))
-                | ((CoreMatch.home_team_id == away_id) & (CoreMatch.away_team_id == home_id))
+            or_(
+                and_(CoreMatch.home_team_id == home_id, CoreMatch.away_team_id == away_id),
+                and_(CoreMatch.home_team_id == away_id, CoreMatch.away_team_id == home_id),
             ),
         )
         .order_by(CoreMatch.kickoff_utc.desc())
         .limit(10)
         .all()
     )
+
+    # Fallback: search by name across all player ID schemes (handles fragmentation)
+    if not matches and home_name and away_name:
+        home_lower = f"%{home_name.split()[-1].lower()}%"  # match on last name
+        away_lower = f"%{away_name.split()[-1].lower()}%"
+        home_ids = [
+            t.id for t in db.query(CoreTeam.id)
+            .filter(CoreTeam.sport == "tennis", CoreTeam.name.ilike(home_lower))
+            .all()
+        ]
+        away_ids = [
+            t.id for t in db.query(CoreTeam.id)
+            .filter(CoreTeam.sport == "tennis", CoreTeam.name.ilike(away_lower))
+            .all()
+        ]
+        if home_ids and away_ids:
+            matches = (
+                db.query(CoreMatch)
+                .filter(
+                    CoreMatch.sport == "tennis",
+                    CoreMatch.status == "finished",
+                    or_(
+                        and_(CoreMatch.home_team_id.in_(home_ids), CoreMatch.away_team_id.in_(away_ids)),
+                        and_(CoreMatch.home_team_id.in_(away_ids), CoreMatch.away_team_id.in_(home_ids)),
+                    ),
+                )
+                .order_by(CoreMatch.kickoff_utc.desc())
+                .limit(10)
+                .all()
+            )
     a_wins = b_wins = 0
     recent = []
+    # Resolve home_name player's team IDs across all schemes for outcome mapping
+    home_name_lower = home_name.split()[-1].lower() if home_name else ""
     for m in matches:
-        if m.home_team_id == home_id:
+        home_team = db.get(CoreTeam, m.home_team_id)
+        home_team_name = (home_team.name if home_team else "").lower()
+        a_is_home = home_name_lower and home_name_lower in home_team_name
+        if a_is_home:
             winner = "a" if m.outcome in ("H", "home_win") else "b"
             hs, bs = m.home_score, m.away_score
         else:

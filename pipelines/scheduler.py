@@ -592,13 +592,14 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
-    # Re-score every hour (in case model is retrained mid-day)
+    # Re-score every hour (in case model is retrained mid-day) — run immediately on startup
     _scheduler.add_job(
         _job_predict_only,
         trigger=IntervalTrigger(hours=1),
         id="predict_only",
         name="Re-run prediction pipeline",
         replace_existing=True,
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=20),
     )
 
     # Fetch real market odds + run auto-pick bot every 30 minutes (run immediately on startup)
@@ -629,7 +630,7 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
-    # Incremental ELO update nightly (3 AM UTC)
+    # Incremental ELO update nightly (3 AM UTC) — also runs once on startup
     from apscheduler.triggers.cron import CronTrigger
     _scheduler.add_job(
         _job_update_elo,
@@ -637,15 +638,18 @@ def start() -> BackgroundScheduler:
         id="update_elo",
         name="Incremental ELO ratings update (all sports)",
         replace_existing=True,
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=5),
     )
 
     # Build soccer features daily at 3:30 AM UTC (after ELO update at 3:00)
+    # Also runs after the startup ELO run (ELO at +5m → features at +15m → predict at +20m)
     _scheduler.add_job(
         _job_build_soccer_features,
         trigger=CronTrigger(hour=3, minute=30, timezone="UTC"),
         id="build_soccer_features",
         name="Build feat_soccer_match feature table",
         replace_existing=True,
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=15),
     )
 
     # Tennis player profiles refresh (weekly, Sunday 4 AM UTC)
