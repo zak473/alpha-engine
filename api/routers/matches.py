@@ -30,9 +30,14 @@ class LiveMatchOut(BaseModel):
     away_score: Optional[int]
     kickoff_utc: str
     is_live: bool  # True = currently live; False = next upcoming for that sport
+    live_clock: Optional[str] = None
+    current_period: Optional[int] = None
+    home_logo: Optional[str] = None
+    away_logo: Optional[str] = None
+    league_logo: Optional[str] = None
 
 
-def _build_out(m: CoreMatch, teams: dict, leagues: dict, is_live: bool) -> LiveMatchOut:
+def _build_out(m: CoreMatch, teams: dict, leagues: dict, team_logos: dict, league_logos: dict, is_live: bool) -> LiveMatchOut:
     return LiveMatchOut(
         id=m.id,
         sport=m.sport,
@@ -45,6 +50,11 @@ def _build_out(m: CoreMatch, teams: dict, leagues: dict, is_live: bool) -> LiveM
         away_score=m.away_score,
         kickoff_utc=m.kickoff_utc.isoformat() if m.kickoff_utc else "",
         is_live=is_live,
+        live_clock=m.live_clock if is_live else None,
+        current_period=m.current_period if is_live else None,
+        home_logo=team_logos.get(m.home_team_id),
+        away_logo=team_logos.get(m.away_team_id),
+        league_logo=league_logos.get(m.league_id),
     )
 
 
@@ -90,8 +100,12 @@ def get_live_matches(db: Session = Depends(get_db)):
     team_ids = {m.home_team_id for m in all_matches} | {m.away_team_id for m in all_matches}
     league_ids = {m.league_id for m in all_matches if m.league_id}
 
-    teams = {t.id: t.name for t in db.query(CoreTeam).filter(CoreTeam.id.in_(team_ids)).all()} if team_ids else {}
-    leagues = {lg.id: lg.name for lg in db.query(CoreLeague).filter(CoreLeague.id.in_(league_ids)).all()} if league_ids else {}
+    team_objs = {t.id: t for t in db.query(CoreTeam).filter(CoreTeam.id.in_(team_ids)).all()} if team_ids else {}
+    league_objs = {lg.id: lg for lg in db.query(CoreLeague).filter(CoreLeague.id.in_(league_ids)).all()} if league_ids else {}
+    teams = {tid: t.name for tid, t in team_objs.items()}
+    leagues = {lid: lg.name for lid, lg in league_objs.items()}
+    team_logos = {tid: t.logo_url for tid, t in team_objs.items() if t.logo_url}
+    league_logos = {lid: lg.logo_url for lid, lg in league_objs.items() if lg.logo_url}
 
     result: list[LiveMatchOut] = []
 
@@ -99,10 +113,10 @@ def get_live_matches(db: Session = Depends(get_db)):
     for sport in ALL_SPORTS:
         if sport in live_by_sport:
             for m in live_by_sport[sport]:
-                result.append(_build_out(m, teams, leagues, is_live=True))
+                result.append(_build_out(m, teams, leagues, team_logos, league_logos, is_live=True))
         elif sport in upcoming_by_sport:
             for m in upcoming_by_sport[sport]:
-                result.append(_build_out(m, teams, leagues, is_live=False))
+                result.append(_build_out(m, teams, leagues, team_logos, league_logos, is_live=False))
 
     return result
 

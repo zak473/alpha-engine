@@ -464,6 +464,21 @@ class BasketballMatchService(BaseMatchListService):
         team_map = {t.id: t for t in db.query(CoreTeam).filter(CoreTeam.id.in_(all_team_ids)).all()} if all_team_ids else {}
         league_map = {lg.id: lg for lg in db.query(CoreLeague).filter(CoreLeague.id.in_(all_league_ids)).all()} if all_league_ids else {}
 
+        # Batch-load latest ELO ratings for all teams in one query
+        from sqlalchemy import func as _func
+        elo_subq = (
+            db.query(RatingEloTeam.team_id, _func.max(RatingEloTeam.rated_at).label("max_at"))
+            .filter(RatingEloTeam.team_id.in_(all_team_ids), RatingEloTeam.context == "global")
+            .group_by(RatingEloTeam.team_id)
+            .subquery()
+        )
+        elo_rows = (
+            db.query(RatingEloTeam)
+            .join(elo_subq, (RatingEloTeam.team_id == elo_subq.c.team_id) & (RatingEloTeam.rated_at == elo_subq.c.max_at))
+            .all()
+        )
+        elo_map: dict[str, float] = {r.team_id: r.rating_after for r in elo_rows}
+
         items = []
         for m in rows:
             ht = team_map.get(m.home_team_id)
@@ -471,10 +486,10 @@ class BasketballMatchService(BaseMatchListService):
             lg = league_map.get(m.league_id)
             home_name = ht.name if ht else m.home_team_id
             away_name = at.name if at else m.away_team_id
-            elo_h = _elo_snapshot(db, m.home_team_id, home_name)
-            elo_a = _elo_snapshot(db, m.away_team_id, away_name)
-            r_home = (elo_h.rating if elo_h else 1500.0)
-            r_away = (elo_a.rating if elo_a else 1500.0)
+            r_home = elo_map.get(m.home_team_id, 1500.0)
+            r_away = elo_map.get(m.away_team_id, 1500.0)
+            elo_h = round(r_home, 1) if m.home_team_id in elo_map else None
+            elo_a = round(r_away, 1) if m.away_team_id in elo_map else None
             p_home = _elo_win_prob(r_home, r_away, 35.0)
             items.append(BasketballMatchListItem(
                 id=m.id,
@@ -491,8 +506,8 @@ class BasketballMatchService(BaseMatchListService):
                 outcome=m.outcome,
                 live_clock=m.live_clock if m.status == "live" else None,
                 current_period=m.current_period if m.status == "live" else None,
-                elo_home=elo_h.rating if elo_h else None,
-                elo_away=elo_a.rating if elo_a else None,
+                elo_home=elo_h,
+                elo_away=elo_a,
                 p_home=round(p_home, 3),
                 p_away=round(1.0 - p_home, 3),
                 confidence=None,

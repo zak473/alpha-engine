@@ -692,7 +692,7 @@ def start() -> BackgroundScheduler:
         id="highlightly_live",
         name="Highlightly live scores (2m, scores only)",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=1),
+        next_run_time=_dt.now(_tz.utc),
     )
 
     # Highlightly full sync every 10 minutes — today+tomorrow with live extras + inline odds
@@ -703,17 +703,17 @@ def start() -> BackgroundScheduler:
         id="fetch_highlightly",
         name="Highlightly sync with live extras (10m)",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=3),
+        next_run_time=_dt.now(_tz.utc),
     )
 
-    # Prematch extras (lastfivegames, headtohead, players) every 30 min
+    # Prematch extras (lastfivegames, headtohead, players) every 15 min
     _scheduler.add_job(
         _job_prematch_extras,
-        trigger=IntervalTrigger(minutes=30),
+        trigger=IntervalTrigger(minutes=15),
         id="prematch_extras",
         name="Highlightly prematch extras (lastfivegames/h2h/players)",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=5),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=2),
     )
 
     # Standings sync every 12 hours

@@ -1057,7 +1057,7 @@ function H2HTab({ match }: { match: TMatch }) {
                 <tbody>
                   {h2h.recent_matches.map((m: any, i: number) => (
                     <tr key={i} className="border-b border-surface-border/20 last:border-0">
-                      <td className="py-1 text-text-subtle">{new Date(m.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" })}</td>
+                      <td className="py-1 text-text-subtle">{m.date ? new Date(m.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }) : "—"}</td>
                       <td className="py-1 text-right font-mono text-text-muted">{m.home_score ?? "—"}</td>
                       <td className="py-1 text-center text-text-subtle px-2">–</td>
                       <td className="py-1 font-mono text-text-muted">{m.away_score ?? "—"}</td>

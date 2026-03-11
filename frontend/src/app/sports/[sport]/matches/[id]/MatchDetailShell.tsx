@@ -310,7 +310,7 @@ function H2HTab({ match }: { match: SportMatchDetail }) {
           <div className="flex flex-col gap-2">
             {h2h.recent_matches.map((m, i) => (
               <div key={i} className="flex items-center justify-between text-xs py-1.5 border-b border-surface-border/40 last:border-0">
-                <span className="text-text-subtle">{new Date(m.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" })}</span>
+                <span className="text-text-subtle">{m.date ? new Date(m.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }) : "—"}</span>
                 <span className="text-text-muted font-mono">
                   {m.home_score ?? "—"} – {m.away_score ?? "—"}
                 </span>

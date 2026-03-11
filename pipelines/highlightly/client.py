@@ -1,7 +1,7 @@
 """Highlightly Sport API client.
 
 Base URL: https://sports.highlightly.net
-Auth:     x-rapidapi-key + x-rapidapi-host: sport-highlights-api.p.rapidapi.com
+Auth:     x-api-key: {HIGHLIGHTLY_API_KEY}   (direct API, not RapidAPI)
 
 Endpoint paths follow /{sport}/{resource}, e.g.:
   /football/matches, /hockey/matches, /baseball/matches, /basketball/matches
@@ -34,7 +34,6 @@ log = logging.getLogger(__name__)
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 BASE_URL = "https://sports.highlightly.net"
-RAPIDAPI_HOST = "sport-highlights-api.p.rapidapi.com"
 
 # Internal slug → API path prefix
 SPORT_PREFIX: dict[str, str] = {
@@ -54,9 +53,8 @@ _EXTRAS_SPORT_OVERRIDE: dict[str, str] = {
 
 def _headers() -> dict[str, str]:
     return {
-        "x-rapidapi-key":  settings.HIGHLIGHTLY_API_KEY,
-        "x-rapidapi-host": RAPIDAPI_HOST,
-        "Accept":          "application/json",
+        "x-api-key": settings.HIGHLIGHTLY_API_KEY,
+        "Accept":    "application/json",
     }
 
 
@@ -115,7 +113,7 @@ def get_matches(sport: str, date: str, limit: int = 100, offset: int = 0) -> lis
     all_matches: list[dict] = []
     current_offset = offset
     while True:
-        data = get(f"{prefix}/matches", {"date": date, "limit": limit, "offset": current_offset})
+        data = get(f"{prefix}/matches", {"date": date, "timezone": "UTC", "limit": limit, "offset": current_offset})
         batch = _payload(data)
         if not isinstance(batch, list):
             break

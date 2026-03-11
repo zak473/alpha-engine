@@ -392,9 +392,8 @@ class HockeyMatchService(BaseMatchListService):
                 pass
 
         status_order = case(
-            (CoreMatch.status == "live",      0),
-            (CoreMatch.status == "scheduled", 1),
-            (CoreMatch.status == "finished",  2),
+            {"live": 0, "scheduled": 1, "finished": 2},
+            value=CoreMatch.status,
             else_=3,
         )
         q = q.order_by(status_order, CoreMatch.kickoff_utc.asc())
@@ -457,6 +456,8 @@ class HockeyMatchService(BaseMatchListService):
                 home_score=m.home_score,
                 away_score=m.away_score,
                 outcome=m.outcome,
+                live_clock=m.live_clock if m.status == "live" else None,
+                current_period=m.current_period if m.status == "live" else None,
                 elo_home=round(elo_h, 1) if elo_h else None,
                 elo_away=round(elo_a, 1) if elo_a else None,
                 p_home=round(p_home, 3) if p_home else None,

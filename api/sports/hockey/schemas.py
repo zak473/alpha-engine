@@ -120,6 +120,7 @@ class HockeyMatchListItem(BaseModel):
     away_score: Optional[int] = None
     outcome: Optional[str] = None
     live_clock: Optional[str] = None
+    current_period: Optional[int] = None
     elo_home: Optional[float] = None
     elo_away: Optional[float] = None
     p_home: Optional[float] = None

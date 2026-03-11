@@ -313,11 +313,12 @@ def fetch_today(dry_run: bool = False) -> int:
 
 def fetch_with_extras(dry_run: bool = False) -> int:
     """
-    Fetch today + tomorrow with live extras (lineups, stats, events).
-    Used by the 30-minute job. Only fetches extras for LIVE matches.
+    Fetch today + tomorrow with live extras (lineups, stats, events) and
+    highlights for recently finished matches (capped at 3 per sport).
     Cost: 4 sports × 2 dates = 8 /matches calls
           + ~10 live matches × 3 endpoints = ~30 extras calls
-          Total: ~38 API calls per run × 48 runs/day = ~1,800 calls/day.
+          + ~12 highlights calls (3 per sport × 4 sports)
+          Total: ~50 API calls per run × 48 runs/day = ~2,400 calls/day.
     """
     if not settings.HIGHLIGHTLY_API_KEY:
         return 0
@@ -336,13 +337,12 @@ def fetch_with_extras(dry_run: bool = False) -> int:
             except Exception as exc:
                 log.warning("[highlightly:extras] %s %s failed: %s", sport, date, exc)
 
-        # Fetch separate /odds for upcoming/live matches that don't have inline odds
-        _fetch_and_attach_odds(sport_matches, sport)
-
         sport_rows = [r for m in sport_matches if (r := _transform(m, sport))]
 
         # Enrich live matches with lineups/stats/events
         _enrich_live_rows(sport_rows, sport)
+        # Fetch highlights for recently-finished matches (capped to save quota)
+        _enrich_finished_highlights(sport_rows, sport, max_matches=3)
         all_rows.extend(sport_rows)
 
     if not all_rows or dry_run:
@@ -444,7 +444,7 @@ def fetch_historical(dry_run: bool = False, days_back: int = 730) -> int:
     return ingested
 
 
-def fetch_prematch_extras(dry_run: bool = False, max_matches: int = 8) -> int:
+def fetch_prematch_extras(dry_run: bool = False, max_matches: int = 50) -> int:
     """
     Enrich upcoming matches (next 24h) with lastfivegames, headtohead, and players.
     Reads directly from DB, merges new keys into existing extras_json without wiping
@@ -464,7 +464,7 @@ def fetch_prematch_extras(dry_run: bool = False, max_matches: int = 8) -> int:
     enriched = 0
     try:
         now = datetime.now(timezone.utc)
-        window_end = now + timedelta(hours=24)
+        window_end = now + timedelta(hours=48)
 
         upcoming = (
             db.query(CoreMatch)

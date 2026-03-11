@@ -432,6 +432,11 @@ export interface LiveMatchOut {
   away_score: number | null;
   kickoff_utc: string;
   is_live: boolean;
+  live_clock?: string | null;
+  current_period?: number | null;
+  home_logo?: string | null;
+  away_logo?: string | null;
+  league_logo?: string | null;
 }
 
 export async function getLiveMatches(): Promise<LiveMatchOut[]> {
