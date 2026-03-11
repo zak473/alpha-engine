@@ -28,6 +28,7 @@ import type {
   EsportsMatchDetail,
   BasketballMatchDetail,
   BaseballMatchDetail,
+  HockeyMatchDetail,
 } from "./types";
 
 // Always use absolute URL — Vercel blocks proxied SSR requests to external origins.
@@ -399,6 +400,21 @@ export async function getBaseballTeamEloHistory(
 ): Promise<Array<{ date: string; rating: number; match_id?: string | null }>> {
   try {
     return await request(`/sports/baseball/teams/${teamId}/elo-history?limit=${limit}`, { revalidate: 60 });
+  } catch {
+    return [];
+  }
+}
+
+export async function getHockeyMatchDetail(matchId: string): Promise<HockeyMatchDetail> {
+  return request<HockeyMatchDetail>(`/sports/hockey/matches/${matchId}`, { revalidate: 30 });
+}
+
+export async function getHockeyTeamEloHistory(
+  teamId: string,
+  limit = 30
+): Promise<Array<{ date: string; rating: number; match_id?: string | null }>> {
+  try {
+    return await request(`/sports/hockey/teams/${teamId}/elo-history?limit=${limit}`, { revalidate: 60 });
   } catch {
     return [];
   }

@@ -22,12 +22,15 @@ from api.sports.hockey.schemas import (
     HockeyMatchDetail,
     HockeyMatchListItem,
     HockeyMatchListResponse,
+    HockeyTeamFormOut,
+    HockeyTeamStatsOut,
     KeyDriverOut,
     ModelMetaOut,
     ParticipantOut,
+    PeriodScore,
     ProbabilitiesOut,
 )
-from api.sports.base.queries import h2h_from_hl
+from api.sports.base.queries import compute_team_form, form_from_hl, form_summary, h2h_from_hl
 from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, RatingEloTeam
 
 
@@ -103,6 +106,128 @@ def _h2h(db: Session, home_id: str, away_id: str) -> H2HRecordOut:
                 "outcome": result,
             })
     return H2HRecordOut(total_matches=len(rows), home_wins=home_wins, away_wins=away_wins, recent_matches=recent)
+
+
+# ─── Hockey-specific helpers ──────────────────────────────────────────────────
+
+def _form_hockey(hl_matches: list[dict], team_name: str) -> HockeyTeamFormOut | None:
+    raw = form_from_hl(hl_matches, team_name)
+    if not raw:
+        return None
+    return HockeyTeamFormOut(
+        team_name=team_name,
+        wins=raw["wins"],
+        draws=raw["draws"],
+        losses=raw["losses"],
+        form_pts=float(raw["form_pts"]),
+        goals_scored_avg=raw.get("gf_avg"),
+        goals_conceded_avg=raw.get("ga_avg"),
+    )
+
+
+def _form_from_db(db: Session, team_id: str, team_name: str) -> HockeyTeamFormOut | None:
+    records = compute_team_form(db, "hockey", team_id, limit=10)
+    if not records:
+        return None
+    s = form_summary(records)
+    return HockeyTeamFormOut(
+        team_name=team_name,
+        wins=s["wins"],
+        draws=s["draws"],
+        losses=s["losses"],
+        goals_scored_avg=s.get("avg_pts_for"),
+        goals_conceded_avg=s.get("avg_pts_against"),
+    )
+
+
+def _parse_hockey_stats(stats_list: list, team_name: str) -> HockeyTeamStatsOut | None:
+    """Parse a Highlightly statistics list into HockeyTeamStatsOut."""
+    if not stats_list:
+        return None
+    parsed: dict[str, str | None] = {}
+    for s in stats_list:
+        if isinstance(s, dict) and s.get("type"):
+            parsed[s["type"].lower().strip()] = s.get("value")
+
+    def _int(key: str) -> int | None:
+        v = parsed.get(key)
+        try:
+            return int(str(v).replace("%", "").strip()) if v not in (None, "") else None
+        except (ValueError, TypeError):
+            return None
+
+    def _float(key: str) -> float | None:
+        v = parsed.get(key)
+        try:
+            return float(str(v).replace("%", "").strip()) if v not in (None, "") else None
+        except (ValueError, TypeError):
+            return None
+
+    return HockeyTeamStatsOut(
+        team_name=team_name,
+        shots=_int("shots") or _int("total shots"),
+        shots_on_goal=_int("shots on goal") or _int("shots on target"),
+        hits=_int("hits"),
+        blocked_shots=_int("blocked shots") or _int("blocked"),
+        faceoff_wins=_int("faceoff wins") or _int("faceoffs won"),
+        faceoff_pct=_float("faceoff %") or _float("faceoff percentage"),
+        power_plays=_int("power plays"),
+        power_play_goals=_int("power play goals") or _int("pp goals"),
+        penalty_minutes=_int("penalty minutes") or _int("pim"),
+    )
+
+
+def _extract_hockey_stats(extras: dict) -> tuple[HockeyTeamStatsOut | None, HockeyTeamStatsOut | None]:
+    raw = extras.get("statistics") or extras.get("stats")
+    if not raw:
+        return None, None
+    home_list: list = []
+    away_list: list = []
+    if isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            side = str(item.get("team") or item.get("side") or "").lower()
+            stats = item.get("statistics") or item.get("stats") or []
+            if "home" in side or side == "1":
+                home_list = stats
+            elif "away" in side or side == "2":
+                away_list = stats
+    elif isinstance(raw, dict):
+        home_raw = raw.get("home") or raw.get("homeTeam")
+        away_raw = raw.get("away") or raw.get("awayTeam")
+        home_list = home_raw if isinstance(home_raw, list) else []
+        away_list = away_raw if isinstance(away_raw, list) else []
+    return home_list, away_list  # type: ignore[return-value]
+
+
+def _parse_period_scores(extras: dict, side: str) -> PeriodScore | None:
+    """Parse period-by-period scores from extras_json."""
+    periods = extras.get("periods") or extras.get("periodScores") or extras.get("period_scores")
+    if not periods:
+        return None
+    # Shape: [{"period": 1, "home": 2, "away": 1}, ...] or {"1": {"home": 2, "away": 1}, ...}
+    p1 = p2 = p3 = ot = so = None
+    if isinstance(periods, list):
+        for p in periods:
+            num = p.get("period") or p.get("number")
+            val = p.get(side)
+            if num == 1: p1 = val
+            elif num == 2: p2 = val
+            elif num == 3: p3 = val
+            elif num in (4, "OT", "ot"): ot = val
+            elif str(num).lower() in ("so", "5", "shootout"): so = val
+    elif isinstance(periods, dict):
+        for k, v in periods.items():
+            val = v.get(side) if isinstance(v, dict) else None
+            if str(k) == "1": p1 = val
+            elif str(k) == "2": p2 = val
+            elif str(k) == "3": p3 = val
+            elif str(k).lower() in ("4", "ot"): ot = val
+            elif str(k).lower() in ("so", "5", "shootout"): so = val
+    if p1 is None and p2 is None and p3 is None:
+        return None
+    return PeriodScore(p1=p1, p2=p2, p3=p3, ot=ot, so=so)
 
 
 # ─── Service ──────────────────────────────────────────────────────────────────
@@ -277,8 +402,10 @@ class HockeyMatchService(BaseMatchListService):
                 KeyDriverOut(feature="ELO Differential", importance=1.0, value=round(elo_h.rating - elo_a.rating, 1)),
             ]
 
-        # H2H: prefer HL prematch data, fall back to DB
+        # extras_json contains HL enrichment: stats, form, h2h, period scores
         extras = m.extras_json or {}
+
+        # H2H: prefer HL prematch data, fall back to DB
         _hl_h2h_raw = h2h_from_hl(extras.get("headtohead") or [], home_name, away_name)
         if _hl_h2h_raw:
             h2h = H2HRecordOut(
@@ -298,6 +425,28 @@ class HockeyMatchService(BaseMatchListService):
         else:
             h2h = _h2h(db, m.home_team_id, m.away_team_id)
 
+        # Form: prefer HL lastfivegames, fall back to DB
+        form_h = (
+            _form_hockey(extras.get("lastfivegames_home") or [], home_name)
+            or _form_from_db(db, m.home_team_id, home_name)
+        )
+        form_a = (
+            _form_hockey(extras.get("lastfivegames_away") or [], away_name)
+            or _form_from_db(db, m.away_team_id, away_name)
+        )
+
+        # Live/post-match statistics
+        home_stats_list, away_stats_list = _extract_hockey_stats(extras)
+        stats_h = _parse_hockey_stats(home_stats_list, home_name) if home_stats_list else None
+        stats_a = _parse_hockey_stats(away_stats_list, away_name) if away_stats_list else None
+
+        # Period scores
+        home_periods = _parse_period_scores(extras, "home")
+        away_periods = _parse_period_scores(extras, "away")
+
+        # Current period from extras or live_clock
+        current_period: int | None = extras.get("current_period") or extras.get("period")
+
         return HockeyMatchDetail(
             id=m.id,
             sport="hockey",
@@ -310,6 +459,10 @@ class HockeyMatchService(BaseMatchListService):
             home_score=m.home_score,
             away_score=m.away_score,
             outcome=m.outcome,
+            live_clock=m.live_clock if hasattr(m, "live_clock") else None,
+            current_period=current_period,
+            home_periods=home_periods,
+            away_periods=away_periods,
             probabilities=probs,
             confidence=confidence,
             fair_odds=fair_odds,
@@ -317,9 +470,21 @@ class HockeyMatchService(BaseMatchListService):
             model=model_meta,
             elo_home=elo_h,
             elo_away=elo_a,
+            form_home=form_h,
+            form_away=form_a,
+            stats_home=stats_h,
+            stats_away=stats_a,
             h2h=h2h,
+            odds_home=m.odds_home,
+            odds_away=m.odds_away,
             context={"venue_name": m.venue} if m.venue else None,
-            data_completeness={"source": "highlightly", "has_elo": elo_h is not None, "has_pred": pred is not None},
+            data_completeness={
+                "source": "highlightly",
+                "has_elo": elo_h is not None,
+                "has_pred": pred is not None,
+                "has_stats": stats_h is not None,
+                "has_form": form_h is not None,
+            },
         )
 
     def get_elo_history(self, team_id: str, limit: int, db: Session) -> list[EloHistoryPoint]:

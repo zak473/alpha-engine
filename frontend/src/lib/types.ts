@@ -1503,6 +1503,83 @@ export interface BaseballMatchDetail {
   betting?: Record<string, unknown> | null;
 }
 
+// ─── Hockey ────────────────────────────────────────────────────────────────
+
+export interface HockeyEloPanelOut {
+  team_id: string;
+  team_name: string;
+  rating: number;
+  rating_change?: number | null;
+  implied_win_prob?: number | null;
+  elo_win_prob?: number | null;
+}
+
+export interface HockeyTeamFormOut {
+  team_name: string;
+  wins: number;
+  draws: number;
+  losses: number;
+  form_pts?: number | null;
+  goals_scored_avg?: number | null;
+  goals_conceded_avg?: number | null;
+}
+
+export interface HockeyTeamStatsOut {
+  team_name: string;
+  shots?: number | null;
+  shots_on_goal?: number | null;
+  hits?: number | null;
+  blocked_shots?: number | null;
+  faceoff_wins?: number | null;
+  faceoff_pct?: number | null;
+  power_plays?: number | null;
+  power_play_goals?: number | null;
+  penalty_minutes?: number | null;
+}
+
+export interface HockeyPeriodScore {
+  p1?: number | null;
+  p2?: number | null;
+  p3?: number | null;
+  ot?: number | null;
+  so?: number | null;
+}
+
+export interface HockeyMatchDetail {
+  id: string;
+  sport: "hockey";
+  league: string;
+  season?: string | null;
+  kickoff_utc: string;
+  status: string;
+  home: { id: string; name: string; logo_url?: string | null };
+  away: { id: string; name: string; logo_url?: string | null };
+  home_score?: number | null;
+  away_score?: number | null;
+  outcome?: string | null;
+  live_clock?: string | null;
+  current_period?: number | null;
+  home_periods?: HockeyPeriodScore | null;
+  away_periods?: HockeyPeriodScore | null;
+  probabilities?: { home_win: number; away_win: number; draw?: number | null } | null;
+  confidence?: number | null;
+  fair_odds?: { home_win?: number | null; away_win?: number | null } | null;
+  key_drivers?: Array<{ feature: string; importance: number; value?: number | null; direction?: string | null }> | null;
+  model?: { version: string; algorithm?: string | null; trained_at?: string | null; n_train_samples?: number | null; accuracy?: number | null; brier_score?: number | null } | null;
+  elo_home?: HockeyEloPanelOut | null;
+  elo_away?: HockeyEloPanelOut | null;
+  form_home?: HockeyTeamFormOut | null;
+  form_away?: HockeyTeamFormOut | null;
+  stats_home?: HockeyTeamStatsOut | null;
+  stats_away?: HockeyTeamStatsOut | null;
+  h2h?: { total_matches: number; home_wins: number; away_wins: number; recent_matches: any[] } | null;
+  odds_home?: number | null;
+  odds_away?: number | null;
+  odds_draw?: number | null;
+  context?: Record<string, any> | null;
+  data_completeness?: Record<string, boolean> | null;
+}
+
 // ─── Chart data shapes ─────────────────────────────────────────────────────
 
 export interface EloPoint {

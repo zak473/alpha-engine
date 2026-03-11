@@ -110,6 +110,29 @@ class HockeyMatchListResponse(BaseModel):
     sport: str = "hockey"
 
 
+class HockeyTeamFormOut(BaseModel):
+    team_name: str
+    wins: int = 0
+    draws: int = 0
+    losses: int = 0
+    form_pts: Optional[float] = None
+    goals_scored_avg: Optional[float] = None
+    goals_conceded_avg: Optional[float] = None
+
+
+class HockeyTeamStatsOut(BaseModel):
+    team_name: str
+    shots: Optional[int] = None
+    shots_on_goal: Optional[int] = None
+    hits: Optional[int] = None
+    blocked_shots: Optional[int] = None
+    faceoff_wins: Optional[int] = None
+    faceoff_pct: Optional[float] = None
+    power_plays: Optional[int] = None
+    power_play_goals: Optional[int] = None
+    penalty_minutes: Optional[int] = None
+
+
 # ─── Full detail schema ─────────────────────────────────────────────────────
 
 class HockeyMatchDetail(BaseModel):
@@ -125,6 +148,7 @@ class HockeyMatchDetail(BaseModel):
     away_score: Optional[int] = None
     outcome: Optional[str] = None
     live_clock: Optional[str] = None
+    current_period: Optional[int] = None
     home_periods: Optional[PeriodScore] = None
     away_periods: Optional[PeriodScore] = None
     # Model
@@ -136,8 +160,18 @@ class HockeyMatchDetail(BaseModel):
     # ELO
     elo_home: Optional[EloPanelOut] = None
     elo_away: Optional[EloPanelOut] = None
+    # Form
+    form_home: Optional[HockeyTeamFormOut] = None
+    form_away: Optional[HockeyTeamFormOut] = None
+    # Team stats (from Highlightly live/post-match)
+    stats_home: Optional[HockeyTeamStatsOut] = None
+    stats_away: Optional[HockeyTeamStatsOut] = None
     # H2H
     h2h: Optional[H2HRecordOut] = None
+    # Odds
+    odds_home: Optional[float] = None
+    odds_away: Optional[float] = None
+    odds_draw: Optional[float] = None
     # Context
     context: Optional[dict] = None
     data_completeness: Optional[dict] = None
