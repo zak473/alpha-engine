@@ -1545,6 +1545,35 @@ export interface HockeyPeriodScore {
   so?: number | null;
 }
 
+export interface HockeyEventOut {
+  period?: number | null;
+  time?: string | null;
+  type?: string | null;
+  team?: string | null;
+  player_name?: string | null;
+  assist1?: string | null;
+  assist2?: string | null;
+  description?: string | null;
+  score_home?: number | null;
+  score_away?: number | null;
+}
+
+export interface HockeyLineupPlayer {
+  name: string;
+  number?: string | null;
+  position?: string | null;
+  is_starter: boolean;
+  is_goalie: boolean;
+}
+
+export interface HockeyLineupOut {
+  team_id: string;
+  team_name: string;
+  formation?: string | null;
+  players: HockeyLineupPlayer[];
+  goalie?: string | null;
+}
+
 export interface HockeyMatchDetail {
   id: string;
   sport: "hockey";
@@ -1572,6 +1601,9 @@ export interface HockeyMatchDetail {
   form_away?: HockeyTeamFormOut | null;
   stats_home?: HockeyTeamStatsOut | null;
   stats_away?: HockeyTeamStatsOut | null;
+  lineup_home?: HockeyLineupOut | null;
+  lineup_away?: HockeyLineupOut | null;
+  events?: HockeyEventOut[];
   h2h?: { total_matches: number; home_wins: number; away_wins: number; recent_matches: any[] } | null;
   odds_home?: number | null;
   odds_away?: number | null;

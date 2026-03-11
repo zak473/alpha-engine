@@ -18,7 +18,8 @@ import type {
   HockeyEloPanelOut,
   HockeyTeamFormOut,
   HockeyTeamStatsOut,
-  HockeyPeriodScore,
+  HockeyLineupOut,
+  HockeyEventOut,
 } from "@/lib/types";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -435,6 +436,100 @@ function EloPanel({ elo, label }: { elo: HockeyEloPanelOut | null | undefined; l
   );
 }
 
+// ─── Events feed ─────────────────────────────────────────────────────────────
+function EventTypeIcon({ type }: { type: string | null | undefined }) {
+  const t = (type || "").toLowerCase();
+  if (t === "goal" || t === "shootout_goal") return <span className="text-accent-green font-bold text-xs">⬤</span>;
+  if (t.includes("penalty")) return <span className="text-accent-amber text-xs">⬛</span>;
+  if (t === "fight") return <span className="text-accent-red text-xs">✕</span>;
+  return <span className="text-text-subtle text-xs">·</span>;
+}
+
+function EventsFeed({ events, homeName, awayName }: { events: HockeyEventOut[]; homeName: string; awayName: string }) {
+  const goalEvents = events.filter(e => e.type === "goal" || e.type === "shootout_goal" || e.type === "penalty_shot");
+  const allEvents = events.filter(e => !["period_start", "period_end"].includes(e.type || ""));
+  if (!allEvents.length) return <EmptyState msg="No events yet. Available during and after games." />;
+  return (
+    <div className="space-y-1">
+      {allEvents.map((ev, i) => {
+        const isHome = ev.team === "home";
+        return (
+          <div key={i} className={cn("flex items-start gap-2 py-1.5 border-b border-surface-border/30 last:border-0", isHome ? "flex-row" : "flex-row-reverse")}>
+            <div className={cn("flex items-center gap-1.5 min-w-[28px]", isHome ? "justify-start" : "justify-end")}>
+              <EventTypeIcon type={ev.type} />
+              {ev.period && <span className="text-[9px] text-text-subtle">P{ev.period}</span>}
+            </div>
+            <div className={cn("flex-1 min-w-0", isHome ? "text-left" : "text-right")}>
+              <div className="flex items-baseline gap-1.5 flex-wrap" style={{ justifyContent: isHome ? "flex-start" : "flex-end" }}>
+                {ev.player_name && <span className="text-xs text-text-muted font-semibold">{ev.player_name}</span>}
+                {ev.assist1 && <span className="text-[10px] text-text-subtle">({ev.assist1}{ev.assist2 ? `, ${ev.assist2}` : ""})</span>}
+              </div>
+              {ev.description && !ev.player_name && <div className="text-[10px] text-text-subtle">{ev.description}</div>}
+              {ev.time && <div className="text-[9px] text-text-subtle">{ev.time}</div>}
+            </div>
+            {ev.score_home != null && ev.score_away != null && (
+              <div className="text-[10px] font-mono text-text-subtle shrink-0 tabular-nums">
+                {ev.score_home}–{ev.score_away}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Lineup panel ─────────────────────────────────────────────────────────────
+function LineupSide({ lineup, isHome }: { lineup: HockeyLineupOut | null | undefined; isHome: boolean }) {
+  if (!lineup) return <div className="text-text-subtle text-xs text-center py-4">No lineup data</div>;
+  const goalies = lineup.players.filter(p => p.is_goalie);
+  const skaters = lineup.players.filter(p => !p.is_goalie && p.is_starter);
+  const align = isHome ? "text-left" : "text-right";
+  return (
+    <div className={cn("space-y-2", align)}>
+      {goalies.length > 0 && (
+        <div>
+          <div className="text-[9px] uppercase tracking-wider text-text-subtle mb-1">Goalie</div>
+          {goalies.map((p, i) => (
+            <div key={i} className="text-xs text-text-muted">
+              {p.number && <span className="font-mono text-text-subtle mr-1.5">#{p.number}</span>}
+              {p.name}
+            </div>
+          ))}
+        </div>
+      )}
+      {skaters.length > 0 && (
+        <div>
+          <div className="text-[9px] uppercase tracking-wider text-text-subtle mb-1">Skaters</div>
+          {skaters.map((p, i) => (
+            <div key={i} className="text-xs text-text-muted">
+              {p.number && <span className="font-mono text-text-subtle mr-1.5">#{p.number}</span>}
+              {p.name}
+              {p.position && <span className="text-[9px] text-text-subtle ml-1">{p.position}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LineupPanel({ home, away, homeName, awayName }: { home: HockeyLineupOut | null | undefined; away: HockeyLineupOut | null | undefined; homeName: string; awayName: string }) {
+  if (!home && !away) return <EmptyState msg="Lineups available closer to puck drop." />;
+  return (
+    <div className="grid grid-cols-2 gap-4 divide-x divide-surface-border/40">
+      <div>
+        <div className="text-[10px] font-semibold text-text-muted mb-2">{homeName}</div>
+        <LineupSide lineup={home} isHome />
+      </div>
+      <div className="pl-4">
+        <div className="text-[10px] font-semibold text-text-muted mb-2 text-right">{awayName}</div>
+        <LineupSide lineup={away} isHome={false} />
+      </div>
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 interface Props {
   match: TMatch;
@@ -520,6 +615,11 @@ export function HockeyMatchDetail({ match: initialMatch, eloHomeHistory, eloAway
             />
           </PanelCard>
 
+          {/* Events */}
+          <PanelCard title="Game Events">
+            <EventsFeed events={match.events ?? []} homeName={match.home.name} awayName={match.away.name} />
+          </PanelCard>
+
           {/* H2H */}
           <PanelCard title="Head-to-Head">
             <H2HPanel match={match} />
@@ -540,6 +640,11 @@ export function HockeyMatchDetail({ match: initialMatch, eloHomeHistory, eloAway
           {/* Odds */}
           <PanelCard title="Odds">
             <OddsPanel match={match} />
+          </PanelCard>
+
+          {/* Lineups */}
+          <PanelCard title="Lineup">
+            <LineupPanel home={match.lineup_home} away={match.lineup_away} homeName={match.home.name} awayName={match.away.name} />
           </PanelCard>
 
           {/* Form */}

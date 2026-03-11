@@ -998,5 +998,8 @@ class SoccerMatchService(BaseMatchListService):
                 "away_ml": round(1 / probabilities.away_win, 2) if probabilities and probabilities.away_win > 0 else None,
                 "spread": None,
                 "total": None,
+                "market_home": match.odds_home,
+                "market_draw": match.odds_draw,
+                "market_away": match.odds_away,
             },
         )

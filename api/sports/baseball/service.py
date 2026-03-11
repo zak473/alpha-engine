@@ -42,7 +42,7 @@ from api.sports.baseball.schemas import (
     StarterPitcherOut,
     UmpireOut,
 )
-from api.sports.base.queries import compute_team_form, form_summary, h2h_from_hl
+from api.sports.base.queries import compute_team_form, form_from_hl, form_summary, h2h_from_hl
 from db.models.baseball import BaseballTeamMatchStats, BaseballPlayerMatchStats, EventContext
 from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, RatingEloTeam
 
@@ -181,6 +181,56 @@ def _starter_from_stats(row: "BaseballTeamMatchStats") -> Optional[StarterPitche
     )
 
 
+def _hl_form_baseball(hl_matches: list[dict], team_id: str, team_name: str) -> Optional[BaseballTeamFormOut]:
+    """Build BaseballTeamFormOut from Highlightly lastfivegames data."""
+    raw = form_from_hl(hl_matches, team_name)
+    if not raw:
+        return None
+    return BaseballTeamFormOut(
+        team_id=team_id,
+        team_name=team_name,
+        last_5=None,
+        wins_last_5=raw["wins"],
+        losses_last_5=raw["losses"],
+        avg_runs_for=raw.get("gf_avg"),
+        avg_runs_against=raw.get("ga_avg"),
+        team_era_last_5=None,
+        bullpen_era_last_5=None,
+        starter=None,
+    )
+
+
+def _parse_hl_events_baseball(raw_events: list | dict) -> list[InningEvent]:
+    """Parse Highlightly events into InningEvent list for baseball."""
+    if isinstance(raw_events, dict):
+        raw_events = raw_events.get("events") or raw_events.get("incidents") or []
+    if not isinstance(raw_events, list):
+        return []
+    out: list[InningEvent] = []
+    for ev in raw_events:
+        if not isinstance(ev, dict):
+            continue
+        ev_type = str(ev.get("type") or ev.get("eventType") or "").lower()
+        inning_raw = ev.get("inning") or ev.get("period") or ev.get("half") or 0
+        try:
+            inning = int(inning_raw)
+        except (ValueError, TypeError):
+            inning = 0
+        half_raw = str(ev.get("half") or ev.get("side") or ev.get("team") or "").lower()
+        half = "bottom" if ("bottom" in half_raw or "away" in half_raw or half_raw == "2") else "top"
+        desc = ev.get("description") or ev.get("detail") or ev.get("text") or ev_type
+        team_raw = str(ev.get("team") or ev.get("teamId") or ev.get("side") or "").lower()
+        team = "away" if ("away" in team_raw or team_raw == "2") else "home"
+        out.append(InningEvent(
+            inning=inning,
+            half=half,
+            description=str(desc),
+            event_type=ev_type or None,
+            team=team,
+        ))
+    return out
+
+
 def _build_baseball_form(
     team_id: str, team_name: str, records: list[dict], summary: dict
 ) -> Optional[BaseballTeamFormOut]:
@@ -248,14 +298,24 @@ def _build_baseball_detail(
     batting_home = _batting_from_stats(stats_home_row, home_name, db) if stats_home_row else None
     batting_away = _batting_from_stats(stats_away_row, away_name, db) if stats_away_row else None
 
-    # Real form from CoreMatch
-    home_form_records = compute_team_form(db, "baseball", match.home_team_id, limit=5)
-    away_form_records = compute_team_form(db, "baseball", match.away_team_id, limit=5)
-    home_summary = form_summary(home_form_records)
-    away_summary = form_summary(away_form_records)
-
-    # H2H: prefer HL prematch data, fall back to DB
+    # H2H, form, events from extras_json (Highlightly)
     extras = match.extras_json or {}
+
+    # Form: prefer HL lastfivegames, fall back to DB
+    hl_form_home = _hl_form_baseball(extras.get("lastfivegames_home") or [], match.home_team_id, home_name)
+    hl_form_away = _hl_form_baseball(extras.get("lastfivegames_away") or [], match.away_team_id, away_name)
+    if not hl_form_home:
+        home_form_records = compute_team_form(db, "baseball", match.home_team_id, limit=5)
+        home_summary = form_summary(home_form_records)
+        hl_form_home = _build_baseball_form(match.home_team_id, home_name, home_form_records, home_summary)
+    if not hl_form_away:
+        away_form_records = compute_team_form(db, "baseball", match.away_team_id, limit=5)
+        away_summary = form_summary(away_form_records)
+        hl_form_away = _build_baseball_form(match.away_team_id, away_name, away_form_records, away_summary)
+
+    # Events: from extras_json, then EventContext DB
+    hl_events = _parse_hl_events_baseball(extras.get("events") or [])
+
     _hl_h2h_raw = h2h_from_hl(extras.get("headtohead") or [], home_name, away_name)
     if _hl_h2h_raw:
         _hl_recent = [
@@ -347,9 +407,9 @@ def _build_baseball_detail(
         bullpen_away=bullpen_away,
         batting_home=batting_home,
         batting_away=batting_away,
-        form_home=_build_baseball_form(match.home_team_id, home_name, home_form_records, home_summary),
-        form_away=_build_baseball_form(match.away_team_id, away_name, away_form_records, away_summary),
-        inning_events=events,
+        form_home=hl_form_home,
+        form_away=hl_form_away,
+        inning_events=hl_events or events,
         h2h=h2h_result,
         context={"venue_name": match.venue} if match.venue else None,
         data_completeness={
@@ -369,6 +429,8 @@ def _build_baseball_detail(
         betting={
             "home_ml": round(1 / p_home, 2) if p_home > 0 else None,
             "away_ml": round(1 / p_away, 2) if p_away > 0 else None,
+            "market_home": match.odds_home,
+            "market_away": match.odds_away,
         },
     )
 

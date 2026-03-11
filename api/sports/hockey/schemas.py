@@ -58,6 +58,35 @@ class ModelMetaOut(BaseModel):
 
 # ─── Hockey-specific ────────────────────────────────────────────────────────
 
+class HockeyEventOut(BaseModel):
+    period: Optional[int] = None
+    time: Optional[str] = None       # e.g. "12:34"
+    type: Optional[str] = None       # "goal" | "penalty" | "penalty_shot" | "fight"
+    team: Optional[str] = None       # "home" | "away"
+    player_name: Optional[str] = None
+    assist1: Optional[str] = None
+    assist2: Optional[str] = None
+    description: Optional[str] = None
+    score_home: Optional[int] = None
+    score_away: Optional[int] = None
+
+
+class HockeyLineupPlayer(BaseModel):
+    name: str
+    number: Optional[str] = None
+    position: Optional[str] = None
+    is_starter: bool = True
+    is_goalie: bool = False
+
+
+class HockeyLineupOut(BaseModel):
+    team_id: str
+    team_name: str
+    formation: Optional[str] = None
+    players: list[HockeyLineupPlayer] = []
+    goalie: Optional[str] = None
+
+
 class PeriodScore(BaseModel):
     p1: Optional[int] = None
     p2: Optional[int] = None
@@ -166,6 +195,11 @@ class HockeyMatchDetail(BaseModel):
     # Team stats (from Highlightly live/post-match)
     stats_home: Optional[HockeyTeamStatsOut] = None
     stats_away: Optional[HockeyTeamStatsOut] = None
+    # Lineups
+    lineup_home: Optional[HockeyLineupOut] = None
+    lineup_away: Optional[HockeyLineupOut] = None
+    # Events (goals, penalties)
+    events: list[HockeyEventOut] = []
     # H2H
     h2h: Optional[H2HRecordOut] = None
     # Odds

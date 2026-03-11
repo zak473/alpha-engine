@@ -19,6 +19,9 @@ from api.sports.hockey.schemas import (
     EloHistoryPoint,
     FairOddsOut,
     H2HRecordOut,
+    HockeyEventOut,
+    HockeyLineupOut,
+    HockeyLineupPlayer,
     HockeyMatchDetail,
     HockeyMatchListItem,
     HockeyMatchListResponse,
@@ -228,6 +231,129 @@ def _parse_period_scores(extras: dict, side: str) -> PeriodScore | None:
     if p1 is None and p2 is None and p3 is None:
         return None
     return PeriodScore(p1=p1, p2=p2, p3=p3, ot=ot, so=so)
+
+
+def _parse_hockey_lineup(raw: dict | list | None, team_id: str, team_name: str) -> HockeyLineupOut | None:
+    """Parse a Highlightly lineup payload for one hockey team."""
+    if not raw:
+        return None
+    if isinstance(raw, list):
+        data = raw[0] if raw and isinstance(raw[0], dict) else {}
+    else:
+        data = raw
+
+    players: list[HockeyLineupPlayer] = []
+    goalie: str | None = None
+
+    # Handles shapes: {"players": [...]} or {"starters": [...], "substitutes": [...]}
+    player_list = (
+        data.get("players") or data.get("starters") or
+        data.get("lineup") or data.get("roster") or []
+    )
+    for p in player_list:
+        if not isinstance(p, dict):
+            continue
+        name = (
+            p.get("name") or p.get("playerName") or
+            (p.get("player") or {}).get("name") if isinstance(p.get("player"), dict) else None
+        )
+        if not name:
+            continue
+        pos_raw = str(p.get("position") or p.get("pos") or "").upper()
+        is_goalie = pos_raw in ("G", "GK", "GOALIE", "GOALKEEPER")
+        player = HockeyLineupPlayer(
+            name=str(name),
+            number=str(p.get("number") or p.get("jerseyNumber") or p.get("jersey") or ""),
+            position=pos_raw or None,
+            is_starter=not bool(p.get("isSub") or p.get("substitute")),
+            is_goalie=is_goalie,
+        )
+        players.append(player)
+        if is_goalie and not goalie:
+            goalie = str(name)
+
+    if not players:
+        return None
+    return HockeyLineupOut(
+        team_id=team_id,
+        team_name=team_name,
+        formation=str(data.get("formation") or ""),
+        players=players,
+        goalie=goalie,
+    )
+
+
+def _extract_hockey_lineups(extras: dict, home_id: str, home_name: str, away_id: str, away_name: str) -> tuple[HockeyLineupOut | None, HockeyLineupOut | None]:
+    raw = extras.get("lineups")
+    if not raw:
+        return None, None
+    if isinstance(raw, dict):
+        home_data = raw.get("home") or raw.get("homeTeam")
+        away_data = raw.get("away") or raw.get("awayTeam")
+        return _parse_hockey_lineup(home_data, home_id, home_name), _parse_hockey_lineup(away_data, away_id, away_name)
+    if isinstance(raw, list) and len(raw) >= 2:
+        return _parse_hockey_lineup(raw[0], home_id, home_name), _parse_hockey_lineup(raw[1], away_id, away_name)
+    return None, None
+
+
+def _parse_hockey_events(extras: dict, home_name: str, away_name: str) -> list[HockeyEventOut]:
+    """Parse Highlightly events payload into HockeyEventOut list."""
+    raw = extras.get("events") or extras.get("incidents") or []
+    if isinstance(raw, dict):
+        raw = raw.get("events") or raw.get("incidents") or []
+    if not isinstance(raw, list):
+        return []
+
+    _TYPE_MAP = {
+        "goal": "goal", "score": "goal", "powerplaygoal": "goal", "shorthandedgoal": "goal",
+        "penalty": "penalty", "penaltyshot": "penalty_shot",
+        "fight": "fight", "misconduct": "misconduct",
+        "periodstart": "period_start", "periodend": "period_end",
+        "shootout": "shootout_goal", "shootoutgoal": "shootout_goal",
+    }
+
+    out: list[HockeyEventOut] = []
+    for ev in raw:
+        if not isinstance(ev, dict):
+            continue
+        raw_type = str(ev.get("type") or ev.get("eventType") or ev.get("incident") or "").lower().replace(" ", "").replace("_", "")
+        ev_type = _TYPE_MAP.get(raw_type, raw_type) or "unknown"
+
+        team_raw = str(ev.get("team") or ev.get("teamId") or ev.get("side") or "").lower()
+        if "home" in team_raw or team_raw == "1":
+            team = "home"
+        elif "away" in team_raw or team_raw == "2":
+            team = "away"
+        else:
+            t_name = str(ev.get("teamName") or "").lower()
+            team = "home" if (home_name.lower() in t_name or t_name in home_name.lower()) else "away"
+
+        player = (
+            ev.get("playerName") or ev.get("player") or
+            (ev.get("player") or {}).get("name") if isinstance(ev.get("player"), dict) else None
+        )
+        assists = ev.get("assists") or []
+        assist1 = assists[0].get("name") if assists and isinstance(assists[0], dict) else ev.get("assist1") or ev.get("primaryAssist")
+        assist2 = assists[1].get("name") if len(assists) > 1 and isinstance(assists[1], dict) else ev.get("assist2") or ev.get("secondaryAssist")
+
+        score = ev.get("score") or ev.get("result") or {}
+        score_h = score.get("home") if isinstance(score, dict) else None
+        score_a = score.get("away") if isinstance(score, dict) else None
+
+        out.append(HockeyEventOut(
+            period=ev.get("period") or ev.get("half"),
+            time=str(ev.get("time") or ev.get("minute") or ev.get("elapsed") or ""),
+            type=ev_type,
+            team=team,
+            player_name=str(player) if player else None,
+            assist1=str(assist1) if assist1 else None,
+            assist2=str(assist2) if assist2 else None,
+            description=ev.get("description") or ev.get("detail"),
+            score_home=int(score_h) if score_h is not None else None,
+            score_away=int(score_a) if score_a is not None else None,
+        ))
+
+    return out
 
 
 # ─── Service ──────────────────────────────────────────────────────────────────
@@ -440,12 +566,18 @@ class HockeyMatchService(BaseMatchListService):
         stats_h = _parse_hockey_stats(home_stats_list, home_name) if home_stats_list else None
         stats_a = _parse_hockey_stats(away_stats_list, away_name) if away_stats_list else None
 
+        # Lineups
+        lineup_h, lineup_a = _extract_hockey_lineups(extras, m.home_team_id, home_name, m.away_team_id, away_name)
+
+        # Events (goals, penalties)
+        events = _parse_hockey_events(extras, home_name, away_name)
+
         # Period scores
         home_periods = _parse_period_scores(extras, "home")
         away_periods = _parse_period_scores(extras, "away")
 
-        # Current period from extras or live_clock
-        current_period: int | None = extras.get("current_period") or extras.get("period")
+        # Current period from extras or CoreMatch
+        current_period: int | None = extras.get("current_period") or extras.get("period") or (m.current_period if m.status == "live" else None)
 
         return HockeyMatchDetail(
             id=m.id,
@@ -459,7 +591,7 @@ class HockeyMatchService(BaseMatchListService):
             home_score=m.home_score,
             away_score=m.away_score,
             outcome=m.outcome,
-            live_clock=m.live_clock if hasattr(m, "live_clock") else None,
+            live_clock=m.live_clock,
             current_period=current_period,
             home_periods=home_periods,
             away_periods=away_periods,
@@ -474,9 +606,13 @@ class HockeyMatchService(BaseMatchListService):
             form_away=form_a,
             stats_home=stats_h,
             stats_away=stats_a,
+            lineup_home=lineup_h,
+            lineup_away=lineup_a,
+            events=events,
             h2h=h2h,
             odds_home=m.odds_home,
             odds_away=m.odds_away,
+            odds_draw=m.odds_draw,
             context={"venue_name": m.venue} if m.venue else None,
             data_completeness={
                 "source": "highlightly",
