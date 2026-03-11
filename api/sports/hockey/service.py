@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from datetime import datetime, timezone
 from typing import Optional
@@ -11,6 +12,8 @@ from sqlalchemy import case
 from sqlalchemy.orm import Session
 
 from api.sports.base.interfaces import BaseMatchListService
+
+log = logging.getLogger(__name__)
 from api.sports.hockey.schemas import (
     EloPanelOut,
     EloHistoryPoint,
@@ -24,6 +27,7 @@ from api.sports.hockey.schemas import (
     ParticipantOut,
     ProbabilitiesOut,
 )
+from api.sports.base.queries import h2h_from_hl
 from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, RatingEloTeam
 
 
@@ -244,15 +248,55 @@ class HockeyMatchService(BaseMatchListService):
         key_drivers = None
         model_meta = None
         if pred:
-            probs = ProbabilitiesOut(home_win=pred.p_home or 0.0, away_win=pred.p_away or 0.0)
-            confidence = int(round(max(pred.p_home or 0, pred.p_away or 0) * 100))
-            if pred.p_home and pred.p_away:
+            p_home = pred.p_home or 0.0
+            p_away = pred.p_away or 0.0
+            probs = ProbabilitiesOut(home_win=p_home, away_win=p_away)
+            confidence = int(round(max(0, min(100, (max(p_home, p_away) - 0.5) * 200))))
+            if p_home > 0 and p_away > 0:
                 fair_odds = FairOddsOut(
-                    home_win=round(1 / pred.p_home, 2) if pred.p_home > 0 else None,
-                    away_win=round(1 / pred.p_away, 2) if pred.p_away > 0 else None,
+                    home_win=round(1 / p_home, 2),
+                    away_win=round(1 / p_away, 2),
                 )
+            key_drivers = [
+                KeyDriverOut(feature=d.get("feature", ""), value=d.get("value"), importance=d.get("importance", 0.0))
+                for d in (pred.key_drivers or [])
+            ]
+        elif elo_h and elo_a:
+            # ELO-derived fallback probabilities
+            r_diff = elo_h.rating - elo_a.rating + 30.0  # 30-pt home advantage
+            p_home = round(1.0 / (1.0 + math.pow(10, -r_diff / 400.0)), 4)
+            p_away = round(1.0 - p_home, 4)
+            probs = ProbabilitiesOut(home_win=p_home, away_win=p_away)
+            confidence = int(round(max(0, min(100, (max(p_home, p_away) - 0.5) * 200))))
+            if p_home > 0 and p_away > 0:
+                fair_odds = FairOddsOut(
+                    home_win=round(1 / p_home, 2),
+                    away_win=round(1 / p_away, 2),
+                )
+            key_drivers = [
+                KeyDriverOut(feature="ELO Differential", importance=1.0, value=round(elo_h.rating - elo_a.rating, 1)),
+            ]
 
-        h2h = _h2h(db, m.home_team_id, m.away_team_id)
+        # H2H: prefer HL prematch data, fall back to DB
+        extras = m.extras_json or {}
+        _hl_h2h_raw = h2h_from_hl(extras.get("headtohead") or [], home_name, away_name)
+        if _hl_h2h_raw:
+            h2h = H2HRecordOut(
+                total_matches=_hl_h2h_raw["total_matches"],
+                home_wins=_hl_h2h_raw["home_wins"],
+                away_wins=_hl_h2h_raw["away_wins"],
+                recent_matches=[
+                    {
+                        "date": entry.get("date"),
+                        "home_score": entry.get("home_score"),
+                        "away_score": entry.get("away_score"),
+                        "outcome": entry.get("outcome"),
+                    }
+                    for entry in _hl_h2h_raw.get("recent_matches", [])
+                ],
+            )
+        else:
+            h2h = _h2h(db, m.home_team_id, m.away_team_id)
 
         return HockeyMatchDetail(
             id=m.id,
@@ -274,6 +318,7 @@ class HockeyMatchService(BaseMatchListService):
             elo_home=elo_h,
             elo_away=elo_a,
             h2h=h2h,
+            context={"venue_name": m.venue} if m.venue else None,
             data_completeness={"source": "highlightly", "has_elo": elo_h is not None, "has_pred": pred is not None},
         )
 

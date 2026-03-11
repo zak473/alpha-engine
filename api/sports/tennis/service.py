@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import logging
+
+log = logging.getLogger(__name__)
 import math
 from datetime import datetime, timezone
 from typing import Optional
@@ -249,8 +252,8 @@ def _compute_extended_form(
                     tb_played += 1
                     if (is_player_a and a_g == 7) or (not is_player_a and b_g == 7):
                         tb_won += 1
-        except Exception:
-            pass
+        except Exception as exc:
+            log.debug("tennis_tiebreak_parse player=%s match=%s err=%s", player_id, getattr(tm, "id", "?"), exc)
 
     if tb_played > 0:
         form.tiebreaks_played = tb_played
@@ -353,7 +356,7 @@ def _elo_snapshot(db: Session, player_id: str, name: str) -> EloHistoryPoint | N
     if not rows:
         return None
     latest = rows[0]
-    change = round(latest.rating_after - rows[1].rating_after, 1) if len(rows) == 2 else None
+    change = round(latest.rating_after - latest.rating_before, 1)
     return EloHistoryPoint(
         date=latest.rated_at.isoformat(),
         rating=round(latest.rating_after, 1),
@@ -423,8 +426,8 @@ def _tennis_info(db: Session, match_id: str) -> TennisMatchInfoOut | None:
                         tb_a=s.get("tb_a"),
                         tb_b=s.get("tb_b"),
                     ))
-            except Exception:
-                pass
+            except Exception as exc:
+                log.debug("tennis_sets_parse match=%s err=%s", row.match_id if hasattr(row, "match_id") else "?", exc)
         return TennisMatchInfoOut(
             surface=row.surface,
             is_indoor=bool(row.is_indoor),
@@ -439,7 +442,8 @@ def _tennis_info(db: Session, match_id: str) -> TennisMatchInfoOut | None:
             retired=bool(row.retired),
             sets_detail=sets_detail,
         )
-    except Exception:
+    except Exception as exc:
+        log.warning("tennis_match_info_failed err=%s", exc)
         return None
 
 
@@ -487,7 +491,8 @@ def _match_stats(db: Session, match_id: str, player_id: str, player_name: str) -
             return_points_played=row.return_points_played,
             return_points_won=row.return_points_won,
         )
-    except Exception:
+    except Exception as exc:
+        log.warning("tennis_match_stats_failed match=%s player=%s err=%s", match_id, player_id, exc)
         return None
 
 
@@ -522,8 +527,36 @@ def _player_form(db: Session, player_id: str, player_name: str, surface: str | N
             avg_df_per_match=row.avg_df_per_match,
             matches_since_last_title=row.matches_since_last_title,
         )
-    except Exception:
+    except Exception as exc:
+        log.warning("tennis_player_form_failed player=%s err=%s", player_id, exc)
         return None
+
+
+def _h2h_from_hl(hl_matches: list[dict], home_name: str, away_name: str) -> H2HRecordOut | None:
+    """Parse HL headtohead data into tennis H2HRecordOut. Sets score is used as game proxy."""
+    from api.sports.base.queries import h2h_from_hl as _parse_h2h
+    raw = _parse_h2h(hl_matches, home_name, away_name)
+    if not raw:
+        return None
+    recent = [
+        {
+            "date": m.get("date"),
+            "player_a_sets": m.get("home_score"),
+            "player_b_sets": m.get("away_score"),
+            "winner": "a" if m.get("outcome") == "home_win" else "b",
+            "player_a_name": home_name,
+            "player_b_name": away_name,
+            "surface": None,
+            "round": None,
+        }
+        for m in raw.get("recent_matches", [])
+    ]
+    return H2HRecordOut(
+        total_matches=raw["total_matches"],
+        player_a_wins=raw["home_wins"],
+        player_b_wins=raw["away_wins"],
+        recent_matches=recent,
+    )
 
 
 def _h2h(db: Session, home_id: str, away_id: str, home_name: str = "", away_name: str = "") -> H2HRecordOut:
@@ -563,8 +596,8 @@ def _h2h(db: Session, home_id: str, away_id: str, home_name: str = "", away_name
                 if tm:
                     surface_name = tm.surface
                     round_name = tm.round_name
-            except Exception:
-                pass
+            except Exception as exc:
+                log.debug("tennis_h2h_match_info match=%s err=%s", m.id, exc)
             recent.append({
                 "date": m.kickoff_utc.isoformat() if m.kickoff_utc else None,
                 "player_a_sets": hs,
@@ -816,8 +849,8 @@ class TennisMatchService(BaseMatchListService):
                             }
                             if tennis_current_period is None:
                                 tennis_current_period = len(raw_sets)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    log.warning("tennis_live_state_failed match=%s err=%s", match.id, exc)
 
         return TennisMatchDetail(
             id=match.id,
@@ -846,7 +879,11 @@ class TennisMatchService(BaseMatchListService):
             stats_away=stats_away,
             form_home=form_home,
             form_away=form_away,
-            h2h=_h2h(db, match.home_team_id, match.away_team_id, home_name, away_name),
+            h2h=(
+                _h2h_from_hl(
+                    (match.extras_json or {}).get("headtohead") or [], home_name, away_name
+                ) or _h2h(db, match.home_team_id, match.away_team_id, home_name, away_name)
+            ),
             profile_home=profile_home,
             profile_away=profile_away,
             tiebreaks=tiebreaks,

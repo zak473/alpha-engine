@@ -11,7 +11,11 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+
+log = logging.getLogger(__name__)
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -173,8 +177,9 @@ def _create_bankroll_snapshot(pick: TrackedPick, db: Session) -> None:
             notes=f"{pick.match_label} — {pick.selection_label} @ {pick.odds} ({pick.outcome})",
         )
         db.add(snap)
-    except Exception:
-        pass  # settlement failure must never block pick persistence
+    except Exception as exc:
+        log.warning("bankroll_snapshot_failed pick=%s err=%s", pick.id, exc)
+        # settlement failure must never block pick persistence
 
 
 # ─── Routes ───────────────────────────────────────────────────────────────────

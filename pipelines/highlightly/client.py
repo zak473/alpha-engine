@@ -97,14 +97,16 @@ def get_odds(sport: str, match_id: str | int) -> dict[str, Any]:
     return data
 
 
-def get_extras(sport: str, match_id: str | int) -> dict[str, Any]:
+def get_extras(sport: str, match_id: str | int, include_players: bool = False) -> dict[str, Any]:
     """
-    Fetch lineups, statistics, and events for a single match.
-    Returns a combined dict with keys "lineups", "statistics", "events".
-    Each key is absent if the endpoint fails or returns no data.
+    Fetch lineups, statistics, events (and optionally players) for a single match.
+    Returns a combined dict. Each key absent if endpoint fails or returns no data.
     """
     extras: dict[str, Any] = {}
-    for endpoint in ("lineups", "statistics", "events"):
+    endpoints = ["lineups", "statistics", "events"]
+    if include_players:
+        endpoints.append("players")
+    for endpoint in endpoints:
         try:
             data = get(sport, endpoint, {"matchId": str(match_id)})
             payload = data.get("data") or data
@@ -113,6 +115,51 @@ def get_extras(sport: str, match_id: str | int) -> dict[str, Any]:
         except Exception as exc:
             log.warning("[highlightly:extras] %s %s/%s failed: %s", sport, endpoint, match_id, exc)
     return extras
+
+
+def get_last_five(sport: str, team_id: str | int) -> list[dict[str, Any]]:
+    """Fetch last 5 games for a team from /lastfivegames?teamId={id}."""
+    try:
+        data = get(sport, "lastfivegames", {"teamId": str(team_id)})
+        payload = data.get("data") or data
+        if isinstance(payload, list):
+            return payload
+        if isinstance(payload, dict):
+            return payload.get("matches") or payload.get("games") or []
+    except Exception as exc:
+        log.warning("[highlightly:lastfive] %s team %s: %s", sport, team_id, exc)
+    return []
+
+
+def get_headtohead(sport: str, home_team_id: str | int, away_team_id: str | int) -> list[dict[str, Any]]:
+    """Fetch head-to-head history between two teams."""
+    try:
+        data = get(sport, "headtohead", {
+            "homeTeamId": str(home_team_id),
+            "awayTeamId": str(away_team_id),
+        })
+        payload = data.get("data") or data
+        if isinstance(payload, list):
+            return payload
+        if isinstance(payload, dict):
+            return payload.get("matches") or payload.get("games") or []
+    except Exception as exc:
+        log.warning("[highlightly:h2h] %s %s vs %s: %s", sport, home_team_id, away_team_id, exc)
+    return []
+
+
+def get_players(sport: str, match_id: str | int) -> list[dict[str, Any]]:
+    """Fetch player profiles/stats for a match from /players?matchId={id}."""
+    try:
+        data = get(sport, "players", {"matchId": str(match_id)})
+        payload = data.get("data") or data
+        if isinstance(payload, list):
+            return payload
+        if isinstance(payload, dict):
+            return payload.get("players") or []
+    except Exception as exc:
+        log.warning("[highlightly:players] %s match %s: %s", sport, match_id, exc)
+    return []
 
 
 def get_highlights(sport: str, match_id: str | int) -> list[dict[str, Any]]:

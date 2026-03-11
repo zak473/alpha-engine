@@ -31,7 +31,10 @@ function StatChip({ icon: Icon, label, value, tone = "neutral" }: { icon: typeof
 export function BettingHero({ matches, filteredCount, activeSportLabel }: BettingHeroProps) {
   const liveCount = matches.filter((m) => m.status === "live").length;
   const topEdge = matches.reduce((max, m) => Math.max(max, m.edgePercent ?? 0), 0);
-  const avgConfidence = matches.length ? Math.round(matches.reduce((sum, m) => sum + ((m.modelConfidence ?? 0.5) * 100), 0) / matches.length) : 0;
+  const predictedMatches = matches.filter((m) => m.modelConfidence != null);
+  const avgConfidence = predictedMatches.length
+    ? Math.round(predictedMatches.reduce((sum, m) => sum + (m.modelConfidence! * 100), 0) / predictedMatches.length)
+    : null;
 
   return (
     <section className="px-4 pt-4 pb-3 lg:px-6 lg:pt-6 lg:pb-4">
@@ -58,7 +61,7 @@ export function BettingHero({ matches, filteredCount, activeSportLabel }: Bettin
           <div className="grid gap-3 sm:grid-cols-2">
             <StatChip icon={Activity} label="Live now" value={`${liveCount} matches`} tone="accent" />
             <StatChip icon={TrendingUp} label="Top edge" value={`+${topEdge.toFixed(1)}%`} tone="positive" />
-            <StatChip icon={ShieldCheck} label="Model confidence" value={`${avgConfidence}% avg`} tone="neutral" />
+            <StatChip icon={ShieldCheck} label="Model confidence" value={avgConfidence != null ? `${avgConfidence}% avg` : "No data"} tone="neutral" />
             <StatChip icon={Flame} label="Board focus" value="Best bets first" tone="warning" />
           </div>
         </div>

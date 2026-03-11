@@ -1,8 +1,11 @@
-"""Baseball match service — full Quant Terminal depth with mock data fallback."""
+"""Baseball match service."""
 
 from __future__ import annotations
 
+import logging
 import math
+
+log = logging.getLogger(__name__)
 from datetime import datetime
 from typing import Optional
 
@@ -39,7 +42,7 @@ from api.sports.baseball.schemas import (
     StarterPitcherOut,
     UmpireOut,
 )
-from api.sports.base.queries import compute_team_form, form_summary
+from api.sports.base.queries import compute_team_form, form_summary, h2h_from_hl
 from db.models.baseball import BaseballTeamMatchStats, BaseballPlayerMatchStats, EventContext
 from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, RatingEloTeam
 
@@ -67,7 +70,7 @@ def _elo_snapshot(db: Session, team_id: str, name: str) -> Optional[BaseballEloP
     if not rows:
         return None
     latest = rows[0]
-    change = round(latest.rating_after - rows[1].rating_after, 1) if len(rows) >= 2 else None
+    change = round(latest.rating_after - latest.rating_before, 1) if len(rows) >= 1 else None
     last_10 = [round(r.rating_after, 1) for r in reversed(rows)]
     return BaseballEloPanelOut(
         team_id=team_id,
@@ -179,7 +182,7 @@ def _starter_from_stats(row: "BaseballTeamMatchStats") -> Optional[StarterPitche
 
 
 def _build_baseball_form(
-    team_id: str, team_name: str, records: list[dict], summary: dict, seed: int, is_home: bool
+    team_id: str, team_name: str, records: list[dict], summary: dict
 ) -> Optional[BaseballTeamFormOut]:
     if not records:
         return None
@@ -213,15 +216,14 @@ def _build_baseball_form(
     )
 
 
-def _mock_baseball_detail(
+def _build_baseball_detail(
     match: CoreMatch, home_name: str, away_name: str, league: str, db: Session,
     home_logo: str | None = None, away_logo: str | None = None,
 ) -> BaseballMatchDetail:
-    seed = sum(ord(c) for c in match.id) % 100
     is_finished = match.status == "finished"
 
-    home_runs = match.home_score if match.home_score is not None else (3 + (seed % 6) if is_finished else None)
-    away_runs = match.away_score if match.away_score is not None else (2 + ((seed + 4) % 6) if is_finished else None)
+    home_runs = match.home_score
+    away_runs = match.away_score
 
     # Real ELO
     elo_home = _elo_snapshot(db, match.home_team_id, home_name)
@@ -252,6 +254,28 @@ def _mock_baseball_detail(
     home_summary = form_summary(home_form_records)
     away_summary = form_summary(away_form_records)
 
+    # H2H: prefer HL prematch data, fall back to DB
+    extras = match.extras_json or {}
+    _hl_h2h_raw = h2h_from_hl(extras.get("headtohead") or [], home_name, away_name)
+    if _hl_h2h_raw:
+        _hl_recent = [
+            {
+                "date": m.get("date"),
+                "home_score": m.get("home_score"),
+                "away_score": m.get("away_score"),
+                "winner": "home" if m.get("outcome") == "home_win" else "away",
+            }
+            for m in _hl_h2h_raw.get("recent_matches", [])
+        ]
+        h2h_result = H2HRecordOut(
+            total_matches=_hl_h2h_raw["total_matches"],
+            home_wins=_hl_h2h_raw["home_wins"],
+            away_wins=_hl_h2h_raw["away_wins"],
+            recent_matches=_hl_recent,
+        )
+    else:
+        h2h_result = _h2h(db, match.home_team_id, match.away_team_id)
+
     # Real inning scores from EventContext (populated by fetch_stats.py)
     innings = None
     ctx = db.query(EventContext).filter_by(match_id=match.id).first()
@@ -260,7 +284,8 @@ def _mock_baseball_detail(
             import json as _json
             raw = _json.loads(ctx.inning_scores_json)
             innings = [InningScore(inning=r["inning"], home=r.get("home"), away=r.get("away")) for r in raw]
-        except Exception:
+        except Exception as exc:
+            log.warning("inning_scores_parse_failed match=%s err=%s", match.id, exc)
             innings = None
     events = None
 
@@ -322,10 +347,10 @@ def _mock_baseball_detail(
         bullpen_away=bullpen_away,
         batting_home=batting_home,
         batting_away=batting_away,
-        form_home=_build_baseball_form(match.home_team_id, home_name, home_form_records, home_summary, seed, True),
-        form_away=_build_baseball_form(match.away_team_id, away_name, away_form_records, away_summary, seed + 11, False),
+        form_home=_build_baseball_form(match.home_team_id, home_name, home_form_records, home_summary),
+        form_away=_build_baseball_form(match.away_team_id, away_name, away_form_records, away_summary),
         inning_events=events,
-        h2h=_h2h(db, match.home_team_id, match.away_team_id),
+        h2h=h2h_result,
         context={"venue_name": match.venue} if match.venue else None,
         data_completeness={
             "box_score": is_finished and (stats_home_row is not None or stats_away_row is not None),
@@ -429,7 +454,7 @@ class BaseballMatchService(BaseMatchListService):
         away_logo = away_team.logo_url if away_team else None
         league = _league_name(db, match.league_id)
 
-        return _mock_baseball_detail(match, home_name, away_name, league, db,
+        return _build_baseball_detail(match, home_name, away_name, league, db,
                                      home_logo=home_logo, away_logo=away_logo)
 
     def get_elo_history(self, team_id: str, limit: int, db: Session) -> list[EloHistoryPoint]:

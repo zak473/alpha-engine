@@ -12,7 +12,10 @@ async function getMatches(): Promise<BettingMatch[]> {
   const results = await Promise.allSettled(
     SPORTS.map((sport) =>
       getSportMatches(sport, { limit: 100 })
-        .then((res) => res.items.map((item) => adaptToMatchCard(item, sport)))
+        .then((res) => res.items.flatMap((item) => {
+          try { return [adaptToMatchCard(item, sport)]; }
+          catch { return []; }
+        }))
     )
   );
 

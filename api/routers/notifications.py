@@ -2,6 +2,7 @@
 Notifications API — /api/v1/notifications
 """
 from __future__ import annotations
+import logging
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -9,6 +10,8 @@ from datetime import datetime
 from typing import Optional
 from api.deps import get_session, get_current_user
 from db.models.notifications import UserNotification
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
@@ -96,8 +99,8 @@ def create_notification(db: Session, user_id: str, type: str, title: str, messag
     """Create a notification for a user. Safe to call from the scheduler."""
     try:
         UserNotification.__table__.create(db.get_bind(), checkfirst=True)
-    except Exception:
-        pass
+    except Exception as exc:
+        log.warning("notifications_table_create_failed err=%s", exc)
     n = UserNotification(user_id=user_id, type=type, title=title, message=message, data=data or {})
     db.add(n)
     # Don't commit here — caller handles transaction

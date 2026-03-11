@@ -1,8 +1,11 @@
-"""Esports match service — CS2 + LoL aware with mock data fallback."""
+"""Esports match service."""
 
 from __future__ import annotations
 
+import logging
 import math
+
+log = logging.getLogger(__name__)
 from typing import Optional
 
 from fastapi import HTTPException
@@ -99,7 +102,7 @@ def _elo_panel(db: Session, team_id: str, name: str) -> Optional[EsportsEloPanel
     if not rows:
         return None
     latest = rows[0]
-    change = round(latest.rating_after - rows[1].rating_after, 1) if len(rows) == 2 else None
+    change = round(latest.rating_after - latest.rating_before, 1)
     return EsportsEloPanel(
         team_id=team_id,
         team_name=name,
@@ -177,7 +180,8 @@ def _team_form(db: Session, team_id: str, team_name: str) -> Optional[EsportsTea
             online_win_pct=row.online_win_pct,
             roster_stability_score=row.roster_stability_score,
         )
-    except Exception:
+    except Exception as exc:
+        log.warning("esports_team_form_failed team=%s err=%s", team_id, exc)
         db.rollback()
         return None
 
@@ -314,7 +318,8 @@ class EsportsMatchService(BaseMatchListService):
             if em:
                 series_format = em.format or "bo3"
                 is_lan = bool(em.is_lan)
-        except Exception:
+        except Exception as exc:
+            log.warning("esports_match_info_failed match=%s err=%s", match_id, exc)
             db.rollback()
 
         match_info = EsportsMatchInfo(
@@ -361,7 +366,8 @@ class EsportsMatchService(BaseMatchListService):
                 if em.veto_json:
                     for v in em.veto_json:
                         veto_data.append(EsportsVetoEntry(action=v.get("action","ban"), team=v.get("team","a"), map_name=v.get("map","")))
-        except Exception:
+        except Exception as exc:
+            log.warning("esports_map_data_failed match=%s err=%s", match_id, exc)
             db.rollback()
 
         # Try HLTV scraped data (CS2 only) if no PandaScore data
@@ -425,7 +431,8 @@ class EsportsMatchService(BaseMatchListService):
                         patch_version=match_info.patch_version,
                         tournament_tier=match_info.tournament_tier,
                     )
-            except Exception:
+            except Exception as exc:
+                log.warning("esports_hltv_data_failed match=%s err=%s", match_id, exc)
                 db.rollback()
 
         # No mock fallback — leave all lists empty when real data is unavailable
@@ -450,8 +457,8 @@ class EsportsMatchService(BaseMatchListService):
                     played_maps = [mr for mr in em_live.map_results]
                     if played_maps:
                         esports_current_period = max(mr.map_number for mr in played_maps)
-            except Exception:
-                pass
+            except Exception as exc:
+                log.warning("esports_live_period_failed match=%s err=%s", match_id, exc)
 
         return EsportsMatchDetail(
             id=match.id, sport="esports", league=league_name, season=match.season,

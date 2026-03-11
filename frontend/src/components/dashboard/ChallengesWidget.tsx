@@ -31,7 +31,6 @@ function ChallengeRow({ challenge, leaderboard, userId }: {
   const rank = userRow?.rank;
   const totalPlayers = leaderboard?.rows.length ?? challenge.member_count;
 
-  // Mock trend: if rank ≤ half of total, trending up, otherwise flat
   const trend = rank == null ? "neutral" : rank <= Math.ceil(totalPlayers / 2) ? "up" : "down";
 
   return (

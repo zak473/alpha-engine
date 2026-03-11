@@ -159,6 +159,14 @@ def _job_predict_only() -> None:
     except Exception as exc:
         log.error("[scheduler] baseball predict failed: %s", exc, exc_info=True)
 
+    # Hockey (ELO)
+    try:
+        from pipelines.hockey.predict_hockey import run as run_hockey_pred
+        run_hockey_pred()
+        log.info("[scheduler] hockey predict done.")
+    except Exception as exc:
+        log.error("[scheduler] hockey predict failed: %s", exc, exc_info=True)
+
     log.info("[scheduler] predict_only done.")
 
 
@@ -192,6 +200,7 @@ def _job_update_elo() -> None:
         ("esports",    "pipelines.esports.backfill_elo",    "run_backfill"),
         ("basketball", "pipelines.basketball.backfill_elo", "run_backfill"),
         ("baseball",   "pipelines.baseball.backfill_elo",   "run_backfill"),
+        ("hockey",     "pipelines.hockey.backfill_elo",     "run_backfill"),
     ]
 
     for sport, module_path, fn_name in sports:
@@ -520,6 +529,20 @@ def _job_fetch_highlightly_historical() -> None:
     log.info("[scheduler] highlightly_historical done.")
 
 
+def _job_prematch_extras() -> None:
+    """
+    Enrich upcoming matches (next 24h) with lastfivegames, headtohead, players.
+    Runs every 30 min. Cost: ~32 API calls/run × 48 runs/day = ~1,536 calls/day.
+    """
+    from pipelines.highlightly.fetch_all import fetch_prematch_extras
+    try:
+        n = fetch_prematch_extras()
+        if n:
+            log.info("[scheduler] prematch_extras: enriched %d matches.", n)
+    except Exception as exc:
+        log.error("[scheduler] prematch_extras failed: %s", exc, exc_info=True)
+
+
 def _job_sync_standings() -> None:
     """Sync league standings for all active Highlightly leagues — runs every 6 hours."""
     from pipelines.highlightly.fetch_all import fetch_standings
@@ -661,24 +684,36 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
-    # Highlightly live scores every 1 minute — scores only, 4 calls/run
+    # Highlightly live scores every 2 minutes — scores only, 4 calls/run
+    # 720 runs/day × 4 calls = 2,880 calls/day
     _scheduler.add_job(
         _job_highlightly_live,
-        trigger=IntervalTrigger(minutes=1),
+        trigger=IntervalTrigger(minutes=2),
         id="highlightly_live",
-        name="Highlightly live scores (1m, scores only)",
+        name="Highlightly live scores (2m, scores only)",
         replace_existing=True,
         next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=1),
     )
 
-    # Highlightly full sync every 1 minute — today+tomorrow with live extras
+    # Highlightly full sync every 10 minutes — today+tomorrow with live extras + inline odds
+    # 144 runs/day × ~38 calls = ~5,500 calls/day (fits Pro plan)
     _scheduler.add_job(
         _job_fetch_highlightly,
-        trigger=IntervalTrigger(minutes=1),
+        trigger=IntervalTrigger(minutes=10),
         id="fetch_highlightly",
-        name="Highlightly sync with live extras (1m)",
+        name="Highlightly sync with live extras (10m)",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=2),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=3),
+    )
+
+    # Prematch extras (lastfivegames, headtohead, players) every 30 min
+    _scheduler.add_job(
+        _job_prematch_extras,
+        trigger=IntervalTrigger(minutes=30),
+        id="prematch_extras",
+        name="Highlightly prematch extras (lastfivegames/h2h/players)",
+        replace_existing=True,
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=5),
     )
 
     # Standings sync every 12 hours
@@ -703,7 +738,8 @@ def start() -> BackgroundScheduler:
     _scheduler.start()
     log.info(
         "[scheduler] Started. Jobs: expire_stale (5m), fetch_live (30m), fetch_odds (30m), "
-        "highlightly_live (2m), fetch_highlightly (15m), highlightly_historical (daily 04:00), "
+        "highlightly_live (2m, scores only), fetch_highlightly (10m, extras+odds), prematch_extras (30m), "
+        "highlightly_historical (daily 03:00), sync_standings (12h), "
         "settle_picks (15m), predict_only (1h), fetch_stats (6h), "
         "update_elo (nightly 03:00 UTC), build_soccer_features (nightly 03:30 UTC), "
         "fetch_player_profiles (weekly Sun), fetch_xg (weekly Mon), "

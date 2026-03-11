@@ -8,7 +8,10 @@ Provides:
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
+
+log = logging.getLogger(__name__)
 from typing import Optional
 
 from fastapi import HTTPException
@@ -71,21 +74,46 @@ def _elo_snapshot(db: Session, team_id: str, team_name: str) -> Optional[EloSnap
         db.query(RatingEloTeam)
         .filter(RatingEloTeam.team_id == team_id, RatingEloTeam.context == "global")
         .order_by(RatingEloTeam.rated_at.desc())
-        .limit(2)
+        .limit(10)
         .all()
     )
     if not rows:
         return None
     latest = rows[0]
-    change = None
-    if len(rows) == 2:
-        change = round(latest.rating_after - rows[1].rating_after, 1)
+    change = round(latest.rating_after - latest.rating_before, 1)
     return EloSnapshotOut(
         team_id=team_id,
         team_name=team_name,
         rating=round(latest.rating_after, 1),
         rating_change=change,
     )
+
+
+def _form_from_hl(hl_matches: list[dict], team_name: str) -> FormStatsOut | None:
+    """Build FormStatsOut from Highlightly lastfivegames data."""
+    from api.sports.base.queries import form_from_hl
+    raw = form_from_hl(hl_matches, team_name)
+    if not raw:
+        return None
+    return FormStatsOut(
+        team_name=team_name,
+        form_pts=float(raw["form_pts"]),
+        wins=raw["wins"],
+        draws=raw["draws"],
+        losses=raw["losses"],
+        goals_scored_avg=raw.get("gf_avg"),
+        goals_conceded_avg=raw.get("ga_avg"),
+        form_last_5=raw.get("form_seq"),
+    )
+
+
+def _h2h_from_hl(hl_matches: list[dict], home_name: str, away_name: str) -> H2HRecordOut | None:
+    """Build H2HRecordOut from Highlightly headtohead data."""
+    from api.sports.base.queries import h2h_from_hl
+    raw = h2h_from_hl(hl_matches, home_name, away_name)
+    if not raw:
+        return None
+    return H2HRecordOut(**raw)
 
 
 def _h2h(db: Session, home_id: str, away_id: str, home_name: str = "", away_name: str = "") -> H2HRecordOut:
@@ -117,12 +145,16 @@ def _h2h(db: Session, home_id: str, away_id: str, home_name: str = "", away_name
     for m in matches:
         # Normalise: "home" always = the team we queried as home_id
         if m.home_team_id == home_id:
-            result = _norm.get(m.outcome or "", "draw")
+            result = _norm.get(m.outcome or "")
             home_score, away_score = m.home_score, m.away_score
         else:
             # Swap perspective
-            result = _flip.get(_norm.get(m.outcome or "", "draw"), "draw")
+            normed = _norm.get(m.outcome or "")
+            result = _flip.get(normed) if normed else None
             home_score, away_score = m.away_score, m.home_score
+
+        if result is None:
+            continue  # unknown outcome — skip rather than miscount as draw
 
         if result == "home_win":
             home_wins += 1
@@ -900,6 +932,24 @@ class SoccerMatchService(BaseMatchListService):
         events = _extract_events(match.extras_json, home_name, away_name)
         stats_home_live, stats_away_live = _extract_live_stats(match.extras_json)
 
+        # Prefer Highlightly prematch data for form/H2H when available
+        extras = match.extras_json or {}
+        hl_form_home = _form_from_hl(extras.get("lastfivegames_home") or [], home_name)
+        hl_form_away = _form_from_hl(extras.get("lastfivegames_away") or [], away_name)
+        hl_h2h = _h2h_from_hl(extras.get("headtohead") or [], home_name, away_name)
+
+        form_home = (
+            hl_form_home
+            or _form_stats(feat, home_name, "home", match_id)
+            or _compute_form_from_db(db, match.home_team_id, match.kickoff_utc, home_name)
+        )
+        form_away = (
+            hl_form_away
+            or _form_stats(feat, away_name, "away", match_id)
+            or _compute_form_from_db(db, match.away_team_id, match.kickoff_utc, away_name)
+        )
+        h2h = hl_h2h or _h2h(db, match.home_team_id, match.away_team_id, home_name, away_name)
+
         return SoccerMatchDetail(
             id=match.id,
             sport="soccer",
@@ -925,10 +975,10 @@ class SoccerMatchService(BaseMatchListService):
             elo_away=elo_away,
             stats_home=_team_stats_out(db, match_id, match.home_team_id, home_name, True),
             stats_away=_team_stats_out(db, match_id, match.away_team_id, away_name, False),
-            form_home=_form_stats(feat, home_name, "home", match_id) or _compute_form_from_db(db, match.home_team_id, match.kickoff_utc, home_name),
-            form_away=_form_stats(feat, away_name, "away", match_id) or _compute_form_from_db(db, match.away_team_id, match.kickoff_utc, away_name),
+            form_home=form_home,
+            form_away=form_away,
             simulation=simulation,
-            h2h=_h2h(db, match.home_team_id, match.away_team_id, home_name, away_name),
+            h2h=h2h,
             context=match_context,
             lineup_home=lineup_home,
             lineup_away=lineup_away,

@@ -275,12 +275,15 @@ export function MatchCard({ match, highlighted, sport, detailHref }: MatchCardPr
 }
 
 function isWithinHour(iso: string): boolean {
-  const diff = new Date(iso).getTime() - Date.now();
+  const ms = new Date(iso).getTime();
+  if (isNaN(ms)) return false;
+  const diff = ms - Date.now();
   return diff > 0 && diff < 3_600_000;
 }
 
 function formatMatchTime(iso: string): string {
   const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const tomorrowStart = new Date(todayStart.getTime() + 86_400_000);
@@ -293,7 +296,9 @@ function formatMatchTime(iso: string): string {
 function formatCountdown(iso: string, status: BettingMatch["status"]): string {
   if (status === "live") return "In-play";
   if (status === "finished") return "Settled";
-  const diff = new Date(iso).getTime() - Date.now();
+  const ms = new Date(iso).getTime();
+  if (isNaN(ms)) return "—";
+  const diff = ms - Date.now();
   const mins = Math.round(diff / 60000);
   if (mins < 60) return `${Math.max(0, mins)} min to start`;
   const hours = Math.floor(mins / 60);

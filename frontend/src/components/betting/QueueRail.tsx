@@ -81,8 +81,9 @@ function QueueItem({ sel, onRemove }: { sel: QueueSelection; onRemove: () => voi
 // ── Running EV summary ────────────────────────────────────────────────────────
 
 function EvSummary({ queue }: { queue: QueueSelection[] }) {
-  const avgOdds = queue.reduce((s, q) => s + q.odds, 0) / queue.length;
-  const avgEdge = queue.reduce((s, q) => s + (q.edge ?? 0), 0) / queue.length;
+  const n = queue.length || 1; // guard against division by zero
+  const avgOdds = queue.reduce((s, q) => s + q.odds, 0) / n;
+  const avgEdge = queue.reduce((s, q) => s + (q.edge ?? 0), 0) / n;
   const parlayOdds = queue.reduce((p, q) => p * q.odds, 1);
 
   return (

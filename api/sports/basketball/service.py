@@ -1,8 +1,11 @@
-"""Basketball match service — full Quant Terminal depth with mock data fallback."""
+"""Basketball match service."""
 
 from __future__ import annotations
 
+import logging
 import math
+
+log = logging.getLogger(__name__)
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -38,7 +41,7 @@ from api.sports.basketball.schemas import (
     QuarterScore,
     ShotZoneOut,
 )
-from api.sports.base.queries import compute_team_form, form_summary
+from api.sports.base.queries import compute_team_form, form_summary, h2h_from_hl
 from db.models.basketball import BasketballTeamMatchStats, BasketballPlayerMatchStats
 from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, RatingEloTeam
 
@@ -66,7 +69,7 @@ def _elo_snapshot(db: Session, team_id: str, name: str) -> Optional[BasketballEl
     if not rows:
         return None
     latest = rows[0]
-    change = round(latest.rating_after - rows[1].rating_after, 1) if len(rows) >= 2 else None
+    change = round(latest.rating_after - latest.rating_before, 1)
     last_10 = [round(r.rating_after, 1) for r in reversed(rows)]
     return BasketballEloPanelOut(
         team_id=team_id,
@@ -206,7 +209,7 @@ def _box_from_stats(row: "BasketballTeamMatchStats", team_name: str, db: Session
 
 
 def _build_basketball_form(
-    team_id: str, team_name: str, records: list[dict], summary: dict, seed: int
+    team_id: str, team_name: str, records: list[dict], summary: dict
 ) -> BasketballTeamFormOut:
     entries = []
     for rec in records:
@@ -240,7 +243,7 @@ def _build_basketball_form(
     )
 
 
-def _mock_basketball_detail(
+def _build_basketball_detail(
     match: CoreMatch,
     home_name: str,
     away_name: str,
@@ -249,7 +252,6 @@ def _mock_basketball_detail(
     home_logo: str | None = None,
     away_logo: str | None = None,
 ) -> BasketballMatchDetail:
-    seed = sum(ord(c) for c in match.id) % 100
     status = match.status
     is_finished = status == "finished"
 
@@ -318,6 +320,28 @@ def _mock_basketball_detail(
     home_summary = form_summary(home_form_records)
     away_summary = form_summary(away_form_records)
 
+    # H2H: prefer HL prematch data, fall back to DB
+    extras = match.extras_json or {}
+    _hl_h2h_raw = h2h_from_hl(extras.get("headtohead") or [], home_name, away_name)
+    if _hl_h2h_raw:
+        _hl_recent = [
+            {
+                "date": m.get("date"),
+                "home_score": m.get("home_score"),
+                "away_score": m.get("away_score"),
+                "winner": "home" if m.get("outcome") == "home_win" else "away",
+            }
+            for m in _hl_h2h_raw.get("recent_matches", [])
+        ]
+        h2h_result = H2HRecordOut(
+            total_matches=_hl_h2h_raw["total_matches"],
+            home_wins=_hl_h2h_raw["home_wins"],
+            away_wins=_hl_h2h_raw["away_wins"],
+            recent_matches=_hl_recent,
+        )
+    else:
+        h2h_result = _h2h(db, match.home_team_id, match.away_team_id)
+
     # Derive current_period for live matches from quarter scores in DB stats
     live_current_period = None
     if status == "live":
@@ -334,8 +358,8 @@ def _mock_basketball_detail(
                     ] if v is not None and v > 0)
                     if quarters_played > 0:
                         live_current_period = quarters_played
-            except Exception:
-                pass
+            except Exception as exc:
+                log.warning("live_period_detect_failed match=%s err=%s", match.id, exc)
 
     return BasketballMatchDetail(
         id=match.id,
@@ -381,8 +405,8 @@ def _mock_basketball_detail(
             referee_crew=[],
             overtime_periods=0,
         ),
-        form_home=_build_basketball_form(match.home_team_id, home_name, home_form_records, home_summary, seed),
-        form_away=_build_basketball_form(match.away_team_id, away_name, away_form_records, away_summary, seed + 11),
+        form_home=_build_basketball_form(match.home_team_id, home_name, home_form_records, home_summary),
+        form_away=_build_basketball_form(match.away_team_id, away_name, away_form_records, away_summary),
         box_home=box_home,
         box_away=box_away,
         adv_home=(
@@ -395,7 +419,7 @@ def _mock_basketball_detail(
         injuries_away=[],
         shots_home=[],
         shots_away=[],
-        h2h=_h2h(db, match.home_team_id, match.away_team_id),
+        h2h=h2h_result,
         context={"venue_name": match.venue} if match.venue else None,
         data_completeness={
             "box_score": is_finished and (stats_home is not None or stats_away is not None),
@@ -413,18 +437,6 @@ def _mock_basketball_detail(
         referee=None,
         betting=None,
     )
-
-
-def _split_quarters(total: int, seed: int) -> QuarterScore:
-    """Split total into 4 plausible quarters."""
-    base = total // 4
-    rem = total - base * 4
-    qs = [base + (1 if i < rem else 0) for i in range(4)]
-    # Add some variance
-    for i in range(4):
-        delta = (seed + i * 7) % 7 - 3
-        qs[i] = max(10, qs[i] + delta)
-    return QuarterScore(q1=qs[0], q2=qs[1], q3=qs[2], q4=qs[3])
 
 
 # ─── Service ─────────────────────────────────────────────────────────────────
@@ -461,7 +473,6 @@ class BasketballMatchService(BaseMatchListService):
             away_name = at.name if at else m.away_team_id
             elo_h = _elo_snapshot(db, m.home_team_id, home_name)
             elo_a = _elo_snapshot(db, m.away_team_id, away_name)
-            seed = sum(ord(c) for c in m.id) % 100
             r_home = (elo_h.rating if elo_h else 1500.0)
             r_away = (elo_a.rating if elo_a else 1500.0)
             p_home = _elo_win_prob(r_home, r_away, 35.0)
@@ -508,7 +519,7 @@ class BasketballMatchService(BaseMatchListService):
         away_logo = away_team.logo_url if away_team else None
         league = _league_name(db, match.league_id)
 
-        return _mock_basketball_detail(match, home_name, away_name, league, db,
+        return _build_basketball_detail(match, home_name, away_name, league, db,
                                        home_logo=home_logo, away_logo=away_logo)
 
     def get_elo_history(self, team_id: str, limit: int, db: Session) -> list[EloHistoryPoint]:

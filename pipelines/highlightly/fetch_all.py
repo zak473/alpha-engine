@@ -18,8 +18,9 @@ from config.settings import settings
 import json as _json
 
 from pipelines.highlightly.client import (
-    extract_odds, get_extras, get_highlights, get_leagues,
-    get_matches, get_odds, get_standings,
+    extract_odds, get_extras, get_headtohead, get_highlights,
+    get_last_five, get_leagues, get_matches, get_odds,
+    get_players, get_standings,
 )
 from pipelines.soccer.ingest_matches import ingest_from_dicts
 
@@ -200,8 +201,10 @@ def _transform(match: dict[str, Any], sport: str) -> dict[str, Any] | None:
         "home_team_logo_url":     home_logo,
         "away_team_logo_url":     away_logo,
         "league_logo_url":        league_logo,
-        "_hl_match_id":           match_id,  # temp: used for extras enrichment, not stored in DB
-        "_hl_league_id":          league_id,  # temp: used for standings sync
+        "_hl_match_id":           match_id,    # temp: used for extras enrichment, not stored in DB
+        "_hl_league_id":          league_id,   # temp: used for standings sync
+        "_hl_home_team_id":       home.get("id"),   # temp: HL team ID for lastfivegames
+        "_hl_away_team_id":       away.get("id"),   # temp: HL team ID for lastfivegames
     }
 
 
@@ -235,9 +238,8 @@ def _fetch_and_attach_odds(matches: list[dict], sport: str) -> None:
 
 def _enrich_live_rows(rows: list[dict], sport: str) -> None:
     """
-    Fetch extras (lineups, statistics, events) ONLY for currently live matches.
-    Called sparingly — not on every poll cycle.
-    Each live match costs 3 API calls. With 10 live matches = 30 calls.
+    Fetch extras (lineups, statistics, events, players) ONLY for live matches.
+    Each live match costs 4 API calls. With 10 live matches = 40 calls.
     """
     for row in rows:
         if row.get("status") != "live":
@@ -246,7 +248,7 @@ def _enrich_live_rows(rows: list[dict], sport: str) -> None:
         if not hl_id:
             continue
         try:
-            extras = get_extras(sport, hl_id)
+            extras = get_extras(sport, hl_id, include_players=True)
             if extras:
                 row["extras_json"] = _json.dumps(extras)
             time.sleep(0.3)
@@ -325,16 +327,21 @@ def fetch_with_extras(dry_run: bool = False) -> int:
     all_rows: list[dict] = []
 
     for sport in SPORTS:
-        sport_rows: list[dict] = []
+        sport_matches: list[dict] = []
         for date in dates:
             try:
-                matches = get_matches(sport, date)
-                rows = [r for m in matches if (r := _transform(m, sport))]
-                sport_rows.extend(rows)
+                raw_matches = get_matches(sport, date)
+                sport_matches.extend(raw_matches)
                 time.sleep(0.3)
             except Exception as exc:
                 log.warning("[highlightly:extras] %s %s failed: %s", sport, date, exc)
-        # Only enrich live matches — not upcoming/recent
+
+        # Fetch separate /odds for upcoming/live matches that don't have inline odds
+        _fetch_and_attach_odds(sport_matches, sport)
+
+        sport_rows = [r for m in sport_matches if (r := _transform(m, sport))]
+
+        # Enrich live matches with lineups/stats/events
         _enrich_live_rows(sport_rows, sport)
         all_rows.extend(sport_rows)
 
@@ -435,6 +442,118 @@ def fetch_historical(dry_run: bool = False, days_back: int = 730) -> int:
     ingested = ingest_from_dicts(all_rows)
     log.info("[highlightly:history] Ingested %d rows.", ingested)
     return ingested
+
+
+def fetch_prematch_extras(dry_run: bool = False, max_matches: int = 8) -> int:
+    """
+    Enrich upcoming matches (next 24h) with lastfivegames, headtohead, and players.
+    Reads directly from DB, merges new keys into existing extras_json without wiping
+    lineups/stats/events already stored for live matches.
+
+    Skips matches that already have lastfivegames_home (idempotent).
+    Cost: max_matches × 4 calls = 32 calls/run × 48 runs/day = ~1,536 calls/day.
+    """
+    if not settings.HIGHLIGHTLY_API_KEY:
+        return 0
+
+    from db.session import SessionLocal
+    from db.models.mvp import CoreMatch, CoreTeam
+    from datetime import timedelta
+
+    db = SessionLocal()
+    enriched = 0
+    try:
+        now = datetime.now(timezone.utc)
+        window_end = now + timedelta(hours=24)
+
+        upcoming = (
+            db.query(CoreMatch)
+            .filter(
+                CoreMatch.sport.in_(SPORTS),
+                CoreMatch.status == "scheduled",
+                CoreMatch.kickoff_utc >= now,
+                CoreMatch.kickoff_utc <= window_end,
+            )
+            .order_by(CoreMatch.kickoff_utc.asc())
+            .limit(max_matches * 2)  # fetch extra to account for skips
+            .all()
+        )
+
+        done = 0
+        for match in upcoming:
+            if done >= max_matches:
+                break
+
+            # Skip if already enriched with prematch data
+            existing: dict = match.extras_json or {}
+            if "lastfivegames_home" in existing:
+                continue
+
+            sport = match.sport
+
+            # Extract HL IDs from provider_ids: "hl-{sport}-team-{hl_id}"
+            home_team = db.query(CoreTeam).filter_by(id=match.home_team_id).first()
+            away_team = db.query(CoreTeam).filter_by(id=match.away_team_id).first()
+
+            def _hl_id(team: CoreTeam | None) -> str | None:
+                if not team or not team.provider_id:
+                    return None
+                parts = team.provider_id.split("-")
+                return parts[-1] if len(parts) >= 4 else None
+
+            home_hl_id = _hl_id(home_team)
+            away_hl_id = _hl_id(away_team)
+
+            # HL match ID: "hl-{sport}-{match_id}" → extract last part
+            match_hl_id = None
+            if match.provider_id and match.provider_id.startswith(f"hl-{sport}-"):
+                match_hl_id = match.provider_id[len(f"hl-{sport}-"):]
+
+            if not home_hl_id or not away_hl_id:
+                continue
+
+            extras = dict(existing)  # preserve existing keys (lineups/stats/events)
+            try:
+                lf_home = get_last_five(sport, home_hl_id)
+                if lf_home:
+                    extras["lastfivegames_home"] = lf_home
+                time.sleep(0.3)
+
+                lf_away = get_last_five(sport, away_hl_id)
+                if lf_away:
+                    extras["lastfivegames_away"] = lf_away
+                time.sleep(0.3)
+
+                h2h = get_headtohead(sport, home_hl_id, away_hl_id)
+                if h2h:
+                    extras["headtohead"] = h2h
+                time.sleep(0.3)
+
+                if match_hl_id:
+                    players = get_players(sport, match_hl_id)
+                    if players:
+                        extras["players"] = players
+                    time.sleep(0.3)
+
+                if not dry_run and extras:
+                    match.extras_json = extras
+                    enriched += 1
+                    done += 1
+
+            except Exception as exc:
+                log.warning("[highlightly:prematch] %s match %s failed: %s", sport, match.id, exc)
+
+        if not dry_run:
+            db.commit()
+
+    except Exception as exc:
+        db.rollback()
+        log.error("[highlightly:prematch] fetch_prematch_extras failed: %s", exc, exc_info=True)
+    finally:
+        db.close()
+
+    log.info("[highlightly:prematch] Enriched %d upcoming matches.", enriched)
+    return enriched
 
 
 def fetch_standings(dry_run: bool = False) -> int:
