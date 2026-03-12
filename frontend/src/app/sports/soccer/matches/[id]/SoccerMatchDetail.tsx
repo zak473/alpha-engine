@@ -105,6 +105,28 @@ function Panel({
   padded?: boolean; children: React.ReactNode;
 }) {
   return (
+    <div className="overflow-hidden rounded-[28px] border border-[#d9e2d7] bg-white shadow-[0_12px_30px_rgba(17,19,21,0.05)]">
+      <div className="flex items-start justify-between gap-3 border-b border-[#edf2ea] px-5 py-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[#667066]">
+              {title}
+            </span>
+            {badge}
+          </div>
+          {subtitle && <p className="mt-1 text-[12px] text-[#7b857b]">{subtitle}</p>}
+        </div>
+        {action && <div className="shrink-0">{action}</div>}
+      </div>
+      <div className={padded ? "px-5 py-5" : ""}>{children}</div>
+    </div>
+  );
+}
+: {
+  title: string; subtitle?: string; badge?: React.ReactNode; action?: React.ReactNode;
+  padded?: boolean; children: React.ReactNode;
+}) {
+  return (
     <div className="overflow-hidden rounded-[28px] border border-[#dbe4d7] bg-white shadow-[0_10px_30px_rgba(17,19,21,0.05)]">
       <div className="flex items-center justify-between gap-3 border-b border-[#edf2ea] px-5 py-4">
         <div className="min-w-0">
@@ -686,6 +708,80 @@ function TeamComparisonTable({ match }: { match: MatchProps["match"] }) {
 
   const getCol = (a?: number | null, b?: number | null, hb = true) => {
     if (a == null || b == null) return "text-[#4f5950]";
+    return (hb ? a > b : a < b) ? "text-[#2d7f4f]" : a === b ? "text-[#4f5950]" : "text-[#b45309]";
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-[1fr_auto_1fr_auto] md:items-center">
+        <div className="rounded-[18px] border border-[#d9e2d7] bg-[#f6faf5] px-4 py-3 text-center md:text-left">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b857b]">Home</p>
+          <p className="mt-1 text-sm font-semibold text-[#2d7f4f]">{match.home.name}</p>
+        </div>
+        <div className="hidden md:block text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b857b]">vs</div>
+        <div className="rounded-[18px] border border-[#d9e2d7] bg-[#fffbf4] px-4 py-3 text-center md:text-right">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b857b]">Away</p>
+          <p className="mt-1 text-sm font-semibold text-[#b45309]">{match.away.name}</p>
+        </div>
+        <button
+          className="inline-flex items-center justify-center gap-1 rounded-full border border-[#d9e2d7] bg-[#f7f8f5] px-3 py-2 text-[11px] font-medium text-[#667066] transition hover:text-[#111315]"
+          onClick={() => setAdvanced(v => !v)}
+        >
+          {advanced ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          {advanced ? "Basic view" : "Advanced view"}
+        </button>
+      </div>
+
+      <div className="overflow-hidden rounded-[22px] border border-[#e6ece3] bg-[#fbfcfa]">
+        {rows.map((row) => (
+          <div
+            key={row.label}
+            className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-[#e9efe7] px-4 py-3 last:border-b-0"
+          >
+            <div className={cn("text-right font-mono text-sm font-semibold tabular-nums", getCol(row.hRaw, row.aRaw, row.higherBetter !== false))}>
+              {row.hVal}
+            </div>
+            <div className="rounded-full bg-white px-3 py-1 text-center text-[11px] font-medium text-[#667066] shadow-sm">
+              {row.label}
+            </div>
+            <div className={cn("text-left font-mono text-sm font-semibold tabular-nums", getCol(row.aRaw, row.hRaw, row.higherBetter !== false))}>
+              {row.aVal}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+: { match: MatchProps["match"] }) {
+  const [advanced, setAdvanced] = useState(false);
+  const eh = match.elo_home; const ea = match.elo_away;
+  const fh = match.form_home; const fa = match.form_away;
+  const sh = match.stats_home as Record<string, number | null> | null;
+  const sa = match.stats_away as Record<string, number | null> | null;
+  const p  = match.probabilities;
+  const ep = eh && ea ? eloThreeOutcome(eh.rating, ea.rating) : null;
+
+  type Row = { label: string; hVal: React.ReactNode; aVal: React.ReactNode; hRaw?: number | null; aRaw?: number | null; higherBetter?: boolean; adv?: boolean };
+  const rows: Row[] = [
+    { label: "Win probability", hVal: pct(p?.home_win), aVal: pct(p?.away_win), hRaw: p?.home_win, aRaw: p?.away_win },
+    { label: "ELO-implied H/A", hVal: ep ? `${Math.round(ep.home * 100)}%` : "—", aVal: ep ? `${Math.round(ep.away * 100)}%` : "—", hRaw: ep?.home, aRaw: ep?.away },
+    { label: "ELO rating", hVal: eh ? Math.round(eh.rating) : "—", aVal: ea ? Math.round(ea.rating) : "—", hRaw: eh?.rating, aRaw: ea?.rating },
+    { label: "ELO Δ last match", hVal: <Delta v={eh?.rating_change} />, aVal: <Delta v={ea?.rating_change} />, hRaw: eh?.rating_change, aRaw: ea?.rating_change },
+    { label: "Form pts (last 5)", hVal: n(fh?.form_pts, 0), aVal: n(fa?.form_pts, 0), hRaw: fh?.form_pts, aRaw: fa?.form_pts },
+    { label: "W / D / L", hVal: fh ? `${fh.wins ?? 0}W ${fh.draws ?? 0}D ${fh.losses ?? 0}L` : "—", aVal: fa ? `${fa.wins ?? 0}W ${fa.draws ?? 0}D ${fa.losses ?? 0}L` : "—", hRaw: fh?.form_pts, aRaw: fa?.form_pts },
+    { label: "Goals for avg", hVal: n(fh?.goals_scored_avg), aVal: n(fa?.goals_scored_avg), hRaw: fh?.goals_scored_avg, aRaw: fa?.goals_scored_avg },
+    { label: "Goals ag avg", hVal: n(fh?.goals_conceded_avg), aVal: n(fa?.goals_conceded_avg), hRaw: fh?.goals_conceded_avg, aRaw: fa?.goals_conceded_avg, higherBetter: false },
+    { label: "xG avg", hVal: n(fh?.xg_avg, 2), aVal: n(fa?.xg_avg, 2), hRaw: fh?.xg_avg, aRaw: fa?.xg_avg, adv: true },
+    { label: "xGA avg", hVal: n(fh?.xga_avg, 2), aVal: n(fa?.xga_avg, 2), hRaw: fh?.xga_avg, aRaw: fa?.xga_avg, higherBetter: false, adv: true },
+    { label: "Days rest", hVal: fh?.days_rest != null ? `${Math.round(fh.days_rest)}d` : "—", aVal: fa?.days_rest != null ? `${Math.round(fa.days_rest)}d` : "—", hRaw: fh?.days_rest, aRaw: fa?.days_rest },
+    { label: "Shots (match)", hVal: sh?.shots_total ?? "—", aVal: sa?.shots_total ?? "—", hRaw: sh?.shots_total, aRaw: sa?.shots_total, adv: true },
+    { label: "Shots on target", hVal: sh?.shots_on_target ?? "—", aVal: sa?.shots_on_target ?? "—", hRaw: sh?.shots_on_target, aRaw: sa?.shots_on_target, adv: true },
+    { label: "Fouls (match)", hVal: sh?.fouls ?? "—", aVal: sa?.fouls ?? "—", hRaw: sh?.fouls, aRaw: sa?.fouls, higherBetter: false, adv: true },
+  ].filter(r => !r.adv || advanced);
+
+  const getCol = (a?: number | null, b?: number | null, hb = true) => {
+    if (a == null || b == null) return "text-[#4f5950]";
     return (hb ? a > b : a < b) ? "text-[#2d7f4f]" : a === b ? "text-[#4f5950]" : "text-[#667066]";
   };
 
@@ -719,6 +815,53 @@ function TeamComparisonTable({ match }: { match: MatchProps["match"] }) {
 }
 
 function RecentFormMiniTable({ match }: { match: MatchProps["match"] }) {
+  const fh = match.form_home;
+  const fa = match.form_away;
+
+  const block = (name: string, form: typeof fh, col: string, tint: string) => (
+    <div className={cn("rounded-[22px] border px-4 py-4", tint)}>
+      <p className={cn("text-sm font-semibold", col)}>{name}</p>
+      {form ? (
+        <>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <FormPills wins={form.wins} draws={form.draws} losses={form.losses} />
+            <span className="rounded-full border border-[#d9e2d7] bg-white px-2.5 py-1 text-[10px] font-mono text-[#4f5950]">
+              {form.form_pts != null ? `${form.form_pts.toFixed(0)} pts` : "—"}
+            </span>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-[16px] bg-white px-3 py-3">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-[#7b857b]">Goals for</p>
+              <p className="mt-1 font-mono text-lg font-bold text-[#111315]">{n(form.goals_scored_avg)}</p>
+            </div>
+            <div className="rounded-[16px] bg-white px-3 py-3">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-[#7b857b]">Goals against</p>
+              <p className="mt-1 font-mono text-lg font-bold text-[#111315]">{n(form.goals_conceded_avg)}</p>
+            </div>
+            <div className="rounded-[16px] bg-white px-3 py-3">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-[#7b857b]">xG avg</p>
+              <p className="mt-1 font-mono text-lg font-bold text-[#111315]">{form.xg_avg != null ? n(form.xg_avg, 2) : "—"}</p>
+            </div>
+            <div className="rounded-[16px] bg-white px-3 py-3">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-[#7b857b]">Days rest</p>
+              <p className="mt-1 font-mono text-lg font-bold text-[#111315]">{form.days_rest != null ? `${Math.round(form.days_rest)}d` : "—"}</p>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="mt-4 rounded-[16px] bg-white px-4 py-4 text-sm text-[#667066]">No form data</div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      {block(match.home.name, fh, "text-[#2d7f4f]", "border-[#d9e2d7] bg-[#f6faf5]")}
+      {block(match.away.name, fa, "text-[#b45309]", "border-[#f3e2bf] bg-[#fffbf4]")}
+    </div>
+  );
+}
+: { match: MatchProps["match"] }) {
   const fh = match.form_home;
   const fa = match.form_away;
 
@@ -757,6 +900,32 @@ function RecentFormMiniTable({ match }: { match: MatchProps["match"] }) {
 }
 
 function QuickContext({ match }: { match: MatchProps["match"] }) {
+  const fh = match.form_home; const fa = match.form_away;
+  const ctx = match.context;
+  return (
+    <div className="grid gap-3">
+      <div className="rounded-[18px] border border-[#d9e2d7] bg-[#f7f8f5] px-4 py-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b857b]">Home rest</p>
+        <p className="mt-1 font-mono text-lg font-bold text-[#111315]">{fh?.days_rest != null ? `${Math.round(fh.days_rest)}d` : "—"}</p>
+      </div>
+      <div className="rounded-[18px] border border-[#d9e2d7] bg-[#f7f8f5] px-4 py-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b857b]">Away rest</p>
+        <p className="mt-1 font-mono text-lg font-bold text-[#111315]">{fa?.days_rest != null ? `${Math.round(fa.days_rest)}d` : "—"}</p>
+      </div>
+      {ctx?.venue_name && (
+        <div className="rounded-[18px] border border-[#d9e2d7] bg-[#f7f8f5] px-4 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b857b]">Venue</p>
+          <p className="mt-1 text-sm font-medium text-[#111315]">{ctx.venue_name}</p>
+        </div>
+      )}
+      <div className="rounded-[18px] border border-[#f3e2bf] bg-[#fffbf4] px-4 py-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b857b]">Injuries data</p>
+        <p className="mt-1 text-sm font-medium text-[#b45309]">Not available</p>
+      </div>
+    </div>
+  );
+}
+: { match: MatchProps["match"] }) {
   const fh = match.form_home; const fa = match.form_away;
   const ctx = match.context;
   return (
@@ -821,6 +990,84 @@ function ModelSnapshot({ match }: { match: MatchProps["match"] }) {
 }
 
 function OverviewTab({ match }: { match: MatchProps["match"] }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sh = match.stats_home as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sa = match.stats_away as any;
+  const fh = match.form_home;
+  const fa = match.form_away;
+  const xgHome = sh?.xg ?? fh?.xg_avg ?? null;
+  const xgAway = sa?.xg ?? fa?.xg_avg ?? null;
+  const shotsHome = sh?.shots_total ?? null;
+  const shotsAway = sa?.shots_total ?? null;
+
+  return (
+    <SideGrid>
+      <MainCol>
+        <Panel title="Match Summary" subtitle="AI-generated edge analysis">
+          <KeyEdges match={match} />
+        </Panel>
+
+        <Panel title="Head-to-Head Matchup" subtitle="Key numbers side by side">
+          <TeamComparisonTable match={match} />
+        </Panel>
+
+        <Panel title="Recent Form" subtitle="Last 5 games for each team">
+          <RecentFormMiniTable match={match} />
+        </Panel>
+      </MainCol>
+      <SideCol>
+        <Panel title="Quick Context">
+          <QuickContext match={match} />
+        </Panel>
+
+        {(() => {
+          const lc = (match as any).league_context as Record<string, any> | null;
+          if (!lc) return null;
+          return (
+            <Panel title="League Table" subtitle="Positioning before kickoff">
+              <div className="flex flex-col gap-0">
+                {lc.home_position != null && (
+                  <MetricRow label={`${match.home.name.split(" ")[0]} position`} value={`#${lc.home_position}`} highlight={lc.home_position <= 4 ? "positive" : lc.home_position >= 18 ? "negative" : undefined} />
+                )}
+                {lc.away_position != null && (
+                  <MetricRow label={`${match.away.name.split(" ")[0]} position`} value={`#${lc.away_position}`} highlight={lc.away_position <= 4 ? "positive" : lc.away_position >= 18 ? "negative" : undefined} />
+                )}
+                {lc.home_points != null && <MetricRow label={`${match.home.name.split(" ")[0]} pts`} value={lc.home_points} />}
+                {lc.away_points != null && <MetricRow label={`${match.away.name.split(" ")[0]} pts`} value={lc.away_points} />}
+                {lc.points_gap != null && <MetricRow label="Points gap" value={lc.points_gap} />}
+                {lc.top_4_gap_home != null && (
+                  <MetricRow label="Top 4 gap (home)" value={lc.top_4_gap_home > 0 ? `+${lc.top_4_gap_home}` : lc.top_4_gap_home.toString()} highlight={lc.top_4_gap_home <= 0 ? "positive" : "warning"} />
+                )}
+                {lc.relegation_gap_away != null && (
+                  <MetricRow label="Relegation gap (away)" value={lc.relegation_gap_away} highlight={lc.relegation_gap_away < 3 ? "negative" : "positive"} />
+                )}
+              </div>
+            </Panel>
+          );
+        })()}
+
+        <Panel title="Model Snapshot" subtitle="Win probabilities and scorelines">
+          <ModelSnapshot match={match} />
+        </Panel>
+
+        {(xgHome != null || xgAway != null) && (
+          <Panel title="Expected Goals">
+            <SoccerPitchSVG
+              xgHome={xgHome}
+              xgAway={xgAway}
+              shotsHome={shotsHome}
+              shotsAway={shotsAway}
+              homeLabel={match.home.name}
+              awayLabel={match.away.name}
+            />
+          </Panel>
+        )}
+      </SideCol>
+    </SideGrid>
+  );
+}
+: { match: MatchProps["match"] }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sh = match.stats_home as any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
