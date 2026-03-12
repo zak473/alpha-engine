@@ -6,51 +6,51 @@
 
 @layer base {
   :root {
-    color-scheme: light;
+    color-scheme: dark;
 
-    --bg0: #f6f8f4;
-    --bg1: #ffffff;
-    --bg2: #eef2eb;
-    --bg3: #e5ebe2;
-    --bg-solid: #ffffff;
+    --bg0: #09120e;
+    --bg1: #0d1712;
+    --bg2: #101d17;
+    --bg3: #15231c;
+    --bg-solid: #0b1511;
 
-    --text0: #111315;
-    --text1: #667066;
-    --text2: #95a093;
+    --text0: #edf7f0;
+    --text1: rgba(237, 247, 240, 0.70);
+    --text2: rgba(237, 247, 240, 0.42);
 
-    --border0: #d8e0d4;
-    --border1: #c6d3c1;
+    --border0: rgba(255,255,255,0.08);
+    --border1: rgba(255,255,255,0.12);
 
-    --accent: #2edb6c;
-    --accent-dim: rgba(46, 219, 108, 0.10);
-    --accent-muted: rgba(46, 219, 108, 0.06);
-    --accent-ring: rgba(46, 219, 108, 0.22);
-    --accent-glow: 0 0 0 1px rgba(46,219,108,0.08), 0 14px 34px rgba(46,219,108,0.10);
+    --accent: #36f28f;
+    --accent-dim: rgba(54, 242, 143, 0.12);
+    --accent-muted: rgba(54, 242, 143, 0.08);
+    --accent-ring: rgba(54, 242, 143, 0.24);
+    --accent-glow: 0 0 0 1px rgba(54,242,143,0.10), 0 20px 44px rgba(54,242,143,0.16);
 
-    --positive: #1d9a4d;
-    --positive-dim: rgba(29, 154, 77, 0.10);
-    --negative: #d94b61;
-    --negative-dim: rgba(217, 75, 97, 0.10);
-    --warning: #d6a23d;
-    --warning-dim: rgba(214, 162, 61, 0.12);
-    --info: #64748b;
-    --info-dim: rgba(100, 116, 139, 0.10);
+    --positive: #4ade80;
+    --positive-dim: rgba(74, 222, 128, 0.14);
+    --negative: #fb7185;
+    --negative-dim: rgba(251, 113, 133, 0.14);
+    --warning: #fbbf24;
+    --warning-dim: rgba(251, 191, 36, 0.14);
+    --info: #93c5fd;
+    --info-dim: rgba(147, 197, 253, 0.14);
 
-    --focus-ring: rgba(46,219,108,0.24);
+    --focus-ring: rgba(54,242,143,0.28);
 
-    --radius-sm: 6px;
-    --radius-md: 10px;
-    --radius-lg: 18px;
-    --radius-xl: 24px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+    --radius-xl: 28px;
 
     --shadow-0: none;
-    --shadow-1: 0 10px 28px rgba(17, 24, 17, 0.06);
-    --shadow-2: 0 18px 44px rgba(17, 24, 17, 0.10);
-    --shadow-glow: 0 18px 42px rgba(46,219,108,0.10);
+    --shadow-1: 0 18px 42px rgba(0, 0, 0, 0.24);
+    --shadow-2: 0 24px 60px rgba(0, 0, 0, 0.30);
+    --shadow-glow: 0 18px 42px rgba(54,242,143,0.14);
 
-    --glass-bg: #ffffff;
+    --glass-bg: rgba(255,255,255,0.05);
     --glass-border: var(--border0);
-    --glass-inset: inset 0 1px 0 rgba(255,255,255,0.9);
+    --glass-inset: inset 0 1px 0 rgba(255,255,255,0.05);
 
     --sp-8:  8px;
     --sp-12: 12px;
@@ -87,7 +87,7 @@
   *, *::before, *::after { box-sizing: border-box; border-color: var(--border0); }
   html { height: 100%; }
   body {
-    background: var(--bg0);
+    background: radial-gradient(circle at top, rgba(54,242,143,0.08), transparent 20%), var(--bg0);
     color: var(--text0);
     font-family: 'Inter', system-ui, sans-serif;
     font-size: 14px;
@@ -146,8 +146,8 @@
   .input-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
   .sb-row { display:flex; align-items:center; gap:10px; padding:10px var(--sp-16); min-height:50px; border-bottom:1px solid var(--border0); transition:background 100ms; cursor:pointer; border-left:2px solid transparent; }
   .sb-row:hover { background: var(--accent-muted); border-left-color: var(--accent); }
-  .nav-link { display:flex; align-items:center; gap:10px; min-height:42px; padding:0 12px; border-radius:16px; color:rgba(226,232,240,0.84); font-size:13px; font-weight:500; transition:all 160ms ease; text-decoration:none; }
-  .nav-link:hover { background: rgba(255,255,255,0.06); color: #fff; }
+  .nav-link { display:flex; align-items:center; gap:10px; min-height:44px; padding:0 12px; border-radius:16px; color:rgba(255,255,255,0.78); font-size:13px; font-weight:500; transition:all 160ms ease; text-decoration:none; background: rgba(255,255,255,0.02); }
+  .nav-link:hover { background: rgba(255,255,255,0.06); color: #fff; transform: translateX(2px); }
   .label { font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--text1); }
   .positive { color: var(--positive); }
   .negative { color: var(--negative); }
@@ -190,7 +190,7 @@
 .sportsbook-hero,
 .page-intro {
   position: relative;
-  background: #ffffff;
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
   border: 1px solid var(--border0);
   box-shadow: var(--shadow-1);
   overflow: hidden;
@@ -199,7 +199,7 @@
 .page-intro::before,
 .brand-shell::before { display:none; }
 .sportsbook-card {
-  background: #ffffff;
+  background: rgba(255,255,255,0.05);
   border: 1px solid var(--border0);
   border-radius: 26px;
   box-shadow: 0 10px 26px rgba(17,24,17,0.06);
