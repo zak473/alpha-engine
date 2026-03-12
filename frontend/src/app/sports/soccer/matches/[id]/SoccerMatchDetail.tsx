@@ -105,20 +105,22 @@ function Panel({
   padded?: boolean; children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white border border-[#d9e2d7] rounded-[24px] flex flex-col overflow-hidden shadow-[0_4px_20px_rgba(17,19,21,0.05)]">
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#d9e2d7] shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#667066] truncate">{title}</span>
-          {badge}
-        </div>
-        {(subtitle || action) && (
-          <div className="flex items-center gap-2 shrink-0">
-            {subtitle && <span className="text-[10px] text-[#7b857b]">{subtitle}</span>}
-            {action}
+    <div className="overflow-hidden rounded-[28px] border border-[#dbe4d7] bg-white shadow-[0_10px_30px_rgba(17,19,21,0.05)]">
+      <div className="flex items-center justify-between gap-3 border-b border-[#edf2ea] px-5 py-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-[#667066]">
+              {title}
+            </span>
+            {badge}
           </div>
-        )}
+          {subtitle && (
+            <p className="mt-1 text-[11px] text-[#7b857b]">{subtitle}</p>
+          )}
+        </div>
+        {action && <div className="shrink-0">{action}</div>}
       </div>
-      <div className={padded ? "px-5 py-4 flex-1" : "flex-1"}>{children}</div>
+      <div className={padded ? "px-5 py-5" : ""}>{children}</div>
     </div>
   );
 }
@@ -284,27 +286,41 @@ function TeamBlock({ name, elo, form, side, logoUrl }: {
   logoUrl?: string | null;
 }) {
   const isHome = side === "home";
+
   return (
-    <div className={cn("flex flex-col gap-2 min-w-0", isHome ? "items-start" : "items-end")}>
-      {logoUrl ? (
-        <img src={logoUrl} alt={name} className="w-14 h-14 rounded-[14px] object-contain bg-white/10 border border-white/10 p-1" />
-      ) : (
-        <div className="w-12 h-12 rounded-[14px] flex items-center justify-center text-sm font-bold border bg-[#2edb6c]/10 border-[#2edb6c]/30 text-[#2edb6c]">
-          {name.slice(0, 2).toUpperCase()}
-        </div>
-      )}
+    <div className={cn("flex flex-col gap-3 min-w-0", isHome ? "items-start" : "items-end")}>
+      <div className={cn("flex items-center gap-3", !isHome && "flex-row-reverse")}>
+        {logoUrl ? (
+          <img
+            src={logoUrl}
+            alt={name}
+            className="h-16 w-16 rounded-[18px] border border-[#d9e2d7] bg-white object-contain p-2 shadow-sm"
+          />
+        ) : (
+          <div className="flex h-16 w-16 items-center justify-center rounded-[18px] border border-[#d9e2d7] bg-[#f7f8f5] text-sm font-bold text-[#2d7f4f]">
+            {name.slice(0, 2).toUpperCase()}
+          </div>
+        )}
 
-      <p className={cn("font-semibold text-base text-white leading-tight", !isHome && "text-right")}>{name}</p>
-
-      {elo && (
-        <div className={cn("flex items-center gap-2", !isHome && "flex-row-reverse")}>
-          <span className="font-mono text-2xl font-bold text-[#2edb6c] tabular-nums">{Math.round(elo.rating)}</span>
-          <Delta v={elo.rating_change} suffix="ELO" />
+        <div className={cn("min-w-0", !isHome && "text-right")}>
+          <p className="truncate text-[22px] font-semibold leading-tight text-[#111315] md:text-[28px]">
+            {name}
+          </p>
+          {elo && (
+            <div className={cn("mt-2 flex items-center gap-2", !isHome && "justify-end")}>
+              <span className="font-mono text-[28px] font-bold tabular-nums text-[#111315]">
+                {Math.round(elo.rating)}
+              </span>
+              <span className="rounded-full border border-[#d9e2d7] bg-[#f7f8f5] px-2 py-1">
+                <Delta v={elo.rating_change} suffix="ELO" />
+              </span>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {form && (
-        <div className={cn("flex flex-col gap-1", !isHome && "items-end")}>
+        <div className={cn("flex flex-col gap-2", !isHome && "items-end")}>
           <FormStreak
             results={[
               ...Array(form.wins ?? 0).fill("W" as const),
@@ -313,19 +329,20 @@ function TeamBlock({ name, elo, form, side, logoUrl }: {
             ].slice(0, 5)}
             size="sm"
           />
-          {form.form_pts != null && (
-            <span className="text-[10px] text-white/50 font-mono">{form.form_pts.toFixed(0)} pts last 5</span>
-          )}
+          <div className={cn("flex flex-wrap gap-2", !isHome && "justify-end")}>
+            {form.form_pts != null && (
+              <span className="inline-flex items-center rounded-full border border-[#d9e2d7] bg-[#f7f8f5] px-2.5 py-1 text-[10px] font-mono text-[#4f5950]">
+                {form.form_pts.toFixed(0)} pts last 5
+              </span>
+            )}
+            {form.days_rest != null && (
+              <span className="inline-flex items-center rounded-full border border-[#d9e2d7] bg-[#f7f8f5] px-2.5 py-1 text-[10px] font-mono text-[#4f5950]">
+                {Math.round(form.days_rest)}d rest
+              </span>
+            )}
+          </div>
         </div>
       )}
-
-      <div className={cn("flex gap-1 flex-wrap", !isHome && "justify-end")}>
-        {form?.days_rest != null && (
-          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[10px] font-mono text-white/45">
-            {Math.round(form.days_rest)}d rest
-          </span>
-        )}
-      </div>
     </div>
   );
 }
@@ -333,103 +350,137 @@ function TeamBlock({ name, elo, form, side, logoUrl }: {
 function MatchHeader({ match }: { match: MatchProps["match"] }) {
   const ctx = match.context;
   const isScheduled = match.status === "scheduled";
-  const isLive      = match.status === "live";
-  const isFinished  = match.status === "finished";
+  const isLive = match.status === "live";
+  const isFinished = match.status === "finished";
+
+  const homeProb = match.probabilities ? Math.round(match.probabilities.home_win * 100) : null;
+  const drawProb =
+    match.probabilities?.draw != null ? Math.round(match.probabilities.draw * 100) : null;
+  const awayProb = match.probabilities ? Math.round(match.probabilities.away_win * 100) : null;
 
   return (
-    <div className="relative overflow-hidden rounded-[36px] border border-[#1f2a22] bg-[#111315] text-white shadow-[0_25px_80px_rgba(0,0,0,0.25)]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(46,219,108,0.15),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(46,219,108,0.06),transparent_30%)]" />
-      <div className="relative z-10">
-        {/* Breadcrumb + league + status */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-3 gap-2">
-          <Link href="/sports/soccer/matches" className="flex items-center gap-1.5 text-white/45 hover:text-white text-xs transition-colors">
-            <ArrowLeft size={13} /> Soccer
-          </Link>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-white/35 font-mono">{match.league}{match.season ? ` · ${match.season}` : ""}</span>
-            <StatusBadge status={match.status} />
+    <div className="overflow-hidden rounded-[32px] border border-[#d9e2d7] bg-white shadow-[0_16px_40px_rgba(17,19,21,0.06)]">
+      <div className="flex flex-col gap-3 border-b border-[#edf2ea] px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
+        <Link
+          href="/sports/soccer/matches"
+          className="inline-flex w-fit items-center gap-2 rounded-full border border-[#d9e2d7] bg-[#f7f8f5] px-3 py-1.5 text-xs font-medium text-[#4f5950] transition hover:bg-[#eef4ee] hover:text-[#111315]"
+        >
+          <ArrowLeft size={13} />
+          Back to Soccer
+        </Link>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center rounded-full border border-[#d9e2d7] bg-[#f7f8f5] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#667066]">
+            {match.league}
+            {match.season ? ` · ${match.season}` : ""}
+          </span>
+          <StatusBadge status={match.status} />
+        </div>
+      </div>
+
+      <div className="grid gap-5 px-4 py-5 md:grid-cols-[1fr_auto_1fr] md:px-6 md:py-6">
+        <TeamBlock
+          name={match.home.name}
+          elo={match.elo_home}
+          form={match.form_home}
+          side="home"
+          logoUrl={match.home.logo_url}
+        />
+
+        <div className="flex min-w-[220px] flex-col items-center justify-center gap-3 rounded-[28px] border border-[#d9e2d7] bg-[#f7f8f5] px-5 py-5">
+          {isLive && (
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#bbf7d0] bg-[#dcfce7] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#15803d]">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#22c55e] opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#22c55e]" />
+              </span>
+              Live
+            </span>
+          )}
+
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-5xl font-bold tabular-nums text-[#111315] md:text-6xl">
+              {match.home_score ?? (isLive ? "0" : "—")}
+            </span>
+            <span className="font-mono text-2xl text-[#a0aaa0]">:</span>
+            <span className="font-mono text-5xl font-bold tabular-nums text-[#111315] md:text-6xl">
+              {match.away_score ?? (isLive ? "0" : "—")}
+            </span>
+          </div>
+
+          {isScheduled && (
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b857b]">
+                Kickoff in
+              </span>
+              <Countdown kickoffUtc={match.kickoff_utc} />
+            </div>
+          )}
+
+          {isFinished && match.outcome && (
+            <span className="inline-flex items-center rounded-full border border-[#d9e2d7] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#4f5950]">
+              {match.outcome === "home_win" || match.outcome === "H"
+                ? `${match.home.name.split(" ")[0]} Win`
+                : match.outcome === "away_win" || match.outcome === "A"
+                ? `${match.away.name.split(" ")[0]} Win`
+                : "Draw"}
+            </span>
+          )}
+
+          {match.probabilities && (
+            <div className="w-full max-w-[260px]">
+              <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b857b]">
+                <span>Win probabilities</span>
+              </div>
+              <div className="flex h-2 w-full overflow-hidden rounded-full bg-[#e8efe6]">
+                <div
+                  className="h-full bg-[#2edb6c]"
+                  style={{ width: `${homeProb ?? 0}%` }}
+                />
+                {drawProb != null && drawProb > 0 && (
+                  <div
+                    className="h-full bg-[#cfd7cc]"
+                    style={{ width: `${drawProb}%` }}
+                  />
+                )}
+                <div
+                  className="h-full bg-[#f59e0b]"
+                  style={{ width: `${awayProb ?? 0}%` }}
+                />
+              </div>
+              <div className="mt-2 flex justify-between font-mono text-[11px] tabular-nums">
+                <span className="text-[#2d7f4f]">{homeProb ?? "—"}%</span>
+                {drawProb != null && <span className="text-[#667066]">{drawProb}%</span>}
+                <span className="text-[#b45309]">{awayProb ?? "—"}%</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col items-center gap-1 text-center">
+            <span className="flex items-center gap-1 text-[11px] text-[#667066]">
+              <Calendar size={12} />
+              {fmtDate(match.kickoff_utc)}
+            </span>
+            <span className="flex items-center gap-1 text-[11px] text-[#667066]">
+              <Clock size={12} />
+              {fmtTime(match.kickoff_utc)}
+            </span>
+            {ctx?.venue_name && (
+              <span className="flex items-center gap-1 text-[11px] text-[#667066]">
+                <MapPin size={12} />
+                {ctx.venue_name}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* 3-column hero */}
-        <div className="grid grid-cols-[1fr_auto_1fr] gap-4 px-6 pb-6 items-start">
-          <TeamBlock name={match.home.name} elo={match.elo_home} form={match.form_home} side="home" logoUrl={match.home.logo_url} />
-
-          {/* Center: score block */}
-          <div className="flex flex-col items-center gap-2 pt-1 min-w-[130px]">
-            {isLive && (
-              <span className="flex items-center gap-1.5 text-[10px] text-[#2edb6c] font-mono">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="animate-ping absolute h-full w-full rounded-full bg-[#2edb6c] opacity-75" />
-                  <span className="relative rounded-full h-1.5 w-1.5 bg-[#2edb6c]" />
-                </span>
-                LIVE
-              </span>
-            )}
-
-            <div className="flex items-center gap-3">
-              <span className="font-mono text-5xl font-bold tabular-nums text-white">
-                {match.home_score ?? (isLive ? "0" : "—")}
-              </span>
-              <span className="text-white/25 text-xl font-mono">:</span>
-              <span className="font-mono text-5xl font-bold tabular-nums text-white">
-                {match.away_score ?? (isLive ? "0" : "—")}
-              </span>
-            </div>
-
-            {isScheduled && (
-              <div className="flex flex-col items-center gap-0.5">
-                <span className="text-[10px] text-white/35 uppercase tracking-widest">Kickoff in</span>
-                <Countdown kickoffUtc={match.kickoff_utc} />
-              </div>
-            )}
-            {isFinished && match.outcome && (
-              <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[10px] font-semibold text-white/55">
-                {match.outcome === "home_win" || match.outcome === "H" ? `${match.home.name.split(" ")[0]} Win`
-                  : match.outcome === "away_win" || match.outcome === "A" ? `${match.away.name.split(" ")[0]} Win`
-                  : "Draw"}
-              </span>
-            )}
-
-            {match.probabilities && (
-              <div className="w-full flex flex-col items-center gap-1 mt-1">
-                <div className="flex h-1.5 w-full rounded-full overflow-hidden">
-                  <div className="bg-[#2edb6c] h-full" style={{ width: `${Math.round(match.probabilities.home_win * 100)}%` }} />
-                  {match.probabilities.draw != null && match.probabilities.draw > 0 && (
-                    <div className="bg-white/15 h-full" style={{ width: `${Math.round(match.probabilities.draw * 100)}%` }} />
-                  )}
-                  <div className="bg-[#f59e0b] h-full flex-1" />
-                </div>
-                <div className="flex justify-between w-full text-[10px] font-mono tabular-nums">
-                  <span className="text-[#2edb6c]">{Math.round(match.probabilities.home_win * 100)}%</span>
-                  {match.probabilities.draw != null && match.probabilities.draw > 0 && (
-                    <span className="text-white/30">{Math.round(match.probabilities.draw * 100)}%</span>
-                  )}
-                  <span className="text-[#f59e0b]">{Math.round(match.probabilities.away_win * 100)}%</span>
-                </div>
-              </div>
-            )}
-
-            <div className="flex flex-col items-center gap-0.5 mt-1">
-              <span className="flex items-center gap-1 text-[10px] text-white/30">
-                <Calendar size={10} />
-                {fmtDate(match.kickoff_utc)}
-              </span>
-              <span className="flex items-center gap-1 text-[10px] text-white/30">
-                <Clock size={10} />
-                {fmtTime(match.kickoff_utc)}
-              </span>
-              {ctx?.venue_name && (
-                <span className="flex items-center gap-1 text-[10px] text-white/40 text-center max-w-[140px]">
-                  <MapPin size={10} className="shrink-0" />
-                  <span className="truncate">{ctx.venue_name}</span>
-                </span>
-              )}
-            </div>
-          </div>
-
-          <TeamBlock name={match.away.name} elo={match.elo_away} form={match.form_away} side="away" logoUrl={match.away.logo_url} />
-        </div>
+        <TeamBlock
+          name={match.away.name}
+          elo={match.elo_away}
+          form={match.form_away}
+          side="away"
+          logoUrl={match.away.logo_url}
+        />
       </div>
     </div>
   );
@@ -437,98 +488,151 @@ function MatchHeader({ match }: { match: MatchProps["match"] }) {
 
 // ─── KPI Strip (2 rows) ──────────────────────────────────────────────────────
 
-function KpiCell({ label, value, sub, col }: { label: string; value: React.ReactNode; sub?: string; col?: string }) {
+function KpiCell({
+  label,
+  value,
+  sub,
+  col,
+}: {
+  label: string;
+  value: React.ReactNode;
+  sub?: string;
+  col?: string;
+}) {
   return (
-    <div className="flex flex-col gap-0.5 px-4 py-3 min-w-[90px] border-r border-[#d9e2d7] last:border-0">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b857b] whitespace-nowrap">{label}</p>
-      <p className={cn("text-xl font-bold leading-none tabular-nums whitespace-nowrap", col ?? "text-[#111315]")}>{value}</p>
-      {sub && <p className="text-[10px] text-[#7b857b] font-mono whitespace-nowrap">{sub}</p>}
+    <div className="min-w-[120px] rounded-[20px] border border-[#d9e2d7] bg-[#f7f8f5] px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b857b]">
+        {label}
+      </p>
+      <p className={cn("mt-1 font-mono text-[24px] font-bold leading-none tabular-nums", col ?? "text-[#111315]")}>
+        {value}
+      </p>
+      {sub && <p className="mt-1 text-[10px] font-mono text-[#7b857b]">{sub}</p>}
     </div>
   );
 }
 
 function KpiStrip2Row({ match }: { match: MatchProps["match"] }) {
-  const p   = match.probabilities;
-  const fo  = match.fair_odds;
-  const eh  = match.elo_home;
-  const ea  = match.elo_away;
-  const fh  = match.form_home;
-  const fa  = match.form_away;
+  const p = match.probabilities;
+  const fo = match.fair_odds;
+  const eh = match.elo_home;
+  const ea = match.elo_away;
+  const fh = match.form_home;
+  const fa = match.form_away;
   const h2h = match.h2h;
-  const ep  = eh && ea ? eloThreeOutcome(eh.rating, ea.rating) : null;
+  const ep = eh && ea ? eloThreeOutcome(eh.rating, ea.rating) : null;
 
-  const restDiff = fh?.days_rest != null && fa?.days_rest != null ? fh.days_rest - fa.days_rest : null;
+  const restDiff =
+    fh?.days_rest != null && fa?.days_rest != null ? fh.days_rest - fa.days_rest : null;
 
   return (
-    <div className="bg-white border border-[#d9e2d7] rounded-[28px] shadow-[0_4px_20px_rgba(17,19,21,0.05)] overflow-hidden">
-      {/* Row 1: probabilities */}
-      <div className="flex items-center flex-wrap border-b border-[#d9e2d7] overflow-x-auto no-scrollbar">
-        <div className="flex items-center px-4 py-3 shrink-0 border-r border-[#d9e2d7]">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#2d7f4f] whitespace-nowrap">MODEL</span>
-        </div>
+    <div className="rounded-[30px] border border-[#d9e2d7] bg-white p-4 shadow-[0_10px_30px_rgba(17,19,21,0.05)] md:p-5">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {p ? (
           <>
-            <KpiCell label="Home" value={`${Math.round(p.home_win * 100)}%`} col="text-[#2d7f4f]" />
-            {p.draw != null && p.draw > 0 && <KpiCell label="Draw" value={`${Math.round(p.draw * 100)}%`} />}
-            <KpiCell label="Away" value={`${Math.round(p.away_win * 100)}%`} col="text-[#b45309]" />
+            <KpiCell label="Model Home" value={`${Math.round(p.home_win * 100)}%`} col="text-[#2d7f4f]" />
+            {p.draw != null && p.draw > 0 ? (
+              <KpiCell label="Model Draw" value={`${Math.round(p.draw * 100)}%`} />
+            ) : (
+              <KpiCell label="Model Draw" value="—" />
+            )}
+            <KpiCell label="Model Away" value={`${Math.round(p.away_win * 100)}%`} col="text-[#b45309]" />
           </>
         ) : (
-          <KpiCell label="Probs" value="—" sub="no model" />
+          <KpiCell label="Model" value="—" sub="no probabilities" />
         )}
-        <div className="flex items-center px-4 py-3 shrink-0 border-r border-[#d9e2d7] border-l border-l-[#d9e2d7]">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#667066] whitespace-nowrap">ELO</span>
-        </div>
-        {ep ? (
-          <>
-            <KpiCell label="Home" value={`${Math.round(ep.home * 100)}%`} col="text-[#2d7f4f]" />
-            <KpiCell label="Draw" value={`${Math.round(ep.draw * 100)}%`} />
-            <KpiCell label="Away" value={`${Math.round(ep.away * 100)}%`} col="text-[#b45309]" />
-          </>
-        ) : (
-          <KpiCell label="Probs" value="—" sub="no ELO" />
-        )}
+
         {match.confidence != null && (
           <KpiCell
             label="Confidence"
             value={`${match.confidence}%`}
-            col={match.confidence >= 60 ? "text-[#2d7f4f]" : match.confidence >= 40 ? "text-[#b45309]" : "text-[#4f5950]"}
+            col={
+              match.confidence >= 60
+                ? "text-[#2d7f4f]"
+                : match.confidence >= 40
+                ? "text-[#b45309]"
+                : "text-[#4f5950]"
+            }
           />
         )}
-      </div>
-      {/* Row 2: odds + context */}
-      <div className="flex items-center flex-wrap overflow-x-auto no-scrollbar">
+
         {fo && (
           <>
-            <KpiCell label="Fair H" value={fo.home_win?.toFixed(2) ?? "—"} col="text-[#2d7f4f]" />
-            {fo.draw != null && fo.draw > 0 && <KpiCell label="Fair D" value={fo.draw.toFixed(2)} />}
-            <KpiCell label="Fair A" value={fo.away_win?.toFixed(2) ?? "—"} col="text-[#b45309]" />
+            <KpiCell label="Fair Home" value={fo.home_win?.toFixed(2) ?? "—"} col="text-[#2d7f4f]" />
+            {fo.draw != null && fo.draw > 0 && (
+              <KpiCell label="Fair Draw" value={fo.draw.toFixed(2)} />
+            )}
+            <KpiCell label="Fair Away" value={fo.away_win?.toFixed(2) ?? "—"} col="text-[#b45309]" />
           </>
         )}
+
+        {ep ? (
+          <>
+            <KpiCell label="ELO Home" value={`${Math.round(ep.home * 100)}%`} col="text-[#2d7f4f]" />
+            <KpiCell label="ELO Draw" value={`${Math.round(ep.draw * 100)}%`} />
+            <KpiCell label="ELO Away" value={`${Math.round(ep.away * 100)}%`} col="text-[#b45309]" />
+          </>
+        ) : (
+          <KpiCell label="ELO View" value="—" sub="no ratings" />
+        )}
+
         {eh && ea && (
           <KpiCell
-            label="ELO Δ"
-            value={`${(eh.rating - ea.rating) >= 0 ? "+" : ""}${(eh.rating - ea.rating).toFixed(0)}`}
-            col={(eh.rating - ea.rating) >= 0 ? "text-[#2d7f4f]" : "text-[#dc2626]"}
+            label="ELO Delta"
+            value={`${eh.rating - ea.rating >= 0 ? "+" : ""}${(eh.rating - ea.rating).toFixed(0)}`}
             sub="home − away"
+            col={eh.rating - ea.rating >= 0 ? "text-[#2d7f4f]" : "text-[#dc2626]"}
           />
         )}
+
         {restDiff != null && (
           <KpiCell
-            label="Rest Δ"
+            label="Rest Delta"
             value={`${restDiff >= 0 ? "+" : ""}${Math.round(restDiff)}d`}
-            col={restDiff >= 2 ? "text-[#2d7f4f]" : restDiff <= -2 ? "text-[#dc2626]" : "text-[#4f5950]"}
-            sub="home adv"
+            sub="home advantage"
+            col={
+              restDiff >= 2
+                ? "text-[#2d7f4f]"
+                : restDiff <= -2
+                ? "text-[#dc2626]"
+                : "text-[#4f5950]"
+            }
           />
         )}
+
         {h2h && h2h.total_matches > 0 && (
           <KpiCell
             label="H2H"
-            value={`${h2h.home_wins ?? 0}–${h2h.draws ?? 0}–${h2h.away_wins ?? 0}`}
+            value={`${h2h.home_wins ?? 0}-${h2h.draws ?? 0}-${h2h.away_wins ?? 0}`}
             sub={`${h2h.total_matches} meetings`}
           />
         )}
-        {eh && <KpiCell label="Home ELO" value={Math.round(eh.rating)} sub={eh.rating_change != null ? `${eh.rating_change >= 0 ? "+" : ""}${eh.rating_change.toFixed(1)} last` : undefined} />}
-        {ea && <KpiCell label="Away ELO" value={Math.round(ea.rating)} sub={ea.rating_change != null ? `${ea.rating_change >= 0 ? "+" : ""}${ea.rating_change.toFixed(1)} last` : undefined} />}
+
+        {eh && (
+          <KpiCell
+            label="Home ELO"
+            value={Math.round(eh.rating)}
+            sub={
+              eh.rating_change != null
+                ? `${eh.rating_change >= 0 ? "+" : ""}${eh.rating_change.toFixed(1)} last`
+                : undefined
+            }
+            col="text-[#2d7f4f]"
+          />
+        )}
+
+        {ea && (
+          <KpiCell
+            label="Away ELO"
+            value={Math.round(ea.rating)}
+            sub={
+              ea.rating_change != null
+                ? `${ea.rating_change >= 0 ? "+" : ""}${ea.rating_change.toFixed(1)} last`
+                : undefined
+            }
+            col="text-[#b45309]"
+          />
+        )}
       </div>
     </div>
   );
@@ -1900,63 +2004,51 @@ export function SoccerMatchDetail({ match, eloHome, eloAway }: MatchProps) {
   const highlights = match.highlights ?? [];
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#f0f4ef] max-w-screen-2xl mx-auto w-full px-3 md:px-4 py-4 gap-3">
-      {/* Header */}
+    <div className="mx-auto flex min-h-screen w-full max-w-screen-2xl flex-col gap-4 bg-[#f3f7f2] px-3 py-4 md:px-4 md:py-5">
       <MatchHeader match={match} />
-
-      {/* KPI strip */}
       <KpiStrip2Row match={match} />
-
-      {match.status === "live" && <div className="px-1 pb-1"><SoccerLivePanel match={match} /></div>}
-
-      {/* Sticky tab bar */}
-      <div className="sticky top-2 z-20 px-1">
-        <div className="bg-white border border-[#d9e2d7] rounded-full shadow-[0_4px_20px_rgba(17,19,21,0.08)] flex items-center gap-1 p-1 overflow-x-auto no-scrollbar max-w-screen-2xl mx-auto">
-          {TABS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={cn(
-                "shrink-0 px-4 py-2 rounded-full text-[12px] font-semibold transition-all",
-                activeTab === t.id
-                  ? "bg-[#111315] text-white shadow-sm"
-                  : "text-[#667066] hover:text-[#111315] hover:bg-[#f7f8f5]"
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
+      {match.status === "live" && (
+        <div className="rounded-[28px] border border-[#d9e2d7] bg-white p-2 shadow-[0_10px_30px_rgba(17,19,21,0.05)]">
+          <SoccerLivePanel match={match} />
+        </div>
+      )}
+      <div className="sticky top-2 z-20">
+        <div className="overflow-x-auto no-scrollbar rounded-[24px] border border-[#d9e2d7] bg-white p-2 shadow-[0_10px_24px_rgba(17,19,21,0.06)]">
+          <div className="flex min-w-max items-center gap-2">
+            {TABS.map((t) => (
+              <button key={t.id} onClick={() => setActiveTab(t.id)}
+                className={cn("shrink-0 rounded-full px-4 py-2.5 text-[12px] font-semibold transition-all",
+                  activeTab === t.id
+                    ? "bg-[#111315] text-white shadow-sm"
+                    : "border border-transparent bg-[#f7f8f5] text-[#667066] hover:border-[#d9e2d7] hover:bg-white hover:text-[#111315]"
+                )}>{t.label}</button>
+            ))}
+          </div>
         </div>
       </div>
-
-      {/* Tab content */}
-      <div className="flex-1 max-w-screen-2xl mx-auto w-full">
-        {activeTab === "overview"  && (
+      <div className="w-full">
+        {activeTab === "overview" && (
           <div className="flex flex-col gap-6">
             <OverviewTab match={match} />
             {standings && (
-              <div className="bg-white border border-[#d9e2d7] rounded-[24px] p-5 shadow-[0_4px_20px_rgba(17,19,21,0.05)]">
-                <StandingsTable
-                  standings={standings}
-                  homeTeamId={match.home.id}
-                  awayTeamId={match.away.id}
-                />
+              <div className="overflow-hidden rounded-[28px] border border-[#d9e2d7] bg-white p-5 shadow-[0_10px_30px_rgba(17,19,21,0.05)]">
+                <StandingsTable standings={standings} homeTeamId={match.home.id} awayTeamId={match.away.id} />
               </div>
             )}
             {highlights.length > 0 && (
-              <div className="bg-white border border-[#d9e2d7] rounded-[24px] p-5 shadow-[0_4px_20px_rgba(17,19,21,0.05)]">
+              <div className="overflow-hidden rounded-[28px] border border-[#d9e2d7] bg-white p-5 shadow-[0_10px_30px_rgba(17,19,21,0.05)]">
                 <HighlightsSection highlights={highlights} />
               </div>
             )}
           </div>
         )}
-        {activeTab === "lineups"   && <LineupsTab   match={match} />}
-        {activeTab === "stats"     && <StatsTab     match={match} />}
-        {activeTab === "timeline"  && <TimelineTab  match={match} />}
-        {activeTab === "h2h"       && <H2HTab       match={match} />}
-        {activeTab === "elo"       && <EloTab       match={match} eloHome={eloHome} eloAway={eloAway} />}
-        {activeTab === "model"     && <ModelTab     match={match} />}
-        {activeTab === "context"   && <ContextTab   match={match} eloHome={eloHome} eloAway={eloAway} />}
+        {activeTab === "lineups" && <LineupsTab match={match} />}
+        {activeTab === "stats" && <StatsTab match={match} />}
+        {activeTab === "timeline" && <TimelineTab match={match} />}
+        {activeTab === "h2h" && <H2HTab match={match} />}
+        {activeTab === "elo" && <EloTab match={match} eloHome={eloHome} eloAway={eloAway} />}
+        {activeTab === "model" && <ModelTab match={match} />}
+        {activeTab === "context" && <ContextTab match={match} eloHome={eloHome} eloAway={eloAway} />}
       </div>
     </div>
   );
