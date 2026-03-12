@@ -6,7 +6,7 @@ import { useLiveRefresh } from "@/lib/hooks/useLiveRefresh";
 import {
   ArrowLeft, Activity, TrendingUp, TrendingDown, BarChart2,
   CheckCircle2, XCircle, AlertTriangle, Info, Target, Layers,
-  Award, Zap, Shield, Users, Wifi, Monitor, Globe,
+  Award, Zap, Shield, Users, Wifi, Monitor, Globe, Calendar, Clock,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -351,17 +351,105 @@ function CenterBlock({ match }: { match: EsportsMatch }) {
 // ─── 3-Col Header ────────────────────────────────────────────────────────────
 
 function EsportsMatchHeader({ match }: { match: EsportsMatch }) {
+  const info = match.match_info;
+  const isLive = match.status === "live";
+  const isFinished = match.status === "finished";
+
   return (
-    <div className="card mb-3">
-      <div className="flex items-center gap-2 px-3 pt-2.5 pb-0">
-        <Link href="/sports/esports/matches" className="inline-flex items-center gap-1 text-2xs text-t3 hover:text-t1 transition-colors">
-          <ArrowLeft size={12} />
-          Esports Matches
-        </Link>
+    <div className="overflow-hidden rounded-[34px] border border-[#1f2a22] bg-[#111315] text-white shadow-[0_24px_70px_rgba(0,0,0,0.24)]">
+      <div className="border-b border-white/[0.08] px-5 py-4 md:px-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <Link
+            href="/sports/esports/matches"
+            className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3.5 py-1.5 text-xs font-medium text-white/75 transition hover:bg-white/[0.08] hover:text-white"
+          >
+            <ArrowLeft size={13} />
+            Esports Matches
+          </Link>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {info?.game_type && (
+              <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/60">
+                {gameLabel(info.game_type)}
+              </span>
+            )}
+            {info?.series_format && (
+              <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/60">
+                {info.series_format.toUpperCase()}
+              </span>
+            )}
+            <StatusBadge status={match.status} />
+          </div>
+        </div>
       </div>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-0 px-1 py-2">
+
+      <div className="grid gap-5 px-5 py-6 md:grid-cols-[1fr_340px_1fr] md:items-center md:px-6 md:py-7">
         <TeamBlock match={match} side="home" />
-        <CenterBlock match={match} />
+
+        <div className="flex flex-col items-center justify-center rounded-[30px] border border-white/10 bg-white/[0.05] px-6 py-6 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+          {isLive && (
+            <span className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#bbf7d0]/40 bg-[#22c55e]/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#86efac]">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#22c55e] opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#22c55e]" />
+              </span>
+              Live
+            </span>
+          )}
+
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-5xl font-bold tabular-nums text-white md:text-6xl">
+              {match.home_score ?? "—"}
+            </span>
+            <span className="font-mono text-2xl text-white/25">:</span>
+            <span className="font-mono text-5xl font-bold tabular-nums text-white md:text-6xl">
+              {match.away_score ?? "—"}
+            </span>
+          </div>
+
+          {isFinished && (
+            <span className="mt-4 inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">
+              Final
+            </span>
+          )}
+
+          {match.probabilities && (
+            <div className="mt-5 w-full max-w-[230px]">
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+                Series win probabilities
+              </div>
+              <div className="flex h-2 w-full overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full bg-[#2edb6c]"
+                  style={{ width: `${Math.round(match.probabilities.home_win * 100)}%` }}
+                />
+                <div
+                  className="h-full bg-[#8b5cf6]"
+                  style={{ width: `${Math.round(match.probabilities.away_win * 100)}%` }}
+                />
+              </div>
+              <div className="mt-2 flex justify-between font-mono text-[11px] font-semibold tabular-nums">
+                <span className="text-[#86efac]">{Math.round(match.probabilities.home_win * 100)}%</span>
+                <span className="text-[#c4b5fd]">{Math.round(match.probabilities.away_win * 100)}%</span>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-5 flex flex-col items-center gap-1 text-center">
+            <span className="flex items-center gap-1 text-[11px] text-white/55">
+              <Calendar size={12} />
+              {fmtDate(match.kickoff_utc)}
+            </span>
+            <span className="flex items-center gap-1 text-[11px] text-white/55">
+              <Clock size={12} />
+              {fmtTime(match.kickoff_utc)}
+            </span>
+            <span className="text-[11px] text-white/55">
+              {info?.is_lan ? "LAN event" : "Online match"}
+            </span>
+          </div>
+        </div>
+
         <TeamBlock match={match} side="away" />
       </div>
     </div>
@@ -372,10 +460,10 @@ function EsportsMatchHeader({ match }: { match: EsportsMatch }) {
 
 function KpiCell({ label, value, sub, accent }: { label: string; value: React.ReactNode; sub?: string; accent?: string }) {
   return (
-    <div className="detail-kpi-card">
-      <span className="detail-kpi-label block truncate">{label}</span>
-      <span className={cn("detail-kpi-value block truncate", accent ?? "text-t1")}>{value}</span>
-      {sub && <span className="detail-kpi-sub block truncate">{sub}</span>}
+    <div className="min-w-[100px] rounded-[20px] border border-[#d9e2d7] bg-[#f7f8f5] px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b857b]">{label}</p>
+      <p className={cn("mt-1 font-mono text-[20px] font-bold leading-none tabular-nums truncate", accent ?? "text-[#111315]")}>{value}</p>
+      {sub && <p className="mt-1 text-[10px] font-mono text-[#7b857b]">{sub}</p>}
     </div>
   );
 }
@@ -389,7 +477,8 @@ function EsportsKpiStrip({ match }: { match: EsportsMatch }) {
   const fA = match.form_away;
   const info = match.match_info;
 
-  let eloH = "—", eloA = "—";
+  let eloH = "—";
+  let eloA = "—";
   if (eH && eA) {
     eloH = `${Math.round(eloWinProb(eH.overall_rating, eA.overall_rating) * 100)}%`;
     eloA = `${Math.round(eloWinProb(eA.overall_rating, eH.overall_rating) * 100)}%`;
@@ -397,24 +486,28 @@ function EsportsKpiStrip({ match }: { match: EsportsMatch }) {
 
   const eloDiff = eH && eA ? (eH.overall_rating - eA.overall_rating).toFixed(0) : "—";
 
-  // Game-type specific edge
-  const gameEdge = info?.game_type === "cs2"
-    ? { label: "Map pool edge", value: fH && fA ? (fH.map_win_pct != null && fA.map_win_pct != null ? `${(fH.map_win_pct - fA.map_win_pct > 0 ? "+" : "")}${((fH.map_win_pct - fA.map_win_pct) * 100).toFixed(1)}pp` : "—") : "—" }
-    : { label: "Avg GD@15", value: "—" };
+  const gameEdge =
+    info?.game_type === "cs2"
+      ? {
+          label: "Map pool edge",
+          value:
+            fH && fA && fH.map_win_pct != null && fA.map_win_pct != null
+              ? `${fH.map_win_pct - fA.map_win_pct > 0 ? "+" : ""}${((fH.map_win_pct - fA.map_win_pct) * 100).toFixed(1)}pp`
+              : "—",
+        }
+      : { label: "Avg GD@15", value: "—" };
 
   return (
-    <div className="px-3 py-3 space-y-3">
-      <div className="detail-kpi-grid">
-        <KpiCell label="Model P(A)" value={p ? `${Math.round(p.home_win * 100)}%` : "—"} sub={match.home.name.split(" ").slice(-1)[0]} accent={p ? "text-accent-blue" : undefined} />
-        <KpiCell label="Model P(B)" value={p ? `${Math.round(p.away_win * 100)}%` : "—"} sub={match.away.name.split(" ").slice(-1)[0]} />
-        <KpiCell label="ELO P(A)" value={eloH} accent="text-accent-purple" />
-        <KpiCell label="ELO P(B)" value={eloA} accent="text-accent-purple" />
+    <div className="rounded-[30px] border border-[#d9e2d7] bg-white p-5 shadow-[0_10px_30px_rgba(17,19,21,0.05)]">
+      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <KpiCell label="Model P(A)" value={p ? `${Math.round(p.home_win * 100)}%` : "—"} sub={match.home.name.split(" ").slice(-1)[0]} accent={p ? "text-[#2d7f4f]" : undefined} />
+        <KpiCell label="Model P(B)" value={p ? `${Math.round(p.away_win * 100)}%` : "—"} sub={match.away.name.split(" ").slice(-1)[0]} accent={p ? "text-[#7c3aed]" : undefined} />
+        <KpiCell label="ELO P(A)" value={eloH} accent="text-[#2d7f4f]" />
+        <KpiCell label="ELO P(B)" value={eloA} accent="text-[#7c3aed]" />
         <KpiCell label="Fair odds A" value={fo?.home_win ? fo.home_win.toFixed(2) : "—"} />
         <KpiCell label="Fair odds B" value={fo?.away_win ? fo.away_win.toFixed(2) : "—"} />
-        <KpiCell label="Confidence" value={match.confidence ? `${match.confidence}%` : "—"} accent={match.confidence && match.confidence >= 65 ? "text-accent-green" : undefined} />
-      </div>
-      <div className="detail-kpi-grid">
-        <KpiCell label="ELO diff" value={eloDiff !== "—" ? `${Number(eloDiff) > 0 ? "+" : ""}${eloDiff}` : "—"} />
+        <KpiCell label="Confidence" value={match.confidence != null ? `${match.confidence}%` : "—"} accent={match.confidence != null && match.confidence >= 65 ? "text-[#2d7f4f]" : match.confidence != null && match.confidence >= 45 ? "text-[#b45309]" : undefined} />
+        <KpiCell label="ELO diff" value={eloDiff !== "—" ? `${Number(eloDiff) > 0 ? "+" : ""}${eloDiff}` : "—"} accent={Number(eloDiff) > 0 ? "text-[#2d7f4f]" : "text-[#7c3aed]"} />
         <KpiCell label="Series W% (A)" value={fH?.series_win_pct != null ? pct(fH.series_win_pct) : "—"} />
         <KpiCell label="Series W% (B)" value={fA?.series_win_pct != null ? pct(fA.series_win_pct) : "—"} />
         <KpiCell label="Map W% (A)" value={fH?.map_win_pct != null ? pct(fH.map_win_pct) : "—"} />
