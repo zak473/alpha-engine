@@ -1427,7 +1427,8 @@ function H2HTab({ match }: { match: MatchProps["match"] }) {
   const awayWins = h2h?.away_wins ?? 0;
   const total    = h2h?.total_matches ?? 0;
   const avgGoals = h2h?.recent_matches?.length
-    ? h2h.recent_matches.reduce((a, m) => a + (m.home_score ?? 0) + (m.away_score ?? 0), 0) / h2h.recent_matches.length
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? h2h.recent_matches.reduce((a: number, m: any) => a + (m.home_score ?? 0) + (m.away_score ?? 0), 0) / h2h.recent_matches.length
     : null;
 
   return (
@@ -1475,8 +1476,8 @@ function H2HTab({ match }: { match: MatchProps["match"] }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {h2h.recent_matches.map((m, i) => {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  {h2h.recent_matches.map((m: any, i: number) => {
                     const rm = m as any;
                     const norm = normaliseOutcome(rm.outcome ?? rm.winner);
                     const homeName = rm.home_name || match.home.name;

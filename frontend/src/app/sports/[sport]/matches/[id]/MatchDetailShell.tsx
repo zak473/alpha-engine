@@ -1,460 +1,238 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import type { ReactNode } from "react";
+import Link from "next/link";
+import { ArrowLeft, CalendarDays, Clock3, MapPin, Sparkles } from "lucide-react";
 import type { SportMatchDetail } from "@/lib/types";
 import type { SportSlug } from "@/lib/api";
+import { cn, formatDate } from "@/lib/utils";
 
-interface MatchDetailShellProps {
-  match: SportMatchDetail;
-  sport: SportSlug;
-}
-
-function fmt(n: number | null | undefined, decimals = 1) {
-  if (n == null) return "—";
-  return n.toFixed(decimals);
-}
-
-function ProbBar({ label, prob, colour }: { label: string; prob: number; colour: string }) {
+function Avatar({ name, src }: { name: string; src?: string | null }) {
+  if (src) return <img src={src} alt={name} className="h-16 w-16 rounded-full border border-white/10 bg-white/5 object-contain p-1" />;
   return (
-    <div className="flex flex-col items-center gap-1 flex-1">
-      <div className="text-xs text-text-muted">{label}</div>
-      <div className="text-xl font-bold text-text-primary">{Math.round(prob * 100)}%</div>
-      <div className="w-full h-1.5 rounded-full bg-white/[0.06]">
-        <div className={cn("h-full rounded-full", colour)} style={{ width: `${prob * 100}%` }} />
-      </div>
+    <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-white/5 text-lg font-semibold text-white/65">
+      {name.slice(0, 2).toUpperCase()}
     </div>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, aside }: { title: string; children: ReactNode; aside?: ReactNode }) {
   return (
-    <div className="bg-surface-overlay border border-surface-border rounded-xl p-5">
-      <h3 className="text-text-muted text-xs uppercase tracking-widest mb-4">{title}</h3>
+    <section className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-5 lg:p-6">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="text-[11px] uppercase tracking-[0.2em] text-white/38">{title}</div>
+        {aside}
+      </div>
       {children}
-    </div>
+    </section>
   );
 }
 
-function StatRow({ label, home, away }: { label: string; home: React.ReactNode; away: React.ReactNode }) {
+function StatCard({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
-    <div className="flex items-center justify-between py-1.5 border-b border-surface-border/40 last:border-0">
-      <span className="text-text-muted text-xs w-1/3 text-right pr-4">{home}</span>
-      <span className="text-text-subtle text-xs w-1/3 text-center">{label}</span>
-      <span className="text-text-muted text-xs w-1/3 text-left pl-4">{away}</span>
+    <div className="rounded-[20px] border border-white/8 bg-black/15 p-4">
+      <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">{label}</div>
+      <div className={cn("mt-2 text-2xl font-semibold tracking-[-0.05em] text-white", tone)}>{value}</div>
     </div>
   );
 }
 
-// ── Tab panels ──────────────────────────────────────────────────────────────
-
-function OverviewTab({ match }: { match: SportMatchDetail }) {
-  const p = match.probabilities;
-  const hasDraw = typeof p?.draw === "number" && p.draw > 0;
-
+function ProbCard({ label, prob, tone }: { label: string; prob?: number | null; tone: string }) {
+  const pct = prob != null ? Math.round(prob * 100) : null;
   return (
-    <div className="flex flex-col gap-4">
-      {/* Score / status */}
-      <Section title="Result">
-        <div className="flex items-center justify-between">
-          <div className="text-right flex-1 flex flex-col items-end gap-1">
-            {match.home.logo_url ? (
-              <img src={match.home.logo_url} alt={match.home.name} className="w-12 h-12 rounded-full object-contain bg-white/5" />
-            ) : (
-              <div className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold bg-white/[0.06] text-text-muted">
-                {match.home.name.slice(0, 2).toUpperCase()}
-              </div>
-            )}
-            <div className="text-text-primary font-semibold text-sm">{match.home.name}</div>
-            <div className="text-3xl font-bold text-text-primary tabular-nums">
-              {match.home_score != null ? match.home_score : (match.status === "live" ? "–" : "—")}
-            </div>
-          </div>
-          <div className="flex flex-col items-center px-6 gap-1">
-            {match.status === "live" ? (
-              <div className="flex items-center gap-1.5">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-                </span>
-                <span className="text-green-400 text-xs font-semibold uppercase tracking-widest">Live</span>
-              </div>
-            ) : (
-              <span className="text-text-subtle text-xs uppercase tracking-widest">vs</span>
-            )}
-          </div>
-          <div className="text-left flex-1 flex flex-col items-start gap-1">
-            {match.away.logo_url ? (
-              <img src={match.away.logo_url} alt={match.away.name} className="w-12 h-12 rounded-full object-contain bg-white/5" />
-            ) : (
-              <div className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold bg-white/[0.06] text-text-muted">
-                {match.away.name.slice(0, 2).toUpperCase()}
-              </div>
-            )}
-            <div className="text-text-primary font-semibold text-sm">{match.away.name}</div>
-            <div className="text-3xl font-bold text-text-primary tabular-nums">
-              {match.away_score != null ? match.away_score : (match.status === "live" ? "–" : "—")}
-            </div>
-          </div>
-        </div>
-        {match.outcome && (
-          <div className="mt-2 text-center">
-            <span className="text-xs text-accent-blue capitalize">
-              {match.outcome.replace(/_/g, " ")}
-            </span>
-          </div>
-        )}
-      </Section>
-
-      {/* Probabilities */}
-      {p && (
-        <Section title="Model Probabilities">
-          <div className="flex gap-4">
-            <ProbBar label="Home Win" prob={p.home_win} colour="bg-accent-blue" />
-            {hasDraw && <ProbBar label="Draw" prob={p.draw!} colour="bg-amber-500" />}
-            <ProbBar label="Away Win" prob={p.away_win} colour="bg-accent-red" />
-          </div>
-          {match.confidence != null && (
-            <div className="mt-3 flex items-center gap-2">
-              <span className="text-text-subtle text-xs">Confidence</span>
-              <div className="flex-1 h-1.5 rounded-full bg-white/[0.06]">
-                <div
-                  className={cn("h-full rounded-full", match.confidence >= 75 ? "bg-green-500" : match.confidence >= 55 ? "bg-amber-500" : "bg-white/20")}
-                  style={{ width: `${match.confidence}%` }}
-                />
-              </div>
-              <span className="text-text-muted text-xs font-mono tabular-nums">{match.confidence}%</span>
-            </div>
-          )}
-        </Section>
-      )}
-
-      {/* Key drivers */}
-      {match.key_drivers && match.key_drivers.length > 0 && (
-        <Section title="Key Drivers">
-          <div className="flex flex-col gap-2">
-            {match.key_drivers.map((d, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="w-32 truncate text-text-muted text-xs">{d.feature}</div>
-                <div className="flex-1 h-1.5 rounded-full bg-white/[0.06]">
-                  <div className="h-full rounded-full bg-accent-blue/60" style={{ width: `${d.importance * 100}%` }} />
-                </div>
-                <div className="text-text-subtle text-xs font-mono tabular-nums w-10 text-right">
-                  {fmt(d.importance * 100, 0)}%
-                </div>
-                {d.value != null && (
-                  <div className="text-text-muted text-xs font-mono tabular-nums w-12 text-right">
-                    {fmt(d.value, 2)}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-    </div>
-  );
-}
-
-function StatsTab({ match }: { match: SportMatchDetail }) {
-  const sh = match.stats_home as Record<string, any> | null;
-  const sa = match.stats_away as Record<string, any> | null;
-  const fh = (match as any).form_home as Record<string, any> | null;
-  const fa = (match as any).form_away as Record<string, any> | null;
-
-  const homeName = match.home.name;
-  const awayName = match.away.name;
-
-  const fieldToLabel: Record<string, string> = {
-    shots_total: "Shots", shots_on_target: "On Target", xg: "xG", xga: "xGA",
-    possession_pct: "Possession %", passes_completed: "Passes", pass_accuracy_pct: "Pass Acc %",
-    yellow_cards: "Yellow Cards", red_cards: "Red Cards", fouls: "Fouls",
-    points: "Points", fg_pct: "FG%", fg3_pct: "3P%", ft_pct: "FT%",
-    rebounds_total: "Rebounds", assists: "Assists", turnovers: "Turnovers",
-    steals: "Steals", blocks: "Blocks", plus_minus: "+/−",
-    runs: "Runs", hits: "Hits", home_runs: "HR", rbi: "RBI",
-    batting_avg: "BA", obp: "OBP", slg: "SLG", ops: "OPS",
-    era: "ERA", whip: "WHIP", errors: "Errors", pitcher_name: "Starting Pitcher",
-  };
-
-  const display = (v: unknown, decimals = 1) => {
-    if (v == null) return "—";
-    if (typeof v === "number") return v.toFixed(decimals);
-    return String(v);
-  };
-
-  return (
-    <div className="flex flex-col gap-4">
-      {/* Actual match stats if available */}
-      {(sh || sa) && (
-        <Section title={`${homeName} vs ${awayName} — Match Stats`}>
-          <div className="text-xs text-text-subtle mb-3 flex items-center justify-between">
-            <span className="font-medium text-text-muted">{homeName}</span>
-            <span className="font-medium text-text-muted">{awayName}</span>
-          </div>
-          {sh && Object.entries(sh)
-            .filter(([k]) => !["team_id", "team_name", "is_home"].includes(k))
-            .filter(([k, val]) => val != null || sa?.[k] != null)  // skip if both sides null
-            .map(([key, val]) => {
-              const awayVal = sa?.[key];
-              const label = fieldToLabel[key] ?? key.replace(/_/g, " ");
-              const dec = key.includes("pct") || key === "batting_avg" ? 3 : 1;
-              return (
-                <StatRow key={key} label={label} home={display(val, dec)} away={display(awayVal, dec)} />
-              );
-            })}
-        </Section>
-      )}
-
-      {/* Pre-match form averages */}
-      {(fh || fa) && (
-        <Section title="Pre-Match Form (Last 5 Games)">
-          <div className="text-xs text-text-subtle mb-3 flex items-center justify-between">
-            <span className="font-medium text-text-muted">{homeName}</span>
-            <span className="font-medium text-text-muted">{awayName}</span>
-          </div>
-          {fh?.wins != null && <StatRow label="W / D / L" home={`${fh.wins}W ${fh.draws}D ${fh.losses}L`} away={fa ? `${fa.wins}W ${fa.draws}D ${fa.losses}L` : "—"} />}
-          {fh?.form_pts != null && <StatRow label="Form pts" home={display(fh.form_pts, 0)} away={display(fa?.form_pts, 0)} />}
-          {fh?.goals_scored_avg != null && <StatRow label="Goals scored avg" home={display(fh.goals_scored_avg)} away={display(fa?.goals_scored_avg)} />}
-          {fh?.goals_conceded_avg != null && <StatRow label="Goals conceded avg" home={display(fh.goals_conceded_avg)} away={display(fa?.goals_conceded_avg)} />}
-          {fh?.xg_avg != null && <StatRow label="xG avg" home={display(fh.xg_avg, 2)} away={display(fa?.xg_avg, 2)} />}
-          {fh?.xga_avg != null && <StatRow label="xGA avg" home={display(fh.xga_avg, 2)} away={display(fa?.xga_avg, 2)} />}
-          {fh?.days_rest != null && <StatRow label="Days rest" home={display(fh.days_rest, 0)} away={display(fa?.days_rest, 0)} />}
-        </Section>
-      )}
-
-      {!sh && !sa && !fh && !fa && (
-        <div className="flex items-center justify-center h-40 text-text-muted text-sm">
-          No stats available yet
-        </div>
-      )}
-    </div>
-  );
-}
-
-function EloTab({ match }: { match: SportMatchDetail }) {
-  const elo_h = match.elo_home;
-  const elo_a = match.elo_away;
-
-  if (!elo_h && !elo_a) {
-    return (
-      <div className="flex items-center justify-center h-40 text-text-muted text-sm">
-        No ELO data available
+    <div className="rounded-[22px] border border-white/8 bg-black/15 p-4">
+      <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">{label}</div>
+      <div className={cn("mt-2 text-3xl font-semibold tracking-[-0.05em]", tone)}>{pct != null ? `${pct}%` : "—"}</div>
+      <div className="mt-3 h-2 rounded-full bg-white/[0.06]">
+        <div className={cn("h-full rounded-full", tone.replace("text-", "bg-"))} style={{ width: `${pct ?? 0}%` }} />
       </div>
-    );
-  }
+    </div>
+  );
+}
+
+function scoreState(status: string) {
+  if (status === "live") return "Live";
+  if (status === "finished") return "Final";
+  return "Upcoming";
+}
+
+function valueForDisplay(value: unknown) {
+  if (value == null) return "—";
+  if (typeof value === "number") return Number.isInteger(value) ? `${value}` : value.toFixed(2);
+  return String(value).replace(/_/g, " ");
+}
+
+export function MatchDetailShell({ match }: { match: SportMatchDetail; sport?: SportSlug }) {
+  const probability = match.probabilities;
+  const hasDraw = typeof probability?.draw === "number" && probability.draw > 0;
+  const context = match.context;
+  const statRows = Array.from(
+    new Set([
+      ...Object.keys((match.stats_home ?? {}) as Record<string, unknown>),
+      ...Object.keys((match.stats_away ?? {}) as Record<string, unknown>),
+    ])
+  ).slice(0, 12);
+
+  const keyDrivers = (match.key_drivers ?? []).slice(0, 6);
 
   return (
-    <div className="grid grid-cols-2 gap-4">
-      {[
-        { elo: elo_h, label: match.home.name, side: "Home" },
-        { elo: elo_a, label: match.away.name, side: "Away" },
-      ].map(({ elo, label, side }) => (
-        <Section key={side} title={`${side} — ${label}`}>
-          {elo ? (
-            <div className="flex flex-col gap-3">
-              <div className="text-4xl font-bold text-text-primary tabular-nums">
-                {Math.round(elo.rating)}
-              </div>
-              {elo.rating_change != null && (
-                <div className={cn("text-sm font-medium", elo.rating_change >= 0 ? "text-green-400" : "text-accent-red")}>
-                  {elo.rating_change >= 0 ? "+" : ""}{elo.rating_change} pts last match
-                </div>
-              )}
-              <div className="text-text-subtle text-xs">Global ELO rating</div>
+    <div className="grid gap-6 pb-10">
+      <section className="overflow-hidden rounded-[32px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.10),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-5 shadow-[0_26px_70px_rgba(0,0,0,0.24)] lg:p-7">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link href={`/sports/${match.sport}/matches`} className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.04] px-4 py-2 text-sm text-white/65 transition hover:text-white">
+            <ArrowLeft size={14} />
+            Back to matches
+          </Link>
+
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-full border border-white/8 bg-white/[0.04] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-white/50">{match.league}</span>
+            <span className="rounded-full border border-emerald-300/18 bg-emerald-300/10 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-emerald-200">{scoreState(match.status)}</span>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_auto_1fr] xl:items-center">
+          <div className="flex items-center gap-4">
+            <Avatar name={match.home.name} src={match.home.logo_url} />
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">Team A</div>
+              <div className="mt-1 text-2xl font-semibold tracking-[-0.04em] text-white">{match.home.name}</div>
+              <div className="mt-1 text-sm text-white/48">{match.elo_home?.rating != null ? `ELO ${Math.round(match.elo_home.rating)}` : "No rating yet"}</div>
+            </div>
+          </div>
+
+          <div className="rounded-[28px] border border-white/8 bg-black/20 px-6 py-5 text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/18 bg-emerald-300/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-emerald-200">
+              <Sparkles size={12} />
+              Match centre
+            </div>
+            <div className="mt-4 text-6xl font-semibold tracking-[-0.08em] text-white">
+              <span className={match.status === "live" ? "text-emerald-300" : ""}>{match.home_score ?? 0}</span>
+              <span className="px-3 text-white/18">:</span>
+              <span className={match.status === "live" ? "text-emerald-300" : ""}>{match.away_score ?? 0}</span>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-4 text-sm text-white/50">
+              <span className="inline-flex items-center gap-2"><CalendarDays size={14} /> {formatDate(match.kickoff_utc, "long")}</span>
+              {match.live_clock ? <span className="inline-flex items-center gap-2"><Clock3 size={14} /> {match.live_clock}</span> : null}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-4">
+            <div className="text-right">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/35">Team B</div>
+              <div className="mt-1 text-2xl font-semibold tracking-[-0.04em] text-white">{match.away.name}</div>
+              <div className="mt-1 text-sm text-white/48">{match.elo_away?.rating != null ? `ELO ${Math.round(match.elo_away.rating)}` : "No rating yet"}</div>
+            </div>
+            <Avatar name={match.away.name} src={match.away.logo_url} />
+          </div>
+        </div>
+      </section>
+
+      <section className={cn("grid gap-4", hasDraw ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
+        <ProbCard label={`${match.home.name} win`} prob={probability?.home_win} tone="text-emerald-300" />
+        {hasDraw ? <ProbCard label="Draw" prob={probability?.draw} tone="text-amber-300" /> : null}
+        <ProbCard label={`${match.away.name} win`} prob={probability?.away_win} tone="text-violet-300" />
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-3">
+        <StatCard label="Model confidence" value={match.confidence != null ? `${match.confidence}%` : "—"} tone={match.confidence != null && match.confidence >= 60 ? "text-emerald-300" : undefined} />
+        <StatCard label="Fair odds A" value={match.fair_odds?.home_win != null ? match.fair_odds.home_win.toFixed(2) : "—"} />
+        <StatCard label="Fair odds B" value={match.fair_odds?.away_win != null ? match.fair_odds.away_win.toFixed(2) : "—"} />
+      </section>
+
+      <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+        <Section title="Match overview">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="rounded-[20px] border border-white/8 bg-black/15 p-4">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">League</div>
+              <div className="mt-2 text-sm text-white/78">{match.league}</div>
+            </div>
+            <div className="rounded-[20px] border border-white/8 bg-black/15 p-4">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">Status</div>
+              <div className="mt-2 text-sm text-white/78">{scoreState(match.status)}</div>
+            </div>
+            <div className="rounded-[20px] border border-white/8 bg-black/15 p-4">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">Venue</div>
+              <div className="mt-2 text-sm text-white/78">{context?.venue_name || context?.venue_city || "—"}</div>
+            </div>
+            <div className="rounded-[20px] border border-white/8 bg-black/15 p-4">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">Weather</div>
+              <div className="mt-2 text-sm text-white/78">{context?.weather_desc || "—"}</div>
+            </div>
+            <div className="rounded-[20px] border border-white/8 bg-black/15 p-4">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">Attendance</div>
+              <div className="mt-2 text-sm text-white/78">{context?.attendance ? context.attendance.toLocaleString() : "—"}</div>
+            </div>
+            <div className="rounded-[20px] border border-white/8 bg-black/15 p-4">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">Neutral site</div>
+              <div className="mt-2 text-sm text-white/78">{context?.neutral_site ? "Yes" : "No"}</div>
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Model drivers">
+          {keyDrivers.length ? (
+            <div className="space-y-3">
+              {keyDrivers.map((driver, index) => {
+                const pct = Math.round(driver.importance * 100);
+                return (
+                  <div key={`${driver.feature}-${index}`} className="rounded-[20px] border border-white/8 bg-black/15 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-medium text-white">{driver.feature}</div>
+                        <div className="mt-1 text-xs text-white/45">Value: {valueForDisplay(driver.value)}</div>
+                      </div>
+                      <div className="text-sm font-semibold text-emerald-200">{pct}%</div>
+                    </div>
+                    <div className="mt-3 h-2 rounded-full bg-white/[0.06]">
+                      <div className="h-full rounded-full bg-emerald-300" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
-            <div className="text-text-subtle text-sm">No rating history</div>
+            <div className="rounded-[20px] border border-dashed border-white/10 bg-white/[0.03] p-6 text-sm text-white/50">No driver breakdown has been provided for this match yet.</div>
           )}
         </Section>
-      ))}
-    </div>
-  );
-}
-
-function H2HTab({ match }: { match: SportMatchDetail }) {
-  const h2h = match.h2h;
-  if (!h2h || h2h.total_matches === 0) {
-    return (
-      <div className="flex items-center justify-center h-40 text-text-muted text-sm">
-        No head-to-head history found
       </div>
-    );
-  }
 
-  const homeWins = h2h.home_wins ?? h2h.player_a_wins ?? h2h.team_a_wins ?? 0;
-  const awayWins = h2h.away_wins ?? h2h.player_b_wins ?? h2h.team_b_wins ?? 0;
-
-  return (
-    <div className="flex flex-col gap-4">
-      <Section title="All-Time Record">
-        <div className="flex items-center justify-around">
-          <div className="flex flex-col items-center">
-            <div className="text-3xl font-bold text-text-primary">{homeWins}</div>
-            <div className="text-text-muted text-xs mt-1">{match.home.name}</div>
-          </div>
-          {h2h.draws != null && (
-            <div className="flex flex-col items-center">
-              <div className="text-3xl font-bold text-text-subtle">{h2h.draws}</div>
-              <div className="text-text-subtle text-xs mt-1">Draws</div>
+      <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+        <Section title="Stat comparison">
+          {statRows.length ? (
+            <div className="space-y-2">
+              {statRows.map((key) => (
+                <div key={key} className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 rounded-[18px] border border-white/8 bg-black/15 px-4 py-3">
+                  <div className="text-right text-sm text-white/72">{valueForDisplay((match.stats_home as Record<string, unknown> | null)?.[key])}</div>
+                  <div className="text-center text-[11px] uppercase tracking-[0.18em] text-white/38">{key.replace(/_/g, " ")}</div>
+                  <div className="text-sm text-white/72">{valueForDisplay((match.stats_away as Record<string, unknown> | null)?.[key])}</div>
+                </div>
+              ))}
             </div>
+          ) : (
+            <div className="rounded-[20px] border border-dashed border-white/10 bg-white/[0.03] p-6 text-sm text-white/50">Detailed stat splits are not available for this fixture.</div>
           )}
-          <div className="flex flex-col items-center">
-            <div className="text-3xl font-bold text-text-primary">{awayWins}</div>
-            <div className="text-text-muted text-xs mt-1">{match.away.name}</div>
-          </div>
-        </div>
-      </Section>
+        </Section>
 
-      {h2h.recent_matches.length > 0 && (
-        <Section title="Recent Meetings">
-          <div className="flex flex-col gap-2">
-            {h2h.recent_matches.map((m, i) => (
-              <div key={i} className="flex items-center justify-between text-xs py-1.5 border-b border-surface-border/40 last:border-0">
-                <span className="text-text-subtle">{m.date ? new Date(m.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }) : "—"}</span>
-                <span className="text-text-muted font-mono">
-                  {m.home_score ?? "—"} – {m.away_score ?? "—"}
-                </span>
-                <span className={cn("font-medium capitalize", m.outcome === "home_win" || m.winner === "home" || m.winner === "team_a" || m.winner === "player_a" ? "text-accent-blue" : "text-text-muted")}>
-                  {m.outcome?.replace("_", " ") ?? m.winner ?? "—"}
-                </span>
-              </div>
-            ))}
+        <Section title="Head to head & context">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <StatCard label="Meetings" value={match.h2h?.total_matches != null ? String(match.h2h.total_matches) : "—"} />
+            <StatCard label={`${match.home.name} wins`} value={match.h2h?.home_wins != null ? String(match.h2h.home_wins) : match.h2h?.player_a_wins != null ? String(match.h2h.player_a_wins) : match.h2h?.team_a_wins != null ? String(match.h2h.team_a_wins) : "—"} />
+            <StatCard label={`${match.away.name} wins`} value={match.h2h?.away_wins != null ? String(match.h2h.away_wins) : match.h2h?.player_b_wins != null ? String(match.h2h.player_b_wins) : match.h2h?.team_b_wins != null ? String(match.h2h.team_b_wins) : "—"} />
+            <StatCard label="Draws" value={match.h2h?.draws != null ? String(match.h2h.draws) : "—"} />
+          </div>
+          <div className="mt-4 rounded-[20px] border border-white/8 bg-black/15 p-4 text-sm text-white/58">
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-white/35">
+              <MapPin size={12} />
+              Match context
+            </div>
+            <div className="mt-2">
+              {context?.venue_name || context?.venue_city
+                ? `${context?.venue_name ?? ""}${context?.venue_name && context?.venue_city ? ", " : ""}${context?.venue_city ?? ""}`
+                : "Venue context not supplied yet."}
+            </div>
           </div>
         </Section>
-      )}
-    </div>
-  );
-}
-
-function ModelTab({ match }: { match: SportMatchDetail }) {
-  if (!match.model) {
-    return (
-      <div className="flex items-center justify-center h-40 text-text-muted text-sm">
-        No model metadata available
       </div>
-    );
-  }
-  return (
-    <Section title="Model Information">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <span className="text-text-subtle text-xs">Version</span>
-          <span className="text-text-muted text-xs font-mono">{match.model.version}</span>
-        </div>
-        {match.model.algorithm && (
-          <div className="flex items-center justify-between">
-            <span className="text-text-subtle text-xs">Algorithm</span>
-            <span className="text-text-muted text-xs font-mono">{match.model.algorithm}</span>
-          </div>
-        )}
-        {match.model.trained_at && (
-          <div className="flex items-center justify-between">
-            <span className="text-text-subtle text-xs">Trained</span>
-            <span className="text-text-muted text-xs">
-              {new Date(match.model.trained_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-            </span>
-          </div>
-        )}
-        {match.model.n_train_samples != null && (
-          <div className="flex items-center justify-between">
-            <span className="text-text-subtle text-xs">Training samples</span>
-            <span className="text-text-muted text-xs font-mono">{match.model.n_train_samples.toLocaleString()}</span>
-          </div>
-        )}
-        {match.model.accuracy != null && (
-          <div className="flex items-center justify-between">
-            <span className="text-text-subtle text-xs">Accuracy (eval)</span>
-            <span className="text-text-muted text-xs font-mono">{(match.model.accuracy * 100).toFixed(1)}%</span>
-          </div>
-        )}
-        {match.model.brier_score != null && (
-          <div className="flex items-center justify-between">
-            <span className="text-text-subtle text-xs">Brier score</span>
-            <span className="text-text-muted text-xs font-mono">{match.model.brier_score.toFixed(4)}</span>
-          </div>
-        )}
-        {match.fair_odds && (
-          <>
-            <div className="border-t border-surface-border/40 pt-2 mt-2 text-text-subtle text-xs uppercase tracking-widest">Fair Odds</div>
-            <div className="flex items-center justify-between">
-              <span className="text-text-subtle text-xs">Home</span>
-              <span className="text-text-muted text-xs font-mono">{match.fair_odds.home_win?.toFixed(2)}</span>
-            </div>
-            {match.fair_odds.draw != null && match.fair_odds.draw > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-text-subtle text-xs">Draw</span>
-                <span className="text-text-muted text-xs font-mono">{match.fair_odds.draw.toFixed(2)}</span>
-              </div>
-            )}
-            <div className="flex items-center justify-between">
-              <span className="text-text-subtle text-xs">Away</span>
-              <span className="text-text-muted text-xs font-mono">{match.fair_odds.away_win?.toFixed(2)}</span>
-            </div>
-          </>
-        )}
-      </div>
-    </Section>
-  );
-}
-
-function ContextTab({ match }: { match: SportMatchDetail }) {
-  const ctx = match.context;
-  if (!ctx) {
-    return (
-      <div className="flex items-center justify-center h-40 text-text-muted text-sm">
-        No venue or context data available
-      </div>
-    );
-  }
-  return (
-    <Section title="Venue & Context">
-      <div className="flex flex-col gap-2">
-        {ctx.venue_name && (
-          <div className="flex items-center justify-between">
-            <span className="text-text-subtle text-xs">Venue</span>
-            <span className="text-text-muted text-xs">{ctx.venue_name}{ctx.venue_city ? `, ${ctx.venue_city}` : ""}</span>
-          </div>
-        )}
-        {ctx.attendance != null && (
-          <div className="flex items-center justify-between">
-            <span className="text-text-subtle text-xs">Attendance</span>
-            <span className="text-text-muted text-xs font-mono">{ctx.attendance.toLocaleString()}</span>
-          </div>
-        )}
-        {ctx.neutral_site && (
-          <div className="flex items-center justify-between">
-            <span className="text-text-subtle text-xs">Neutral Site</span>
-            <span className="text-text-muted text-xs">Yes</span>
-          </div>
-        )}
-        {ctx.weather_desc && (
-          <div className="flex items-center justify-between">
-            <span className="text-text-subtle text-xs">Weather</span>
-            <span className="text-text-muted text-xs">{ctx.weather_desc}</span>
-          </div>
-        )}
-        {ctx.temperature_c != null && (
-          <div className="flex items-center justify-between">
-            <span className="text-text-subtle text-xs">Temperature</span>
-            <span className="text-text-muted text-xs">{ctx.temperature_c}°C</span>
-          </div>
-        )}
-      </div>
-    </Section>
-  );
-}
-
-// ── Main shell ──────────────────────────────────────────────────────────────
-
-export function MatchDetailShell({ match, sport }: MatchDetailShellProps) {
-  return (
-    <div className="flex flex-col gap-6 pb-12">
-      <OverviewTab match={match} />
-      <StatsTab match={match} />
-      <EloTab match={match} />
-      <H2HTab match={match} />
-      <ModelTab match={match} />
-      <ContextTab match={match} />
     </div>
   );
 }
