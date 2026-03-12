@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
-import { getBasketballMatchDetail, getBasketballTeamEloHistory } from "@/lib/api";
-import { BasketballMatchDetail } from "./BasketballMatchDetail";
+import { getBasketballMatchDetail } from "@/lib/api";
+import { MatchDetailShell } from "@/app/sports/[sport]/matches/[id]/MatchDetailShell";
 
 export const revalidate = 30;
 
@@ -30,18 +30,9 @@ export default async function BasketballMatchPage({ params }: Props) {
     notFound();
   }
 
-  const [eloHomeHistory, eloAwayHistory] = await Promise.all([
-    getBasketballTeamEloHistory(match.elo_home?.team_id ?? match.home.id),
-    getBasketballTeamEloHistory(match.elo_away?.team_id ?? match.away.id),
-  ]);
-
   return (
-    <AppShell title={`${match.home.name} vs ${match.away.name}`}>
-      <BasketballMatchDetail
-        match={match}
-        eloHomeHistory={eloHomeHistory}
-        eloAwayHistory={eloAwayHistory}
-      />
+    <AppShell title={`${match.home.name} vs ${match.away.name}`} subtitle={match.league}>
+      <MatchDetailShell match={match as any} sport="basketball" />
     </AppShell>
   );
 }

@@ -37,7 +37,7 @@ function StatCard({ label, value, tone }: { label: string; value: string; tone?:
   );
 }
 
-function ProbCard({ label, prob, tone }: { label: string; prob?: number; tone: string }) {
+function ProbCard({ label, prob, tone }: { label: string; prob?: number | null; tone: string }) {
   const pct = prob != null ? Math.round(prob * 100) : null;
   return (
     <div className="rounded-[22px] border border-white/8 bg-black/15 p-4">
@@ -62,7 +62,7 @@ function valueForDisplay(value: unknown) {
   return String(value).replace(/_/g, " ");
 }
 
-export function MatchDetailShell({ match }: { match: SportMatchDetail; sport: SportSlug }) {
+export function MatchDetailShell({ match }: { match: SportMatchDetail; sport?: SportSlug }) {
   const probability = match.probabilities;
   const hasDraw = typeof probability?.draw === "number" && probability.draw > 0;
   const context = match.context;
