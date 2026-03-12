@@ -843,31 +843,52 @@ function OverviewTab({ match }: { match: EsportsMatch }) {
   return (
     <SideGrid>
       <MainCol>
-        {isLol ? <LolOverviewPanel match={match} /> : <Cs2OverviewPanel match={match} />}
+        <Panel
+          title={isLol ? "League of Legends Matchup" : "Counter-Strike Matchup"}
+          subtitle="Primary matchup summary"
+        >
+          {isLol ? <LolOverviewPanel match={match} /> : <Cs2OverviewPanel match={match} />}
+        </Panel>
+
         {p && (
-          <Panel title="Win Probability">
+          <Panel title="Series Win Probability" subtitle="Model projection">
             <WinBar pA={p.home_win} pB={p.away_win} labelA={match.home.name} labelB={match.away.name} />
           </Panel>
         )}
       </MainCol>
+
       <SideCol>
-        <Panel title="Match Info">
+        <Panel title="Match Info" subtitle="Format and environment">
           <MetricRow label="Game" value={<span className={gameColor(gt)}>{gameLabel(gt)}</span>} />
-          {match.match_info?.series_format && <MetricRow label="Format" value={match.match_info.series_format.toUpperCase()} />}
+          {match.match_info?.series_format && (
+            <MetricRow label="Format" value={match.match_info.series_format.toUpperCase()} />
+          )}
           <MetricRow label="Setting" value={match.match_info?.is_lan ? "LAN" : "Online"} />
-          {match.match_info?.patch_version && <MetricRow label="Patch" value={match.match_info.patch_version} />}
-          {match.match_info?.tournament_tier && <MetricRow label="Tier" value={match.match_info.tournament_tier} />}
+          {match.match_info?.patch_version && (
+            <MetricRow label="Patch" value={match.match_info.patch_version} />
+          )}
+          {match.match_info?.tournament_tier && (
+            <MetricRow label="Tier" value={match.match_info.tournament_tier} />
+          )}
         </Panel>
+
         {match.h2h && (
-          <Panel title="H2H Summary">
+          <Panel title="H2H Summary" subtitle="Recent series history">
             <MetricRow label="Total" value={match.h2h.total_matches} />
             <MetricRow label={`${match.home.name} wins`} value={match.h2h.team_a_wins} accent />
             <MetricRow label={`${match.away.name} wins`} value={match.h2h.team_b_wins} />
           </Panel>
         )}
-        <Panel title="Roster Stability">
-          <MetricRow label={match.home.name} value={match.form_home?.roster_stability_score != null ? pct(match.form_home.roster_stability_score) : "—"} />
-          <MetricRow label={match.away.name} value={match.form_away?.roster_stability_score != null ? pct(match.form_away.roster_stability_score) : "—"} />
+
+        <Panel title="Roster Stability" subtitle="Continuity signal">
+          <MetricRow
+            label={match.home.name}
+            value={match.form_home?.roster_stability_score != null ? pct(match.form_home.roster_stability_score) : "—"}
+          />
+          <MetricRow
+            label={match.away.name}
+            value={match.form_away?.roster_stability_score != null ? pct(match.form_away.roster_stability_score) : "—"}
+          />
         </Panel>
       </SideCol>
     </SideGrid>
