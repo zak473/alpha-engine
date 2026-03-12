@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import Link from "next/link";
 import type { SportMatchListItem } from "@/lib/types";
 import type { SportSlug } from "@/lib/api";
 import type { BettingMatch, BettingFilter } from "@/lib/betting-types";
@@ -13,16 +12,6 @@ import { MatchList } from "@/components/betting/MatchList";
 import { QueueRail } from "@/components/betting/QueueRail";
 import { MobileQueueDrawer } from "@/components/betting/MobileQueueDrawer";
 import { useLiveMatches } from "@/hooks/useLiveMatches";
-import { cn } from "@/lib/utils";
-
-const SPORT_BAR: { slug: SportSlug; label: string; icon: string }[] = [
-  { slug: "soccer",     label: "Soccer",     icon: "⚽" },
-  { slug: "tennis",     label: "Tennis",     icon: "🎾" },
-  { slug: "basketball", label: "Basketball", icon: "🏀" },
-  { slug: "baseball",   label: "Baseball",   icon: "⚾" },
-  { slug: "hockey",     label: "Hockey",     icon: "🏒" },
-  { slug: "esports",    label: "Esports",    icon: "🎮" },
-];
 
 interface SportMatchesViewProps {
   sport: SportSlug;
@@ -82,42 +71,8 @@ export function SportMatchesView({ sport, matches, total }: SportMatchesViewProp
     setFilter({ ...DEFAULT_BETTING_FILTER, status: "finished" });
   }, []);
 
-  // Count scheduled matches per the full unfiltered set
-  const scheduledCount = mergedMatches.filter((m) => m.status === "upcoming").length;
-
   return (
     <div className="flex flex-col" style={{ minHeight: "calc(100vh - var(--topbar-height))" }}>
-      {/* Sport navigation bar */}
-      <div className="px-4 pt-4 lg:px-6">
-        <div className="overflow-x-auto no-scrollbar">
-          <div className="flex min-w-max items-center gap-2 rounded-[24px] border border-white/8 bg-white/[0.03] p-2">
-            {SPORT_BAR.map((s) => {
-              const isActive = s.slug === sport;
-              return (
-                <Link
-                  key={s.slug}
-                  href={`/sports/${s.slug}/matches`}
-                  className={cn(
-                    "flex items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-all",
-                    isActive
-                      ? "bg-[#2edb6c] text-[#07110d] shadow-sm"
-                      : "text-white/60 hover:bg-white/[0.06] hover:text-white"
-                  )}
-                >
-                  <span>{s.icon}</span>
-                  <span>{s.label}</span>
-                  {isActive && scheduledCount > 0 && (
-                    <span className="rounded-full bg-[#07110d]/20 px-1.5 py-0.5 text-[10px] font-bold text-[#07110d]">
-                      {scheduledCount} scheduled
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
       {/* Live strip — full width */}
       <LiveNowStrip
         matches={mergedMatches}
