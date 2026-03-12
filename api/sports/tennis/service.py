@@ -674,8 +674,10 @@ class TennisMatchService(BaseMatchListService):
         # Batch-load teams and leagues for logos
         all_team_ids = {m.home_team_id for m in rows} | {m.away_team_id for m in rows}
         all_league_ids = {m.league_id for m in rows if m.league_id}
+        all_match_ids = [m.id for m in rows]
         team_map = {t.id: t for t in db.query(CoreTeam).filter(CoreTeam.id.in_(all_team_ids)).all()} if all_team_ids else {}
         league_map = {lg.id: lg for lg in db.query(CoreLeague).filter(CoreLeague.id.in_(all_league_ids)).all()} if all_league_ids else {}
+        pred_map = {p.match_id: p for p in db.query(PredMatch).filter(PredMatch.match_id.in_(all_match_ids)).all()} if all_match_ids else {}
 
         items = []
         for m in rows:
@@ -690,7 +692,7 @@ class TennisMatchService(BaseMatchListService):
             r_away = snap_a.rating if snap_a else 1500.0
             p_home = round(1.0 / (1.0 + 10 ** (-(r_home - r_away) / 400.0)), 4)
             p_away = round(1.0 - p_home, 4)
-            seed = sum(ord(c) for c in m.id) % 100
+            pred = pred_map.get(m.id)
             items.append(TennisMatchListItem(
                 id=m.id,
                 league=lg.name if lg else "Unknown Tournament",
@@ -710,7 +712,7 @@ class TennisMatchService(BaseMatchListService):
                 elo_away=snap_a.rating if snap_a else None,
                 p_home=p_home,
                 p_away=p_away,
-                confidence=52 + (seed % 28),
+                confidence=pred.confidence if pred else None,
                 odds_home=m.odds_home,
                 odds_away=m.odds_away,
                 home_logo=ht.logo_url if ht else None,

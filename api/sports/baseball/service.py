@@ -45,6 +45,7 @@ from api.sports.baseball.schemas import (
 from api.sports.base.queries import compute_team_form, form_from_hl, form_summary, h2h_from_hl
 from db.models.baseball import BaseballTeamMatchStats, BaseballPlayerMatchStats, EventContext
 from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, RatingEloTeam
+from sqlalchemy import or_
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -52,6 +53,101 @@ from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, RatingEloTeam
 def _name(db: Session, team_id: str) -> str:
     t = db.get(CoreTeam, team_id)
     return t.name if t else team_id
+
+
+# MLB ballpark run-scoring factors (league-average = 1.0; >1.0 = hitter-friendly)
+_PARK_FACTORS: dict[str, float] = {
+    "coors field": 1.15,
+    "great american ball park": 1.09,
+    "fenway park": 1.04,
+    "yankee stadium": 1.03,
+    "citizen's bank park": 1.03,
+    "citizens bank park": 1.03,
+    "oracle park": 0.92,
+    "dodger stadium": 0.93,
+    "petco park": 0.94,
+    "tropicana field": 0.95,
+    "t-mobile park": 0.96,
+    "minute maid park": 1.01,
+    "wrigley field": 1.02,
+    "busch stadium": 0.97,
+    "pnc park": 0.97,
+    "camden yards": 1.02,
+    "oriole park at camden yards": 1.02,
+    "american family field": 1.01,
+    "target field": 0.98,
+    "progressive field": 0.98,
+    "comerica park": 0.97,
+    "guaranteed rate field": 1.01,
+    "kauffman stadium": 0.97,
+    "angel stadium": 0.97,
+    "globe life field": 1.01,
+    "truist park": 1.00,
+    "loanDepot park": 0.95,
+    "loandepot park": 0.95,
+    "marlins park": 0.95,
+    "citi field": 0.98,
+    "nationals park": 1.00,
+}
+
+
+def _get_park_factor(venue: str | None) -> float | None:
+    if not venue:
+        return None
+    return _PARK_FACTORS.get(venue.lower().strip())
+
+
+def _season_record(db: Session, sport: str, team_id: str, season: str | None) -> str | None:
+    """Return 'W-L' season record for a team."""
+    q = db.query(CoreMatch).filter(
+        CoreMatch.sport == sport,
+        CoreMatch.status == "finished",
+        or_(CoreMatch.home_team_id == team_id, CoreMatch.away_team_id == team_id),
+    )
+    if season:
+        q = q.filter(CoreMatch.season == season)
+    matches = q.all()
+    if not matches:
+        return None
+    wins = losses = 0
+    for m in matches:
+        is_home = m.home_team_id == team_id
+        if m.outcome == "home_win":
+            wins += 1 if is_home else 0
+            losses += 0 if is_home else 1
+        elif m.outcome == "away_win":
+            wins += 0 if is_home else 1
+            losses += 1 if is_home else 0
+    return f"{wins}-{losses}"
+
+
+def _parse_weather(extras: dict) -> Optional[BaseballWeatherOut]:
+    """Parse weather conditions from Highlightly extras_json."""
+    raw = extras.get("weather") or extras.get("conditions") or extras.get("environment")
+    if not raw or not isinstance(raw, dict):
+        return None
+    try:
+        temp_f = raw.get("temperature") or raw.get("temp_f")
+        temp_c = raw.get("temp_c")
+        if temp_f and not temp_c:
+            temp_c = round((float(temp_f) - 32) * 5 / 9, 1)
+        wind = raw.get("wind") or {}
+        wind_speed = wind.get("speed") if isinstance(wind, dict) else raw.get("wind_speed")
+        wind_dir = wind.get("direction") if isinstance(wind, dict) else raw.get("wind_direction")
+        conditions = raw.get("description") or raw.get("conditions") or raw.get("summary")
+        humidity = raw.get("humidity") or raw.get("humidity_pct")
+        if not any([temp_f, temp_c, conditions, wind_speed]):
+            return None
+        return BaseballWeatherOut(
+            temperature_f=float(temp_f) if temp_f is not None else None,
+            temperature_c=float(temp_c) if temp_c is not None else None,
+            wind_speed_mph=float(wind_speed) if wind_speed is not None else None,
+            wind_direction=str(wind_dir) if wind_dir else None,
+            conditions=str(conditions) if conditions else None,
+            humidity_pct=float(humidity) if humidity is not None else None,
+        )
+    except Exception:
+        return None
 
 
 def _league_name(db: Session, league_id: str) -> str:
@@ -349,8 +445,18 @@ def _build_baseball_detail(
             innings = None
     events = None
 
-    weather = None
-    park_factor = None
+    weather = _parse_weather(extras)
+    park_factor = _get_park_factor(match.venue)
+
+    # Umpire name from Highlightly extras
+    umpire_name: str | None = (
+        extras.get("umpire")
+        or extras.get("referee")
+        or (extras.get("officials") or [None])[0]
+        or None
+    )
+    if isinstance(umpire_name, dict):
+        umpire_name = umpire_name.get("name") or umpire_name.get("full_name")
 
     # Derive current_period for live baseball from EventContext inning_scores_json length
     baseball_current_period = match.current_period if match.status == "live" else None
@@ -392,10 +498,11 @@ def _build_baseball_detail(
             home_errors=None,
             away_hits=batting_away.total_hits if batting_away else None,
             away_errors=None,
+            umpire_home_plate=umpire_name,
             weather=weather,
             park_factor=park_factor,
-            home_record=None,
-            away_record=None,
+            home_record=_season_record(db, "baseball", match.home_team_id, match.season),
+            away_record=_season_record(db, "baseball", match.away_team_id, match.season),
             home_streak=None,
             away_streak=None,
             home_bullpen_era=None,

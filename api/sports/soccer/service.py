@@ -55,6 +55,7 @@ from db.models.mvp import (
     ModelRegistry,
     PredMatch,
     RatingEloTeam,
+    TeamInjury,
 )
 
 
@@ -283,6 +284,29 @@ def _adv_stats_out(
         xpts=xpts,
         progressive_passes=row.deep_completions,
     )
+
+
+def _injuries_for_team(db: Session, team_id: str) -> list[SoccerInjuryOut]:
+    """Return current injuries/suspensions for a team (fetched within last 48h)."""
+    from datetime import timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+    rows = (
+        db.query(TeamInjury)
+        .filter(TeamInjury.team_id == team_id, TeamInjury.fetched_at >= cutoff)
+        .order_by(TeamInjury.status, TeamInjury.player_name)
+        .all()
+    )
+    return [
+        SoccerInjuryOut(
+            player_name=r.player_name,
+            position=r.position,
+            status=r.status,
+            reason=r.reason,
+            expected_return=r.expected_return,
+            impact=None,
+        )
+        for r in rows
+    ]
 
 
 def _referee_stats(db: Session, match: CoreMatch) -> Optional[SoccerRefereeOut]:
@@ -527,6 +551,26 @@ def _real_league_context(db: Session, match: CoreMatch, home_id: str, away_id: s
     top4_pts = standings[sorted_teams[3]]["pts"] if n >= 4 else None
     rel_pts = standings[sorted_teams[max(0, n - 3)]]["pts"] if n >= 3 else None
 
+    # Form rank: rank each team by points earned in their last 5 matches
+    sorted_by_date = sorted(matches, key=lambda m: m.kickoff_utc, reverse=True)
+    form_pts: dict[str, int] = {tid: 0 for tid in standings}
+    form_count: dict[str, int] = {tid: 0 for tid in standings}
+    for m in sorted_by_date:
+        for tid, is_home in [(m.home_team_id, True), (m.away_team_id, False)]:
+            if tid not in form_count or form_count[tid] >= 5:
+                continue
+            outcome = _norm.get(m.outcome or "", "draw")
+            if outcome == "home_win":
+                form_pts[tid] += 3 if is_home else 0
+            elif outcome == "away_win":
+                form_pts[tid] += 0 if is_home else 3
+            else:
+                form_pts[tid] += 1
+            form_count[tid] += 1
+
+    form_sorted = sorted(standings.keys(), key=lambda t: -form_pts.get(t, 0))
+    form_rank_map = {tid: i + 1 for i, tid in enumerate(form_sorted)}
+
     return SoccerLeagueContextOut(
         home_position=home_pos,
         away_position=away_pos,
@@ -537,8 +581,8 @@ def _real_league_context(db: Session, match: CoreMatch, home_id: str, away_id: s
         points_gap=home_s["pts"] - away_s["pts"],
         top_4_gap_home=(home_s["pts"] - top4_pts) if top4_pts is not None else None,
         relegation_gap_away=(away_s["pts"] - rel_pts) if rel_pts is not None else None,
-        home_form_rank=None,
-        away_form_rank=None,
+        home_form_rank=form_rank_map.get(home_id),
+        away_form_rank=form_rank_map.get(away_id),
     )
 
 
@@ -1108,8 +1152,8 @@ class SoccerMatchService(BaseMatchListService):
             context=match_context,
             lineup_home=lineup_home,
             lineup_away=lineup_away,
-            injuries_home=[],
-            injuries_away=[],
+            injuries_home=_injuries_for_team(db, match.home_team_id),
+            injuries_away=_injuries_for_team(db, match.away_team_id),
             referee=_referee_stats(db, match),
             highlights=highlights,
             events=events,

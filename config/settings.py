@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     # Register at https://highlightly.net → API key
     HIGHLIGHTLY_API_KEY: str = ""
 
+    # Injury data — API-Football via RapidAPI (free tier: 100 req/day)
+    # Register at https://rapidapi.com/api-sports/api/api-football → X-RapidAPI-Key
+    API_FOOTBALL_KEY: str = ""
+
     # Auto-pick bot settings
     AUTO_PICK_USER_ID: str = "bot"          # user_id for auto-generated picks
     AUTO_PICK_MIN_EDGE: float = 0.03        # minimum edge to generate a pick (3%)

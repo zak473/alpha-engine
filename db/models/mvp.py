@@ -397,3 +397,30 @@ class CoreStanding(Base):
         Index("ix_standings_league_season", "league_id", "season"),
         Index("ix_standings_sport", "sport"),
     )
+
+
+class TeamInjury(Base):
+    """
+    Current player injuries and suspensions per team.
+    Populated daily from API-Football (/injuries endpoint).
+    Service reads rows where fetched_at > now() - 48h.
+    """
+    __tablename__ = "team_injuries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    team_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)   # CoreTeam.id
+    team_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    player_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    position: Mapped[str] = mapped_column(String(50), nullable=True)
+    status: Mapped[str] = mapped_column(String(50), nullable=False)                 # "Out" | "Suspended" | "Doubtful"
+    reason: Mapped[str] = mapped_column(String(200), nullable=True)
+    expected_return: Mapped[str] = mapped_column(String(100), nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("team_id", "player_name", name="uq_team_injury_player"),
+        Index("ix_team_injuries_team_id", "team_id"),
+        Index("ix_team_injuries_fetched_at", "fetched_at"),
+    )

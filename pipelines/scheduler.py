@@ -273,6 +273,18 @@ def _job_fetch_xg() -> None:
     log.info("[scheduler] fetch_xg done.")
 
 
+def _job_fetch_injuries() -> None:
+    """Fetch player injuries and suspensions from API-Football."""
+    log.info("[scheduler] Starting fetch_injuries job ...")
+    try:
+        from pipelines.soccer.fetch_injuries import fetch_all as fetch_injuries
+        n = fetch_injuries()
+        log.info("[scheduler] fetch_injuries: %d rows upserted.", n)
+    except Exception as exc:
+        log.error("[scheduler] fetch_injuries failed: %s", exc, exc_info=True)
+    log.info("[scheduler] fetch_injuries done.")
+
+
 def _job_settle_pending_picks() -> None:
     """Batch-settle all pending moneyline picks whose match is now finished."""
     from datetime import datetime, timezone
@@ -661,12 +673,21 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
-    # Fetch Understat xG data weekly (Monday 1 AM UTC — after weekend matches)
+    # Fetch Understat xG data nightly (3 AM UTC — Understat updates within ~24h of match)
     _scheduler.add_job(
         _job_fetch_xg,
-        trigger=CronTrigger(day_of_week="mon", hour=1, minute=0, timezone="UTC"),
+        trigger=CronTrigger(hour=3, minute=0, timezone="UTC"),
         id="fetch_xg",
         name="Fetch Understat xG data (soccer)",
+        replace_existing=True,
+    )
+
+    # Fetch player injuries from API-Football (daily 6 AM UTC)
+    _scheduler.add_job(
+        _job_fetch_injuries,
+        trigger=CronTrigger(hour=6, minute=0, timezone="UTC"),
+        id="fetch_injuries",
+        name="Fetch player injuries/suspensions (API-Football)",
         replace_existing=True,
     )
 
@@ -675,7 +696,7 @@ def start() -> BackgroundScheduler:
         _job_retrain_models,
         trigger=CronTrigger(day_of_week="sat", hour=2, minute=0, timezone="UTC"),
         id="retrain_models",
-        name="Weekly ML model retraining (soccer, basketball, baseball)",
+        name="Weekly ML model retraining (soccer, basketball, baseball, tennis, esports)",
         replace_existing=True,
     )
 
@@ -746,7 +767,7 @@ def start() -> BackgroundScheduler:
         "highlightly_historical (daily 03:00), sync_standings (12h), "
         "settle_picks (15m), predict_only (1h), fetch_stats (6h), "
         "update_elo (nightly 03:00 UTC), build_soccer_features (nightly 03:30 UTC), "
-        "fetch_player_profiles (weekly Sun), fetch_xg (weekly Mon), "
+        "fetch_player_profiles (weekly Sun), fetch_xg (nightly 03:00 UTC), "
         "retrain_models (weekly Sat), generate_weekly_challenges (weekly Mon 00:05). "
         "Executor: ThreadPoolExecutor(20 workers)."
     )

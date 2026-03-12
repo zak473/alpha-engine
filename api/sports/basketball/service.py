@@ -43,7 +43,8 @@ from api.sports.basketball.schemas import (
 )
 from api.sports.base.queries import compute_team_form, form_summary, h2h_from_hl
 from db.models.basketball import BasketballTeamMatchStats, BasketballPlayerMatchStats
-from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, RatingEloTeam
+from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, RatingEloTeam, TeamInjury
+from sqlalchemy import or_
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -56,6 +57,51 @@ def _name(db: Session, team_id: str) -> str:
 def _league_name(db: Session, league_id: str) -> str:
     lg = db.get(CoreLeague, league_id)
     return lg.name if lg else "Unknown League"
+
+
+def _injuries_for_team(db: Session, team_id: str) -> list[BasketballInjuryOut]:
+    """Return current injuries for a team (fetched within last 48h)."""
+    from datetime import timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+    rows = (
+        db.query(TeamInjury)
+        .filter(TeamInjury.team_id == team_id, TeamInjury.fetched_at >= cutoff)
+        .order_by(TeamInjury.status, TeamInjury.player_name)
+        .all()
+    )
+    return [
+        BasketballInjuryOut(
+            player_name=r.player_name,
+            position=r.position,
+            status=r.status,
+            reason=r.reason,
+        )
+        for r in rows
+    ]
+
+
+def _season_record(db: Session, sport: str, team_id: str, season: str | None) -> str | None:
+    """Return 'W-L' record for a team in the current season."""
+    q = db.query(CoreMatch).filter(
+        CoreMatch.sport == sport,
+        CoreMatch.status == "finished",
+        or_(CoreMatch.home_team_id == team_id, CoreMatch.away_team_id == team_id),
+    )
+    if season:
+        q = q.filter(CoreMatch.season == season)
+    matches = q.all()
+    if not matches:
+        return None
+    wins = losses = 0
+    for m in matches:
+        is_home = m.home_team_id == team_id
+        if m.outcome == "home_win":
+            wins += 1 if is_home else 0
+            losses += 0 if is_home else 1
+        elif m.outcome == "away_win":
+            wins += 0 if is_home else 1
+            losses += 1 if is_home else 0
+    return f"{wins}-{losses}"
 
 
 def _elo_snapshot(db: Session, team_id: str, name: str) -> Optional[BasketballEloPanelOut]:
@@ -396,8 +442,8 @@ def _build_basketball_detail(
             pace=None,
             home_quarters=h_qs,
             away_quarters=a_qs,
-            home_record=None,
-            away_record=None,
+            home_record=_season_record(db, "basketball", match.home_team_id, match.season),
+            away_record=_season_record(db, "basketball", match.away_team_id, match.season),
             home_streak=None,
             away_streak=None,
             home_home_record=None,
@@ -415,8 +461,8 @@ def _build_basketball_detail(
         adv_away=(
             _adv_from_stats(stats_away, away_name) if is_finished and stats_away else None
         ),
-        injuries_home=[],
-        injuries_away=[],
+        injuries_home=_injuries_for_team(db, match.home_team_id),
+        injuries_away=_injuries_for_team(db, match.away_team_id),
         shots_home=[],
         shots_away=[],
         h2h=h2h_result,
