@@ -133,7 +133,7 @@ export function StickyFilterBar({
             placeholder="Search teams, leagues..."
             value={filter.search}
             onChange={(e) => set("search", e.target.value)}
-            className="input-field pl-8 text-sm"
+            className="input-field pl-9 text-sm"
           />
           {filter.search && (
             <button
