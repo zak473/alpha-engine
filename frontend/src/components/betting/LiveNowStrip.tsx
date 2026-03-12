@@ -77,7 +77,7 @@ export function LiveNowStrip({ matches, onTileClick, nextUpcoming }: LiveNowStri
   return (
     <div
       className="flex items-center gap-2 px-4 py-2 border-b"
-      style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.72)" }}
+      style={{ borderColor: "var(--border0)", background: "var(--bg1)" }}
     >
       {/* Label */}
       <div className="flex items-center gap-2 flex-shrink-0">

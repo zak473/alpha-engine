@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import type { SportMatchListItem } from "@/lib/types";
 import type { SportSlug } from "@/lib/api";
+import { getLiveMatches } from "@/lib/api";
 import type { BettingMatch, BettingFilter } from "@/lib/betting-types";
 import { DEFAULT_BETTING_FILTER } from "@/lib/betting-types";
 import { adaptToMatchCard, applyBettingFilter, sortMatches } from "@/lib/betting-adapters";
@@ -34,6 +35,18 @@ export function SportMatchesView({ sport, matches, total }: SportMatchesViewProp
   const [filter, setFilter] = useState<BettingFilter>(DEFAULT_BETTING_FILTER);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [mobileQueueOpen, setMobileQueueOpen] = useState(false);
+  const [liveCounts, setLiveCounts] = useState<Record<string, number>>({});
+
+  // Fetch live counts for all sports once on mount
+  useEffect(() => {
+    getLiveMatches().then((all) => {
+      const counts: Record<string, number> = {};
+      for (const m of all) {
+        if (m.is_live) counts[m.sport] = (counts[m.sport] ?? 0) + 1;
+      }
+      setLiveCounts(counts);
+    }).catch(() => {});
+  }, []);
 
   // Poll full match list every 30s — initialise with SSR snapshot (no flash)
   const liveItems = useLiveMatches(sport, matches);
@@ -93,6 +106,7 @@ export function SportMatchesView({ sport, matches, total }: SportMatchesViewProp
           <div className="flex min-w-max items-center gap-2 rounded-[24px] border border-white/8 bg-white/[0.03] p-2">
             {SPORT_BAR.map((s) => {
               const isActive = s.slug === sport;
+              const liveCount = liveCounts[s.slug] ?? 0;
               return (
                 <Link
                   key={s.slug}
@@ -106,9 +120,14 @@ export function SportMatchesView({ sport, matches, total }: SportMatchesViewProp
                 >
                   <span>{s.icon}</span>
                   <span>{s.label}</span>
-                  {isActive && scheduledCount > 0 && (
-                    <span className="rounded-full bg-[#07110d]/20 px-1.5 py-0.5 text-[10px] font-bold text-[#07110d]">
-                      {scheduledCount} scheduled
+                  {liveCount > 0 && (
+                    <span className={cn(
+                      "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                      isActive
+                        ? "bg-[#07110d]/20 text-[#07110d]"
+                        : "bg-[#2edb6c]/15 text-[#2edb6c]"
+                    )}>
+                      {liveCount} live
                     </span>
                   )}
                 </Link>
