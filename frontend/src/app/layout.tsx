@@ -4,7 +4,6 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { BettingProvider } from "@/components/betting/BettingContext";
 import { AuthProvider } from "@/lib/auth";
 import { OddsFormatProvider } from "@/lib/odds-format";
-import { ThemeProvider } from "@/lib/theme";
 
 export const metadata: Metadata = {
   title: {
@@ -28,15 +27,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <ThemeProvider>
-          <OddsFormatProvider>
-            <AuthProvider>
-              <BettingProvider>
-                <ToastProvider>{children}</ToastProvider>
-              </BettingProvider>
-            </AuthProvider>
-          </OddsFormatProvider>
-        </ThemeProvider>
+        <OddsFormatProvider>
+          <AuthProvider>
+            <BettingProvider>
+              <ToastProvider>{children}</ToastProvider>
+            </BettingProvider>
+          </AuthProvider>
+        </OddsFormatProvider>
       </body>
     </html>
   );

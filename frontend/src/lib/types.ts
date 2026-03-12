@@ -369,37 +369,29 @@ export interface SportMatchDetail {
   sport: string;
   league: string;
   league_logo?: string | null;
-  season?: string | null;
+  season: string | null;
   kickoff_utc: string;
   status: string;
   home: { id: string; name: string; logo_url?: string | null };
   away: { id: string; name: string; logo_url?: string | null };
-  home_score?: number | null;
-  away_score?: number | null;
-  outcome?: string | null;
+  home_score: number | null;
+  away_score: number | null;
+  outcome: string | null;
   live_clock?: string | null;
   current_period?: number | null;
   current_state?: Record<string, unknown> | null;
-  probabilities?: { home_win: number; draw?: number | null; away_win: number } | null;
-  fair_odds?: { home_win?: number | null; draw?: number | null; away_win?: number | null } | null;
-  confidence?: number | null;
-  key_drivers?: Array<{ feature: string; value?: number | null; importance: number; direction?: string | null }> | null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  model?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  elo_home?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  elo_away?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  h2h?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  stats_home?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  stats_away?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  form_home?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  form_away?: any;
+  probabilities: { home_win: number; draw?: number; away_win: number } | null;
+  fair_odds?: { home_win: number; draw?: number; away_win: number } | null;
+  confidence: number | null;
+  key_drivers?: Array<{ feature: string; value: number | null; importance: number }>;
+  model?: { version: string; algorithm?: string | null; trained_at: string | null; accuracy?: number | null; brier_score?: number | null; n_train_samples?: number | null } | null;
+  elo_home: EloSnapshotOut | null;
+  elo_away: EloSnapshotOut | null;
+  stats_home?: Record<string, unknown> | null;
+  stats_away?: Record<string, unknown> | null;
+  form_home?: { team_name: string; form_pts?: number | null; wins?: number | null; draws?: number | null; losses?: number | null; goals_scored_avg?: number | null; goals_conceded_avg?: number | null; xg_avg?: number | null; xga_avg?: number | null; days_rest?: number | null } | null;
+  form_away?: { team_name: string; form_pts?: number | null; wins?: number | null; draws?: number | null; losses?: number | null; goals_scored_avg?: number | null; goals_conceded_avg?: number | null; xg_avg?: number | null; xga_avg?: number | null; days_rest?: number | null } | null;
+  h2h: H2HRecordOut | null;
   context?: {
     venue_name?: string | null;
     venue_city?: string | null;

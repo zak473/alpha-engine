@@ -1,18 +1,19 @@
 "use client";
 
-import { Bell, LogIn, Menu, Search, X } from "lucide-react";
+import Image from "next/image";
+import { Bell, Menu, Search, LogIn, TrendingUp, Swords, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useSidebar } from "./SidebarContext";
 import { useAuth } from "@/lib/auth";
-import { getNotifications, getUnreadNotificationCount, markAllNotificationsRead, searchMatches, type SearchResult } from "@/lib/api";
+import { searchMatches, type SearchResult, getNotifications, getUnreadNotificationCount, markAllNotificationsRead } from "@/lib/api";
 
 const ENV = process.env.NEXT_PUBLIC_ENV ?? "development";
 const ENV_BADGE: Record<string, { label: string; color: string; bg: string }> = {
-  production: { label: "PROD", color: "#86efac", bg: "rgba(134,239,172,0.10)" },
-  staging: { label: "STAGE", color: "#93c5fd", bg: "rgba(147,197,253,0.10)" },
-  development: { label: "DEV", color: "#6ee7b7", bg: "rgba(110,231,183,0.10)" },
+  production: { label: "PROD", color: "#16a34a", bg: "rgba(22,163,74,0.10)" },
+  staging: { label: "STAGE", color: "#2563eb", bg: "rgba(37,99,235,0.10)" },
+  development: { label: "DEV", color: "#1d9a4d", bg: "rgba(29,154,77,0.10)" },
 };
 const badge = ENV_BADGE[ENV] ?? ENV_BADGE.development;
 
@@ -26,21 +27,30 @@ function SearchBox({ onClose }: { onClose?: () => void }) {
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const doSearch = useCallback((q: string) => {
-    if (q.trim().length < 2) {
-      setResults([]);
-      setOpen(false);
-      return;
-    }
+    if (q.trim().length < 2) { setResults([]); setOpen(false); return; }
     setLoading(true);
     searchMatches(q, 8)
-      .then((r) => {
-        setResults(r);
-        setOpen(r.length > 0);
-      })
+      .then((r) => { setResults(r); setOpen(r.length > 0); })
       .catch(() => setResults([]))
       .finally(() => setLoading(false));
   }, []);
 
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const q = e.target.value;
+    setQuery(q);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => doSearch(q), 280);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Escape") { setOpen(false); setQuery(""); }
+    if (e.key === "Enter" && results.length > 0) {
+      router.push(results[0].href);
+      setOpen(false); setQuery(""); onClose?.();
+    }
+  }
+
+  // Close on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
@@ -50,123 +60,141 @@ function SearchBox({ onClose }: { onClose?: () => void }) {
   }, []);
 
   return (
-    <div ref={wrapRef} className="relative w-full max-w-xl">
-      <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-2.5 backdrop-blur transition focus-within:border-emerald-300/25 focus-within:bg-white/[0.07]">
-        <Search size={15} className="text-white/45" />
-        <input
-          value={query}
-          onChange={(e) => {
-            const q = e.target.value;
-            setQuery(q);
-            if (debounceRef.current) clearTimeout(debounceRef.current);
-            debounceRef.current = setTimeout(() => doSearch(q), 260);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              setOpen(false);
-              setQuery("");
-            }
-            if (e.key === "Enter" && results.length > 0) {
-              router.push(results[0].href);
-              setOpen(false);
-              setQuery("");
-              onClose?.();
-            }
-          }}
-          placeholder="Search matches, leagues, or teams"
-          className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/34"
-        />
-      </div>
-
-      {open && (
-        <div className="absolute left-0 right-0 top-[calc(100%+10px)] z-50 overflow-hidden rounded-[24px] border border-white/10 bg-[#0a1410] shadow-[0_24px_50px_rgba(0,0,0,0.35)]">
-          {loading ? (
-            <div className="px-4 py-4 text-sm text-white/54">Searching…</div>
-          ) : (
-            <div className="max-h-[360px] overflow-y-auto p-2">
-              {results.map((result) => (
-                <button
-                  key={result.href}
-                  onClick={() => {
-                    router.push(result.href);
-                    setOpen(false);
-                    setQuery("");
-                    onClose?.();
-                  }}
-                  className="flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left transition hover:bg-white/[0.05]"
+    <div ref={wrapRef} className="relative w-[280px]">
+      <Search size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: loading ? "var(--accent)" : "var(--text2)", pointerEvents: "none", transition: "color 0.15s" }} />
+      <input
+        type="search"
+        value={query}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        onFocus={() => results.length > 0 && setOpen(true)}
+        placeholder="Search teams or matches…"
+        className="input-field"
+        style={{ paddingLeft: 30, fontSize: 12 }}
+        autoComplete="off"
+      />
+      {open && results.length > 0 && (
+        <div
+          className="absolute left-0 right-0 top-full mt-1.5 rounded-xl border overflow-hidden shadow-lg z-50"
+          style={{ background: "#fff", borderColor: "var(--border0)", boxShadow: "0 8px 32px rgba(0,0,0,0.10)" }}
+        >
+          {results.map((r) => (
+            <Link
+              key={r.id}
+              href={r.href}
+              onClick={() => { setOpen(false); setQuery(""); onClose?.(); }}
+              className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--bg2)] transition-colors"
+            >
+              <div
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                style={{ background: r.type === "match" ? "rgba(31,208,106,0.10)" : "rgba(96,165,250,0.10)" }}
+              >
+                {r.type === "match" ? <Swords size={13} style={{ color: "var(--positive)" }} /> : <TrendingUp size={13} style={{ color: "#60a5fa" }} />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold text-text-primary">{r.title}</p>
+                <p className="truncate text-[10px] text-text-muted">{r.subtitle}</p>
+              </div>
+              {r.status && (
+                <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase"
+                  style={r.status === "live"
+                    ? { background: "rgba(34,197,94,0.15)", color: "var(--positive)" }
+                    : { background: "var(--bg2)", color: "var(--text1)" }
+                  }
                 >
-                  <div>
-                    <div className="text-sm font-semibold text-white">{result.title}</div>
-                    <div className="mt-1 text-xs text-white/45">{result.subtitle}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
+                  {r.status === "scheduled" ? "upcoming" : r.status}
+                </span>
+              )}
+            </Link>
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-function NotificationsMenu() {
+function NotificationBell() {
+  const { isLoggedIn } = useAuth();
   const [open, setOpen] = useState(false);
-  const [count, setCount] = useState(0);
-  const [items, setItems] = useState<Array<{ title: string; message?: string | null; created_at: string; is_read: boolean }>>([]);
+  const [notifications, setNotifications] = useState<import("@/lib/api").Notification[]>([]);
+  const [unread, setUnread] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    getUnreadNotificationCount().then(setCount).catch(() => {});
-  }, []);
+    if (!isLoggedIn) return;
+    getNotifications(20).then(setNotifications).catch(() => {});
+    getUnreadNotificationCount().then(setUnread).catch(() => {});
+  }, [isLoggedIn]);
 
   useEffect(() => {
-    function onClick(e: MouseEvent) {
+    if (!isLoggedIn) return;
+    const id = setInterval(() => {
+      getUnreadNotificationCount().then(setUnread).catch(() => {});
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !open) return;
+    getNotifications(20).then(setNotifications).catch(() => {});
+  }, [open, isLoggedIn]);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
     }
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  async function toggle() {
-    const next = !open;
-    setOpen(next);
-    if (next) {
-      const res = await getNotifications(10).catch(() => []);
-      setItems(res);
-      if (count > 0) {
-        markAllNotificationsRead().catch(() => {});
-        setCount(0);
-      }
-    }
+  async function handleMarkAll() {
+    await markAllNotificationsRead();
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    setUnread(0);
   }
 
+  if (!isLoggedIn) return null;
+
   return (
-    <div ref={wrapRef} className="relative">
+    <div ref={wrapRef} className="relative hidden sm:block">
       <button
-        onClick={toggle}
-        className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/72 transition hover:bg-white/[0.08]"
+        onClick={() => setOpen(v => !v)}
+        style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 14, border: "1px solid var(--border0)", background: "#fff", color: "var(--text1)", position: "relative" }}
         aria-label="Notifications"
       >
-        <Bell size={16} />
-        {count > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,255,178,0.8)]" />}
+        <Bell size={15} />
+        {unread > 0 && (
+          <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white"
+            style={{ background: "var(--positive)", minWidth: 16 }}>
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-[320px] overflow-hidden rounded-[24px] border border-white/10 bg-[#0a1410] shadow-[0_24px_50px_rgba(0,0,0,0.35)]">
-          <div className="border-b border-white/8 px-4 py-3">
-            <div className="text-sm font-semibold text-white">Notifications</div>
-            <div className="text-xs text-white/42">Recent system and betting activity</div>
+        <div className="absolute right-0 top-full mt-2 w-80 rounded-2xl border overflow-hidden shadow-xl z-50"
+          style={{ background: "#fff", borderColor: "var(--border0)" }}>
+          <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "var(--border0)" }}>
+            <p className="text-xs font-bold text-text-primary">Notifications</p>
+            {unread > 0 && (
+              <button onClick={handleMarkAll} className="text-[10px] font-semibold" style={{ color: "var(--accent)" }}>
+                Mark all read
+              </button>
+            )}
           </div>
-          <div className="max-h-[380px] overflow-y-auto p-2">
-            {items.length === 0 ? (
-              <div className="px-3 py-4 text-sm text-white/48">Nothing new yet.</div>
+          <div className="max-h-80 overflow-y-auto">
+            {notifications.length === 0 ? (
+              <p className="text-center py-8 text-sm text-text-muted">No notifications yet</p>
             ) : (
-              items.map((n, idx) => (
-                <div key={`${n.title}-${idx}`} className="rounded-2xl px-3 py-3 hover:bg-white/[0.04]">
-                  <div className="text-sm font-semibold text-white">{n.title}</div>
-                  {n.message && <div className="mt-1 text-xs text-white/48">{n.message}</div>}
-                  <div className="mt-2 text-[11px] text-white/34">
-                    {new Date(n.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+              notifications.map(n => (
+                <div key={n.id}
+                  className="flex items-start gap-3 px-4 py-3 border-b last:border-b-0 hover:bg-[var(--bg2)] transition-colors"
+                  style={{ borderColor: "var(--border0)", background: n.is_read ? "transparent" : "rgba(34,226,131,0.04)" }}>
+                  <div className="mt-0.5 h-2 w-2 rounded-full shrink-0" style={{ background: n.is_read ? "transparent" : "var(--positive)" }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-text-primary leading-tight">{n.title}</p>
+                    {n.message && <p className="text-[11px] text-text-muted mt-0.5">{n.message}</p>}
+                    <p className="text-[10px] text-text-subtle mt-1">{new Date(n.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
                   </div>
                 </div>
               ))
@@ -178,10 +206,7 @@ function NotificationsMenu() {
   );
 }
 
-interface TopBarProps {
-  title: string;
-  subtitle?: string;
-}
+interface TopBarProps { title: string; subtitle?: string; }
 
 export function TopBar({ title, subtitle }: TopBarProps) {
   const { setOpen } = useSidebar();
@@ -189,62 +214,74 @@ export function TopBar({ title, subtitle }: TopBarProps) {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
 
   return (
-    <header className="sticky top-0 z-30 flex h-[74px] items-center gap-3 border-b border-white/8 bg-[rgba(8,18,14,0.84)] px-4 backdrop-blur-xl lg:px-6">
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <button
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/72 lg:hidden"
-          onClick={() => setOpen(true)}
-          aria-label="Open sidebar"
-        >
-          <Menu size={17} />
+    <header style={{ height: "64px", display: "grid", gridTemplateColumns: "1fr auto auto", alignItems: "center", gap: 12, padding: "0 16px", borderBottom: "1px solid var(--border0)", background: "rgba(246,248,244,0.94)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", position: "sticky", top: 0, zIndex: 30, flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+        <button className="lg:hidden" onClick={() => setOpen(true)} style={{ padding: "6px", borderRadius: 12, color: "var(--text1)", background: "#fff", border: "1px solid var(--border0)", cursor: "pointer", display: "flex", alignItems: "center" }} aria-label="Open sidebar">
+          <Menu size={16} />
         </button>
 
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="truncate text-base font-semibold tracking-[-0.03em] text-white sm:text-lg">{title}</h1>
-            <span className="hidden rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.14em] sm:inline-flex" style={{ color: badge.color, background: badge.bg, border: `1px solid ${badge.color}26` }}>
-              {badge.label}
-            </span>
+        <div className="hidden sm:flex items-center gap-3 rounded-2xl border px-3 py-2" style={{ borderColor: "var(--border0)", background: "#fff" }}>
+          <div className="overflow-hidden rounded-xl border p-1.5" style={{ borderColor: "var(--border0)", background: "var(--bg0)" }}>
+            <Image src="/never-in-doubt-logo.png" alt="Never In Doubt logo" width={96} height={48} className="h-8 w-auto" />
           </div>
-          {subtitle && <p className="truncate text-xs text-white/42">{subtitle}</p>}
+          <div className="hidden md:block">
+            <div className="text-[10px] uppercase tracking-[0.22em] text-text-subtle">Never In Doubt</div>
+            <div className="text-xs font-medium text-text-primary">Premium board</div>
+          </div>
+        </div>
+
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <h1 style={{ fontSize: 15, fontWeight: 700, color: "var(--text0)", lineHeight: 1.1, letterSpacing: "-0.02em" }}>{title}</h1>
+            <span className="hidden sm:inline-flex" style={{ padding: "3px 8px", borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: badge.color, background: badge.bg, border: `1px solid ${badge.color}25` }}>{badge.label}</span>
+          </div>
+          {subtitle && <p style={{ fontSize: 11, color: "var(--text1)", marginTop: 2 }}>{subtitle}</p>}
         </div>
       </div>
 
-      <div className="hidden flex-1 justify-center md:flex">
+      <div className="hidden md:flex" style={{ justifyContent: "center" }}>
         <SearchBox />
       </div>
+      {/* Mobile search overlay */}
+      {showMobileSearch && (
+        <div className="md:hidden absolute left-0 right-0 top-[64px] z-40 border-b px-4 py-3 flex items-center gap-2"
+          style={{ background: "rgba(246,248,244,0.98)", backdropFilter: "blur(18px)", borderColor: "var(--border0)" }}>
+          <div className="flex-1">
+            <SearchBox onClose={() => setShowMobileSearch(false)} />
+          </div>
+          <button onClick={() => setShowMobileSearch(false)} className="shrink-0 p-1.5 rounded-lg text-text-muted hover:text-text-primary">
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
-      <div className="flex items-center justify-end gap-2">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 }}>
         <button
-          onClick={() => setShowMobileSearch((v) => !v)}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/72 md:hidden"
+          className="flex md:hidden"
+          onClick={() => setShowMobileSearch(v => !v)}
+          style={{ width: 34, height: 34, alignItems: "center", justifyContent: "center", borderRadius: 14, border: "1px solid var(--border0)", background: "#fff", color: "var(--text1)" }}
           aria-label="Search"
         >
-          {showMobileSearch ? <X size={16} /> : <Search size={16} />}
+          <Search size={15} />
         </button>
+        <NotificationBell />
 
-        <NotificationsMenu />
-
-        {isLoggedIn ? (
-          <button
-            onClick={logout}
-            className="hidden rounded-full border border-white/10 bg-white/[0.05] px-4 py-2.5 text-sm font-medium text-white/80 transition hover:bg-white/[0.08] sm:inline-flex"
-          >
-            {user ? `Logout · ${user.displayName ?? user.email}` : "Logout"}
-          </button>
+        {isLoggedIn && user ? (
+          <div className="flex items-center gap-2 rounded-2xl border px-2 py-1.5" style={{ borderColor: "var(--border0)", background: "#fff" }}>
+            <Link href="/profile" style={{ width: 32, height: 32, borderRadius: 12, background: "rgba(46,219,108,0.10)", border: "1px solid rgba(46,219,108,0.18)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "var(--positive)", fontFamily: "'JetBrains Mono', monospace", cursor: "pointer", textDecoration: "none" }}>
+              {(user.displayName ?? user.email).slice(0, 2).toUpperCase()}
+            </Link>
+            <div className="hidden sm:block leading-tight">
+              <div className="text-[11px] font-semibold text-text-primary">{user.displayName ?? user.email}</div>
+              <button onClick={logout} title="Click to log out" className="text-[10px] text-text-subtle hover:text-text-primary transition-colors" style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>Signed in</button>
+            </div>
+          </div>
         ) : (
-          <Link href="/login" className="hidden items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-[#07110d] sm:inline-flex">
-            <LogIn size={15} />
-            Login
+          <Link href="/login" className="inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-[12px] font-semibold transition-colors hover:opacity-90" style={{ borderColor: "rgba(46,219,106,0.18)", background: "rgba(46,219,106,0.10)", color: "var(--positive)" }}>
+            <LogIn size={14} /> Log in
           </Link>
         )}
       </div>
-
-      {showMobileSearch && (
-        <div className="absolute left-0 right-0 top-[74px] z-40 border-b border-white/8 bg-[rgba(8,18,14,0.96)] px-4 py-3 backdrop-blur-xl md:hidden">
-          <SearchBox onClose={() => setShowMobileSearch(false)} />
-        </div>
-      )}
     </header>
   );
 }

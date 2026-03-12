@@ -93,7 +93,7 @@ export function WatchlistModule({ predictions }: WatchlistModuleProps) {
       padding="flush"
       action={
         <button
-          className="btn-ghost text-xs py-1 px-2"
+          className="btn btn-ghost btn-sm"
           onClick={() => setShowAdd((v) => !v)}
         >
           <Plus size={12} /> Add
@@ -116,7 +116,7 @@ export function WatchlistModule({ predictions }: WatchlistModuleProps) {
               <button
                 key={s.id}
                 onClick={() => { add(s); setShowAdd(false); setQuery(""); }}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border border-surface-border text-text-muted hover:text-text-primary hover:border-zinc-600 transition-colors capitalize"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border border-surface-border text-text-muted hover:text-text-primary hover:border-surface-border1 transition-colors capitalize"
               >
                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sportColor(s.sport) }} />
                 {s.name}
@@ -141,7 +141,7 @@ export function WatchlistModule({ predictions }: WatchlistModuleProps) {
               <button
                 key={s.id}
                 onClick={() => add(s)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs border border-surface-border text-text-muted hover:text-text-primary hover:border-zinc-600 transition-colors"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs border border-surface-border text-text-muted hover:text-text-primary hover:border-surface-border1 transition-colors"
               >
                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sportColor(s.sport) }} />
                 {s.name}
@@ -156,7 +156,7 @@ export function WatchlistModule({ predictions }: WatchlistModuleProps) {
             return (
               <div
                 key={entry.id}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.025] transition-colors group"
+                className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg2)] transition-colors group"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">

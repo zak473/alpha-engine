@@ -1,8 +1,21 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BrainCircuit, Circle, ClipboardList, LayoutDashboard, Radio, ShieldCheck, Swords, TrendingUp, Trophy, Users } from "lucide-react";
+import {
+  Activity,
+  BrainCircuit,
+  Circle,
+  ClipboardList,
+  LayoutDashboard,
+  Radio,
+  ShieldCheck,
+  Swords,
+  TrendingUp,
+  Trophy,
+  Users,
+} from "lucide-react";
 import { useSidebar } from "./SidebarContext";
 
 const NAV = [
@@ -17,12 +30,12 @@ const NAV = [
 ];
 
 const SPORTS = [
-  { label: "Soccer", href: "/sports/soccer/matches", color: "#60a5fa" },
-  { label: "Tennis", href: "/sports/tennis/matches", color: "#2edb6c" },
-  { label: "Esports", href: "/sports/esports/matches", color: "#a855f7" },
-  { label: "Basketball", href: "/sports/basketball/matches", color: "#f59e0b" },
-  { label: "Baseball", href: "/sports/baseball/matches", color: "#ef4444" },
-  { label: "Hockey", href: "/sports/hockey/matches", color: "#06b6d4" },
+  { label: "Soccer", href: "/sports/soccer/matches", color: "var(--sport-soccer)" },
+  { label: "Tennis", href: "/sports/tennis/matches", color: "var(--sport-tennis)" },
+  { label: "Esports", href: "/sports/esports/matches", color: "var(--sport-esports)" },
+  { label: "Basketball", href: "/sports/basketball/matches", color: "var(--sport-basketball)" },
+  { label: "Baseball", href: "/sports/baseball/matches", color: "var(--sport-baseball)" },
+  { label: "Hockey", href: "/sports/hockey/matches", color: "var(--sport-hockey)" },
 ];
 
 export function Sidebar() {
@@ -36,10 +49,15 @@ export function Sidebar() {
 
   return (
     <>
-      {open && <div className="fixed inset-0 z-30 bg-black/55 backdrop-blur-sm lg:hidden" onClick={() => setOpen(false)} />}
+      {open && (
+        <div
+          className="fixed inset-0 z-30 lg:hidden"
+          style={{ background: "rgba(2, 6, 23, 0.28)" }}
+          onClick={() => setOpen(false)}
+        />
+      )}
 
       <aside
-        className={open ? "" : "-translate-x-full lg:translate-x-0"}
         style={{
           position: "fixed",
           left: 0,
@@ -48,98 +66,114 @@ export function Sidebar() {
           width: "var(--sidebar-width)",
           display: "flex",
           flexDirection: "column",
-          background: "linear-gradient(180deg,#060d0a 0%,#08110d 100%)",
-          borderRight: "1px solid rgba(255,255,255,0.08)",
+          background: "var(--bg1)",
+          borderRight: "1px solid var(--border0)",
           zIndex: 40,
           transform: open ? "translateX(0)" : undefined,
           transition: "transform 200ms",
-          boxShadow: "24px 0 60px rgba(0,0,0,0.28)",
         }}
+        className={open ? "" : "-translate-x-full lg:translate-x-0"}
       >
         <div className="px-4 pb-3 pt-4">
-          <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.24)] backdrop-blur">
-            <div className="rounded-[22px] border border-emerald-300/14 bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.24),transparent_70%),#07110d] p-4">
-              <div className="text-[11px] uppercase tracking-[0.24em] text-emerald-200/70">Never In Doubt</div>
-              <div className="mt-2 text-xl font-semibold tracking-[-0.04em] text-white">Premium betting board</div>
-              <p className="mt-3 text-[12px] leading-5 text-white/58">
-                A calmer shell, stronger hierarchy, and cleaner live workflow across the whole product.
-              </p>
+          <div className="card p-4">
+            <div className="overflow-hidden rounded-2xl border" style={{ borderColor: "var(--border0)", background: "var(--bg0)" }}>
+              <div className="p-3">
+                <Image
+                  src="/never-in-doubt-logo.png"
+                  alt="Never In Doubt logo"
+                  width={900}
+                  height={600}
+                  className="h-auto w-full"
+                  priority
+                />
+              </div>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {[
-                ["Markets", "Live ranked"],
-                ["Signals", "Model-led"],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/38">{label}</div>
-                  <div className="mt-1 text-sm font-semibold text-white/92">{value}</div>
-                </div>
-              ))}
+
+            <div className="mt-4">
+              <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-text-subtle">
+                premium tipping platform
+              </div>
+              <div className="mt-1 text-base font-semibold text-text-primary">Never In Doubt</div>
+            </div>
+
+            <p className="mt-2 text-[12px] leading-5 text-text-muted">
+              A cleaner board, clearer stats, and sharper green accents across every sport.
+            </p>
+
+            <div
+              className="mt-4 flex items-center gap-2 rounded-2xl px-3 py-2 text-[11px] font-medium"
+              style={{
+                background: "var(--accent-muted)",
+                border: "1px solid rgba(46,219,108,0.18)",
+                color: "var(--positive)",
+              }}
+            >
+              <span className="inline-flex h-2 w-2 rounded-full" style={{ background: "var(--accent)" }} />
+              Models synced and live
             </div>
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 pb-4">
-          <div className="mb-6">
-            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.24em] text-white/32">Workspace</p>
-            <div className="space-y-1.5">
-              {NAV.map(({ label, href, icon: Icon }) => {
-                const active = isActive(href);
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    onClick={() => setOpen(false)}
-                    className="nav-link"
-                    style={active ? { background: "linear-gradient(135deg,rgba(54,242,143,0.18),rgba(54,242,143,0.08))", color: "#fff", border: "1px solid rgba(54,242,143,0.24)", boxShadow: "0 10px 24px rgba(54,242,143,0.08)" } : { border: "1px solid transparent" }}
-                  >
-                    <Icon size={15} style={{ flexShrink: 0, color: active ? "#7af7b7" : "rgba(255,255,255,0.54)" }} />
-                    {label}
-                  </Link>
-                );
-              })}
-            </div>
+        <nav style={{ flex: 1, padding: "0 10px 10px", overflowY: "auto" }}>
+          <div className="mb-5">
+            <p className="label px-3 pb-2">Workspace</p>
+            {NAV.map(({ label, href, icon: Icon }) => {
+              const active = isActive(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setOpen(false)}
+                  className={`nav-link ${active ? "nav-link--active" : ""}`}
+                >
+                  <Icon
+                    size={14}
+                    style={{
+                      flexShrink: 0,
+                      color: active ? "var(--positive)" : "var(--text2)",
+                    }}
+                  />
+                  {label}
+                </Link>
+              );
+            })}
           </div>
 
           <div>
-            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.24em] text-white/32">Sports hubs</p>
-            <div className="space-y-1.5">
-              {SPORTS.map(({ label, href, color }) => {
-                const active = isActive(href);
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    onClick={() => setOpen(false)}
-                    className="nav-link"
-                    style={active ? { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", color: "#fff" } : { border: "1px solid transparent" }}
-                  >
-                    <Circle size={8} style={{ color, fill: color, flexShrink: 0 }} />
-                    {label}
-                  </Link>
-                );
-              })}
-            </div>
+            <p className="label px-3 pb-2">Sports hubs</p>
+            {SPORTS.map(({ label, href, color }) => {
+              const active = isActive(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setOpen(false)}
+                  className={`nav-link ${active ? "nav-link--active" : ""}`}
+                >
+                  <Circle size={7} style={{ color, fill: color, flexShrink: 0 }} />
+                  {label}
+                </Link>
+              );
+            })}
           </div>
 
-          <div className="mt-6">
-            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.24em] text-white/32">System</p>
+          <div className="mt-5">
+            <p className="label px-3 pb-2">System</p>
             <Link
               href="/admin"
               onClick={() => setOpen(false)}
-              className="nav-link"
-              style={isActive("/admin") ? { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", color: "#fff" } : { border: "1px solid transparent" }}
+              className={`nav-link ${isActive("/admin") ? "nav-link--active" : ""}`}
             >
-              <ShieldCheck size={15} style={{ flexShrink: 0, color: "rgba(255,255,255,0.54)" }} />
+              <ShieldCheck size={14} style={{ flexShrink: 0, color: "var(--text2)" }} />
               Admin
             </Link>
           </div>
         </nav>
 
-        <div className="border-t border-white/8 px-4 py-3 text-[11px] text-white/52">
+        <div className="border-t px-4 py-3 text-[11px] text-text-muted" style={{ borderColor: "var(--border0)" }}>
           <div className="flex items-center gap-2">
-            <Activity size={12} className="text-emerald-300" />
-            Synced live board experience
+            <Activity size={12} style={{ color: "var(--positive)" }} />
+            Never In Doubt betting board
           </div>
         </div>
       </aside>
