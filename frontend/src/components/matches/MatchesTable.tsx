@@ -10,13 +10,13 @@ type SortField = "scheduled_at" | "confidence" | "competition";
 type SortDir = "asc" | "desc";
 
 const SPORTS = [
-  { label: "All", value: "all" },
-  { label: "Soccer", value: "soccer" },
-  { label: "Tennis", value: "tennis" },
-  { label: "Esports", value: "esports" },
-  { label: "Basketball", value: "basketball" },
-  { label: "Baseball", value: "baseball" },
-  { label: "Hockey", value: "hockey" },
+  { label: "All",        value: "all",        icon: "🏆" },
+  { label: "Soccer",     value: "soccer",     icon: "⚽" },
+  { label: "Tennis",     value: "tennis",     icon: "🎾" },
+  { label: "Basketball", value: "basketball", icon: "🏀" },
+  { label: "Baseball",   value: "baseball",   icon: "⚾" },
+  { label: "Hockey",     value: "hockey",     icon: "🏒" },
+  { label: "Esports",    value: "esports",    icon: "🎮" },
 ];
 
 const PAGE_SIZE = 12;
@@ -85,6 +85,16 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const liveCount = initialMatches.filter((m) => m.status === "live").length;
+
+  const sportCounts = useMemo(() => {
+    const counts: Record<string, { total: number; live: number }> = {};
+    initialMatches.forEach((m) => {
+      if (!counts[m.sport]) counts[m.sport] = { total: 0, live: 0 };
+      counts[m.sport].total++;
+      if (m.status === "live") counts[m.sport].live++;
+    });
+    return counts;
+  }, [initialMatches]);
   const avgConfidence = Math.round(
     (initialMatches.filter((m) => m.confidence != null).reduce((sum, m) => sum + (m.confidence ?? 0), 0) /
       Math.max(1, initialMatches.filter((m) => m.confidence != null).length))
@@ -132,27 +142,50 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
       </section>
 
       <section className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(10,21,16,0.96),rgba(8,18,14,0.96))] p-4 lg:p-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex flex-wrap gap-2">
+        {/* Sport bar — same style as live page */}
+        <div className="overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+          <div className="flex min-w-max items-center gap-2 rounded-[24px] border border-white/8 bg-white/[0.03] p-2">
             {SPORTS.map((item) => {
-              const active = sport === item.value;
+              const isActive = sport === item.value;
+              const counts = item.value === "all" ? null : (sportCounts[item.value] ?? { total: 0, live: 0 });
+              const totalForSport = counts?.total ?? 0;
+              const liveForSport = counts?.live ?? 0;
               return (
                 <button
                   key={item.value}
-                  onClick={() => {
-                    setSport(item.value);
-                    setPage(1);
-                  }}
+                  onClick={() => { setSport(item.value); setPage(1); }}
                   className={cn(
-                    "rounded-full border px-4 py-2 text-sm transition",
-                    active ? "border-emerald-300/20 bg-emerald-300/12 text-emerald-200" : "border-white/8 bg-white/[0.03] text-white/55 hover:text-white"
+                    "flex items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-all",
+                    isActive
+                      ? "bg-[#2edb6c] text-[#07110d] shadow-sm"
+                      : "text-white/60 hover:bg-white/[0.06] hover:text-white"
                   )}
                 >
-                  {item.label}
+                  <span>{item.icon}</span>
+                  <span>{item.label}</span>
+                  {counts && liveForSport > 0 && (
+                    <span className={cn(
+                      "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                      isActive ? "bg-[#07110d]/20 text-[#07110d]" : "bg-emerald-400/20 text-emerald-300"
+                    )}>
+                      {liveForSport} live
+                    </span>
+                  )}
+                  {counts && liveForSport === 0 && totalForSport > 0 && (
+                    <span className={cn(
+                      "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                      isActive ? "bg-[#07110d]/20 text-[#07110d]" : "bg-white/10 text-white/50"
+                    )}>
+                      {totalForSport}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
+        </div>
+
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between mt-4">
 
           <div className="flex flex-col gap-3 md:flex-row">
             <div className="relative min-w-[260px]">
