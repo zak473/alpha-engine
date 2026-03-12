@@ -127,13 +127,13 @@ export function StickyFilterBar({
       <div className="flex items-center gap-3 px-4 py-2.5 border-b" style={{ borderColor: "var(--border0)" }}>
         {/* Search */}
         <div className="relative flex-1 max-w-xs">
-          <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle pointer-events-none" />
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle pointer-events-none" />
           <input
             type="text"
             placeholder="Search teams, leagues..."
             value={filter.search}
             onChange={(e) => set("search", e.target.value)}
-            className="input-field pl-7 text-xs h-8"
+            className="input-field pl-8 text-sm"
           />
           {filter.search && (
             <button
