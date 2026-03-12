@@ -54,7 +54,7 @@ function OddsButton({ selection, market, match, compact = false }: { selection: 
         borderColor: "rgba(46,219,108,0.20)",
         boxShadow: "0 10px 22px rgba(46,219,108,0.10)",
       } : {
-        background: "#ffffff",
+        background: "var(--bg2)",
         borderColor: "var(--border0)",
       }}
     >
@@ -118,7 +118,7 @@ function ScoreBlock({ match }: { match: BettingMatch }) {
   if (!hasScore) return <div className="px-3 text-sm text-text-subtle">vs</div>;
 
   return (
-    <div className="rounded-2xl border px-3 py-2 text-center min-w-[86px]" style={{ borderColor: "var(--border0)", background: "#fff" }}>
+    <div className="rounded-2xl border px-3 py-2 text-center min-w-[86px]" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
       <div className="text-[10px] uppercase tracking-[0.18em] text-text-subtle">score</div>
       <div className="mt-1 flex items-center justify-center gap-2 text-2xl font-mono font-bold text-text-primary">
         <span>{match.homeScore}</span>
@@ -153,7 +153,7 @@ function ModelBar({ match }: { match: BettingMatch }) {
       </div>
       {confidence != null && (
         <div className="flex flex-wrap items-center gap-2 text-[11px]">
-          <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-text-muted" style={{ borderColor: "var(--border0)", background: "#fff" }}>
+          <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
             <Shield size={12} /> {confidence}% confidence
           </span>
           <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-semibold" style={{ borderColor: edge >= 3 ? "rgba(34,197,94,0.2)" : "rgba(245,158,11,0.2)", background: edge >= 3 ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.10)", color: edge >= 3 ? "var(--positive)" : "var(--warning)" }}>
@@ -203,7 +203,7 @@ function MatchCardIdentity({ match, cfg }: { match: BettingMatch; cfg: (typeof S
 
       <div className="px-5 pb-4">
         <div className="flex flex-wrap items-center gap-2 pb-3 text-[11px] text-text-muted">
-          <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1" style={{ borderColor: "var(--border0)", background: "#fff" }}>
+          <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
             <Timer size={12} /> {formatCountdown(match.startTime, match.status)}
           </span>
         </div>
