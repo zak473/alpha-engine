@@ -144,6 +144,8 @@ def _upsert_match(session: Session, row: dict[str, Any], league_id: str, home_te
             away_score=away_score,
             outcome=outcome,
             venue=row.get("venue") or None,
+            referee_name=row.get("referee_name") or None,
+            referee_nationality=row.get("referee_nationality") or None,
             is_neutral=False,
             odds_home=odds_home,
             odds_away=odds_away,
@@ -168,6 +170,10 @@ def _upsert_match(session: Session, row: dict[str, Any], league_id: str, home_te
             match.odds_away = odds_away
         if odds_draw is not None:
             match.odds_draw = odds_draw
+        if row.get("referee_name"):
+            match.referee_name = row["referee_name"]
+        if row.get("referee_nationality"):
+            match.referee_nationality = row["referee_nationality"]
         # Update live state — clear when not live, set when live
         match.live_clock = live_clock
         match.current_period = current_period

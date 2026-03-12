@@ -111,6 +111,8 @@ class CoreMatch(Base):
     current_state_json: Mapped[dict] = mapped_column(JSON, nullable=True)         # sport-specific live state blob
     extras_json: Mapped[dict] = mapped_column(JSON, nullable=True)                # Highlightly enrichment: lineups, statistics, events
     highlights_json: Mapped[dict] = mapped_column(JSON, nullable=True)            # Highlightly highlight clips
+    referee_name: Mapped[str] = mapped_column(String(200), nullable=True)  # e.g. "Michael Oliver"
+    referee_nationality: Mapped[str] = mapped_column(String(100), nullable=True)
 
     __table_args__ = (
         Index("ix_core_matches_kickoff", "kickoff_utc"),
@@ -161,6 +163,16 @@ class CoreTeamMatchStats(Base):
     fouls: Mapped[int] = mapped_column(Integer, nullable=True)
     yellow_cards: Mapped[int] = mapped_column(Integer, nullable=True)
     red_cards: Mapped[int] = mapped_column(Integer, nullable=True)
+
+    # Additional match stats
+    corners: Mapped[int] = mapped_column(Integer, nullable=True)
+    offsides: Mapped[int] = mapped_column(Integer, nullable=True)
+    deep_completions: Mapped[int] = mapped_column(Integer, nullable=True)   # deep passes from Understat
+    big_chances_created: Mapped[int] = mapped_column(Integer, nullable=True)
+    big_chances_missed: Mapped[int] = mapped_column(Integer, nullable=True)
+    aerial_duels_won: Mapped[int] = mapped_column(Integer, nullable=True)
+    aerial_duels_lost: Mapped[int] = mapped_column(Integer, nullable=True)
+    crosses: Mapped[int] = mapped_column(Integer, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

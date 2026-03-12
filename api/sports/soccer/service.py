@@ -206,6 +206,132 @@ def _team_stats_out(
         fouls=row.fouls,
         yellow_cards=row.yellow_cards,
         red_cards=row.red_cards,
+        corners=row.corners,
+        offsides=row.offsides,
+        big_chances_created=row.big_chances_created,
+        big_chances_missed=row.big_chances_missed,
+        aerial_duels_won=row.aerial_duels_won,
+        aerial_duels_lost=row.aerial_duels_lost,
+        crosses=row.crosses,
+    )
+
+
+def _adv_stats_out(
+    db: Session, match_id: str, team_id: str, team_name: str,
+) -> Optional[SoccerAdvancedTeamStatsOut]:
+    """Build advanced stats from CoreTeamMatchStats when populated (Understat + Highlightly data)."""
+    row = (
+        db.query(CoreTeamMatchStats)
+        .filter(CoreTeamMatchStats.match_id == match_id, CoreTeamMatchStats.team_id == team_id)
+        .first()
+    )
+    if row is None:
+        return None
+    # Only return if we have at least some advanced data
+    has_data = any([
+        row.ppda is not None,
+        row.big_chances_created is not None,
+        row.corners is not None,
+        row.deep_completions is not None,
+        row.aerial_duels_won is not None,
+    ])
+    if not has_data:
+        return None
+
+    # Corner conversion: goals from corners / corners won
+    corner_conv = None
+    if row.corners and row.corners > 0 and row.goals is not None:
+        # rough proxy — not exact set piece goals, just overall conversion
+        corner_conv = None  # leave for now, need set_piece_goals separately
+
+    # Aerial duel win rate
+    aerial_win_pct = None
+    if row.aerial_duels_won is not None and row.aerial_duels_lost is not None:
+        total_aerials = row.aerial_duels_won + row.aerial_duels_lost
+        if total_aerials > 0:
+            aerial_win_pct = round(row.aerial_duels_won / total_aerials * 100, 1)
+
+    # xPts from xG (Poisson approximation)
+    xpts = None
+    if row.xg is not None and row.xga is not None:
+        import math as _math
+        def _poisson_win_prob(xg_for: float, xg_against: float) -> float:
+            max_g = 8
+            win = 0.0
+            for g_for in range(max_g + 1):
+                for g_against in range(max_g + 1):
+                    p = (
+                        (_math.exp(-xg_for) * xg_for ** g_for / _math.factorial(g_for)) *
+                        (_math.exp(-xg_against) * xg_against ** g_against / _math.factorial(g_against))
+                    )
+                    if g_for > g_against:
+                        win += p
+            return win
+        draw_p = 1 - _poisson_win_prob(row.xg, row.xga) - _poisson_win_prob(row.xga, row.xg)
+        win_p = _poisson_win_prob(row.xg, row.xga)
+        xpts = round(win_p * 3 + draw_p * 1, 2)
+
+    return SoccerAdvancedTeamStatsOut(
+        team_id=team_id,
+        team_name=team_name,
+        ppda=row.ppda,
+        big_chances_created=row.big_chances_created,
+        big_chances_missed=row.big_chances_missed,
+        corners_won=row.corners,
+        aerial_duel_win_pct=aerial_win_pct,
+        crosses_completed=row.crosses,
+        xpts=xpts,
+        progressive_passes=row.deep_completions,
+    )
+
+
+def _referee_stats(db: Session, match: CoreMatch) -> Optional[SoccerRefereeOut]:
+    """Build referee stats from historical CoreMatch + CoreTeamMatchStats data."""
+    name = getattr(match, "referee_name", None)
+    if not name:
+        return None
+
+    # Find all finished matches with this referee
+    past = (
+        db.query(CoreMatch)
+        .filter(
+            CoreMatch.referee_name == name,
+            CoreMatch.status == "finished",
+            CoreMatch.sport == "soccer",
+            CoreMatch.id != match.id,
+        )
+        .limit(200)
+        .all()
+    )
+    if not past:
+        return SoccerRefereeOut(
+            name=name,
+            nationality=getattr(match, "referee_nationality", None),
+        )
+
+    n = len(past)
+    total_yellows = 0
+    total_reds = 0
+    total_fouls = 0
+    home_wins = 0
+
+    for m in past:
+        # Aggregate cards from CoreTeamMatchStats
+        stats = db.query(CoreTeamMatchStats).filter(CoreTeamMatchStats.match_id == m.id).all()
+        for s in stats:
+            total_yellows += s.yellow_cards or 0
+            total_reds += s.red_cards or 0
+            total_fouls += s.fouls or 0
+        if m.outcome == "home_win":
+            home_wins += 1
+
+    return SoccerRefereeOut(
+        name=name,
+        nationality=getattr(match, "referee_nationality", None),
+        yellow_cards_per_game=round(total_yellows / n, 2) if n else None,
+        red_cards_per_game=round(total_reds / n, 2) if n else None,
+        fouls_per_game=round(total_fouls / n, 2) if n else None,
+        home_win_pct=round(home_wins / n * 100, 1) if n else None,
     )
 
 
@@ -984,14 +1110,14 @@ class SoccerMatchService(BaseMatchListService):
             lineup_away=lineup_away,
             injuries_home=[],
             injuries_away=[],
-            referee=None,
+            referee=_referee_stats(db, match),
             highlights=highlights,
             events=events,
             stats_home_live=stats_home_live,
             stats_away_live=stats_away_live,
             league_context=_real_league_context(db, match, match.home_team_id, match.away_team_id),
-            adv_home=None,
-            adv_away=None,
+            adv_home=_adv_stats_out(db, match_id, match.home_team_id, home_name),
+            adv_away=_adv_stats_out(db, match_id, match.away_team_id, away_name),
             betting={
                 "home_ml": round(1 / probabilities.home_win, 2) if probabilities and probabilities.home_win > 0 else None,
                 "draw_ml": round(1 / probabilities.draw, 2) if probabilities and probabilities.draw and probabilities.draw > 0 else None,

@@ -165,6 +165,8 @@ def _upsert_xg(
     xga_val: float,
     goals_for: int | None,
     goals_against: int | None,
+    ppda_val: float | None,
+    deep_val: int | None,
     dry_run: bool,
 ) -> bool:
     existing: CoreTeamMatchStats | None = (
@@ -181,6 +183,10 @@ def _upsert_xg(
         if not dry_run:
             existing.xg  = xg_val
             existing.xga = xga_val
+            if ppda_val is not None:
+                existing.ppda = ppda_val
+            if deep_val is not None:
+                existing.deep_completions = deep_val
     else:
         if not dry_run:
             db.add(CoreTeamMatchStats(
@@ -191,6 +197,8 @@ def _upsert_xg(
                 xga=xga_val,
                 goals=goals_for,
                 goals_conceded=goals_against,
+                ppda=ppda_val,
+                deep_completions=deep_val,
             ))
     return True
 
@@ -238,6 +246,22 @@ def _process_league_data(db: Session, league_data: dict, dry_run: bool) -> int:
             except (TypeError, ValueError):
                 goals_for = goals_against = None
 
+            # PPDA: dict {"att": int, "def": int} — passes per defensive action
+            ppda_raw = entry.get("ppda")
+            try:
+                if isinstance(ppda_raw, dict) and ppda_raw.get("def", 0) > 0:
+                    ppda_val = round(ppda_raw["att"] / ppda_raw["def"], 2)
+                else:
+                    ppda_val = None
+            except (TypeError, ValueError, ZeroDivisionError):
+                ppda_val = None
+
+            # Deep completions
+            try:
+                deep_val = int(entry["deep"]) if entry.get("deep") is not None else None
+            except (TypeError, ValueError):
+                deep_val = None
+
             match = _find_core_match(db, date_str, team_id, is_home)
             if match is None:
                 continue
@@ -251,6 +275,8 @@ def _process_league_data(db: Session, league_data: dict, dry_run: bool) -> int:
                 xga_val=xga_val,
                 goals_for=goals_for,
                 goals_against=goals_against,
+                ppda_val=ppda_val,
+                deep_val=deep_val,
                 dry_run=dry_run,
             )
             if did_write:

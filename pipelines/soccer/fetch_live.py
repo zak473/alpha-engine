@@ -132,6 +132,15 @@ def _transform_match(match: dict[str, Any]) -> dict[str, Any] | None:
             "ht_away": ht_away,
         }
 
+    # Referee — FD API returns list of officials; pick the first with type "REFEREE"
+    referee_name = None
+    referee_nationality = None
+    for ref in match.get("referees", []):
+        if ref.get("type", "").upper() in ("REFEREE", "MAIN"):
+            referee_name = ref.get("name")
+            referee_nationality = ref.get("nationality")
+            break
+
     # Normalise kickoff to ISO string with Z suffix
     utc_date    = match.get("utcDate", "")
 
@@ -150,6 +159,8 @@ def _transform_match(match: dict[str, Any]) -> dict[str, Any] | None:
         "outcome":                outcome or "",
         "season":                 season or "",
         "venue":                  match.get("venue") or "",
+        "referee_name":           referee_name or "",
+        "referee_nationality":    referee_nationality or "",
         "live_clock":             live_clock or "",
         "current_period":         current_period,
         "current_state_json":     json.dumps(current_state) if current_state is not None else None,
