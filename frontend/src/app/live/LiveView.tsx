@@ -1,12 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { ArrowRight, Clock3, RefreshCw, Radio } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { getLiveMatches } from "@/lib/api";
 import type { LiveMatchOut } from "@/lib/api";
 import { useLiveRefresh } from "@/lib/hooks/useLiveRefresh";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
+
+const SPORT_LABELS: Record<string, string> = {
+  soccer: "Soccer",
+  basketball: "Basketball",
+  baseball: "Baseball",
+  hockey: "Hockey",
+  tennis: "Tennis",
+  esports: "Esports",
+};
 
 const SPORT_ICONS: Record<string, string> = {
   soccer: "⚽",
@@ -17,157 +27,143 @@ const SPORT_ICONS: Record<string, string> = {
   esports: "🎮",
 };
 
-function SportBadge({ sport }: { sport: string }) {
+function TeamPill({ name, logo, align = "left" }: { name: string; logo?: string | null; align?: "left" | "right" }) {
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-white/[0.06] text-text-muted capitalize">
-      <span>{SPORT_ICONS[sport] ?? "🏅"}</span>
-      {sport}
-    </span>
+    <div className={cn("flex min-w-0 items-center gap-3", align === "right" && "justify-end")}>
+      {align === "right" ? (
+        <>
+          <div className="min-w-0 text-right">
+            <div className="truncate text-sm font-semibold text-white">{name}</div>
+          </div>
+          <Avatar name={name} src={logo} />
+        </>
+      ) : (
+        <>
+          <Avatar name={name} src={logo} />
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-white">{name}</div>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
-function LivePulse() {
-  return (
-    <span className="relative flex h-2 w-2 flex-shrink-0">
-      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-    </span>
-  );
-}
-
-function TeamLogo({ src, name }: { src?: string | null; name: string }) {
+function Avatar({ name, src }: { name: string; src?: string | null }) {
   if (src) {
-    return (
-      <img
-        src={src}
-        alt={name}
-        className="w-8 h-8 rounded-full object-contain bg-white/5 flex-shrink-0"
-        onError={(e) => {
-          (e.target as HTMLImageElement).style.display = "none";
-        }}
-      />
-    );
+    return <img src={src} alt={name} className="h-10 w-10 rounded-full border border-white/10 bg-white/5 object-contain p-1" />;
   }
   return (
-    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold bg-white/[0.06] text-text-muted flex-shrink-0">
+    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xs font-semibold text-white/70">
       {name.slice(0, 2).toUpperCase()}
     </div>
   );
 }
 
-function MatchCard({ match }: { match: LiveMatchOut }) {
+function LiveDot() {
+  return (
+    <span className="relative flex h-2.5 w-2.5">
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
+      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
+    </span>
+  );
+}
+
+function MatchTile({ match }: { match: LiveMatchOut }) {
   const href = `/sports/${match.sport}/matches/${match.id}`;
   const isLive = match.is_live;
+  const statusLabel = isLive
+    ? match.live_clock || "Live"
+    : formatDate(match.kickoff_utc ?? new Date().toISOString(), "long");
 
   return (
-    <Link href={href} className="block group">
-      <div
-        className={cn(
-          "rounded-xl border p-4 transition-colors",
-          isLive
-            ? "bg-green-950/20 border-green-500/20 hover:border-green-500/40"
-            : "bg-surface-overlay border-surface-border hover:border-white/20"
-        )}
-      >
-        {/* Header: league + sport + status */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2 min-w-0">
-            {match.league_logo ? (
-              <img src={match.league_logo} alt={match.league} className="w-4 h-4 object-contain flex-shrink-0" />
-            ) : null}
-            <span className="text-text-subtle text-xs truncate">{match.league}</span>
+    <Link
+      href={href}
+      className={cn(
+        "group rounded-[28px] border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300/25 hover:shadow-[0_24px_60px_rgba(0,0,0,0.26)] lg:p-5",
+        isLive
+          ? "bg-[linear-gradient(180deg,rgba(12,28,20,0.98),rgba(8,18,14,0.98))] border-emerald-400/20"
+          : "bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] border-white/8"
+      )}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-white/55">
+            <span>{SPORT_ICONS[match.sport] ?? "🏅"}</span>
+            {SPORT_LABELS[match.sport] ?? match.sport}
+          </span>
+          <span className="truncate text-xs text-white/35">{match.league}</span>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-white/45">
+          {isLive ? (
+            <>
+              <LiveDot />
+              <span className="font-semibold text-emerald-300">Live</span>
+            </>
+          ) : (
+            <>
+              <Clock3 size={12} />
+              <span>{statusLabel}</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-5 grid items-center gap-4 lg:grid-cols-[1fr_auto_1fr]">
+        <TeamPill name={match.home_name} logo={match.home_logo} />
+        <div className="flex flex-col items-center justify-center gap-2 rounded-[24px] border border-white/8 bg-black/20 px-4 py-3">
+          <div className={cn("text-4xl font-semibold tracking-[-0.06em] text-white", isLive && "text-emerald-300")}>
+            <span className="inline-block min-w-[1.5ch] text-right">{match.home_score ?? "–"}</span>
+            <span className="px-2 text-white/25">:</span>
+            <span className="inline-block min-w-[1.5ch] text-left">{match.away_score ?? "–"}</span>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <SportBadge sport={match.sport} />
-            {isLive ? (
-              <div className="flex items-center gap-1.5">
-                <LivePulse />
-                <span className="text-green-400 text-xs font-semibold uppercase tracking-widest">Live</span>
-                {match.live_clock && (
-                  <span className="text-green-300/70 text-xs font-mono">{match.live_clock}</span>
-                )}
-              </div>
-            ) : (
-              <span className="text-text-subtle text-xs">
-                {new Date(match.kickoff_utc).toLocaleTimeString("en-GB", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  timeZone: "UTC",
-                })}{" "}
-                UTC
-              </span>
-            )}
+          <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">
+            {isLive
+              ? match.current_period
+                ? `${match.sport === "basketball" ? "Q" : match.sport === "hockey" ? "Period " : match.sport === "baseball" ? "Inning " : "Set "}${match.current_period}`
+                : "In play"
+              : "Scheduled"}
           </div>
         </div>
+        <TeamPill name={match.away_name} logo={match.away_logo} align="right" />
+      </div>
 
-        {/* Score row */}
-        <div className="flex items-center justify-between gap-3">
-          {/* Home team */}
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <TeamLogo src={match.home_logo} name={match.home_name} />
-            <span className="text-text-primary font-medium text-sm truncate">{match.home_name}</span>
-          </div>
-
-          {/* Score */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <span
-              className={cn(
-                "text-2xl font-bold tabular-nums min-w-[2ch] text-right",
-                isLive ? "text-green-300" : "text-text-primary"
-              )}
-            >
-              {match.home_score != null ? match.home_score : isLive ? "–" : "—"}
-            </span>
-            <span className="text-text-subtle text-sm">:</span>
-            <span
-              className={cn(
-                "text-2xl font-bold tabular-nums min-w-[2ch] text-left",
-                isLive ? "text-green-300" : "text-text-primary"
-              )}
-            >
-              {match.away_score != null ? match.away_score : isLive ? "–" : "—"}
-            </span>
-          </div>
-
-          {/* Away team */}
-          <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-            <span className="text-text-primary font-medium text-sm truncate text-right">{match.away_name}</span>
-            <TeamLogo src={match.away_logo} name={match.away_name} />
-          </div>
+      <div className="mt-4 flex items-center justify-between">
+        <div className="text-sm text-white/50">{isLive ? "Open live matchup" : statusLabel}</div>
+        <div className="inline-flex items-center gap-2 text-sm font-medium text-white/72 transition group-hover:text-white">
+          View board
+          <ArrowRight size={15} />
         </div>
-
-        {/* Period indicator for live matches */}
-        {isLive && match.current_period != null && match.current_period > 0 && (
-          <div className="mt-2 text-center">
-            <span className="text-green-400/60 text-xs">
-              {match.sport === "soccer"
-                ? match.current_period === 1 ? "1st Half" : match.current_period === 2 ? "2nd Half" : "Extra Time"
-                : match.sport === "hockey"
-                ? `Period ${match.current_period}`
-                : match.sport === "basketball"
-                ? `Q${match.current_period}`
-                : match.sport === "baseball"
-                ? `Inning ${match.current_period}`
-                : `Period ${match.current_period}`}
-            </span>
-          </div>
-        )}
       </div>
     </Link>
   );
 }
 
-interface LiveViewProps {
-  initialMatches: LiveMatchOut[];
+function SectionHeader({
+  title,
+  meta,
+  accent = false,
+}: {
+  title: string;
+  meta: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <div>
+        <div className={cn("text-[11px] uppercase tracking-[0.22em]", accent ? "text-emerald-300" : "text-white/38")}>{title}</div>
+        <div className="mt-1 text-lg font-semibold tracking-[-0.03em] text-white">{meta}</div>
+      </div>
+    </div>
+  );
 }
 
-export function LiveView({ initialMatches }: LiveViewProps) {
+export function LiveView({ initialMatches }: { initialMatches: LiveMatchOut[] }) {
   const router = useRouter();
   const [matches, setMatches] = useState<LiveMatchOut[]>(initialMatches);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const hasLive = matches.some((m) => m.is_live);
   const tick = useLiveRefresh(true, 30_000);
 
   const refresh = useCallback(async () => {
@@ -176,94 +172,104 @@ export function LiveView({ initialMatches }: LiveViewProps) {
       const fresh = await getLiveMatches();
       setMatches(fresh);
       setLastUpdated(new Date());
-    } catch {
-      // silently fail — keep stale data
     } finally {
       setIsRefreshing(false);
     }
   }, []);
 
-  // Also trigger router.refresh() to revalidate SSR cache
   useEffect(() => {
     if (tick === 0) return;
     refresh();
     router.refresh();
   }, [tick, refresh, router]);
 
-  const liveMatches = matches.filter((m) => m.is_live);
-  const upcomingMatches = matches.filter((m) => !m.is_live);
+  const liveMatches = useMemo(() => matches.filter((m) => m.is_live), [matches]);
+  const upcomingMatches = useMemo(() => matches.filter((m) => !m.is_live).slice(0, 8), [matches]);
 
-  const sportGroups = upcomingMatches.reduce<Record<string, LiveMatchOut[]>>((acc, m) => {
-    if (!acc[m.sport]) acc[m.sport] = [];
-    acc[m.sport].push(m);
-    return acc;
-  }, {});
+  const groupedUpcoming = useMemo(() => {
+    return upcomingMatches.reduce<Record<string, LiveMatchOut[]>>((acc, match) => {
+      (acc[match.sport] ||= []).push(match);
+      return acc;
+    }, {});
+  }, [upcomingMatches]);
 
   return (
-    <div className="flex flex-col gap-6 pb-12">
-      {/* Status bar */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {hasLive ? (
-            <>
-              <LivePulse />
-              <span className="text-green-400 text-sm font-medium">{liveMatches.length} live now</span>
-            </>
-          ) : (
-            <span className="text-text-subtle text-sm">No live matches right now</span>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          {isRefreshing && (
-            <span className="text-text-subtle text-xs animate-pulse">Updating…</span>
-          )}
-          <span className="text-text-subtle text-xs">
-            Updated {lastUpdated.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-          </span>
-          <span className="text-text-subtle text-xs">· Auto-refresh every 30s</span>
-        </div>
-      </div>
+    <div className="pb-12">
+      <section className="overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.10),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-5 shadow-[0_26px_70px_rgba(0,0,0,0.24)] backdrop-blur xl:p-7">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/16 bg-emerald-300/8 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200">
+              <LiveDot />
+              Always-on live centre
+            </div>
+            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-white lg:text-[2.7rem]">Cleaner match scanning, faster live decisions.</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-white/58">
+              Live matches now lead the page, upcoming fixtures are grouped underneath, and each card prioritises teams, score, and match state in one glance.
+            </p>
+          </div>
 
-      {/* Live matches section */}
-      {liveMatches.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <h2 className="text-text-muted text-xs uppercase tracking-widest font-medium flex items-center gap-2">
-            <LivePulse />
-            Live Now
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {liveMatches.map((m) => (
-              <MatchCard key={m.id} match={m} />
-            ))}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-[22px] border border-white/8 bg-white/[0.05] px-4 py-4">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Live matches</div>
+              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">{liveMatches.length}</div>
+            </div>
+            <div className="rounded-[22px] border border-white/8 bg-white/[0.05] px-4 py-4">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Upcoming queued</div>
+              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">{upcomingMatches.length}</div>
+            </div>
+            <button
+              onClick={refresh}
+              className="inline-flex items-center justify-center gap-2 rounded-[22px] border border-white/8 bg-white/[0.05] px-4 py-4 text-left transition hover:border-emerald-300/25 hover:bg-white/[0.08]"
+            >
+              <RefreshCw size={15} className={cn("text-emerald-200", isRefreshing && "animate-spin")} />
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Last sync</div>
+                <div className="mt-1 text-sm font-medium text-white">
+                  {lastUpdated.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                </div>
+              </div>
+            </button>
           </div>
         </div>
-      )}
+      </section>
 
-      {/* Upcoming fallbacks by sport */}
-      {Object.entries(sportGroups).map(([sport, sportMatches]) => (
-        <div key={sport} className="flex flex-col gap-3">
-          <h2 className="text-text-muted text-xs uppercase tracking-widest font-medium flex items-center gap-2">
-            <span>{SPORT_ICONS[sport] ?? "🏅"}</span>
-            Next Up — {sport.charAt(0).toUpperCase() + sport.slice(1)}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {sportMatches.map((m) => (
-              <MatchCard key={m.id} match={m} />
-            ))}
-          </div>
+      {matches.length === 0 ? (
+        <div className="mt-6 flex min-h-[280px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
+          <Radio size={28} className="text-white/35" />
+          <div className="mt-4 text-xl font-semibold text-white">No match data available</div>
+          <div className="mt-2 max-w-md text-sm text-white/50">The live feed is empty right now. Retry once the API has fresh fixtures available.</div>
         </div>
-      ))}
+      ) : (
+        <div className="mt-6 grid gap-6">
+          <section className="rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,rgba(10,21,16,0.98),rgba(8,18,14,0.98))] p-5 lg:p-6">
+            <SectionHeader title="Live priority" meta={`${liveMatches.length} matches in play`} accent />
+            {liveMatches.length ? (
+              <div className="grid gap-4 xl:grid-cols-2">
+                {liveMatches.map((match) => <MatchTile key={match.id} match={match} />)}
+              </div>
+            ) : (
+              <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-6 text-sm text-white/50">No live matches right now — the next scheduled fixtures are shown below.</div>
+            )}
+          </section>
 
-      {matches.length === 0 && (
-        <div className="flex flex-col items-center justify-center h-60 gap-3 text-text-muted">
-          <span className="text-4xl">📡</span>
-          <span className="text-sm">No match data available right now</span>
-          <button
-            onClick={refresh}
-            className="text-xs text-accent-blue hover:text-accent-blue/80 underline-offset-2 underline"
-          >
-            Retry
-          </button>
+          {Object.entries(groupedUpcoming).length > 0 && (
+            <section className="rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-5 lg:p-6">
+              <SectionHeader title="Upcoming board" meta="Next fixtures grouped by sport" />
+              <div className="grid gap-6">
+                {Object.entries(groupedUpcoming).map(([sport, sportMatches]) => (
+                  <div key={sport}>
+                    <div className="mb-3 flex items-center gap-2 text-sm font-medium text-white/68">
+                      <span>{SPORT_ICONS[sport] ?? "🏅"}</span>
+                      {SPORT_LABELS[sport] ?? sport}
+                    </div>
+                    <div className="grid gap-4 xl:grid-cols-2">
+                      {sportMatches.map((match) => <MatchTile key={match.id} match={match} />)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       )}
     </div>
