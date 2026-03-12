@@ -17,7 +17,14 @@ import type { SportMatchDetail, StandingsResponse } from "@/lib/types";
 import { getStandingsForMatch } from "@/lib/api";
 import { SoccerLivePanel } from "@/components/live/LiveMatchPanel";
 import { cn } from "@/lib/utils";
-import { chartDefaults, colors } from "@/lib/tokens";
+import { chartDefaults } from "@/lib/tokens";
+
+const colors = {
+  info:    "#2d7f4f",
+  warning: "#d97706",
+  border1: "#d9e2d7",
+  text1:   "#667066",
+} as const;
 import { FormStreak } from "@/components/charts/FormStreak";
 import { TeamRadarChart, norm } from "@/components/charts/TeamRadarChart";
 import { SoccerPitchSVG } from "@/components/charts/SoccerPitchSVG";
@@ -98,20 +105,20 @@ function Panel({
   padded?: boolean; children: React.ReactNode;
 }) {
   return (
-    <div className="card flex flex-col">
-      <div className="panel-header shrink-0">
+    <div className="bg-white border border-[#d9e2d7] rounded-[24px] flex flex-col overflow-hidden shadow-[0_4px_20px_rgba(17,19,21,0.05)]">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#d9e2d7] shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="panel-title truncate">{title}</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#667066] truncate">{title}</span>
           {badge}
         </div>
         {(subtitle || action) && (
           <div className="flex items-center gap-2 shrink-0">
-            {subtitle && <span className="text-2xs text-t2">{subtitle}</span>}
+            {subtitle && <span className="text-[10px] text-[#7b857b]">{subtitle}</span>}
             {action}
           </div>
         )}
       </div>
-      <div className={padded ? "panel-content flex-1" : "flex-1"}>{children}</div>
+      <div className={padded ? "px-5 py-4 flex-1" : "flex-1"}>{children}</div>
     </div>
   );
 }
@@ -121,12 +128,16 @@ function MetricRow({
 }: {
   label: string; value: React.ReactNode; sub?: string; mono?: boolean; highlight?: "positive" | "negative" | "warning" | "info";
 }) {
-  const valCls = highlight ? `text-${highlight}` : "text-t0";
+  const valCls = highlight === "positive" ? "text-[#2d7f4f]"
+    : highlight === "negative" ? "text-[#dc2626]"
+    : highlight === "warning" ? "text-[#b45309]"
+    : highlight === "info" ? "text-[#2d7f4f]"
+    : "text-[#111315]";
   return (
-    <div className="flex items-center justify-between py-1.5 border-b border-b0 last:border-0 gap-2">
-      <span className="text-xs text-t2 shrink-0">{label}</span>
+    <div className="flex items-center justify-between py-1.5 border-b border-[#d9e2d7] last:border-0 gap-2">
+      <span className="text-xs text-[#667066] shrink-0">{label}</span>
       <div className="flex items-center gap-1.5 min-w-0">
-        {sub && <span className="text-2xs text-t2 font-mono">{sub}</span>}
+        {sub && <span className="text-[10px] text-[#7b857b] font-mono">{sub}</span>}
         <span className={cn("text-xs truncate", mono && "font-mono tabular-nums", valCls)}>{value}</span>
       </div>
     </div>
@@ -135,14 +146,14 @@ function MetricRow({
 
 function StatusBadge({ status }: { status: string }) {
   const cfg: Record<string, { cls: string; dot?: boolean }> = {
-    live:      { cls: "badge-positive", dot: true },
-    scheduled: { cls: "badge-info" },
-    finished:  { cls: "badge-muted" },
-    cancelled: { cls: "badge-negative" },
+    live:      { cls: "bg-[#dcfce7] border-[#bbf7d0] text-[#15803d]", dot: true },
+    scheduled: { cls: "bg-[#dbeafe] border-[#bfdbfe] text-[#1d4ed8]" },
+    finished:  { cls: "bg-[#f7f8f5] border-[#d9e2d7] text-[#667066]" },
+    cancelled: { cls: "bg-[#fee2e2] border-[#fecaca] text-[#dc2626]" },
   };
   const c = cfg[status] ?? cfg.scheduled;
   return (
-    <span className={cn("badge flex items-center gap-1", c.cls)}>
+    <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]", c.cls)}>
       {c.dot && (
         <span className="relative flex h-1.5 w-1.5">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-75" />
@@ -155,9 +166,9 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function Delta({ v, suffix = "" }: { v: number | null | undefined; suffix?: string }) {
-  if (v == null) return <span className="text-t2 font-mono text-2xs">—</span>;
+  if (v == null) return <span className="text-[#7b857b] font-mono text-[10px]">—</span>;
   return (
-    <span className={cn("flex items-center gap-0.5 font-mono text-2xs", v >= 0 ? "text-positive" : "text-negative")}>
+    <span className={cn("flex items-center gap-0.5 font-mono text-[10px]", v >= 0 ? "text-[#2d7f4f]" : "text-[#dc2626]")}>
       {v >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
       {v >= 0 ? "+" : ""}{v.toFixed(1)}{suffix && ` ${suffix}`}
     </span>
@@ -171,15 +182,15 @@ function FormPills({ wins, draws, losses }: { wins?: number | null; draws?: numb
     ...Array(losses ?? 0).fill("L"),
   ].slice(0, 5);
   const cls: Record<string, string> = {
-    W: "bg-positive/15 text-positive border border-positive/25",
-    D: "bg-warning/15 text-warning border border-warning/25",
-    L: "bg-negative/15 text-negative border border-negative/25",
+    W: "bg-[#dcfce7] text-[#15803d] border border-[#bbf7d0]",
+    D: "bg-[#fef9c3] text-[#854d0e] border border-[#fde047]/50",
+    L: "bg-[#fee2e2] text-[#dc2626] border border-[#fecaca]",
   };
-  if (items.length === 0) return <span className="text-2xs text-t2">—</span>;
+  if (items.length === 0) return <span className="text-[10px] text-[#7b857b]">—</span>;
   return (
     <div className="flex gap-0.5">
       {items.map((r, i) => (
-        <span key={i} className={cn("text-2xs font-mono font-bold w-4 h-4 flex items-center justify-center rounded", cls[r])}>
+        <span key={i} className={cn("text-[10px] font-mono font-bold w-4 h-4 flex items-center justify-center rounded", cls[r])}>
           {r}
         </span>
       ))}
@@ -190,11 +201,11 @@ function FormPills({ wins, draws, losses }: { wins?: number | null; draws?: numb
 function ProbBar({ label, pct: p, color, size = "sm" }: { label: string; pct: number; color: string; size?: "sm" | "md" }) {
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex justify-between text-2xs">
-        <span className="text-t2">{label}</span>
-        <span className="font-mono font-bold text-t0 tabular-nums">{Math.round(p)}%</span>
+      <div className="flex justify-between text-[10px]">
+        <span className="text-[#667066]">{label}</span>
+        <span className="font-mono font-bold text-[#111315] tabular-nums">{Math.round(p)}%</span>
       </div>
-      <div className={cn("rounded-full bg-bg0 overflow-hidden", size === "md" ? "h-2" : "h-1.5")}>
+      <div className={cn("rounded-full bg-[#f7f8f5] overflow-hidden", size === "md" ? "h-2" : "h-1.5")}>
         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${p}%`, backgroundColor: color }} />
       </div>
     </div>
@@ -212,20 +223,20 @@ function StatBar({ label, homeVal, awayVal, lowerBetter = false, fmt }: {
   const homeBetter = lowerBetter ? (homeVal ?? Infinity) < (awayVal ?? -Infinity) : (homeVal ?? -Infinity) > (awayVal ?? Infinity);
   const awayBetter = lowerBetter ? (awayVal ?? Infinity) < (homeVal ?? -Infinity) : (awayVal ?? -Infinity) > (homeVal ?? Infinity);
   return (
-    <div className="py-2 border-b border-b0 last:border-0">
+    <div className="py-2 border-b border-[#d9e2d7] last:border-0">
       <div className="flex justify-between items-baseline mb-1.5">
-        <span className={cn("font-mono text-sm font-bold tabular-nums min-w-[2rem]", homeBetter ? "text-info" : "text-t1")}>
+        <span className={cn("font-mono text-sm font-bold tabular-nums min-w-[2rem]", homeBetter ? "text-[#2d7f4f]" : "text-[#4f5950]")}>
           {homeVal != null ? fmtFn(homeVal) : "—"}
         </span>
-        <span className="text-2xs uppercase tracking-widest text-t2 text-center px-2">{label}</span>
-        <span className={cn("font-mono text-sm font-bold tabular-nums min-w-[2rem] text-right", awayBetter ? "text-warning" : "text-t1")}>
+        <span className="text-[10px] uppercase tracking-widest text-[#667066] text-center px-2">{label}</span>
+        <span className={cn("font-mono text-sm font-bold tabular-nums min-w-[2rem] text-right", awayBetter ? "text-[#b45309]" : "text-[#4f5950]")}>
           {awayVal != null ? fmtFn(awayVal) : "—"}
         </span>
       </div>
       {total > 0 && (
         <div className="h-1 rounded-full overflow-hidden flex">
-          <div className="h-full bg-info" style={{ width: `${homePct}%` }} />
-          <div className="h-full bg-warning flex-1" />
+          <div className="h-full bg-[#2edb6c]" style={{ width: `${homePct}%` }} />
+          <div className="h-full bg-[#f59e0b] flex-1" />
         </div>
       )}
     </div>
@@ -235,9 +246,9 @@ function StatBar({ label, homeVal, awayVal, lowerBetter = false, fmt }: {
 function EmptyState({ icon: Icon = Info, title, desc }: { icon?: React.ElementType; title: string; desc?: string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-      <Icon size={28} className="text-t2" />
-      <p className="text-xs font-medium text-t1">{title}</p>
-      {desc && <p className="text-2xs text-t2 max-w-xs">{desc}</p>}
+      <Icon size={28} className="text-[#d9e2d7]" />
+      <p className="text-xs font-medium text-[#4f5950]">{title}</p>
+      {desc && <p className="text-[10px] text-[#7b857b] max-w-xs">{desc}</p>}
     </div>
   );
 }
@@ -246,21 +257,21 @@ function Countdown({ kickoffUtc }: { kickoffUtc: string }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 30000); return () => clearInterval(t); }, []);
   const diff = new Date(kickoffUtc).getTime() - now.getTime();
-  if (diff <= 0) return <span className="text-positive font-mono text-xs">Starting soon</span>;
+  if (diff <= 0) return <span className="text-[#2d7f4f] font-mono text-xs">Starting soon</span>;
   const d = Math.floor(diff / 86400000);
   const h = Math.floor((diff % 86400000) / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
-  return <span className="font-mono text-sm font-bold text-info tabular-nums">{d > 0 ? `${d}d ` : ""}{h > 0 ? `${h}h ` : ""}{m}m</span>;
+  return <span className="font-mono text-sm font-bold text-[#2edb6c] tabular-nums">{d > 0 ? `${d}d ` : ""}{h > 0 ? `${h}h ` : ""}{m}m</span>;
 }
 
 function SideGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">{children}</div>;
+  return <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">{children}</div>;
 }
 function MainCol({ children }: { children: React.ReactNode }) {
-  return <div className="lg:col-span-8 flex flex-col gap-3">{children}</div>;
+  return <div className="lg:col-span-8 flex flex-col gap-4">{children}</div>;
 }
 function SideCol({ children }: { children: React.ReactNode }) {
-  return <div className="lg:col-span-4 flex flex-col gap-3">{children}</div>;
+  return <div className="lg:col-span-4 flex flex-col gap-4">{children}</div>;
 }
 
 // ─── Match Header 3-Column ───────────────────────────────────────────────────
@@ -273,30 +284,25 @@ function TeamBlock({ name, elo, form, side, logoUrl }: {
   logoUrl?: string | null;
 }) {
   const isHome = side === "home";
-  const col = isHome ? "text-info" : "text-warning";
   return (
-    <div className={cn("flex flex-col gap-1.5 min-w-0", isHome ? "items-start" : "items-end")}>
-      {/* Crest / initial placeholder */}
+    <div className={cn("flex flex-col gap-2 min-w-0", isHome ? "items-start" : "items-end")}>
       {logoUrl ? (
-        <img src={logoUrl} alt={name} className={cn("w-12 h-12 rounded-lg object-contain", isHome ? "bg-info/5" : "bg-warning/5")} />
+        <img src={logoUrl} alt={name} className="w-14 h-14 rounded-[14px] object-contain bg-white/10 border border-white/10 p-1" />
       ) : (
-        <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold border",
-          isHome ? "bg-info/10 border-info/20 text-info" : "bg-warning/10 border-warning/20 text-warning")}>
+        <div className="w-12 h-12 rounded-[14px] flex items-center justify-center text-sm font-bold border bg-[#2edb6c]/10 border-[#2edb6c]/30 text-[#2edb6c]">
           {name.slice(0, 2).toUpperCase()}
         </div>
       )}
 
-      <p className={cn("font-semibold text-sm text-t0 leading-tight", !isHome && "text-right")}>{name}</p>
+      <p className={cn("font-semibold text-base text-white leading-tight", !isHome && "text-right")}>{name}</p>
 
-      {/* ELO */}
       {elo && (
-        <div className={cn("flex items-center gap-1.5", !isHome && "flex-row-reverse")}>
-          <span className={cn("font-mono text-xl font-bold tabular-nums", col)}>{Math.round(elo.rating)}</span>
+        <div className={cn("flex items-center gap-2", !isHome && "flex-row-reverse")}>
+          <span className="font-mono text-2xl font-bold text-[#2edb6c] tabular-nums">{Math.round(elo.rating)}</span>
           <Delta v={elo.rating_change} suffix="ELO" />
         </div>
       )}
 
-      {/* Form streak dots */}
       {form && (
         <div className={cn("flex flex-col gap-1", !isHome && "items-end")}>
           <FormStreak
@@ -308,15 +314,16 @@ function TeamBlock({ name, elo, form, side, logoUrl }: {
             size="sm"
           />
           {form.form_pts != null && (
-            <span className="text-2xs text-t2 font-mono">{form.form_pts.toFixed(0)} pts last 5</span>
+            <span className="text-[10px] text-white/50 font-mono">{form.form_pts.toFixed(0)} pts last 5</span>
           )}
         </div>
       )}
 
-      {/* Tags */}
       <div className={cn("flex gap-1 flex-wrap", !isHome && "justify-end")}>
         {form?.days_rest != null && (
-          <span className="badge badge-muted text-2xs font-mono">{Math.round(form.days_rest)}d rest</span>
+          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[10px] font-mono text-white/45">
+            {Math.round(form.days_rest)}d rest
+          </span>
         )}
       </div>
     </div>
@@ -330,101 +337,99 @@ function MatchHeader({ match }: { match: MatchProps["match"] }) {
   const isFinished  = match.status === "finished";
 
   return (
-    <div className="bg-bg1 border-b border-b0">
-      {/* Breadcrumb + status */}
-      <div className="flex items-center justify-between px-4 pt-2.5 pb-2 gap-2">
-        <Link href="/sports/soccer/matches" className="flex items-center gap-1.5 text-t2 hover:text-t0 text-xs transition-colors">
-          <ArrowLeft size={12} /> Soccer
-        </Link>
-        <div className="flex items-center gap-2">
-          <span className="text-2xs text-t2 font-mono">{match.league}{match.season ? ` · ${match.season}` : ""}</span>
-          <StatusBadge status={match.status} />
-        </div>
-      </div>
-
-      {/* 3-column main header */}
-      <div className="grid grid-cols-[1fr_auto_1fr] gap-3 px-4 pb-4 items-start">
-        {/* Home */}
-        <TeamBlock name={match.home.name} elo={match.elo_home} form={match.form_home} side="home" logoUrl={match.home.logo_url} />
-
-        {/* Center: score block */}
-        <div className="flex flex-col items-center gap-1.5 pt-1 min-w-[120px]">
-          {isLive && (
-            <span className="flex items-center gap-1 text-2xs text-positive font-mono">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute h-full w-full rounded-full bg-positive opacity-75" />
-                <span className="relative rounded-full h-1.5 w-1.5 bg-positive" />
-              </span>
-              LIVE
-            </span>
-          )}
-
-          {/* Score / countdown */}
+    <div className="relative overflow-hidden rounded-[36px] border border-[#1f2a22] bg-[#111315] text-white shadow-[0_25px_80px_rgba(0,0,0,0.25)]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(46,219,108,0.15),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(46,219,108,0.06),transparent_30%)]" />
+      <div className="relative z-10">
+        {/* Breadcrumb + league + status */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-3 gap-2">
+          <Link href="/sports/soccer/matches" className="flex items-center gap-1.5 text-white/45 hover:text-white text-xs transition-colors">
+            <ArrowLeft size={13} /> Soccer
+          </Link>
           <div className="flex items-center gap-2">
-            <span className="font-mono text-4xl font-bold tabular-nums text-t0">
-              {match.home_score ?? (isLive ? "0" : "—")}
-            </span>
-            <span className="text-t2 text-sm font-mono">:</span>
-            <span className="font-mono text-4xl font-bold tabular-nums text-t0">
-              {match.away_score ?? (isLive ? "0" : "—")}
-            </span>
+            <span className="text-[10px] text-white/35 font-mono">{match.league}{match.season ? ` · ${match.season}` : ""}</span>
+            <StatusBadge status={match.status} />
           </div>
+        </div>
 
-          {isScheduled && (
-            <div className="flex flex-col items-center gap-0.5">
-              <span className="text-2xs text-t2 uppercase tracking-widest">Kickoff in</span>
-              <Countdown kickoffUtc={match.kickoff_utc} />
-            </div>
-          )}
-          {isFinished && match.outcome && (
-            <span className="badge badge-muted text-2xs">
-              {match.outcome === "home_win" || match.outcome === "H" ? `${match.home.name.split(" ")[0]} Win`
-                : match.outcome === "away_win" || match.outcome === "A" ? `${match.away.name.split(" ")[0]} Win`
-                : "Draw"}
-            </span>
-          )}
+        {/* 3-column hero */}
+        <div className="grid grid-cols-[1fr_auto_1fr] gap-4 px-6 pb-6 items-start">
+          <TeamBlock name={match.home.name} elo={match.elo_home} form={match.form_home} side="home" logoUrl={match.home.logo_url} />
 
-          {/* Win probability bar */}
-          {match.probabilities && (
-            <div className="w-full flex flex-col items-center gap-0.5 mt-1">
-              <div className="flex h-1.5 w-full rounded-full overflow-hidden">
-                <div className="bg-info h-full" style={{ width: `${Math.round(match.probabilities.home_win * 100)}%` }} />
-                {match.probabilities.draw != null && match.probabilities.draw > 0 && (
-                  <div className="bg-border1 h-full" style={{ width: `${Math.round(match.probabilities.draw * 100)}%` }} />
-                )}
-                <div className="bg-warning h-full flex-1" />
-              </div>
-              <div className="flex justify-between w-full text-2xs font-mono tabular-nums">
-                <span className="text-info">{Math.round(match.probabilities.home_win * 100)}%</span>
-                {match.probabilities.draw != null && match.probabilities.draw > 0 && (
-                  <span className="text-t2">{Math.round(match.probabilities.draw * 100)}%</span>
-                )}
-                <span className="text-warning">{Math.round(match.probabilities.away_win * 100)}%</span>
-              </div>
-            </div>
-          )}
-
-          {/* Kickoff row */}
-          <div className="flex flex-col items-center gap-0.5 mt-0.5">
-            <span className="flex items-center gap-1 text-2xs text-t2">
-              <Calendar size={10} />
-              {fmtDate(match.kickoff_utc)}
-            </span>
-            <span className="flex items-center gap-1 text-2xs text-t2">
-              <Clock size={10} />
-              {fmtTime(match.kickoff_utc)}
-            </span>
-            {ctx?.venue_name && (
-              <span className="flex items-center gap-1 text-2xs text-t1 text-center max-w-[140px]">
-                <MapPin size={10} className="shrink-0" />
-                <span className="truncate">{ctx.venue_name}</span>
+          {/* Center: score block */}
+          <div className="flex flex-col items-center gap-2 pt-1 min-w-[130px]">
+            {isLive && (
+              <span className="flex items-center gap-1.5 text-[10px] text-[#2edb6c] font-mono">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute h-full w-full rounded-full bg-[#2edb6c] opacity-75" />
+                  <span className="relative rounded-full h-1.5 w-1.5 bg-[#2edb6c]" />
+                </span>
+                LIVE
               </span>
             )}
-          </div>
-        </div>
 
-        {/* Away */}
-        <TeamBlock name={match.away.name} elo={match.elo_away} form={match.form_away} side="away" logoUrl={match.away.logo_url} />
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-5xl font-bold tabular-nums text-white">
+                {match.home_score ?? (isLive ? "0" : "—")}
+              </span>
+              <span className="text-white/25 text-xl font-mono">:</span>
+              <span className="font-mono text-5xl font-bold tabular-nums text-white">
+                {match.away_score ?? (isLive ? "0" : "—")}
+              </span>
+            </div>
+
+            {isScheduled && (
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-[10px] text-white/35 uppercase tracking-widest">Kickoff in</span>
+                <Countdown kickoffUtc={match.kickoff_utc} />
+              </div>
+            )}
+            {isFinished && match.outcome && (
+              <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[10px] font-semibold text-white/55">
+                {match.outcome === "home_win" || match.outcome === "H" ? `${match.home.name.split(" ")[0]} Win`
+                  : match.outcome === "away_win" || match.outcome === "A" ? `${match.away.name.split(" ")[0]} Win`
+                  : "Draw"}
+              </span>
+            )}
+
+            {match.probabilities && (
+              <div className="w-full flex flex-col items-center gap-1 mt-1">
+                <div className="flex h-1.5 w-full rounded-full overflow-hidden">
+                  <div className="bg-[#2edb6c] h-full" style={{ width: `${Math.round(match.probabilities.home_win * 100)}%` }} />
+                  {match.probabilities.draw != null && match.probabilities.draw > 0 && (
+                    <div className="bg-white/15 h-full" style={{ width: `${Math.round(match.probabilities.draw * 100)}%` }} />
+                  )}
+                  <div className="bg-[#f59e0b] h-full flex-1" />
+                </div>
+                <div className="flex justify-between w-full text-[10px] font-mono tabular-nums">
+                  <span className="text-[#2edb6c]">{Math.round(match.probabilities.home_win * 100)}%</span>
+                  {match.probabilities.draw != null && match.probabilities.draw > 0 && (
+                    <span className="text-white/30">{Math.round(match.probabilities.draw * 100)}%</span>
+                  )}
+                  <span className="text-[#f59e0b]">{Math.round(match.probabilities.away_win * 100)}%</span>
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col items-center gap-0.5 mt-1">
+              <span className="flex items-center gap-1 text-[10px] text-white/30">
+                <Calendar size={10} />
+                {fmtDate(match.kickoff_utc)}
+              </span>
+              <span className="flex items-center gap-1 text-[10px] text-white/30">
+                <Clock size={10} />
+                {fmtTime(match.kickoff_utc)}
+              </span>
+              {ctx?.venue_name && (
+                <span className="flex items-center gap-1 text-[10px] text-white/40 text-center max-w-[140px]">
+                  <MapPin size={10} className="shrink-0" />
+                  <span className="truncate">{ctx.venue_name}</span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          <TeamBlock name={match.away.name} elo={match.elo_away} form={match.form_away} side="away" logoUrl={match.away.logo_url} />
+        </div>
       </div>
     </div>
   );
@@ -434,10 +439,10 @@ function MatchHeader({ match }: { match: MatchProps["match"] }) {
 
 function KpiCell({ label, value, sub, col }: { label: string; value: React.ReactNode; sub?: string; col?: string }) {
   return (
-    <div className="detail-kpi-card min-w-[120px]">
-      <p className="detail-kpi-label whitespace-nowrap">{label}</p>
-      <p className={cn("detail-kpi-value text-[18px] whitespace-nowrap", col ?? "text-t0")}>{value}</p>
-      {sub && <p className="detail-kpi-sub whitespace-nowrap">{sub}</p>}
+    <div className="flex flex-col gap-0.5 px-4 py-3 min-w-[90px] border-r border-[#d9e2d7] last:border-0">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b857b] whitespace-nowrap">{label}</p>
+      <p className={cn("text-xl font-bold leading-none tabular-nums whitespace-nowrap", col ?? "text-[#111315]")}>{value}</p>
+      {sub && <p className="text-[10px] text-[#7b857b] font-mono whitespace-nowrap">{sub}</p>}
     </div>
   );
 }
@@ -455,29 +460,29 @@ function KpiStrip2Row({ match }: { match: MatchProps["match"] }) {
   const restDiff = fh?.days_rest != null && fa?.days_rest != null ? fh.days_rest - fa.days_rest : null;
 
   return (
-    <div className="px-3 py-3 space-y-3">
+    <div className="bg-white border border-[#d9e2d7] rounded-[28px] shadow-[0_4px_20px_rgba(17,19,21,0.05)] overflow-hidden">
       {/* Row 1: probabilities */}
-      <div className="detail-kpi-grid">
-        <div className="flex items-center px-3 py-1 shrink-0 border-r border-b0">
-          <span className="label text-t2 whitespace-nowrap">MODEL</span>
+      <div className="flex items-center flex-wrap border-b border-[#d9e2d7] overflow-x-auto no-scrollbar">
+        <div className="flex items-center px-4 py-3 shrink-0 border-r border-[#d9e2d7]">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#2d7f4f] whitespace-nowrap">MODEL</span>
         </div>
         {p ? (
           <>
-            <KpiCell label="Home" value={`${Math.round(p.home_win * 100)}%`} col="text-info" />
+            <KpiCell label="Home" value={`${Math.round(p.home_win * 100)}%`} col="text-[#2d7f4f]" />
             {p.draw != null && p.draw > 0 && <KpiCell label="Draw" value={`${Math.round(p.draw * 100)}%`} />}
-            <KpiCell label="Away" value={`${Math.round(p.away_win * 100)}%`} col="text-warning" />
+            <KpiCell label="Away" value={`${Math.round(p.away_win * 100)}%`} col="text-[#b45309]" />
           </>
         ) : (
           <KpiCell label="Probs" value="—" sub="no model" />
         )}
-        <div className="flex items-center px-3 py-1 shrink-0 border-r border-b0 border-l border-l-border1">
-          <span className="label text-t2 whitespace-nowrap">ELO</span>
+        <div className="flex items-center px-4 py-3 shrink-0 border-r border-[#d9e2d7] border-l border-l-[#d9e2d7]">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#667066] whitespace-nowrap">ELO</span>
         </div>
         {ep ? (
           <>
-            <KpiCell label="Home" value={`${Math.round(ep.home * 100)}%`} col="text-info" />
+            <KpiCell label="Home" value={`${Math.round(ep.home * 100)}%`} col="text-[#2d7f4f]" />
             <KpiCell label="Draw" value={`${Math.round(ep.draw * 100)}%`} />
-            <KpiCell label="Away" value={`${Math.round(ep.away * 100)}%`} col="text-warning" />
+            <KpiCell label="Away" value={`${Math.round(ep.away * 100)}%`} col="text-[#b45309]" />
           </>
         ) : (
           <KpiCell label="Probs" value="—" sub="no ELO" />
@@ -486,24 +491,24 @@ function KpiStrip2Row({ match }: { match: MatchProps["match"] }) {
           <KpiCell
             label="Confidence"
             value={`${match.confidence}%`}
-            col={match.confidence >= 60 ? "text-positive" : match.confidence >= 40 ? "text-warning" : "text-t1"}
+            col={match.confidence >= 60 ? "text-[#2d7f4f]" : match.confidence >= 40 ? "text-[#b45309]" : "text-[#4f5950]"}
           />
         )}
       </div>
       {/* Row 2: odds + context */}
-      <div className="detail-kpi-grid">
+      <div className="flex items-center flex-wrap overflow-x-auto no-scrollbar">
         {fo && (
           <>
-            <KpiCell label="Fair H" value={fo.home_win?.toFixed(2) ?? "—"} col="text-info" />
+            <KpiCell label="Fair H" value={fo.home_win?.toFixed(2) ?? "—"} col="text-[#2d7f4f]" />
             {fo.draw != null && fo.draw > 0 && <KpiCell label="Fair D" value={fo.draw.toFixed(2)} />}
-            <KpiCell label="Fair A" value={fo.away_win?.toFixed(2) ?? "—"} col="text-warning" />
+            <KpiCell label="Fair A" value={fo.away_win?.toFixed(2) ?? "—"} col="text-[#b45309]" />
           </>
         )}
         {eh && ea && (
           <KpiCell
             label="ELO Δ"
             value={`${(eh.rating - ea.rating) >= 0 ? "+" : ""}${(eh.rating - ea.rating).toFixed(0)}`}
-            col={(eh.rating - ea.rating) >= 0 ? "text-positive" : "text-negative"}
+            col={(eh.rating - ea.rating) >= 0 ? "text-[#2d7f4f]" : "text-[#dc2626]"}
             sub="home − away"
           />
         )}
@@ -511,7 +516,7 @@ function KpiStrip2Row({ match }: { match: MatchProps["match"] }) {
           <KpiCell
             label="Rest Δ"
             value={`${restDiff >= 0 ? "+" : ""}${Math.round(restDiff)}d`}
-            col={restDiff >= 2 ? "text-positive" : restDiff <= -2 ? "text-negative" : "text-t1"}
+            col={restDiff >= 2 ? "text-[#2d7f4f]" : restDiff <= -2 ? "text-[#dc2626]" : "text-[#4f5950]"}
             sub="home adv"
           />
         )}
@@ -539,28 +544,28 @@ function KeyEdges({ match }: { match: MatchProps["match"] }) {
   if (eh && ea) {
     const diff = eh.rating - ea.rating;
     if (Math.abs(diff) > 50)
-      edges.push({ label: "ELO edge", val: `${diff > 0 ? match.home.name : match.away.name} +${Math.abs(diff).toFixed(0)} pts`, col: diff > 0 ? "text-info" : "text-warning" });
+      edges.push({ label: "ELO edge", val: `${diff > 0 ? match.home.name : match.away.name} +${Math.abs(diff).toFixed(0)} pts`, col: diff > 0 ? "text-[#2d7f4f]" : "text-[#b45309]" });
   }
   if (fh && fa) {
     const formDiff = (fh.form_pts ?? 0) - (fa.form_pts ?? 0);
     if (Math.abs(formDiff) >= 3)
-      edges.push({ label: "Form edge", val: `${formDiff > 0 ? match.home.name : match.away.name} +${Math.abs(formDiff).toFixed(0)} pts`, col: formDiff > 0 ? "text-info" : "text-warning" });
+      edges.push({ label: "Form edge", val: `${formDiff > 0 ? match.home.name : match.away.name} +${Math.abs(formDiff).toFixed(0)} pts`, col: formDiff > 0 ? "text-[#2d7f4f]" : "text-[#b45309]" });
     const restDiff = (fh.days_rest ?? 0) - (fa.days_rest ?? 0);
     if (Math.abs(restDiff) >= 2)
-      edges.push({ label: "Rest edge", val: `${restDiff > 0 ? match.home.name : match.away.name} +${Math.abs(restDiff).toFixed(0)}d`, col: "text-t1" });
+      edges.push({ label: "Rest edge", val: `${restDiff > 0 ? match.home.name : match.away.name} +${Math.abs(restDiff).toFixed(0)}d`, col: "text-[#4f5950]" });
   }
   if (match.confidence != null && match.confidence >= 65)
-    edges.push({ label: "High confidence", val: `${match.confidence}% model certainty`, col: "text-positive" });
+    edges.push({ label: "High confidence", val: `${match.confidence}% model certainty`, col: "text-[#2d7f4f]" });
   if (match.confidence != null && match.confidence < 40)
-    edges.push({ label: "Low confidence", val: `Only ${match.confidence}% — uncertain match`, col: "text-warning" });
+    edges.push({ label: "Low confidence", val: `Only ${match.confidence}% — uncertain match`, col: "text-[#b45309]" });
   if (edges.length === 0)
-    edges.push({ label: "No strong edges", val: "Insufficient data for edge identification", col: "text-t2" });
+    edges.push({ label: "No strong edges", val: "Insufficient data for edge identification", col: "text-[#667066]" });
 
   return (
-    <div className="flex flex-col divide-y divide-b0">
+    <div className="flex flex-col divide-y divide-[#d9e2d7]">
       {edges.map((e, i) => (
         <div key={i} className="flex items-center justify-between py-1.5 gap-2">
-          <span className="text-2xs text-t2 uppercase tracking-widest">{e.label}</span>
+          <span className="text-[10px] text-[#667066] uppercase tracking-widest">{e.label}</span>
           <span className={cn("text-xs font-mono", e.col)}>{e.val}</span>
         </div>
       ))}
@@ -596,20 +601,20 @@ function TeamComparisonTable({ match }: { match: MatchProps["match"] }) {
   ].filter(r => !r.adv || advanced);
 
   const getCol = (a?: number | null, b?: number | null, hb = true) => {
-    if (a == null || b == null) return "text-t1";
-    return (hb ? a > b : a < b) ? "text-positive" : a === b ? "text-t1" : "text-t2";
+    if (a == null || b == null) return "text-[#4f5950]";
+    return (hb ? a > b : a < b) ? "text-[#2d7f4f]" : a === b ? "text-[#4f5950]" : "text-[#667066]";
   };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
         <div className="grid grid-cols-[1fr_auto_1fr] gap-2 flex-1">
-          <span className="text-xs font-semibold text-info text-right">{match.home.name}</span>
-          <span className="text-2xs text-t2 w-28 text-center">Metric</span>
-          <span className="text-xs font-semibold text-warning">{match.away.name}</span>
+          <span className="text-xs font-semibold text-[#2d7f4f] text-right">{match.home.name}</span>
+          <span className="text-[10px] text-[#667066] w-28 text-center">Metric</span>
+          <span className="text-xs font-semibold text-[#b45309]">{match.away.name}</span>
         </div>
         <button
-          className="flex items-center gap-1 text-2xs text-t2 hover:text-t0 ml-4 shrink-0"
+          className="flex items-center gap-1 text-[10px] text-[#667066] hover:text-[#111315] ml-4 shrink-0"
           onClick={() => setAdvanced(v => !v)}
         >
           {advanced ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
@@ -618,9 +623,9 @@ function TeamComparisonTable({ match }: { match: MatchProps["match"] }) {
       </div>
       <div>
         {rows.map(row => (
-          <div key={row.label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-1.5 border-b border-b0 last:border-0">
+          <div key={row.label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 py-1.5 border-b border-[#d9e2d7] last:border-0">
             <div className={cn("text-right text-xs font-mono tabular-nums", getCol(row.hRaw, row.aRaw, row.higherBetter !== false))}>{row.hVal}</div>
-            <div className="text-center text-2xs text-t2 w-28 shrink-0">{row.label}</div>
+            <div className="text-center text-[10px] text-[#667066] w-28 shrink-0">{row.label}</div>
             <div className={cn("text-left text-xs font-mono tabular-nums", getCol(row.aRaw, row.hRaw, row.higherBetter !== false))}>{row.aVal}</div>
           </div>
         ))}
@@ -651,17 +656,17 @@ function RecentFormMiniTable({ match }: { match: MatchProps["match"] }) {
             </div>
           </>
         ) : (
-          <span className="text-2xs text-t2">No form data</span>
+          <span className="text-[10px] text-[#667066]">No form data</span>
         )}
       </div>
     </div>
   );
 
   return (
-    <div className="flex gap-4 divide-x divide-b0">
-      {block(match.home.name, fh, "text-info")}
+    <div className="flex gap-4 divide-x divide-[#d9e2d7]">
+      {block(match.home.name, fh, "text-[#2d7f4f]")}
       <div className="pl-4 flex-1 min-w-0">
-        {block(match.away.name, fa, "text-warning")}
+        {block(match.away.name, fa, "text-[#b45309]")}
       </div>
     </div>
   );
@@ -699,15 +704,15 @@ function ModelSnapshot({ match }: { match: MatchProps["match"] }) {
       ) : <EmptyState title="No prediction" desc="Run model pipeline." />}
 
       {topScorelines.length > 0 && (
-        <div className="border-t border-b0 pt-2">
-          <p className="label mb-1.5">Top scorelines</p>
+        <div className="border-t border-[#d9e2d7] pt-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#667066] mb-1.5">Top scorelines</p>
           {topScorelines.map(s => {
             const [h, a] = s.score.split("-").map(Number);
-            const col = h > a ? "text-info" : h < a ? "text-warning" : "text-t2";
+            const col = h > a ? "text-[#2d7f4f]" : h < a ? "text-[#b45309]" : "text-[#667066]";
             return (
-              <div key={s.score} className="flex items-center justify-between py-1 border-b border-b0 last:border-0">
+              <div key={s.score} className="flex items-center justify-between py-1 border-b border-[#d9e2d7] last:border-0">
                 <span className={cn("font-mono text-xs font-bold", col)}>{s.score}</span>
-                <span className="font-mono text-2xs text-t1 tabular-nums">{(s.probability * 100).toFixed(1)}%</span>
+                <span className="font-mono text-[10px] text-[#4f5950] tabular-nums">{(s.probability * 100).toFixed(1)}%</span>
               </div>
             );
           })}
@@ -715,15 +720,15 @@ function ModelSnapshot({ match }: { match: MatchProps["match"] }) {
       )}
 
       {match.confidence != null && (
-        <div className="border-t border-b0 pt-2">
+        <div className="border-t border-[#d9e2d7] pt-2">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-2xs text-t2">Confidence</span>
-            <span className={cn("font-mono text-xs font-bold", match.confidence >= 60 ? "text-positive" : match.confidence >= 40 ? "text-warning" : "text-t2")}>
+            <span className="text-[10px] text-[#667066]">Confidence</span>
+            <span className={cn("font-mono text-xs font-bold", match.confidence >= 60 ? "text-[#2d7f4f]" : match.confidence >= 40 ? "text-[#b45309]" : "text-[#667066]")}>
               {match.confidence}%
             </span>
           </div>
-          <div className="h-1 rounded-full bg-bg0 overflow-hidden">
-            <div className={cn("h-full rounded-full", match.confidence >= 60 ? "bg-positive" : match.confidence >= 40 ? "bg-warning" : "bg-t2")} style={{ width: `${match.confidence}%` }} />
+          <div className="h-1 rounded-full bg-[#f7f8f5] overflow-hidden">
+            <div className={cn("h-full rounded-full", match.confidence >= 60 ? "bg-[#2edb6c]" : match.confidence >= 40 ? "bg-[#f59e0b]" : "bg-[#d9e2d7]")} style={{ width: `${match.confidence}%` }} />
           </div>
         </div>
       )}
@@ -815,22 +820,22 @@ function OverviewTab({ match }: { match: MatchProps["match"] }) {
 
 function PlayerRow({ p, col }: { p: { name: string; jersey?: number | null; position?: string | null; rating?: number | null; goals?: number | null; assists?: number | null; minutes?: number | null; yellow_cards?: number | null; red_cards?: number | null }; col: string }) {
   return (
-    <div className="flex items-center gap-2 py-1.5 border-b border-b0 last:border-0">
+    <div className="flex items-center gap-2 py-1.5 border-b border-[#d9e2d7] last:border-0">
       {p.jersey != null && (
-        <span className="font-mono text-2xs text-t2 w-5 text-right shrink-0 tabular-nums">{p.jersey}</span>
+        <span className="font-mono text-[10px] text-[#7b857b] w-5 text-right shrink-0 tabular-nums">{p.jersey}</span>
       )}
       <div className="flex-1 min-w-0">
-        <span className="text-xs text-t0 truncate">{p.name}</span>
-        {p.position && <span className="text-2xs text-t2 ml-1.5">{p.position}</span>}
+        <span className="text-xs text-[#111315] truncate">{p.name}</span>
+        {p.position && <span className="text-[10px] text-[#667066] ml-1.5">{p.position}</span>}
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        {p.goals != null && p.goals > 0 && <span className="text-2xs font-mono text-positive" title="Goals">⚽ {p.goals}</span>}
-        {p.assists != null && p.assists > 0 && <span className="text-2xs font-mono text-info" title="Assists">🅐 {p.assists}</span>}
-        {p.yellow_cards != null && p.yellow_cards > 0 && <span className="w-2 h-3 bg-warning rounded-sm inline-block" title="Yellow card" />}
-        {p.red_cards != null && p.red_cards > 0 && <span className="w-2 h-3 bg-negative rounded-sm inline-block" title="Red card" />}
-        {p.minutes != null && <span className="text-2xs text-t2 font-mono">{p.minutes}&apos;</span>}
+        {p.goals != null && p.goals > 0 && <span className="text-[10px] font-mono text-[#2d7f4f]" title="Goals">⚽ {p.goals}</span>}
+        {p.assists != null && p.assists > 0 && <span className="text-[10px] font-mono text-[#2d7f4f]" title="Assists">🅐 {p.assists}</span>}
+        {p.yellow_cards != null && p.yellow_cards > 0 && <span className="w-2 h-3 bg-[#d97706] rounded-sm inline-block" title="Yellow card" />}
+        {p.red_cards != null && p.red_cards > 0 && <span className="w-2 h-3 bg-[#dc2626] rounded-sm inline-block" title="Red card" />}
+        {p.minutes != null && <span className="text-[10px] text-[#667066] font-mono">{p.minutes}&apos;</span>}
         {p.rating != null && (
-          <span className={cn("font-mono text-xs font-bold tabular-nums", p.rating >= 7.5 ? "text-positive" : p.rating >= 6.5 ? "text-t0" : "text-t2")}>{p.rating.toFixed(1)}</span>
+          <span className={cn("font-mono text-xs font-bold tabular-nums", p.rating >= 7.5 ? "text-[#2d7f4f]" : p.rating >= 6.5 ? "text-[#111315]" : "text-[#667066]")}>{p.rating.toFixed(1)}</span>
         )}
       </div>
     </div>
@@ -847,14 +852,14 @@ function TeamLineup({ lineup, col, injuryCount }: { lineup: { team_name: string;
       <div className="flex items-center justify-between">
         <span className={cn("text-xs font-semibold", col)}>{lineup.team_name}</span>
         <div className="flex items-center gap-2">
-          {lineup.formation && <span className="badge badge-muted font-mono text-2xs">{lineup.formation}</span>}
+          {lineup.formation && <span className="inline-flex items-center rounded-full border border-[#d9e2d7] bg-[#f7f8f5] px-2 py-0.5 text-[10px] font-mono text-[#4f5950]">{lineup.formation}</span>}
           {avgRating != null && (
-            <span className={cn("badge font-mono text-2xs", avgRating >= 7.5 ? "badge-positive" : "badge-muted")}>
+            <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-mono", avgRating >= 7.5 ? "bg-[#dcfce7] border-[#bbf7d0] text-[#15803d]" : "bg-[#f7f8f5] border-[#d9e2d7] text-[#667066]")}>
               avg {avgRating.toFixed(1)}
             </span>
           )}
           {injuryCount != null && injuryCount > 0 && (
-            <span className="badge badge-warning text-2xs">{injuryCount} out</span>
+            <span className="inline-flex items-center rounded-full border border-[#fde68a] bg-[#fef9c3] px-2 py-0.5 text-[10px] font-mono text-[#854d0e]">{injuryCount} out</span>
           )}
         </div>
       </div>
@@ -862,8 +867,8 @@ function TeamLineup({ lineup, col, injuryCount }: { lineup: { team_name: string;
         {starters.map((p: any, i: number) => <PlayerRow key={i} p={p} col={col} />)}
       </div>
       {bench.length > 0 && (
-        <div className="border-t border-b0 pt-2">
-          <p className="text-2xs text-t2 uppercase tracking-widest mb-1">Bench</p>
+        <div className="border-t border-[#d9e2d7] pt-2">
+          <p className="text-[10px] text-[#667066] uppercase tracking-widest mb-1">Bench</p>
           {bench.map((p: any, i: number) => <PlayerRow key={i} p={p} col={col} />)}
         </div>
       )}
@@ -873,18 +878,20 @@ function TeamLineup({ lineup, col, injuryCount }: { lineup: { team_name: string;
 
 function InjuriesPanel({ injuries, col, teamName }: { injuries: any[] | null | undefined; col: string; teamName: string }) {
   if (!injuries || injuries.length === 0) return null;
-  const statusColor = (s: string) => s === "Out" ? "text-negative" : s === "Doubtful" ? "text-warning" : s === "Questionable" ? "text-warning" : "text-t1";
   return (
     <div className="flex flex-col gap-0">
       <p className={cn("text-xs font-semibold mb-2", col)}>{teamName}</p>
       {injuries.map((inj: any, i: number) => (
-        <div key={i} className="py-1.5 border-b border-b0 last:border-0">
+        <div key={i} className="py-1.5 border-b border-[#d9e2d7] last:border-0">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-t0">{inj.player_name}</span>
-            <span className={cn("badge text-2xs font-mono", inj.status === "Out" ? "badge-negative" : inj.status === "Doubtful" ? "badge-warning" : "badge-muted")}>{inj.status}</span>
+            <span className="text-xs text-[#111315]">{inj.player_name}</span>
+            <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-mono",
+              inj.status === "Out" ? "bg-[#fee2e2] border-[#fecaca] text-[#dc2626]"
+              : inj.status === "Doubtful" ? "bg-[#fef9c3] border-[#fde68a] text-[#854d0e]"
+              : "bg-[#f7f8f5] border-[#d9e2d7] text-[#667066]")}>{inj.status}</span>
           </div>
-          {inj.reason && <p className="text-2xs text-t2 mt-0.5">{inj.reason}</p>}
-          {inj.expected_return && <p className="text-2xs text-t2">Return: {inj.expected_return}</p>}
+          {inj.reason && <p className="text-[10px] text-[#667066] mt-0.5">{inj.reason}</p>}
+          {inj.expected_return && <p className="text-[10px] text-[#667066]">Return: {inj.expected_return}</p>}
         </div>
       ))}
     </div>
@@ -905,17 +912,21 @@ function LineupsTab({ match }: { match: MatchProps["match"] }) {
     <SideGrid>
       <MainCol>
         {hasLineups ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="card">
-              <div className="panel-header"><span className="panel-title">Home XI</span></div>
-              <div className="panel-content">
-                <TeamLineup lineup={lineupHome} col="text-info" injuryCount={injHome?.filter((i: any) => i.status === "Out").length} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white border border-[#d9e2d7] rounded-[24px] overflow-hidden shadow-[0_4px_20px_rgba(17,19,21,0.05)]">
+              <div className="flex items-center px-5 py-3.5 border-b border-[#d9e2d7]">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#667066]">Home XI</span>
+              </div>
+              <div className="px-5 py-4">
+                <TeamLineup lineup={lineupHome} col="text-[#2d7f4f]" injuryCount={injHome?.filter((i: any) => i.status === "Out").length} />
               </div>
             </div>
-            <div className="card">
-              <div className="panel-header"><span className="panel-title">Away XI</span></div>
-              <div className="panel-content">
-                <TeamLineup lineup={lineupAway} col="text-warning" injuryCount={injAway?.filter((i: any) => i.status === "Out").length} />
+            <div className="bg-white border border-[#d9e2d7] rounded-[24px] overflow-hidden shadow-[0_4px_20px_rgba(17,19,21,0.05)]">
+              <div className="flex items-center px-5 py-3.5 border-b border-[#d9e2d7]">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#667066]">Away XI</span>
+              </div>
+              <div className="px-5 py-4">
+                <TeamLineup lineup={lineupAway} col="text-[#b45309]" injuryCount={injAway?.filter((i: any) => i.status === "Out").length} />
               </div>
             </div>
           </div>
@@ -930,8 +941,8 @@ function LineupsTab({ match }: { match: MatchProps["match"] }) {
         <Panel title="Absences & Injuries">
           {hasInjuries ? (
             <div className="flex flex-col gap-4">
-              {injHome && injHome.length > 0 && <InjuriesPanel injuries={injHome} col="text-info" teamName={match.home.name} />}
-              {injAway && injAway.length > 0 && <div className="border-t border-b0 pt-3"><InjuriesPanel injuries={injAway} col="text-warning" teamName={match.away.name} /></div>}
+              {injHome && injHome.length > 0 && <InjuriesPanel injuries={injHome} col="text-[#2d7f4f]" teamName={match.home.name} />}
+              {injAway && injAway.length > 0 && <div className="border-t border-[#d9e2d7] pt-3"><InjuriesPanel injuries={injAway} col="text-[#b45309]" teamName={match.away.name} /></div>}
             </div>
           ) : (
             <EmptyState icon={Shield} title="No injury data" desc="All players available." />
@@ -940,8 +951,8 @@ function LineupsTab({ match }: { match: MatchProps["match"] }) {
         {hasLineups && (
           <Panel title="Lineup Strength">
             {[
-              { label: match.home.name, lineup: lineupHome, col: "text-info", bgCol: "bg-info" },
-              { label: match.away.name, lineup: lineupAway, col: "text-warning", bgCol: "bg-warning" },
+              { label: match.home.name, lineup: lineupHome, col: "text-[#2d7f4f]", bgCol: "bg-[#2edb6c]" },
+              { label: match.away.name, lineup: lineupAway, col: "text-[#b45309]", bgCol: "bg-[#f59e0b]" },
             ].map(({ label, lineup, col, bgCol }) => {
               if (!lineup) return null;
               const starters = lineup.players.filter((p: any) => p.is_starter !== false).slice(0, 11);
@@ -950,17 +961,17 @@ function LineupsTab({ match }: { match: MatchProps["match"] }) {
                 <div key={label} className="mb-3 last:mb-0">
                   <div className="flex justify-between text-2xs mb-1">
                     <span className={col}>{label.split(" ")[0]}</span>
-                    <span className="font-mono font-bold text-t0 tabular-nums">{avg != null ? avg.toFixed(2) : "—"}</span>
+                    <span className="font-mono font-bold text-[#111315] tabular-nums">{avg != null ? avg.toFixed(2) : "—"}</span>
                   </div>
                   {avg != null && (
-                    <div className="h-1.5 rounded-full bg-bg0 overflow-hidden">
+                    <div className="h-1.5 rounded-full bg-[#f7f8f5] overflow-hidden">
                       <div className={cn("h-full rounded-full", bgCol)} style={{ width: `${((avg - 6) / 4) * 100}%` }} />
                     </div>
                   )}
                 </div>
               );
             })}
-            <p className="text-2xs text-t2 mt-3 pt-2 border-t border-b0">Based on avg player ratings. Scale: 6.0 → 10.0</p>
+            <p className="text-[10px] text-[#667066] mt-3 pt-2 border-t border-[#d9e2d7]">Based on avg player ratings. Scale: 6.0 → 10.0</p>
           </Panel>
         )}
       </SideCol>
@@ -1003,24 +1014,24 @@ function StatsTab({ match }: { match: MatchProps["match"] }) {
           </Panel>
         )}
         <Panel title="Team Statistics" subtitle={match.status === "finished" ? "Full-time" : "Pre-match"} padded={false}>
-          <div className="panel-content-tight">
-            <div className="flex justify-between pb-2 mb-1 border-b border-b0">
-              <span className="text-xs font-semibold text-info">{match.home.name}</span>
-              <span className="text-xs font-semibold text-warning">{match.away.name}</span>
+          <div className="px-5 py-4">
+            <div className="flex justify-between pb-2 mb-1 border-b border-[#d9e2d7]">
+              <span className="text-xs font-semibold text-[#2d7f4f]">{match.home.name}</span>
+              <span className="text-xs font-semibold text-[#b45309]">{match.away.name}</span>
             </div>
 
             {hasMatchStats ? (
               <>
                 {(sh?.possession_pct != null || sa?.possession_pct != null) && (
-                  <div className="py-2.5 border-b border-b0">
+                  <div className="py-2.5 border-b border-[#d9e2d7]">
                     <div className="flex justify-between items-baseline mb-1.5">
-                      <span className="font-mono text-sm font-bold text-info tabular-nums">{sh?.possession_pct != null ? `${Math.round(sh.possession_pct)}%` : "—"}</span>
-                      <span className="text-2xs uppercase tracking-widest text-t2">Possession</span>
-                      <span className="font-mono text-sm font-bold text-warning tabular-nums">{sa?.possession_pct != null ? `${Math.round(sa.possession_pct)}%` : "—"}</span>
+                      <span className="font-mono text-sm font-bold text-[#2d7f4f] tabular-nums">{sh?.possession_pct != null ? `${Math.round(sh.possession_pct)}%` : "—"}</span>
+                      <span className="text-[10px] uppercase tracking-widest text-[#667066]">Possession</span>
+                      <span className="font-mono text-sm font-bold text-[#b45309] tabular-nums">{sa?.possession_pct != null ? `${Math.round(sa.possession_pct)}%` : "—"}</span>
                     </div>
                     <div className="h-2 rounded-full overflow-hidden flex">
-                      <div className="h-full bg-info" style={{ width: `${sh?.possession_pct ?? 50}%` }} />
-                      <div className="h-full bg-warning flex-1" />
+                      <div className="h-full bg-[#2edb6c]" style={{ width: `${sh?.possession_pct ?? 50}%` }} />
+                      <div className="h-full bg-[#f59e0b] flex-1" />
                     </div>
                   </div>
                 )}
@@ -1045,7 +1056,7 @@ function StatsTab({ match }: { match: MatchProps["match"] }) {
         </Panel>
 
         <Panel title="Pre-Match Form Averages" subtitle="Last 5 games" padded={false}>
-          <div className="panel-content-tight">
+          <div className="px-5 py-4">
             {(fh || fa) ? (
               <>
                 <StatBar label="Goals scored avg" homeVal={fh?.goals_scored_avg} awayVal={fa?.goals_scored_avg} />
@@ -1071,10 +1082,10 @@ function StatsTab({ match }: { match: MatchProps["match"] }) {
           if (!advH && !advA && !fh2 && !fa2) return null;
           return (
             <Panel title="Advanced Metrics" subtitle="Pressing · Big Chances · Set Pieces" padded={false}>
-              <div className="panel-content-tight">
-                <div className="flex justify-between pb-2 mb-1 border-b border-b0">
-                  <span className="text-xs font-semibold text-info">{match.home.name}</span>
-                  <span className="text-xs font-semibold text-warning">{match.away.name}</span>
+              <div className="px-5 py-4">
+                <div className="flex justify-between pb-2 mb-1 border-b border-[#d9e2d7]">
+                  <span className="text-xs font-semibold text-[#2d7f4f]">{match.home.name}</span>
+                  <span className="text-xs font-semibold text-[#b45309]">{match.away.name}</span>
                 </div>
                 <StatBar label="PPDA (lower = more press)" homeVal={advH?.ppda} awayVal={advA?.ppda} lowerBetter fmt={v => v.toFixed(2)} />
                 <StatBar label="Big Chances Created" homeVal={advH?.big_chances_created} awayVal={advA?.big_chances_created} />
@@ -1125,14 +1136,14 @@ function StatsTab({ match }: { match: MatchProps["match"] }) {
             <Panel title="Key Leaders" subtitle="Top rated per team">
               {topH.length > 0 && (
                 <div className="mb-3">
-                  <p className="text-xs font-semibold text-info mb-1">{match.home.name}</p>
+                  <p className="text-xs font-semibold text-[#2d7f4f] mb-1">{match.home.name}</p>
                   {topH.map((p: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between py-1 border-b border-b0 last:border-0">
+                    <div key={i} className="flex items-center justify-between py-1 border-b border-[#d9e2d7] last:border-0">
                       <div className="min-w-0">
-                        <span className="text-xs text-t0 truncate">{p.name}</span>
-                        {p.position && <span className="text-2xs text-t2 ml-1">{p.position}</span>}
+                        <span className="text-xs text-[#111315] truncate">{p.name}</span>
+                        {p.position && <span className="text-[10px] text-[#667066] ml-1">{p.position}</span>}
                       </div>
-                      <span className={cn("font-mono text-xs font-bold tabular-nums shrink-0", (p.rating ?? 0) >= 7.5 ? "text-positive" : "text-t1")}>
+                      <span className={cn("font-mono text-xs font-bold tabular-nums shrink-0", (p.rating ?? 0) >= 7.5 ? "text-[#2d7f4f]" : "text-[#4f5950]")}>
                         {p.rating?.toFixed(1) ?? "—"}
                       </span>
                     </div>
@@ -1140,15 +1151,15 @@ function StatsTab({ match }: { match: MatchProps["match"] }) {
                 </div>
               )}
               {topA.length > 0 && (
-                <div className="border-t border-b0 pt-3">
-                  <p className="text-xs font-semibold text-warning mb-1">{match.away.name}</p>
+                <div className="border-t border-[#d9e2d7] pt-3">
+                  <p className="text-xs font-semibold text-[#b45309] mb-1">{match.away.name}</p>
                   {topA.map((p: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between py-1 border-b border-b0 last:border-0">
+                    <div key={i} className="flex items-center justify-between py-1 border-b border-[#d9e2d7] last:border-0">
                       <div className="min-w-0">
-                        <span className="text-xs text-t0 truncate">{p.name}</span>
-                        {p.position && <span className="text-2xs text-t2 ml-1">{p.position}</span>}
+                        <span className="text-xs text-[#111315] truncate">{p.name}</span>
+                        {p.position && <span className="text-[10px] text-[#667066] ml-1">{p.position}</span>}
                       </div>
-                      <span className={cn("font-mono text-xs font-bold tabular-nums shrink-0", (p.rating ?? 0) >= 7.5 ? "text-positive" : "text-t1")}>
+                      <span className={cn("font-mono text-xs font-bold tabular-nums shrink-0", (p.rating ?? 0) >= 7.5 ? "text-[#2d7f4f]" : "text-[#4f5950]")}>
                         {p.rating?.toFixed(1) ?? "—"}
                       </span>
                     </div>
@@ -1173,24 +1184,24 @@ function StatsTab({ match }: { match: MatchProps["match"] }) {
           return (
             <Panel title="Player Stats" padded={false}>
               <div className="overflow-x-auto">
-                <table className="data-table compact w-full">
+                <table className="w-full text-xs">
                   <thead>
-                    <tr>
-                      <th className="text-left">Player</th>
-                      <th className="text-center">G</th>
-                      <th className="text-center">A</th>
-                      <th className="text-center">xG</th>
-                      <th className="text-right">Rtg</th>
+                    <tr className="border-b border-[#d9e2d7]">
+                      <th className="text-left px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#667066]">Player</th>
+                      <th className="text-center px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#667066]">G</th>
+                      <th className="text-center px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#667066]">A</th>
+                      <th className="text-center px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#667066]">xG</th>
+                      <th className="text-right px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#667066]">Rtg</th>
                     </tr>
                   </thead>
                   <tbody>
                     {all.slice(0, 10).map((p: any, i: number) => (
-                      <tr key={i}>
-                        <td className={cn("text-xs", p.side === "home" ? "text-info" : "text-warning")}>{p.name}</td>
-                        <td className="text-center font-mono text-xs tabular-nums">{p.goals ?? "—"}</td>
-                        <td className="text-center font-mono text-xs tabular-nums">{p.assists ?? "—"}</td>
-                        <td className="text-center font-mono text-xs tabular-nums">{p.xg != null ? p.xg.toFixed(2) : "—"}</td>
-                        <td className={cn("text-right font-mono text-xs font-bold tabular-nums", (p.rating ?? 0) >= 7.5 ? "text-positive" : "text-t1")}>{p.rating?.toFixed(1) ?? "—"}</td>
+                      <tr key={i} className="border-b border-[#d9e2d7] last:border-0">
+                        <td className={cn("px-5 py-2", p.side === "home" ? "text-[#2d7f4f]" : "text-[#b45309]")}>{p.name}</td>
+                        <td className="text-center px-3 py-2 font-mono tabular-nums text-[#4f5950]">{p.goals ?? "—"}</td>
+                        <td className="text-center px-3 py-2 font-mono tabular-nums text-[#4f5950]">{p.assists ?? "—"}</td>
+                        <td className="text-center px-3 py-2 font-mono tabular-nums text-[#4f5950]">{p.xg != null ? p.xg.toFixed(2) : "—"}</td>
+                        <td className={cn("text-right px-5 py-2 font-mono font-bold tabular-nums", (p.rating ?? 0) >= 7.5 ? "text-[#2d7f4f]" : "text-[#4f5950]")}>{p.rating?.toFixed(1) ?? "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1208,11 +1219,11 @@ function StatsTab({ match }: { match: MatchProps["match"] }) {
 
 function eventBorderColor(type: string | null | undefined): string {
   const t = (type ?? "").toLowerCase();
-  if (t.includes("goal")) return "border-l-positive";
-  if (t.includes("yellow")) return "border-l-warning";
-  if (t.includes("red")) return "border-l-negative";
-  if (t.includes("sub")) return "border-l-info";
-  return "border-l-t2";
+  if (t.includes("goal")) return "border-l-[#2edb6c]";
+  if (t.includes("yellow")) return "border-l-[#d97706]";
+  if (t.includes("red")) return "border-l-[#dc2626]";
+  if (t.includes("sub")) return "border-l-[#2d7f4f]";
+  return "border-l-[#d9e2d7]";
 }
 
 function eventIcon(type: string): string {
@@ -1248,31 +1259,31 @@ function TimelineTab({ match }: { match: MatchProps["match"] }) {
                   ? `${ev.score_home}–${ev.score_away}`
                   : null;
                 return (
-                  <div key={i} className={cn("grid grid-cols-[1fr_auto_1fr] items-start gap-2 py-2 border-b border-b0 last:border-b-0")}>
+                  <div key={i} className="grid grid-cols-[1fr_auto_1fr] items-start gap-2 py-2 border-b border-[#d9e2d7] last:border-b-0">
                     {/* Home side */}
                     <div className={cn("flex flex-col items-start gap-0.5", !isHome && "opacity-0")}>
                       <div className="flex items-center gap-1.5">
                         <span className="text-base leading-none">{eventIcon(ev.type)}</span>
-                        <span className="text-xs text-t0 font-medium">{label}</span>
-                        {ev.is_own_goal && <span className="text-2xs text-negative">(OG)</span>}
-                        {ev.is_penalty && <span className="text-2xs text-t2">(P)</span>}
+                        <span className="text-xs text-[#111315] font-medium">{label}</span>
+                        {ev.is_own_goal && <span className="text-[10px] text-[#dc2626]">(OG)</span>}
+                        {ev.is_penalty && <span className="text-[10px] text-[#667066]">(P)</span>}
                       </div>
-                      {ev.player_out && <span className="text-2xs text-t2 pl-6">↑ {ev.player_out}</span>}
+                      {ev.player_out && <span className="text-[10px] text-[#667066] pl-6">↑ {ev.player_out}</span>}
                     </div>
                     {/* Center minute + score */}
                     <div className="flex flex-col items-center gap-0.5 shrink-0">
-                      <span className={cn("font-mono text-xs font-bold tabular-nums px-2 py-0.5 rounded", eventBorderColor(ev.type).replace("border-l-", "text-"))}>{minuteStr}&apos;</span>
-                      {scoreStr && <span className="font-mono text-2xs text-t2 tabular-nums">{scoreStr}</span>}
+                      <span className="font-mono text-xs font-bold tabular-nums px-2 py-0.5 rounded-full bg-[#f7f8f5] border border-[#d9e2d7] text-[#4f5950]">{minuteStr}&apos;</span>
+                      {scoreStr && <span className="font-mono text-[10px] text-[#667066] tabular-nums">{scoreStr}</span>}
                     </div>
                     {/* Away side */}
                     <div className={cn("flex flex-col items-end gap-0.5", isHome && "opacity-0")}>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-t0 font-medium">{label}</span>
+                        <span className="text-xs text-[#111315] font-medium">{label}</span>
                         <span className="text-base leading-none">{eventIcon(ev.type)}</span>
-                        {ev.is_own_goal && <span className="text-2xs text-negative">(OG)</span>}
-                        {ev.is_penalty && <span className="text-2xs text-t2">(P)</span>}
+                        {ev.is_own_goal && <span className="text-[10px] text-[#dc2626]">(OG)</span>}
+                        {ev.is_penalty && <span className="text-[10px] text-[#667066]">(P)</span>}
                       </div>
-                      {ev.player_out && <span className="text-2xs text-t2 pr-6">↑ {ev.player_out}</span>}
+                      {ev.player_out && <span className="text-[10px] text-[#667066] pr-6">↑ {ev.player_out}</span>}
                     </div>
                   </div>
                 );
@@ -1312,23 +1323,23 @@ function H2HTab({ match }: { match: MatchProps["match"] }) {
             <>
               <div className="grid grid-cols-3 gap-3 mb-4">
                 {[
-                  { label: `${match.home.name.split(" ")[0]} wins`, v: homeWins, pct: total ? Math.round(homeWins / total * 100) : 0, col: "text-info" },
-                  { label: "Draws", v: draws, pct: total ? Math.round(draws / total * 100) : 0, col: "text-t1" },
-                  { label: `${match.away.name.split(" ")[0]} wins`, v: awayWins, pct: total ? Math.round(awayWins / total * 100) : 0, col: "text-warning" },
+                  { label: `${match.home.name.split(" ")[0]} wins`, v: homeWins, pct: total ? Math.round(homeWins / total * 100) : 0, col: "text-[#2d7f4f]" },
+                  { label: "Draws", v: draws, pct: total ? Math.round(draws / total * 100) : 0, col: "text-[#4f5950]" },
+                  { label: `${match.away.name.split(" ")[0]} wins`, v: awayWins, pct: total ? Math.round(awayWins / total * 100) : 0, col: "text-[#b45309]" },
                 ].map(k => (
                   <div key={k.label} className="flex flex-col gap-0.5">
-                    <p className="text-2xs text-t2">{k.label}</p>
+                    <p className="text-[10px] text-[#667066]">{k.label}</p>
                     <p className={cn("font-mono text-2xl font-bold tabular-nums", k.col)}>{k.v}</p>
-                    <p className="text-2xs text-t2 font-mono">{k.pct}%</p>
+                    <p className="text-[10px] text-[#667066] font-mono">{k.pct}%</p>
                   </div>
                 ))}
               </div>
-              <div className="h-1.5 rounded-full bg-bg0 overflow-hidden flex mb-3">
-                <div className="h-full bg-info" style={{ width: `${total ? homeWins / total * 100 : 33}%` }} />
-                <div className="h-full bg-border1" style={{ width: `${total ? draws / total * 100 : 34}%` }} />
-                <div className="h-full bg-warning flex-1" />
+              <div className="h-1.5 rounded-full bg-[#f7f8f5] overflow-hidden flex mb-3">
+                <div className="h-full bg-[#2edb6c]" style={{ width: `${total ? homeWins / total * 100 : 33}%` }} />
+                <div className="h-full bg-[#d9e2d7]" style={{ width: `${total ? draws / total * 100 : 34}%` }} />
+                <div className="h-full bg-[#f59e0b] flex-1" />
               </div>
-              {avgGoals != null && <p className="text-2xs text-t2 font-mono">Avg goals/game: {avgGoals.toFixed(1)}</p>}
+              {avgGoals != null && <p className="text-[10px] text-[#667066] font-mono">Avg goals/game: {avgGoals.toFixed(1)}</p>}
             </>
           ) : (
             <EmptyState icon={Users} title="No H2H history" desc="These teams haven't met in our database." />
@@ -1338,14 +1349,14 @@ function H2HTab({ match }: { match: MatchProps["match"] }) {
         <Panel title="Recent Meetings" subtitle={`Last ${h2h?.recent_matches?.length ?? 0}`} padded={false}>
           {h2h?.recent_matches && h2h.recent_matches.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="data-table compact w-full">
+              <table className="w-full text-xs">
                 <thead>
-                  <tr>
-                    <th className="text-left">Date</th>
-                    <th className="text-right">Home</th>
-                    <th className="text-center">Score</th>
-                    <th className="text-left">Away</th>
-                    <th className="text-right">Winner</th>
+                  <tr className="border-b border-[#d9e2d7]">
+                    <th className="text-left px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#667066]">Date</th>
+                    <th className="text-right px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#667066]">Home</th>
+                    <th className="text-center px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#667066]">Score</th>
+                    <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#667066]">Away</th>
+                    <th className="text-right px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#667066]">Winner</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1356,14 +1367,14 @@ function H2HTab({ match }: { match: MatchProps["match"] }) {
                     const homeName = rm.home_name || match.home.name;
                     const awayName = rm.away_name || match.away.name;
                     const winnerName = norm === "home_win" ? homeName : norm === "away_win" ? awayName : norm === "draw" ? "Draw" : "—";
-                    const winCol = norm === "home_win" ? "text-info" : norm === "away_win" ? "text-warning" : "text-t2";
+                    const winCol = norm === "home_win" ? "text-[#2d7f4f]" : norm === "away_win" ? "text-[#b45309]" : "text-[#667066]";
                     return (
-                      <tr key={i}>
-                        <td className="text-t2 font-mono text-2xs whitespace-nowrap">{fmtDateShort(rm.date)}</td>
-                        <td className="text-right text-t0 text-xs truncate max-w-[80px]">{homeName}</td>
-                        <td className="text-center font-mono font-bold text-t0 whitespace-nowrap">{rm.home_score ?? "—"} – {rm.away_score ?? "—"}</td>
-                        <td className="text-left text-t0 text-xs truncate max-w-[80px]">{awayName}</td>
-                        <td className={cn("text-right text-2xs font-mono font-bold whitespace-nowrap", winCol)}>{winnerName}</td>
+                      <tr key={i} className="border-b border-[#d9e2d7] last:border-0">
+                        <td className="text-[#667066] font-mono text-[10px] whitespace-nowrap px-5 py-2">{fmtDateShort(rm.date)}</td>
+                        <td className="text-right text-[#111315] truncate max-w-[80px] px-3 py-2">{homeName}</td>
+                        <td className="text-center font-mono font-bold text-[#111315] whitespace-nowrap px-3 py-2">{rm.home_score ?? "—"} – {rm.away_score ?? "—"}</td>
+                        <td className="text-left text-[#111315] truncate max-w-[80px] px-3 py-2">{awayName}</td>
+                        <td className={cn("text-right text-[10px] font-mono font-bold whitespace-nowrap px-5 py-2", winCol)}>{winnerName}</td>
                       </tr>
                     );
                   })}
@@ -1415,24 +1426,24 @@ function EloTab({ match, eloHome, eloAway }: MatchProps) {
     <SideGrid>
       <MainCol>
         {/* ELO ratings */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           {[
-            { elo: eh, name: match.home.name, col: "text-info", bgCol: "bg-info/10 border-info/20" },
-            { elo: ea, name: match.away.name, col: "text-warning", bgCol: "bg-warning/10 border-warning/20" },
+            { elo: eh, name: match.home.name, col: "text-[#2d7f4f]", bgCol: "bg-[#f6faf5] border-[#d9e2d7]" },
+            { elo: ea, name: match.away.name, col: "text-[#b45309]", bgCol: "bg-[#fffbeb] border-[#fde68a]" },
           ].map(({ elo, name, col, bgCol }) => (
-            <div key={name} className="card">
-              <div className="panel-header">
-                <span className={cn("panel-title", col)}>{name.split(" ")[0]}</span>
-                <span className="text-2xs text-t2 truncate ml-2 max-w-[120px]">{name}</span>
+            <div key={name} className="bg-white border border-[#d9e2d7] rounded-[24px] overflow-hidden shadow-[0_4px_20px_rgba(17,19,21,0.05)]">
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#d9e2d7]">
+                <span className={cn("text-[11px] font-semibold uppercase tracking-[0.16em]", col)}>{name.split(" ")[0]}</span>
+                <span className="text-[10px] text-[#7b857b] truncate ml-2 max-w-[120px]">{name}</span>
               </div>
-              <div className="panel-content">
+              <div className="px-5 py-4">
                 {elo ? (
                   <>
-                    <div className={cn("inline-flex items-center justify-center rounded-lg px-3 py-1 mb-2 border", bgCol)}>
+                    <div className={cn("inline-flex items-center justify-center rounded-[14px] px-4 py-2 mb-2 border", bgCol)}>
                       <span className={cn("font-mono text-3xl font-bold tabular-nums", col)}>{Math.round(elo.rating)}</span>
                     </div>
                     <Delta v={elo.rating_change} suffix="last match" />
-                    <p className="text-2xs text-t2 mt-1">Global ELO rating</p>
+                    <p className="text-[10px] text-[#7b857b] mt-1">Global ELO rating</p>
                   </>
                 ) : <EmptyState title="No ELO data" />}
               </div>
@@ -1448,21 +1459,21 @@ function EloTab({ match, eloHome, eloAway }: MatchProps) {
               <ProbBar label="Draw" pct={ep.draw * 100} color={colors.border1} size="md" />
               <ProbBar label={`Away Win — ${match.away.name}`} pct={ep.away * 100} color={colors.warning} size="md" />
             </div>
-            <div className="flex gap-4 pt-2 border-t border-b0">
+            <div className="flex gap-4 pt-2 border-t border-[#d9e2d7]">
               <div>
-                <p className="text-2xs text-t2">Δ ELO (Home − Away)</p>
-                <p className={cn("font-mono text-lg font-bold tabular-nums", (eh.rating - ea.rating) >= 0 ? "text-positive" : "text-negative")}>
+                <p className="text-[10px] text-[#667066]">Δ ELO (Home − Away)</p>
+                <p className={cn("font-mono text-lg font-bold tabular-nums", (eh.rating - ea.rating) >= 0 ? "text-[#2d7f4f]" : "text-[#dc2626]")}>
                   {(eh.rating - ea.rating) >= 0 ? "+" : ""}{(eh.rating - ea.rating).toFixed(1)}
                 </p>
               </div>
               {eloWin != null && (
                 <div>
-                  <p className="text-2xs text-t2">Home win % (ELO model)</p>
-                  <p className="font-mono text-lg font-bold text-t0 tabular-nums">{eloWin}%</p>
+                  <p className="text-[10px] text-[#667066]">Home win % (ELO model)</p>
+                  <p className="font-mono text-lg font-bold text-[#111315] tabular-nums">{eloWin}%</p>
                 </div>
               )}
             </div>
-            <p className="text-2xs text-t2 mt-2 pt-2 border-t border-b0">
+            <p className="text-[10px] text-[#7b857b] mt-2 pt-2 border-t border-[#d9e2d7]">
               Formula: P(home) = 1 / (1 + 10^((elo_away − (elo_home + 65)) / 400)). Draw estimated from ELO divergence.
             </p>
           </Panel>
@@ -1472,11 +1483,11 @@ function EloTab({ match, eloHome, eloAway }: MatchProps) {
         {hasChart && (
           <Panel title={`Rating History`} subtitle={`Last ${Math.max(eloHome.length, eloAway.length)} matches`}>
             <div className="flex gap-4 mb-3">
-              <span className="flex items-center gap-1.5 text-2xs text-t1">
-                <span className="w-6 h-0.5 bg-info inline-block" />{match.home.name}
+              <span className="flex items-center gap-1.5 text-[10px] text-[#4f5950]">
+                <span className="w-6 h-0.5 bg-[#2edb6c] inline-block" />{match.home.name}
               </span>
-              <span className="flex items-center gap-1.5 text-2xs text-t1">
-                <span className="w-6 h-0.5 bg-warning inline-block" />{match.away.name}
+              <span className="flex items-center gap-1.5 text-[10px] text-[#4f5950]">
+                <span className="w-6 h-0.5 bg-[#f59e0b] inline-block" />{match.away.name}
               </span>
             </div>
             <ResponsiveContainer width="100%" height={240}>
@@ -1514,7 +1525,7 @@ function EloTab({ match, eloHome, eloAway }: MatchProps) {
           </div>
         </Panel>
         <Panel title="ELO History Notes">
-          <p className="text-xs text-t2">
+          <p className="text-xs text-[#667066]">
             ELO ratings update after every match. Home advantage of 65 ELO points is applied before computing expected score. Draw is treated as 0.5 win for both teams.
           </p>
         </Panel>
@@ -1544,7 +1555,10 @@ function ModelTab({ match }: { match: MatchProps["match"] }) {
         {/* Probabilities */}
         <Panel title="Prediction" subtitle={mdl ? `v${mdl.version}` : undefined}
           badge={match.confidence != null ? (
-            <span className={cn("badge", match.confidence >= 60 ? "badge-positive" : match.confidence >= 40 ? "badge-warning" : "badge-muted")}>
+            <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+              match.confidence >= 60 ? "bg-[#dcfce7] border-[#bbf7d0] text-[#15803d]"
+              : match.confidence >= 40 ? "bg-[#fef9c3] border-[#fde68a] text-[#854d0e]"
+              : "bg-[#f7f8f5] border-[#d9e2d7] text-[#667066]")}>
               {match.confidence}% conf
             </span>
           ) : undefined}>
@@ -1557,18 +1571,18 @@ function ModelTab({ match }: { match: MatchProps["match"] }) {
               </div>
 
               {fo && (
-                <div className="border-t border-b0 pt-3">
-                  <p className="label mb-2">Fair Odds</p>
+                <div className="border-t border-[#d9e2d7] pt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#667066] mb-2">Fair Odds</p>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { label: "Home", prob: p.home_win, odds: fo.home_win, col: "text-info" },
-                      ...(fo.draw != null && fo.draw > 0 ? [{ label: "Draw", prob: p.draw, odds: fo.draw, col: "text-t1" }] : []),
-                      { label: "Away", prob: p.away_win, odds: fo.away_win, col: "text-warning" },
+                      { label: "Home", prob: p.home_win, odds: fo.home_win, col: "text-[#2d7f4f]" },
+                      ...(fo.draw != null && fo.draw > 0 ? [{ label: "Draw", prob: p.draw, odds: fo.draw, col: "text-[#4f5950]" }] : []),
+                      { label: "Away", prob: p.away_win, odds: fo.away_win, col: "text-[#b45309]" },
                     ].map(row => (
-                      <div key={row.label} className="bg-bg0 rounded p-2">
-                        <p className={cn("text-2xs text-t2 mb-0.5", row.col && "text-t2")}>{row.label}</p>
+                      <div key={row.label} className="bg-[#f7f8f5] rounded-[14px] border border-[#d9e2d7] p-3">
+                        <p className="text-[10px] text-[#667066] mb-0.5">{row.label}</p>
                         <p className={cn("font-mono text-lg font-bold tabular-nums", row.col)}>{row.odds?.toFixed(2) ?? "—"}</p>
-                        <p className="text-2xs text-t2 font-mono">{row.prob != null ? `${Math.round(row.prob * 100)}%` : "—"}</p>
+                        <p className="text-[10px] text-[#7b857b] font-mono">{row.prob != null ? `${Math.round(row.prob * 100)}%` : "—"}</p>
                       </div>
                     ))}
                   </div>
@@ -1583,8 +1597,8 @@ function ModelTab({ match }: { match: MatchProps["match"] }) {
           <Panel title="Score Distribution" subtitle={`${sim.n_simulations.toLocaleString()} simulations`}>
             {sim.mean_home_goals != null && sim.mean_away_goals != null && (
               <div className="flex gap-6 mb-3">
-                <div><p className="text-2xs text-t2">Exp home goals</p><p className="font-mono text-xl font-bold text-info tabular-nums">{sim.mean_home_goals.toFixed(2)}</p></div>
-                <div><p className="text-2xs text-t2">Exp away goals</p><p className="font-mono text-xl font-bold text-warning tabular-nums">{sim.mean_away_goals.toFixed(2)}</p></div>
+                <div><p className="text-[10px] text-[#667066]">Exp home goals</p><p className="font-mono text-xl font-bold text-[#2d7f4f] tabular-nums">{sim.mean_home_goals.toFixed(2)}</p></div>
+                <div><p className="text-[10px] text-[#667066]">Exp away goals</p><p className="font-mono text-xl font-bold text-[#b45309] tabular-nums">{sim.mean_away_goals.toFixed(2)}</p></div>
               </div>
             )}
             <ResponsiveContainer width="100%" height={160}>
@@ -1603,9 +1617,9 @@ function ModelTab({ match }: { match: MatchProps["match"] }) {
               {sim.distribution.slice(0, 10).map(s => {
                 const [h, a] = s.score.split("-").map(Number);
                 return (
-                  <div key={s.score} className="flex flex-col items-center py-1.5 bg-bg0 rounded border border-b0">
-                    <span className={cn("font-mono text-xs font-bold", h > a ? "text-info" : h < a ? "text-warning" : "text-t2")}>{s.score}</span>
-                    <span className="font-mono text-2xs text-t2 tabular-nums">{(s.probability * 100).toFixed(1)}%</span>
+                  <div key={s.score} className="flex flex-col items-center py-1.5 bg-[#f7f8f5] rounded-[10px] border border-[#d9e2d7]">
+                    <span className={cn("font-mono text-xs font-bold", h > a ? "text-[#2d7f4f]" : h < a ? "text-[#b45309]" : "text-[#667066]")}>{s.score}</span>
+                    <span className="font-mono text-[10px] text-[#667066] tabular-nums">{(s.probability * 100).toFixed(1)}%</span>
                   </div>
                 );
               })}
@@ -1620,13 +1634,13 @@ function ModelTab({ match }: { match: MatchProps["match"] }) {
               {drv.map((d, i) => (
                 <div key={i} className="flex items-center gap-3">
                   <div className="w-32 shrink-0">
-                    <p className="text-2xs text-t1 font-mono truncate">{d.feature}</p>
-                    {d.value != null && <p className="text-2xs text-t2 font-mono tabular-nums">{d.value.toFixed(2)}</p>}
+                    <p className="text-[10px] text-[#4f5950] font-mono truncate">{d.feature}</p>
+                    {d.value != null && <p className="text-[10px] text-[#667066] font-mono tabular-nums">{d.value.toFixed(2)}</p>}
                   </div>
-                  <div className="flex-1 h-1.5 rounded-full bg-bg0">
-                    <div className="h-full rounded-full bg-accent" style={{ width: `${(d.importance / maxD) * 100}%`, opacity: Math.max(0.3, 0.85 - i * 0.07) }} />
+                  <div className="flex-1 h-1.5 rounded-full bg-[#f7f8f5]">
+                    <div className="h-full rounded-full bg-[#2edb6c]" style={{ width: `${(d.importance / maxD) * 100}%`, opacity: Math.max(0.3, 0.85 - i * 0.07) }} />
                   </div>
-                  <span className="font-mono text-2xs text-t1 tabular-nums w-8 text-right shrink-0">{(d.importance * 100).toFixed(0)}%</span>
+                  <span className="font-mono text-[10px] text-[#4f5950] tabular-nums w-8 text-right shrink-0">{(d.importance * 100).toFixed(0)}%</span>
                 </div>
               ))}
             </div>
@@ -1636,7 +1650,7 @@ function ModelTab({ match }: { match: MatchProps["match"] }) {
 
       <SideCol>
         {/* Model info */}
-        <Panel title="Model Info" badge={<span className="badge badge-info text-2xs">Live</span>}>
+        <Panel title="Model Info" badge={<span className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#dbeafe] px-2 py-0.5 text-[10px] font-semibold text-[#1d4ed8]">Live</span>}>
           {mdl ? (
             <div className="flex flex-col gap-0">
               <MetricRow label="Version" value={mdl.version} mono={false} />
@@ -1653,14 +1667,14 @@ function ModelTab({ match }: { match: MatchProps["match"] }) {
           <div className="flex flex-col gap-2">
             {match.confidence != null ? (
               <div className="flex flex-col gap-1.5">
-                <div className="flex justify-between text-2xs mb-0.5">
-                  <span className="text-t2">Model confidence</span>
-                  <span className={cn("font-mono font-bold", match.confidence >= 60 ? "text-positive" : match.confidence >= 40 ? "text-warning" : "text-negative")}>{match.confidence}%</span>
+                <div className="flex justify-between text-[10px] mb-0.5">
+                  <span className="text-[#667066]">Model confidence</span>
+                  <span className={cn("font-mono font-bold", match.confidence >= 60 ? "text-[#2d7f4f]" : match.confidence >= 40 ? "text-[#b45309]" : "text-[#dc2626]")}>{match.confidence}%</span>
                 </div>
-                <div className="h-2 rounded-full bg-bg0">
-                  <div className={cn("h-full rounded-full", match.confidence >= 60 ? "bg-positive" : match.confidence >= 40 ? "bg-warning" : "bg-negative")} style={{ width: `${match.confidence}%` }} />
+                <div className="h-2 rounded-full bg-[#f7f8f5]">
+                  <div className={cn("h-full rounded-full", match.confidence >= 60 ? "bg-[#2edb6c]" : match.confidence >= 40 ? "bg-[#f59e0b]" : "bg-[#dc2626]")} style={{ width: `${match.confidence}%` }} />
                 </div>
-                <p className="text-2xs text-t2 mt-1">
+                <p className="text-[10px] text-[#667066] mt-1">
                   {match.confidence >= 65 ? "High confidence pick — model has strong signal."
                     : match.confidence >= 45 ? "Moderate confidence — bet sizing suggested at half-unit."
                     : "Low confidence — minimal edge detected. Consider skipping."}
@@ -1672,20 +1686,20 @@ function ModelTab({ match }: { match: MatchProps["match"] }) {
 
         <Panel title="Sensitivity Notes">
           <div className="flex flex-col gap-1.5">
-            <p className="text-2xs text-t2">Factors that would shift the prediction:</p>
+            <p className="text-[10px] text-[#667066]">Factors that would shift the prediction:</p>
             <ul className="space-y-1">
               {[
                 "Missing key striker → home prob −5–8%",
                 "Wet pitch → fewer goals, draw prob +3%",
                 "Away rotation → away prob −10%",
               ].map((note, i) => (
-                <li key={i} className="flex items-start gap-1.5 text-2xs text-t2">
-                  <AlertTriangle size={10} className="text-warning shrink-0 mt-0.5" />
+                <li key={i} className="flex items-start gap-1.5 text-[10px] text-[#667066]">
+                  <AlertTriangle size={10} className="text-[#d97706] shrink-0 mt-0.5" />
                   {note}
                 </li>
               ))}
             </ul>
-            <p className="text-2xs text-t2 mt-1 italic">Sensitivity analysis requires lineup data.</p>
+            <p className="text-[10px] text-[#7b857b] mt-1 italic">Sensitivity analysis requires lineup data.</p>
           </div>
         </Panel>
 
@@ -1699,11 +1713,11 @@ function ModelTab({ match }: { match: MatchProps["match"] }) {
                 const prob = match.probabilities ? (key === 'home_ml' ? match.probabilities.home_win : key === 'draw_ml' ? (match.probabilities as any).draw ?? 0 : match.probabilities.away_win) : null;
                 const edge = prob != null && val != null ? (prob - 1 / Number(val)) * 100 : null;
                 return (
-                  <div key={key} className="flex-1 card p-3 flex flex-col items-center gap-1">
-                    <span className="text-2xs text-t2">{label}</span>
-                    <span className="text-lg font-bold font-mono text-t0">{Number(val).toFixed(2)}</span>
+                  <div key={key} className="flex-1 bg-[#f7f8f5] border border-[#d9e2d7] rounded-[14px] p-3 flex flex-col items-center gap-1">
+                    <span className="text-[10px] text-[#667066]">{label}</span>
+                    <span className="text-lg font-bold font-mono text-[#111315]">{Number(val).toFixed(2)}</span>
                     {edge != null && (
-                      <span className={cn("text-2xs font-semibold font-mono", edge > 0 ? "text-positive" : "text-negative")}>
+                      <span className={cn("text-[10px] font-semibold font-mono", edge > 0 ? "text-[#2d7f4f]" : "text-[#dc2626]")}>
                         {edge > 0 ? "+" : ""}{edge.toFixed(1)}%
                       </span>
                     )}
@@ -1740,19 +1754,19 @@ function DataCompletenessPanel({ match, eloHome, eloAway }: MatchProps) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-2xs text-t2">Data coverage</span>
-        <span className="font-mono text-xs font-bold text-t0 tabular-nums">{score}/{checks.length}</span>
+        <span className="text-[10px] text-[#667066]">Data coverage</span>
+        <span className="font-mono text-xs font-bold text-[#111315] tabular-nums">{score}/{checks.length}</span>
       </div>
-      <div className="h-1.5 rounded-full bg-bg0 mb-2 overflow-hidden">
-        <div className="h-full rounded-full bg-positive" style={{ width: `${score / checks.length * 100}%` }} />
+      <div className="h-1.5 rounded-full bg-[#f7f8f5] mb-2 overflow-hidden">
+        <div className="h-full rounded-full bg-[#2edb6c]" style={{ width: `${score / checks.length * 100}%` }} />
       </div>
       <div className="flex flex-col gap-0">
         {checks.map(c => (
-          <div key={c.label} className="flex items-center gap-2 py-1 border-b border-b0 last:border-0">
+          <div key={c.label} className="flex items-center gap-2 py-1 border-b border-[#d9e2d7] last:border-0">
             {c.ok
-              ? <CheckCircle2 size={11} className="text-positive shrink-0" />
-              : <XCircle size={11} className="text-t2 shrink-0" />}
-            <span className={cn("text-2xs", c.ok ? "text-t1" : "text-t2")}>{c.label}</span>
+              ? <CheckCircle2 size={11} className="text-[#2d7f4f] shrink-0" />
+              : <XCircle size={11} className="text-[#d9e2d7] shrink-0" />}
+            <span className={cn("text-[10px]", c.ok ? "text-[#4f5950]" : "text-[#667066]")}>{c.label}</span>
           </div>
         ))}
       </div>
@@ -1771,16 +1785,16 @@ function ContextTab(props: MatchProps) {
       <MainCol>
         <Panel title="Scheduling & Rest">
           <div className="grid grid-cols-2 gap-4 mb-4">
-            {[{ label: match.home.name, f: fh, col: "text-info" }, { label: match.away.name, f: fa, col: "text-warning" }].map(({ label, f, col }) => (
+            {[{ label: match.home.name, f: fh, col: "text-[#2d7f4f]" }, { label: match.away.name, f: fa, col: "text-[#b45309]" }].map(({ label, f, col }) => (
               <div key={label}>
-                <p className={cn("text-2xs uppercase tracking-widest mb-1", col)}>{label.split(" ")[0]}</p>
-                <p className="font-mono text-2xl font-bold text-t0 tabular-nums">{f?.days_rest != null ? `${Math.round(f.days_rest)}d` : "—"}</p>
-                <p className="text-2xs text-t2">days since last game</p>
+                <p className={cn("text-[10px] uppercase tracking-widest mb-1", col)}>{label.split(" ")[0]}</p>
+                <p className="font-mono text-2xl font-bold text-[#111315] tabular-nums">{f?.days_rest != null ? `${Math.round(f.days_rest)}d` : "—"}</p>
+                <p className="text-[10px] text-[#667066]">days since last game</p>
               </div>
             ))}
           </div>
           {restDiff != null && (
-            <div className="border-t border-b0 pt-3">
+            <div className="border-t border-[#d9e2d7] pt-3">
               <MetricRow label="Rest advantage" value={`${restDiff >= 0 ? match.home.name.split(" ")[0] : match.away.name.split(" ")[0]} +${Math.abs(restDiff).toFixed(1)}d`} highlight={Math.abs(restDiff) >= 2 ? "positive" : undefined} />
             </div>
           )}
@@ -1794,15 +1808,15 @@ function ContextTab(props: MatchProps) {
               {ctx.attendance != null && <MetricRow label="Attendance" value={ctx.attendance.toLocaleString()} />}
               <MetricRow label="Neutral site" value={ctx.neutral_site ? "Yes" : "No"} />
               {ctx.temperature_c != null && (
-                <div className="flex items-center gap-1.5 py-1.5 border-b border-b0">
-                  <Thermometer size={12} className="text-t2" />
+                <div className="flex items-center gap-1.5 py-1.5 border-b border-[#d9e2d7]">
+                  <Thermometer size={12} className="text-[#667066]" />
                   <MetricRow label="Temperature" value={`${ctx.temperature_c}°C`} />
                 </div>
               )}
               {ctx.weather_desc && (
                 <div className="flex items-center gap-1.5 py-1.5">
-                  <Wind size={12} className="text-t2" />
-                  <span className="text-xs text-t0">{ctx.weather_desc}</span>
+                  <Wind size={12} className="text-[#667066]" />
+                  <span className="text-xs text-[#111315]">{ctx.weather_desc}</span>
                 </div>
               )}
             </div>
@@ -1848,16 +1862,16 @@ function ContextTab(props: MatchProps) {
               (match.h2h?.total_matches ?? 0) < 3 && { type: "info", msg: "Limited H2H history — low H2H signal" },
               match.status === "scheduled" && { type: "info", msg: "Lineups not yet confirmed" },
             ].filter(Boolean).map((flag, i) => flag && (
-              <div key={i} className={cn("flex items-start gap-1.5 p-2 rounded border text-2xs",
-                flag.type === "warning" ? "bg-warning/5 border-warning/20 text-warning"
-                  : flag.type === "negative" ? "bg-negative/5 border-negative/20 text-negative"
-                  : "bg-info/5 border-info/20 text-info")}>
+              <div key={i} className={cn("flex items-start gap-1.5 p-2.5 rounded-[12px] border text-[10px]",
+                flag.type === "warning" ? "bg-[#fef9c3] border-[#fde68a] text-[#854d0e]"
+                  : flag.type === "negative" ? "bg-[#fee2e2] border-[#fecaca] text-[#dc2626]"
+                  : "bg-[#dbeafe] border-[#bfdbfe] text-[#1d4ed8]")}>
                 <AlertTriangle size={10} className="shrink-0 mt-0.5" />
                 {flag.msg}
               </div>
             ))}
             {match.probabilities && match.elo_home && (
-              <div className="flex items-start gap-1.5 p-2 rounded border text-2xs bg-positive/5 border-positive/20 text-positive">
+              <div className="flex items-start gap-1.5 p-2.5 rounded-[12px] border text-[10px] bg-[#dcfce7] border-[#bbf7d0] text-[#15803d]">
                 <CheckCircle2 size={10} className="shrink-0 mt-0.5" />
                 Core analytics data loaded — page ready
               </div>
@@ -1886,20 +1900,29 @@ export function SoccerMatchDetail({ match, eloHome, eloAway }: MatchProps) {
   const highlights = match.highlights ?? [];
 
   return (
-    <div className="match-page-shell flex flex-col min-h-screen bg-bg0 max-w-screen-2xl mx-auto w-full px-3 md:px-4 py-4">
+    <div className="flex flex-col min-h-screen bg-[#f0f4ef] max-w-screen-2xl mx-auto w-full px-3 md:px-4 py-4 gap-3">
       {/* Header */}
-      <div className="match-hero-card overflow-hidden"><MatchHeader match={match} /></div>
+      <MatchHeader match={match} />
 
       {/* KPI strip */}
-      <div className="match-kpi-strip match-kpi-strip--soft overflow-hidden"><KpiStrip2Row match={match} /></div>
+      <KpiStrip2Row match={match} />
 
-      {match.status === "live" && <div className="match-live-wrap px-4 pb-1"><SoccerLivePanel match={match} /></div>}
+      {match.status === "live" && <div className="px-1 pb-1"><SoccerLivePanel match={match} /></div>}
 
       {/* Sticky tab bar */}
-      <div className="match-tabbar-wrap px-3 md:px-4">
-        <div className="match-tabbar max-w-screen-2xl mx-auto no-scrollbar">
+      <div className="sticky top-2 z-20 px-1">
+        <div className="bg-white border border-[#d9e2d7] rounded-full shadow-[0_4px_20px_rgba(17,19,21,0.08)] flex items-center gap-1 p-1 overflow-x-auto no-scrollbar max-w-screen-2xl mx-auto">
           {TABS.map(t => (
-            <button key={t.id} className="match-tab shrink-0" data-active={activeTab === t.id} onClick={() => setActiveTab(t.id)}>
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={cn(
+                "shrink-0 px-4 py-2 rounded-full text-[12px] font-semibold transition-all",
+                activeTab === t.id
+                  ? "bg-[#111315] text-white shadow-sm"
+                  : "text-[#667066] hover:text-[#111315] hover:bg-[#f7f8f5]"
+              )}
+            >
               {t.label}
             </button>
           ))}
@@ -1907,12 +1930,12 @@ export function SoccerMatchDetail({ match, eloHome, eloAway }: MatchProps) {
       </div>
 
       {/* Tab content */}
-      <div className="match-content-wrap flex-1 p-3 md:p-4 max-w-screen-2xl mx-auto w-full">
+      <div className="flex-1 max-w-screen-2xl mx-auto w-full">
         {activeTab === "overview"  && (
           <div className="flex flex-col gap-6">
             <OverviewTab match={match} />
             {standings && (
-              <div className="card p-5">
+              <div className="bg-white border border-[#d9e2d7] rounded-[24px] p-5 shadow-[0_4px_20px_rgba(17,19,21,0.05)]">
                 <StandingsTable
                   standings={standings}
                   homeTeamId={match.home.id}
@@ -1921,7 +1944,7 @@ export function SoccerMatchDetail({ match, eloHome, eloAway }: MatchProps) {
               </div>
             )}
             {highlights.length > 0 && (
-              <div className="card p-5">
+              <div className="bg-white border border-[#d9e2d7] rounded-[24px] p-5 shadow-[0_4px_20px_rgba(17,19,21,0.05)]">
                 <HighlightsSection highlights={highlights} />
               </div>
             )}
