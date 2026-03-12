@@ -288,30 +288,30 @@ function TeamBlock({ name, elo, form, side, logoUrl }: {
   const isHome = side === "home";
 
   return (
-    <div className={cn("flex flex-col gap-3 min-w-0", isHome ? "items-start" : "items-end")}>
-      <div className={cn("flex items-center gap-3", !isHome && "flex-row-reverse")}>
+    <div className={cn("flex min-w-0 flex-col gap-3", !isHome && "items-end text-right")}>
+      <div className={cn("flex items-center gap-4", !isHome && "flex-row-reverse")}>
         {logoUrl ? (
           <img
             src={logoUrl}
             alt={name}
-            className="h-16 w-16 rounded-[18px] border border-[#d9e2d7] bg-white object-contain p-2 shadow-sm"
+            className="h-16 w-16 rounded-[18px] border border-white/10 bg-white p-2 object-contain shadow-[0_8px_24px_rgba(0,0,0,0.18)]"
           />
         ) : (
-          <div className="flex h-16 w-16 items-center justify-center rounded-[18px] border border-[#d9e2d7] bg-[#f7f8f5] text-sm font-bold text-[#2d7f4f]">
+          <div className="flex h-16 w-16 items-center justify-center rounded-[18px] border border-white/10 bg-white/10 text-sm font-bold text-white">
             {name.slice(0, 2).toUpperCase()}
           </div>
         )}
 
-        <div className={cn("min-w-0", !isHome && "text-right")}>
-          <p className="truncate text-[22px] font-semibold leading-tight text-[#111315] md:text-[28px]">
+        <div className="min-w-0">
+          <p className="truncate text-[24px] font-semibold leading-tight text-white md:text-[32px]">
             {name}
           </p>
           {elo && (
             <div className={cn("mt-2 flex items-center gap-2", !isHome && "justify-end")}>
-              <span className="font-mono text-[28px] font-bold tabular-nums text-[#111315]">
+              <span className="font-mono text-[22px] font-bold tabular-nums text-[#2edb6c] md:text-[28px]">
                 {Math.round(elo.rating)}
               </span>
-              <span className="rounded-full border border-[#d9e2d7] bg-[#f7f8f5] px-2 py-1">
+              <span className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1">
                 <Delta v={elo.rating_change} suffix="ELO" />
               </span>
             </div>
@@ -320,7 +320,7 @@ function TeamBlock({ name, elo, form, side, logoUrl }: {
       </div>
 
       {form && (
-        <div className={cn("flex flex-col gap-2", !isHome && "items-end")}>
+        <div className={cn("flex flex-wrap items-center gap-2", !isHome && "justify-end")}>
           <FormStreak
             results={[
               ...Array(form.wins ?? 0).fill("W" as const),
@@ -329,18 +329,16 @@ function TeamBlock({ name, elo, form, side, logoUrl }: {
             ].slice(0, 5)}
             size="sm"
           />
-          <div className={cn("flex flex-wrap gap-2", !isHome && "justify-end")}>
-            {form.form_pts != null && (
-              <span className="inline-flex items-center rounded-full border border-[#d9e2d7] bg-[#f7f8f5] px-2.5 py-1 text-[10px] font-mono text-[#4f5950]">
-                {form.form_pts.toFixed(0)} pts last 5
-              </span>
-            )}
-            {form.days_rest != null && (
-              <span className="inline-flex items-center rounded-full border border-[#d9e2d7] bg-[#f7f8f5] px-2.5 py-1 text-[10px] font-mono text-[#4f5950]">
-                {Math.round(form.days_rest)}d rest
-              </span>
-            )}
-          </div>
+          {form.form_pts != null && (
+            <span className="inline-flex items-center rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[10px] font-mono text-white/70">
+              {form.form_pts.toFixed(0)} pts last 5
+            </span>
+          )}
+          {form.days_rest != null && (
+            <span className="inline-flex items-center rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[10px] font-mono text-white/70">
+              {Math.round(form.days_rest)}d rest
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -359,26 +357,28 @@ function MatchHeader({ match }: { match: MatchProps["match"] }) {
   const awayProb = match.probabilities ? Math.round(match.probabilities.away_win * 100) : null;
 
   return (
-    <div className="overflow-hidden rounded-[32px] border border-[#d9e2d7] bg-white shadow-[0_16px_40px_rgba(17,19,21,0.06)]">
-      <div className="flex flex-col gap-3 border-b border-[#edf2ea] px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
-        <Link
-          href="/sports/soccer/matches"
-          className="inline-flex w-fit items-center gap-2 rounded-full border border-[#d9e2d7] bg-[#f7f8f5] px-3 py-1.5 text-xs font-medium text-[#4f5950] transition hover:bg-[#eef4ee] hover:text-[#111315]"
-        >
-          <ArrowLeft size={13} />
-          Back to Soccer
-        </Link>
+    <div className="overflow-hidden rounded-[34px] border border-[#1f2a22] bg-[#111315] text-white shadow-[0_24px_70px_rgba(0,0,0,0.24)]">
+      <div className="border-b border-white/8 px-5 py-4 md:px-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <Link
+            href="/sports/soccer/matches"
+            className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3.5 py-1.5 text-xs font-medium text-white/75 transition hover:bg-white/[0.08] hover:text-white"
+          >
+            <ArrowLeft size={13} />
+            Back to Soccer
+          </Link>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center rounded-full border border-[#d9e2d7] bg-[#f7f8f5] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#667066]">
-            {match.league}
-            {match.season ? ` · ${match.season}` : ""}
-          </span>
-          <StatusBadge status={match.status} />
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/60">
+              {match.league}
+              {match.season ? ` · ${match.season}` : ""}
+            </span>
+            <StatusBadge status={match.status} />
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-5 px-4 py-5 md:grid-cols-[1fr_auto_1fr] md:px-6 md:py-6">
+      <div className="grid gap-5 px-5 py-6 md:grid-cols-[1fr_340px_1fr] md:items-center md:px-6 md:py-7">
         <TeamBlock
           name={match.home.name}
           elo={match.elo_home}
@@ -387,9 +387,9 @@ function MatchHeader({ match }: { match: MatchProps["match"] }) {
           logoUrl={match.home.logo_url}
         />
 
-        <div className="flex min-w-[220px] flex-col items-center justify-center gap-3 rounded-[28px] border border-[#d9e2d7] bg-[#f7f8f5] px-5 py-5">
+        <div className="flex flex-col items-center justify-center rounded-[30px] border border-white/10 bg-white/[0.05] px-6 py-6 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
           {isLive && (
-            <span className="inline-flex items-center gap-2 rounded-full border border-[#bbf7d0] bg-[#dcfce7] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#15803d]">
+            <span className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#bbf7d0]/40 bg-[#22c55e]/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#86efac]">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#22c55e] opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-[#22c55e]" />
@@ -399,18 +399,18 @@ function MatchHeader({ match }: { match: MatchProps["match"] }) {
           )}
 
           <div className="flex items-center gap-3">
-            <span className="font-mono text-5xl font-bold tabular-nums text-[#111315] md:text-6xl">
+            <span className="font-mono text-5xl font-bold tabular-nums text-white md:text-6xl">
               {match.home_score ?? (isLive ? "0" : "—")}
             </span>
-            <span className="font-mono text-2xl text-[#a0aaa0]">:</span>
-            <span className="font-mono text-5xl font-bold tabular-nums text-[#111315] md:text-6xl">
+            <span className="font-mono text-2xl text-white/25">:</span>
+            <span className="font-mono text-5xl font-bold tabular-nums text-white md:text-6xl">
               {match.away_score ?? (isLive ? "0" : "—")}
             </span>
           </div>
 
           {isScheduled && (
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b857b]">
+            <div className="mt-4 flex flex-col items-center gap-1">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
                 Kickoff in
               </span>
               <Countdown kickoffUtc={match.kickoff_utc} />
@@ -418,7 +418,7 @@ function MatchHeader({ match }: { match: MatchProps["match"] }) {
           )}
 
           {isFinished && match.outcome && (
-            <span className="inline-flex items-center rounded-full border border-[#d9e2d7] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#4f5950]">
+            <span className="mt-4 inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">
               {match.outcome === "home_win" || match.outcome === "H"
                 ? `${match.home.name.split(" ")[0]} Win`
                 : match.outcome === "away_win" || match.outcome === "A"
@@ -428,45 +428,36 @@ function MatchHeader({ match }: { match: MatchProps["match"] }) {
           )}
 
           {match.probabilities && (
-            <div className="w-full max-w-[260px]">
-              <div className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b857b]">
-                <span>Win probabilities</span>
+            <div className="mt-5 w-full max-w-[230px]">
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+                Win probabilities
               </div>
-              <div className="flex h-2 w-full overflow-hidden rounded-full bg-[#e8efe6]">
-                <div
-                  className="h-full bg-[#2edb6c]"
-                  style={{ width: `${homeProb ?? 0}%` }}
-                />
+              <div className="flex h-2 w-full overflow-hidden rounded-full bg-white/10">
+                <div className="h-full bg-[#2edb6c]" style={{ width: `${homeProb ?? 0}%` }} />
                 {drawProb != null && drawProb > 0 && (
-                  <div
-                    className="h-full bg-[#cfd7cc]"
-                    style={{ width: `${drawProb}%` }}
-                  />
+                  <div className="h-full bg-white/25" style={{ width: `${drawProb}%` }} />
                 )}
-                <div
-                  className="h-full bg-[#f59e0b]"
-                  style={{ width: `${awayProb ?? 0}%` }}
-                />
+                <div className="h-full bg-[#f59e0b]" style={{ width: `${awayProb ?? 0}%` }} />
               </div>
-              <div className="mt-2 flex justify-between font-mono text-[11px] tabular-nums">
-                <span className="text-[#2d7f4f]">{homeProb ?? "—"}%</span>
-                {drawProb != null && <span className="text-[#667066]">{drawProb}%</span>}
-                <span className="text-[#b45309]">{awayProb ?? "—"}%</span>
+              <div className="mt-2 flex justify-between font-mono text-[11px] font-semibold tabular-nums">
+                <span className="text-[#86efac]">{homeProb ?? "—"}%</span>
+                {drawProb != null && <span className="text-white/45">{drawProb}%</span>}
+                <span className="text-[#fbbf24]">{awayProb ?? "—"}%</span>
               </div>
             </div>
           )}
 
-          <div className="flex flex-col items-center gap-1 text-center">
-            <span className="flex items-center gap-1 text-[11px] text-[#667066]">
+          <div className="mt-5 flex flex-col items-center gap-1 text-center">
+            <span className="flex items-center gap-1 text-[11px] text-white/55">
               <Calendar size={12} />
               {fmtDate(match.kickoff_utc)}
             </span>
-            <span className="flex items-center gap-1 text-[11px] text-[#667066]">
+            <span className="flex items-center gap-1 text-[11px] text-white/55">
               <Clock size={12} />
               {fmtTime(match.kickoff_utc)}
             </span>
             {ctx?.venue_name && (
-              <span className="flex items-center gap-1 text-[11px] text-[#667066]">
+              <span className="flex items-center gap-1 text-[11px] text-white/55">
                 <MapPin size={12} />
                 {ctx.venue_name}
               </span>
@@ -500,14 +491,14 @@ function KpiCell({
   col?: string;
 }) {
   return (
-    <div className="min-w-[120px] rounded-[20px] border border-[#d9e2d7] bg-[#f7f8f5] px-4 py-3">
+    <div className="rounded-[22px] border border-[#d9e2d7] bg-[#f7f8f5] px-4 py-4">
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b857b]">
         {label}
       </p>
-      <p className={cn("mt-1 font-mono text-[24px] font-bold leading-none tabular-nums", col ?? "text-[#111315]")}>
+      <p className={cn("mt-2 font-mono text-[22px] font-bold leading-none tabular-nums", col ?? "text-[#111315]")}>
         {value}
       </p>
-      {sub && <p className="mt-1 text-[10px] font-mono text-[#7b857b]">{sub}</p>}
+      {sub && <p className="mt-2 text-[10px] font-mono text-[#7b857b]">{sub}</p>}
     </div>
   );
 }
@@ -526,20 +517,22 @@ function KpiStrip2Row({ match }: { match: MatchProps["match"] }) {
     fh?.days_rest != null && fa?.days_rest != null ? fh.days_rest - fa.days_rest : null;
 
   return (
-    <div className="rounded-[30px] border border-[#d9e2d7] bg-white p-4 shadow-[0_10px_30px_rgba(17,19,21,0.05)] md:p-5">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {p ? (
+    <div className="rounded-[30px] border border-[#d9e2d7] bg-white p-5 shadow-[0_10px_30px_rgba(17,19,21,0.05)]">
+      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+        {p && (
           <>
             <KpiCell label="Model Home" value={`${Math.round(p.home_win * 100)}%`} col="text-[#2d7f4f]" />
-            {p.draw != null && p.draw > 0 ? (
-              <KpiCell label="Model Draw" value={`${Math.round(p.draw * 100)}%`} />
-            ) : (
-              <KpiCell label="Model Draw" value="—" />
-            )}
+            {p.draw != null && p.draw > 0 && <KpiCell label="Model Draw" value={`${Math.round(p.draw * 100)}%`} />}
             <KpiCell label="Model Away" value={`${Math.round(p.away_win * 100)}%`} col="text-[#b45309]" />
           </>
-        ) : (
-          <KpiCell label="Model" value="—" sub="no probabilities" />
+        )}
+
+        {fo && (
+          <>
+            <KpiCell label="Fair Home" value={fo.home_win?.toFixed(2) ?? "—"} col="text-[#2d7f4f]" />
+            {fo.draw != null && fo.draw > 0 && <KpiCell label="Fair Draw" value={fo.draw.toFixed(2)} />}
+            <KpiCell label="Fair Away" value={fo.away_win?.toFixed(2) ?? "—"} col="text-[#b45309]" />
+          </>
         )}
 
         {match.confidence != null && (
@@ -556,24 +549,12 @@ function KpiStrip2Row({ match }: { match: MatchProps["match"] }) {
           />
         )}
 
-        {fo && (
-          <>
-            <KpiCell label="Fair Home" value={fo.home_win?.toFixed(2) ?? "—"} col="text-[#2d7f4f]" />
-            {fo.draw != null && fo.draw > 0 && (
-              <KpiCell label="Fair Draw" value={fo.draw.toFixed(2)} />
-            )}
-            <KpiCell label="Fair Away" value={fo.away_win?.toFixed(2) ?? "—"} col="text-[#b45309]" />
-          </>
-        )}
-
-        {ep ? (
+        {ep && (
           <>
             <KpiCell label="ELO Home" value={`${Math.round(ep.home * 100)}%`} col="text-[#2d7f4f]" />
             <KpiCell label="ELO Draw" value={`${Math.round(ep.draw * 100)}%`} />
             <KpiCell label="ELO Away" value={`${Math.round(ep.away * 100)}%`} col="text-[#b45309]" />
           </>
-        ) : (
-          <KpiCell label="ELO View" value="—" sub="no ratings" />
         )}
 
         {eh && ea && (
@@ -637,7 +618,6 @@ function KpiStrip2Row({ match }: { match: MatchProps["match"] }) {
     </div>
   );
 }
-
 // ─── Overview Tab ────────────────────────────────────────────────────────────
 
 function KeyEdges({ match }: { match: MatchProps["match"] }) {
