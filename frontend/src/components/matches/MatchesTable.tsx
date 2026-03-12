@@ -30,7 +30,7 @@ function predictedOutcome(m: Match) {
 
 function StatusPill({ status }: { status: string }) {
   if (status === "live") return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#bbf7d0]/60 bg-[#dcfce7] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#15803d]">
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#bbf7d0]/60 bg-[#dcfce7] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#2d7f4f]">
       <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e] animate-pulse" />
       Live
     </span>
@@ -49,8 +49,8 @@ function StatusPill({ status }: { status: string }) {
 
 function SportPill({ sport }: { sport: string }) {
   const map: Record<string, { bg: string; text: string; border: string; emoji: string }> = {
-    soccer:     { bg: "bg-[#dcfce7]", text: "text-[#15803d]", border: "border-[#bbf7d0]", emoji: "⚽" },
-    tennis:     { bg: "bg-[#f0fdf4]", text: "text-[#166534]", border: "border-[#bbf7d0]", emoji: "🎾" },
+    soccer:     { bg: "bg-[#dcfce7]", text: "text-[#2d7f4f]", border: "border-[#bbf7d0]", emoji: "⚽" },
+    tennis:     { bg: "bg-[#f0fdf4]", text: "text-[#2d7f4f]", border: "border-[#bbf7d0]", emoji: "🎾" },
     esports:    { bg: "bg-[#f5f3ff]", text: "text-[#6d28d9]", border: "border-[#ddd6fe]", emoji: "🎮" },
     basketball: { bg: "bg-[#fef3c7]", text: "text-[#b45309]", border: "border-[#fde68a]", emoji: "🏀" },
     baseball:   { bg: "bg-[#fee2e2]", text: "text-[#b91c1c]", border: "border-[#fecaca]", emoji: "⚾" },
@@ -135,7 +135,7 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
                   className={cn(
                     "rounded-full border px-4 py-2 text-sm font-semibold transition",
                     active
-                      ? "border-[#bbf7d0] bg-[#dcfce7] text-[#15803d]"
+                      ? "border-[#bbf7d0] bg-[#dcfce7] text-[#2d7f4f]"
                       : "border-[#d9e2d7] bg-[#f7f8f5] text-[#667066] hover:text-[#111315]"
                   )}
                 >
@@ -178,7 +178,7 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
           <p className="text-sm text-[#667066]">
             Showing <span className="font-semibold text-[#111315]">{filtered.length}</span> matches
             {liveCount > 0 && (
-              <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-[#bbf7d0] bg-[#dcfce7] px-2 py-0.5 text-[10px] font-semibold text-[#15803d]">
+              <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-[#bbf7d0] bg-[#dcfce7] px-2 py-0.5 text-[10px] font-semibold text-[#2d7f4f]">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e] animate-pulse" />
                 {liveCount} live
               </span>
