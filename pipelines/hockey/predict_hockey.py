@@ -55,8 +55,7 @@ def _predict_elo(match: CoreMatch, engine: HockeyEloEngine) -> dict:
         home_entity_id=match.home_team_id, away_entity_id=match.away_team_id,
         importance=1.0, extra={},
     )
-    p_home, p_away = engine.win_probability(match.home_team_id, match.away_team_id, context)
-    p_home = round(p_home, 4)
+    p_home = round(engine.win_probability(match.home_team_id, match.away_team_id, context), 4)
     p_away = round(1.0 - p_home, 4)
     elo_diff = round(r_home - r_away, 1)
     return dict(

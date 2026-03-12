@@ -118,9 +118,13 @@ def _transform(match: dict[str, Any], sport: str) -> dict[str, Any] | None:
 
     match_id = match.get("id", "")
     kickoff = match.get("date", "")
-    league_data = match.get("league") or {}
-    country_data = match.get("country") or {}
+    raw_league = match.get("league") or {}
+    league_data = raw_league if isinstance(raw_league, dict) else {"name": str(raw_league)}
+    raw_country = match.get("country") or {}
+    country_data = raw_country if isinstance(raw_country, dict) else {"name": str(raw_country)}
     state = match.get("state") or {}
+    if not isinstance(state, dict):
+        state = {}
     score_data = state.get("score") or {}
     description = state.get("description") or ""
 
@@ -499,7 +503,9 @@ def fetch_prematch_extras(dry_run: bool = False, max_matches: int = 50) -> int:
                 if not team or not team.provider_id:
                     return None
                 parts = team.provider_id.split("-")
-                return parts[-1] if len(parts) >= 4 else None
+                candidate = parts[-1] if len(parts) >= 4 else None
+                # Only return numeric IDs — slugified names (e.g. "owls") cause 400 errors
+                return candidate if candidate and candidate.isdigit() else None
 
             home_hl_id = _hl_id(home_team)
             away_hl_id = _hl_id(away_team)
