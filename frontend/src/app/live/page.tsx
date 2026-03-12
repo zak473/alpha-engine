@@ -1,11 +1,12 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { getLiveMatches } from "@/lib/api";
+import type { LiveMatchOut } from "@/lib/api";
 import { LiveView } from "./LiveView";
 
 export const revalidate = 15;
 
 export default async function LivePage() {
-  let matches = [];
+  let matches: LiveMatchOut[] = [];
   try {
     matches = await getLiveMatches();
   } catch {
