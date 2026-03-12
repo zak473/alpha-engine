@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, ArrowUpDown, CalendarDays, Sparkles } from "lucide-react";
+import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, ArrowUpDown, CalendarDays, BrainCircuit } from "lucide-react";
 import { formatDate, formatPercent } from "@/lib/utils";
 import type { Match } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -10,13 +10,13 @@ type SortField = "scheduled_at" | "confidence" | "competition";
 type SortDir = "asc" | "desc";
 
 const SPORTS = [
-  { label: "All", value: "all" },
-  { label: "Soccer", value: "soccer" },
-  { label: "Tennis", value: "tennis" },
-  { label: "Esports", value: "esports" },
-  { label: "Basketball", value: "basketball" },
-  { label: "Baseball", value: "baseball" },
-  { label: "Hockey", value: "hockey" },
+  { label: "All",        value: "all" },
+  { label: "⚽ Soccer",     value: "soccer" },
+  { label: "🎾 Tennis",     value: "tennis" },
+  { label: "🎮 Esports",    value: "esports" },
+  { label: "🏀 Basketball", value: "basketball" },
+  { label: "⚾ Baseball",   value: "baseball" },
+  { label: "🏒 Hockey",     value: "hockey" },
 ];
 
 const PAGE_SIZE = 12;
@@ -28,27 +28,54 @@ function predictedOutcome(m: Match) {
   return "Draw";
 }
 
-function outcomeTone(status: Match["status"]) {
-  if (status === "live") return "text-emerald-300 border-emerald-300/20 bg-emerald-300/10";
-  if (status === "finished") return "text-white/60 border-white/10 bg-white/[0.05]";
-  return "text-sky-200 border-sky-300/15 bg-sky-300/10";
+function StatusPill({ status }: { status: string }) {
+  if (status === "live") return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#bbf7d0]/60 bg-[#dcfce7] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#15803d]">
+      <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e] animate-pulse" />
+      Live
+    </span>
+  );
+  if (status === "scheduled") return (
+    <span className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#dbeafe] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#1d4ed8]">
+      Upcoming
+    </span>
+  );
+  return (
+    <span className="inline-flex items-center rounded-full border border-[#d9e2d7] bg-[#f7f8f5] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#667066]">
+      Finished
+    </span>
+  );
 }
 
-function sportTone(sport: string) {
-  switch (sport) {
-    case "soccer":
-      return "bg-emerald-300/10 text-emerald-200 border-emerald-300/20";
-    case "tennis":
-      return "bg-lime-300/10 text-lime-200 border-lime-300/20";
-    case "esports":
-      return "bg-violet-300/10 text-violet-200 border-violet-300/20";
-    case "basketball":
-      return "bg-amber-300/10 text-amber-200 border-amber-300/20";
-    case "baseball":
-      return "bg-rose-300/10 text-rose-200 border-rose-300/20";
-    default:
-      return "bg-cyan-300/10 text-cyan-200 border-cyan-300/20";
-  }
+function SportPill({ sport }: { sport: string }) {
+  const map: Record<string, { bg: string; text: string; border: string; emoji: string }> = {
+    soccer:     { bg: "bg-[#dcfce7]", text: "text-[#15803d]", border: "border-[#bbf7d0]", emoji: "⚽" },
+    tennis:     { bg: "bg-[#f0fdf4]", text: "text-[#166534]", border: "border-[#bbf7d0]", emoji: "🎾" },
+    esports:    { bg: "bg-[#f5f3ff]", text: "text-[#6d28d9]", border: "border-[#ddd6fe]", emoji: "🎮" },
+    basketball: { bg: "bg-[#fef3c7]", text: "text-[#b45309]", border: "border-[#fde68a]", emoji: "🏀" },
+    baseball:   { bg: "bg-[#fee2e2]", text: "text-[#b91c1c]", border: "border-[#fecaca]", emoji: "⚾" },
+    hockey:     { bg: "bg-[#eff6ff]", text: "text-[#1d4ed8]", border: "border-[#bfdbfe]", emoji: "🏒" },
+  };
+  const s = map[sport] ?? { bg: "bg-[#f7f8f5]", text: "text-[#667066]", border: "border-[#d9e2d7]", emoji: "🏆" };
+  return (
+    <span className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]", s.bg, s.text, s.border)}>
+      {s.emoji} {sport}
+    </span>
+  );
+}
+
+function ConfBar({ conf }: { conf: number }) {
+  const pct = Math.round(conf * 100);
+  const bg = conf >= 0.7 ? "bg-[#2edb6c]" : conf >= 0.5 ? "bg-[#f59e0b]" : "bg-[#ef4444]";
+  const textCol = conf >= 0.7 ? "text-[#2d7f4f]" : conf >= 0.5 ? "text-[#b45309]" : "text-[#dc2626]";
+  return (
+    <div className="flex items-center gap-2 min-w-[90px]">
+      <div className="flex-1 h-1.5 rounded-full bg-[#e8efe6] overflow-hidden">
+        <div className={cn("h-full rounded-full", bg)} style={{ width: `${pct}%` }} />
+      </div>
+      <span className={cn("font-mono text-xs font-bold tabular-nums w-8 text-right", textCol)}>{pct}%</span>
+    </div>
+  );
 }
 
 export function MatchesTable({ initialMatches, loading = false }: { initialMatches: Match[]; loading?: boolean }) {
@@ -80,72 +107,36 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
     });
 
     return items;
-  }, [initialMatches, page, search, sortDir, sortField, sport]);
+  }, [initialMatches, search, sortDir, sortField, sport]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const liveCount = initialMatches.filter((m) => m.status === "live").length;
-  const avgConfidence = Math.round(
-    (initialMatches.filter((m) => m.confidence != null).reduce((sum, m) => sum + (m.confidence ?? 0), 0) /
-      Math.max(1, initialMatches.filter((m) => m.confidence != null).length))
-  );
 
   function toggleSort(field: SortField) {
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else {
-      setSortField(field);
-      setSortDir("asc");
-    }
+    else { setSortField(field); setSortDir("asc"); }
     setPage(1);
   }
 
   return (
     <div className="grid gap-6 pb-10">
-      <section className="overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.10),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-5 shadow-[0_26px_70px_rgba(0,0,0,0.24)] lg:p-6">
-        <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr] xl:items-end">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/16 bg-emerald-300/8 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200">
-              <Sparkles size={12} />
-              Market board redesign
-            </div>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-white lg:text-[2.75rem]">Turn the cluttered table into a board you can actually scan.</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-white/58">
-              Match cards now carry the key decision data first: matchup, time, model lean, confidence, and live state. The heavy spreadsheet feel stays available further down.
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-[22px] border border-white/8 bg-white/[0.05] p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Active markets</div>
-              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">{initialMatches.length}</div>
-            </div>
-            <div className="rounded-[22px] border border-white/8 bg-white/[0.05] p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Live right now</div>
-              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">{liveCount}</div>
-            </div>
-            <div className="rounded-[22px] border border-white/8 bg-white/[0.05] p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Avg confidence</div>
-              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">{Number.isFinite(avgConfidence) ? `${avgConfidence}%` : "—"}</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(10,21,16,0.96),rgba(8,18,14,0.96))] p-4 lg:p-5">
+      {/* Filter bar */}
+      <div className="overflow-hidden rounded-[28px] border border-[#d9e2d7] bg-white p-5 shadow-[0_4px_20px_rgba(17,19,21,0.05)]">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          {/* Sport pills */}
           <div className="flex flex-wrap gap-2">
             {SPORTS.map((item) => {
               const active = sport === item.value;
               return (
                 <button
                   key={item.value}
-                  onClick={() => {
-                    setSport(item.value);
-                    setPage(1);
-                  }}
+                  onClick={() => { setSport(item.value); setPage(1); }}
                   className={cn(
-                    "rounded-full border px-4 py-2 text-sm transition",
-                    active ? "border-emerald-300/20 bg-emerald-300/12 text-emerald-200" : "border-white/8 bg-white/[0.03] text-white/55 hover:text-white"
+                    "rounded-full border px-4 py-2 text-sm font-semibold transition",
+                    active
+                      ? "border-[#bbf7d0] bg-[#dcfce7] text-[#15803d]"
+                      : "border-[#d9e2d7] bg-[#f7f8f5] text-[#667066] hover:text-[#111315]"
                   )}
                 >
                   {item.label}
@@ -154,107 +145,135 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
             })}
           </div>
 
+          {/* Search + sort */}
           <div className="flex flex-col gap-3 md:flex-row">
             <div className="relative min-w-[260px]">
-              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35" />
+              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#7b857b]" />
               <input
                 value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 placeholder="Search teams or leagues"
-                className="h-11 w-full rounded-full border border-white/8 bg-white/[0.04] pl-10 pr-4 text-sm text-white placeholder:text-white/28 outline-none transition focus:border-emerald-300/25"
+                className="h-11 w-full rounded-full border border-[#d9e2d7] bg-[#f7f8f5] pl-10 pr-4 text-sm text-[#111315] placeholder:text-[#7b857b] outline-none transition focus:border-[#2edb6c] focus:bg-white"
               />
             </div>
 
-            <div className="flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.04] px-3 py-2 text-sm text-white/65">
+            <div className="flex items-center gap-2 rounded-full border border-[#d9e2d7] bg-[#f7f8f5] px-3 py-2 text-sm text-[#667066]">
               <SlidersHorizontal size={15} />
-              <button onClick={() => toggleSort("scheduled_at")} className={cn("rounded-full px-3 py-1", sortField === "scheduled_at" && "bg-white/[0.08] text-white")}>
+              <button onClick={() => toggleSort("scheduled_at")} className={cn("rounded-full px-3 py-1 text-sm font-semibold transition", sortField === "scheduled_at" && "bg-[#111315] text-white")}>
                 Time
               </button>
-              <button onClick={() => toggleSort("competition")} className={cn("rounded-full px-3 py-1", sortField === "competition" && "bg-white/[0.08] text-white")}>
+              <button onClick={() => toggleSort("competition")} className={cn("rounded-full px-3 py-1 text-sm font-semibold transition", sortField === "competition" && "bg-[#111315] text-white")}>
                 League
               </button>
-              <button onClick={() => toggleSort("confidence")} className={cn("rounded-full px-3 py-1", sortField === "confidence" && "bg-white/[0.08] text-white")}>
+              <button onClick={() => toggleSort("confidence")} className={cn("rounded-full px-3 py-1 text-sm font-semibold transition", sortField === "confidence" && "bg-[#111315] text-white")}>
                 Confidence
               </button>
-              <div className="text-white/32">
-                <ArrowUpDown size={14} />
-              </div>
+              <ArrowUpDown size={14} className="text-[#7b857b]" />
             </div>
           </div>
         </div>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        {/* Results count */}
+        <div className="mt-4 flex items-center justify-between">
+          <p className="text-sm text-[#667066]">
+            Showing <span className="font-semibold text-[#111315]">{filtered.length}</span> matches
+            {liveCount > 0 && (
+              <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-[#bbf7d0] bg-[#dcfce7] px-2 py-0.5 text-[10px] font-semibold text-[#15803d]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e] animate-pulse" />
+                {liveCount} live
+              </span>
+            )}
+          </p>
+          <p className="text-sm text-[#667066]">Page {page} of {totalPages}</p>
+        </div>
+      </div>
+
+      {/* Match cards grid */}
+      {!loading && paginated.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-4">
+          <div className="flex h-16 w-16 items-center justify-center rounded-[24px] border border-[#d9e2d7] bg-[#f7f8f5]">
+            <BrainCircuit size={28} className="text-[#2d7f4f]" />
+          </div>
+          <div className="text-center">
+            <p className="text-base font-semibold text-[#111315]">No matches found</p>
+            <p className="mt-1 text-sm text-[#667066] max-w-xs">Try a different sport filter or broaden your search.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {paginated.map((match) => (
             <button
               key={match.id}
               onClick={() => (window.location.href = `/sports/${match.sport}/matches/${match.id}`)}
-              className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 text-left transition hover:-translate-y-0.5 hover:border-emerald-300/20"
+              className="group block overflow-hidden rounded-[28px] border border-[#d9e2d7] bg-white text-left shadow-[0_4px_20px_rgba(17,19,21,0.05)] transition hover:border-[#b8d4c0] hover:shadow-[0_8px_30px_rgba(17,19,21,0.1)] hover:-translate-y-0.5"
             >
-              <div className="flex items-center justify-between gap-3">
-                <div className={cn("rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em]", sportTone(match.sport))}>{match.sport}</div>
-                <div className={cn("rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em]", outcomeTone(match.status))}>{match.status}</div>
-              </div>
-
-              <div className="mt-4">
-                <div className="text-lg font-semibold tracking-[-0.03em] text-white">{match.home_name}</div>
-                <div className="mt-1 text-sm text-white/32">vs</div>
-                <div className="text-lg font-semibold tracking-[-0.03em] text-white">{match.away_name}</div>
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-[18px] border border-white/8 bg-black/15 p-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">League</div>
-                  <div className="mt-2 line-clamp-2 text-sm text-white/72">{match.competition}</div>
+              {/* Header */}
+              <div className="flex items-center justify-between gap-3 border-b border-[#edf2ea] px-5 py-3">
+                <SportPill sport={match.sport} />
+                <div className="flex items-center gap-2">
+                  <StatusPill status={match.status} />
                 </div>
-                <div className="rounded-[18px] border border-white/8 bg-black/15 p-3">
-                  <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-white/35">
-                    <CalendarDays size={12} />
-                    Start
+              </div>
+
+              {/* Teams */}
+              <div className="px-5 py-4">
+                <p className="font-semibold text-[#111315] leading-tight">{match.home_name}</p>
+                <p className="mt-1 text-xs text-[#7b857b]">vs</p>
+                <p className="mt-0.5 font-semibold text-[#111315] leading-tight">{match.away_name}</p>
+              </div>
+
+              {/* Info grid */}
+              <div className="grid grid-cols-3 gap-2 px-5 pb-4">
+                <div className="rounded-[16px] border border-[#edf2ea] bg-[#f7f8f5] p-3">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-[#7b857b]">League</div>
+                  <div className="mt-1.5 line-clamp-2 text-xs font-medium text-[#111315]">{match.competition}</div>
+                </div>
+                <div className="rounded-[16px] border border-[#edf2ea] bg-[#f7f8f5] p-3">
+                  <div className="flex items-center gap-1 text-[10px] uppercase tracking-[0.16em] text-[#7b857b]">
+                    <CalendarDays size={10} /> Start
                   </div>
-                  <div className="mt-2 text-sm text-white/72">{formatDate(match.scheduled_at, "long")}</div>
+                  <div className="mt-1.5 text-xs font-medium text-[#111315]">{formatDate(match.scheduled_at, "long")}</div>
                 </div>
-                <div className="rounded-[18px] border border-white/8 bg-black/15 p-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">Model lean</div>
-                  <div className="mt-2 text-sm font-medium text-white">{predictedOutcome(match)}</div>
-                  <div className="mt-1 text-xs text-emerald-200">{match.confidence != null ? formatPercent(match.confidence / 100) : "No confidence"}</div>
+                <div className="rounded-[16px] border border-[#edf2ea] bg-[#f7f8f5] p-3">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-[#7b857b]">Model lean</div>
+                  <div className="mt-1.5 text-xs font-semibold text-[#111315]">{predictedOutcome(match)}</div>
                 </div>
               </div>
+
+              {/* Confidence footer */}
+              {match.confidence != null && (
+                <div className="flex items-center gap-3 border-t border-[#edf2ea] px-5 py-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7b857b]">Confidence</span>
+                  <ConfBar conf={match.confidence / 100} />
+                </div>
+              )}
             </button>
           ))}
         </div>
+      )}
 
-        {!loading && paginated.length === 0 && (
-          <div className="mt-5 rounded-[24px] border border-dashed border-white/10 bg-white/[0.03] p-10 text-center">
-            <div className="text-xl font-semibold text-white">No matches found</div>
-            <div className="mt-2 text-sm text-white/50">Try a different sport filter or broaden your search.</div>
-          </div>
-        )}
-
-        <div className="mt-5 flex items-center justify-between gap-4 border-t border-white/8 pt-4 text-sm text-white/50">
-          <div>{filtered.length} total results · page {page} of {totalPages}</div>
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-4 border-t border-[#d9e2d7] pt-4 text-sm text-[#667066]">
+          <div>{filtered.length} total · page {page} of {totalPages}</div>
           <div className="flex items-center gap-2">
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.04] px-4 py-2 text-white/70 transition disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-full border border-[#d9e2d7] bg-white px-4 py-2 text-[#667066] transition hover:border-[#b8d4c0] disabled:opacity-40"
             >
-              <ChevronLeft size={14} />
-              Prev
+              <ChevronLeft size={14} /> Prev
             </button>
             <button
               disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.04] px-4 py-2 text-white/70 transition disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-full border border-[#d9e2d7] bg-white px-4 py-2 text-[#667066] transition hover:border-[#b8d4c0] disabled:opacity-40"
             >
-              Next
-              <ChevronRight size={14} />
+              Next <ChevronRight size={14} />
             </button>
           </div>
         </div>
-      </section>
+      )}
     </div>
   );
 }
