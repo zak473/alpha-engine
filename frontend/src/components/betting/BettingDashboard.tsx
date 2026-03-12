@@ -12,10 +12,10 @@ import { Activity, ArrowRight, Radar, Sparkles } from "lucide-react";
 
 function InsightCard({ label, value, note }: { label: string; value: string; note: string }) {
   return (
-    <div className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-4">
-      <div className="text-[11px] uppercase tracking-[0.18em] text-white/38">{label}</div>
-      <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">{value}</div>
-      <div className="mt-2 text-sm text-white/52">{note}</div>
+    <div className="rounded-[24px] border border-[#d9e2d7] bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(247,250,245,1))] p-4">
+      <div className="text-[11px] uppercase tracking-[0.18em] text-[#8a9488]">{label}</div>
+      <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-[#111315]">{value}</div>
+      <div className="mt-2 text-sm text-[#667066]">{note}</div>
     </div>
   );
 }
@@ -67,15 +67,15 @@ export function BettingDashboard({ matches, sport }: { matches: BettingMatch[]; 
   const displaySport: SportSlug = activeSport === "all" ? "soccer" : activeSport;
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden bg-[linear-gradient(180deg,#08120e_0%,#0a1510_100%)]">
+    <div className="flex min-h-0 flex-1 overflow-hidden bg-[linear-gradient(180deg,#f4f8f2_0%,#eef4ec_100%)]">
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
           <BettingHero matches={sportFiltered} filteredCount={filtered.length} activeSportLabel={activeSportLabel} />
 
           <div className="px-4 lg:px-6">
             <section className="grid gap-4 pb-4 xl:grid-cols-[1.15fr_0.85fr]">
-              <div className="rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,rgba(10,21,16,0.98),rgba(8,18,14,0.98))] p-5 lg:p-6">
-                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/16 bg-emerald-300/8 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200">
+              <div className="rounded-[30px] border border-[#d9e2d7] bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(247,250,245,1))] p-5 lg:p-6">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#c6e8d3] bg-[#f0faf4] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#2d7f4f]">
                   <Sparkles size={12} />
                   Board controls
                 </div>
@@ -85,8 +85,8 @@ export function BettingDashboard({ matches, sport }: { matches: BettingMatch[]; 
                       key={entry}
                       onClick={() => handleSportSelect(entry)}
                       className={activeSport === entry
-                        ? "rounded-full border border-emerald-300/20 bg-emerald-300/12 px-4 py-2 text-sm text-emerald-200"
-                        : "rounded-full border border-white/8 bg-white/[0.03] px-4 py-2 text-sm text-white/58"}
+                        ? "rounded-full border border-[#c6e8d3] bg-emerald-300/12 px-4 py-2 text-sm text-[#2d7f4f]"
+                        : "rounded-full border border-[#d9e2d7] bg-[#f7f8f5] px-4 py-2 text-sm text-[#667066]"}
                     >
                       {entry === "all" ? "All sports" : SPORT_CONFIG[entry].label}
                     </button>
@@ -94,17 +94,17 @@ export function BettingDashboard({ matches, sport }: { matches: BettingMatch[]; 
                 </div>
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                  <button onClick={handleShowTopPicks} className="rounded-[22px] border border-white/8 bg-white/[0.04] p-4 text-left transition hover:border-emerald-300/20">
-                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-white/38"><Radar size={12} /> Top edges</div>
-                    <div className="mt-2 text-lg font-semibold text-white">Show strongest spots</div>
+                  <button onClick={handleShowTopPicks} className="rounded-[22px] border border-[#d9e2d7] bg-[#f7f8f5] p-4 text-left transition hover:border-[#c6e8d3]">
+                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-[#8a9488]"><Radar size={12} /> Top edges</div>
+                    <div className="mt-2 text-lg font-semibold text-[#111315]">Show strongest spots</div>
                   </button>
-                  <button onClick={handleShowLive} className="rounded-[22px] border border-white/8 bg-white/[0.04] p-4 text-left transition hover:border-emerald-300/20">
-                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-white/38"><Activity size={12} /> Live only</div>
-                    <div className="mt-2 text-lg font-semibold text-white">Focus on matches in play</div>
+                  <button onClick={handleShowLive} className="rounded-[22px] border border-[#d9e2d7] bg-[#f7f8f5] p-4 text-left transition hover:border-[#c6e8d3]">
+                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-[#8a9488]"><Activity size={12} /> Live only</div>
+                    <div className="mt-2 text-lg font-semibold text-[#111315]">Focus on matches in play</div>
                   </button>
-                  <button onClick={handleClearFilters} className="rounded-[22px] border border-white/8 bg-white/[0.04] p-4 text-left transition hover:border-emerald-300/20">
-                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-white/38"><ArrowRight size={12} /> Reset</div>
-                    <div className="mt-2 text-lg font-semibold text-white">Back to full board</div>
+                  <button onClick={handleClearFilters} className="rounded-[22px] border border-[#d9e2d7] bg-[#f7f8f5] p-4 text-left transition hover:border-[#c6e8d3]">
+                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-[#8a9488]"><ArrowRight size={12} /> Reset</div>
+                    <div className="mt-2 text-lg font-semibold text-[#111315]">Back to full board</div>
                   </button>
                 </div>
               </div>

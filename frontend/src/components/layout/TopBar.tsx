@@ -10,9 +10,9 @@ import { getNotifications, getUnreadNotificationCount, markAllNotificationsRead,
 
 const ENV = process.env.NEXT_PUBLIC_ENV ?? "development";
 const ENV_BADGE: Record<string, { label: string; color: string; bg: string }> = {
-  production: { label: "PROD", color: "#86efac", bg: "rgba(134,239,172,0.10)" },
-  staging: { label: "STAGE", color: "#93c5fd", bg: "rgba(147,197,253,0.10)" },
-  development: { label: "DEV", color: "#6ee7b7", bg: "rgba(110,231,183,0.10)" },
+  production: { label: "PROD", color: "#2d7f4f", bg: "#f0faf4" },
+  staging: { label: "STAGE", color: "#1d4ed8", bg: "#eff6ff" },
+  development: { label: "DEV", color: "#2d7f4f", bg: "#f0faf4" },
 };
 const badge = ENV_BADGE[ENV] ?? ENV_BADGE.development;
 
@@ -51,8 +51,8 @@ function SearchBox({ onClose }: { onClose?: () => void }) {
 
   return (
     <div ref={wrapRef} className="relative w-full max-w-xl">
-      <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-2.5 backdrop-blur transition focus-within:border-emerald-300/25 focus-within:bg-white/[0.07]">
-        <Search size={15} className="text-white/45" />
+      <div className="flex items-center gap-2 rounded-full border border-[#d9e2d7] bg-[#f7f8f5] px-3 py-2.5 transition focus-within:border-[#b8d4c0] focus-within:bg-white">
+        <Search size={15} className="text-[#8a9488]" />
         <input
           value={query}
           onChange={(e) => {
@@ -74,15 +74,13 @@ function SearchBox({ onClose }: { onClose?: () => void }) {
             }
           }}
           placeholder="Search matches, leagues, or teams"
-          className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/34"
+          className="w-full bg-transparent text-sm text-[#111315] outline-none placeholder:text-[#8a9488]"
         />
       </div>
 
       {open && (
-        <div className="absolute left-0 right-0 top-[calc(100%+10px)] z-50 overflow-hidden rounded-[24px] border border-white/10 bg-[#0a1410] shadow-[0_24px_50px_rgba(0,0,0,0.35)]">
-          {loading ? (
-            <div className="px-4 py-4 text-sm text-white/54">Searching…</div>
-          ) : (
+        <div className="absolute left-0 right-0 top-[calc(100%+10px)] z-50 overflow-hidden rounded-[24px] border border-[#d9e2d7] bg-white shadow-[0_20px_40px_rgba(17,19,21,0.08)]">
+          {loading ? <div className="px-4 py-4 text-sm text-[#667066]">Searching…</div> : (
             <div className="max-h-[360px] overflow-y-auto p-2">
               {results.map((result) => (
                 <button
@@ -93,11 +91,11 @@ function SearchBox({ onClose }: { onClose?: () => void }) {
                     setQuery("");
                     onClose?.();
                   }}
-                  className="flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left transition hover:bg-white/[0.05]"
+                  className="flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left transition hover:bg-[#f7f8f5]"
                 >
                   <div>
-                    <div className="text-sm font-semibold text-white">{result.title}</div>
-                    <div className="mt-1 text-xs text-white/45">{result.subtitle}</div>
+                    <div className="text-sm font-semibold text-[#111315]">{result.title}</div>
+                    <div className="mt-1 text-xs text-[#667066]">{result.subtitle}</div>
                   </div>
                 </button>
               ))}
@@ -142,35 +140,25 @@ function NotificationsMenu() {
 
   return (
     <div ref={wrapRef} className="relative">
-      <button
-        onClick={toggle}
-        className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/72 transition hover:bg-white/[0.08]"
-        aria-label="Notifications"
-      >
+      <button onClick={toggle} className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#d9e2d7] bg-white text-[#667066] transition hover:bg-[#f7f8f5]" aria-label="Notifications">
         <Bell size={16} />
-        {count > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,255,178,0.8)]" />}
+        {count > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[#2edb6c]" />}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-[320px] overflow-hidden rounded-[24px] border border-white/10 bg-[#0a1410] shadow-[0_24px_50px_rgba(0,0,0,0.35)]">
-          <div className="border-b border-white/8 px-4 py-3">
-            <div className="text-sm font-semibold text-white">Notifications</div>
-            <div className="text-xs text-white/42">Recent system and betting activity</div>
+        <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-[320px] overflow-hidden rounded-[24px] border border-[#d9e2d7] bg-white shadow-[0_20px_40px_rgba(17,19,21,0.08)]">
+          <div className="border-b border-[#edf2ea] px-4 py-3">
+            <div className="text-sm font-semibold text-[#111315]">Notifications</div>
+            <div className="text-xs text-[#667066]">Recent system and betting activity</div>
           </div>
           <div className="max-h-[380px] overflow-y-auto p-2">
-            {items.length === 0 ? (
-              <div className="px-3 py-4 text-sm text-white/48">Nothing new yet.</div>
-            ) : (
-              items.map((n, idx) => (
-                <div key={`${n.title}-${idx}`} className="rounded-2xl px-3 py-3 hover:bg-white/[0.04]">
-                  <div className="text-sm font-semibold text-white">{n.title}</div>
-                  {n.message && <div className="mt-1 text-xs text-white/48">{n.message}</div>}
-                  <div className="mt-2 text-[11px] text-white/34">
-                    {new Date(n.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                  </div>
-                </div>
-              ))
-            )}
+            {items.length === 0 ? <div className="px-3 py-4 text-sm text-[#667066]">Nothing new yet.</div> : items.map((n, idx) => (
+              <div key={`${n.title}-${idx}`} className="rounded-2xl px-3 py-3 hover:bg-[#f7f8f5]">
+                <div className="text-sm font-semibold text-[#111315]">{n.title}</div>
+                {n.message && <div className="mt-1 text-xs text-[#667066]">{n.message}</div>}
+                <div className="mt-2 text-[11px] text-[#8a9488]">{new Date(n.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -189,51 +177,34 @@ export function TopBar({ title, subtitle }: TopBarProps) {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
 
   return (
-    <header className="sticky top-0 z-30 flex h-[74px] items-center gap-3 border-b border-white/8 bg-[rgba(8,18,14,0.84)] px-4 backdrop-blur-xl lg:px-6">
+    <header className="sticky top-0 z-30 flex h-[74px] items-center gap-3 border-b border-[#d9e2d7] bg-[rgba(244,248,242,0.88)] px-4 backdrop-blur-xl lg:px-6">
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <button
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/72 lg:hidden"
-          onClick={() => setOpen(true)}
-          aria-label="Open sidebar"
-        >
+        <button className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#d9e2d7] bg-white text-[#667066] lg:hidden" onClick={() => setOpen(true)} aria-label="Open sidebar">
           <Menu size={17} />
         </button>
 
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="truncate text-base font-semibold tracking-[-0.03em] text-white sm:text-lg">{title}</h1>
-            <span className="hidden rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.14em] sm:inline-flex" style={{ color: badge.color, background: badge.bg, border: `1px solid ${badge.color}26` }}>
-              {badge.label}
-            </span>
+            <h1 className="truncate text-base font-semibold tracking-[-0.03em] text-[#111315] sm:text-lg">{title}</h1>
+            <span className="hidden rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.14em] sm:inline-flex" style={{ color: badge.color, background: badge.bg, border: `1px solid ${badge.color}22` }}>{badge.label}</span>
           </div>
-          {subtitle && <p className="truncate text-xs text-white/42">{subtitle}</p>}
+          {subtitle && <p className="truncate text-xs text-[#667066]">{subtitle}</p>}
         </div>
       </div>
 
-      <div className="hidden flex-1 justify-center md:flex">
-        <SearchBox />
-      </div>
+      <div className="hidden flex-1 justify-center md:flex"><SearchBox /></div>
 
       <div className="flex items-center justify-end gap-2">
-        <button
-          onClick={() => setShowMobileSearch((v) => !v)}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/72 md:hidden"
-          aria-label="Search"
-        >
+        <button onClick={() => setShowMobileSearch((v) => !v)} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#d9e2d7] bg-white text-[#667066] md:hidden" aria-label="Search">
           {showMobileSearch ? <X size={16} /> : <Search size={16} />}
         </button>
-
         <NotificationsMenu />
-
         {isLoggedIn ? (
-          <button
-            onClick={logout}
-            className="hidden rounded-full border border-white/10 bg-white/[0.05] px-4 py-2.5 text-sm font-medium text-white/80 transition hover:bg-white/[0.08] sm:inline-flex"
-          >
+          <button onClick={logout} className="hidden rounded-full border border-[#d9e2d7] bg-white px-4 py-2.5 text-sm font-medium text-[#111315] transition hover:bg-[#f7f8f5] sm:inline-flex">
             {user ? `Logout · ${user.displayName ?? user.email}` : "Logout"}
           </button>
         ) : (
-          <Link href="/login" className="hidden items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-[#07110d] sm:inline-flex">
+          <Link href="/login" className="hidden items-center gap-2 rounded-full bg-[#111315] px-4 py-2.5 text-sm font-semibold text-white sm:inline-flex">
             <LogIn size={15} />
             Login
           </Link>
@@ -241,7 +212,7 @@ export function TopBar({ title, subtitle }: TopBarProps) {
       </div>
 
       {showMobileSearch && (
-        <div className="absolute left-0 right-0 top-[74px] z-40 border-b border-white/8 bg-[rgba(8,18,14,0.96)] px-4 py-3 backdrop-blur-xl md:hidden">
+        <div className="absolute left-0 right-0 top-[74px] z-40 border-b border-[#d9e2d7] bg-[rgba(244,248,242,0.96)] px-4 py-3 backdrop-blur-xl md:hidden">
           <SearchBox onClose={() => setShowMobileSearch(false)} />
         </div>
       )}
