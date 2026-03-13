@@ -78,7 +78,7 @@ export function DashboardLeftRail({
   // Collapsed icon-only width
   if (!open) {
     return (
-      <div className="w-9 flex flex-col items-center py-3 gap-3 border-r border-surface-border bg-surface-raised shrink-0">
+      <div className="w-9 flex flex-col items-center py-3 gap-3 border-r border-white/8 bg-white/[0.04] shrink-0">
         <button
           onClick={onToggle}
           title="Expand sidebar"
@@ -86,7 +86,7 @@ export function DashboardLeftRail({
         >
           <PanelLeftOpen size={15} />
         </button>
-        <div className="w-px flex-1 bg-surface-border/50" />
+        <div className="w-px flex-1 bg-white/[0.04]" />
         {tree.map((node) => (
           <button
             key={node.sport}
@@ -106,7 +106,7 @@ export function DashboardLeftRail({
 
   return (
     <div
-      className="flex flex-col border-r border-surface-border bg-surface-raised overflow-y-auto shrink-0"
+      className="flex flex-col border-r border-white/8 bg-white/[0.04] overflow-y-auto shrink-0"
       style={{ width: "var(--left-rail-width)" }}
     >
       {/* Header */}
@@ -121,7 +121,7 @@ export function DashboardLeftRail({
       <button
         onClick={() => { onSportSelect(null); onLeagueSelect(null); }}
         className={cn(
-          "flex items-center justify-between px-3 py-2 text-[12px] transition-colors border-b border-surface-border",
+          "flex items-center justify-between px-3 py-2 text-[12px] transition-colors border-b border-white/8",
           !activeSport && !activeLeague
             ? "bg-accent-teal/10 text-accent-teal border-l-2 border-l-accent-teal"
             : "text-text-muted hover:text-text-primary hover:bg-white/[0.03]"
@@ -142,8 +142,8 @@ export function DashboardLeftRail({
             <div key={node.sport}>
               {/* Sport row */}
               <div className={cn(
-                "flex items-center gap-2 px-3 py-2 border-b border-surface-border/60 cursor-pointer transition-colors",
-                isActive ? "bg-surface-overlay" : "hover:bg-white/[0.02]"
+                "flex items-center gap-2 px-3 py-2 border-b border-white/[0.05] cursor-pointer transition-colors",
+                isActive ? "bg-white/[0.04]" : "hover:bg-white/[0.02]"
               )}>
                 <button
                   className="flex items-center gap-2 flex-1 text-left"
@@ -173,7 +173,7 @@ export function DashboardLeftRail({
                     key={l.name}
                     onClick={() => { onSportSelect(node.sport); onLeagueSelect(isActiveLeague ? null : l.name); }}
                     className={cn(
-                      "w-full flex items-center justify-between px-4 py-1.5 text-[11px] border-b border-surface-border/40 transition-colors text-left",
+                      "w-full flex items-center justify-between px-4 py-1.5 text-[11px] border-b border-white/[0.032] transition-colors text-left",
                       isActiveLeague
                         ? "bg-accent-teal/8 text-accent-teal"
                         : "text-text-subtle hover:text-text-muted hover:bg-white/[0.02]"
@@ -190,7 +190,7 @@ export function DashboardLeftRail({
       </div>
 
       {/* Divider */}
-      <div className="border-t border-surface-border py-2">
+      <div className="border-t border-white/8 py-2">
         <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-text-subtle">Quick Views</p>
         {FOCUS_VIEWS.map((v) => (
           <button

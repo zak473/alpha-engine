@@ -70,26 +70,26 @@ function PredCol({ p }: { p: MvpPrediction }) {
 
       {/* Key metrics */}
       <div className="grid grid-cols-2 gap-2">
-        <div className="bg-surface-base rounded-lg p-2.5 border border-surface-border">
+        <div className="bg-white/[0.03] rounded-lg p-2.5 border border-white/8">
           <p className="text-2xs text-text-muted mb-0.5">Confidence</p>
           <p className="num text-sm font-semibold" style={{ color: conf.color }}>
             {p.confidence}% <span className="text-2xs">{conf.text}</span>
           </p>
         </div>
-        <div className="bg-surface-base rounded-lg p-2.5 border border-surface-border">
+        <div className="bg-white/[0.03] rounded-lg p-2.5 border border-white/8">
           <p className="text-2xs text-text-muted mb-0.5">Edge</p>
           <p className={cn("num text-sm font-semibold", edge > 0 ? "text-accent-green" : edge < 0 ? "text-accent-red" : "text-text-muted")}>
             {edge > 0 ? "+" : ""}{edge}%
           </p>
         </div>
-        <div className="bg-surface-base rounded-lg p-2.5 border border-surface-border">
+        <div className="bg-white/[0.03] rounded-lg p-2.5 border border-white/8">
           <p className="text-2xs text-text-muted mb-0.5">Volatility</p>
           <p className={cn(
             "text-xs font-medium",
             vol === "Stable" ? "text-accent-green" : vol === "Swingy" ? "text-accent-amber" : "text-text-muted"
           )}>{vol}</p>
         </div>
-        <div className="bg-surface-base rounded-lg p-2.5 border border-surface-border">
+        <div className="bg-white/[0.03] rounded-lg p-2.5 border border-white/8">
           <p className="text-2xs text-text-muted mb-0.5">Lean</p>
           <p className="text-xs font-medium text-text-primary truncate">{pick.label} ({pick.pct}%)</p>
         </div>
@@ -108,7 +108,7 @@ function PredCol({ p }: { p: MvpPrediction }) {
               <span className="text-xs text-text-muted truncate max-w-[120px]">{name}</span>
               <span className="num text-xs font-medium" style={{ color }}>{fmtPct(value)}</span>
             </div>
-            <div className="h-1.5 bg-surface-border rounded-full overflow-hidden">
+            <div className="h-1.5 bg-white/8 rounded-full overflow-hidden">
               <div className="h-full rounded-full" style={{ width: `${value * 100}%`, backgroundColor: color }} />
             </div>
           </div>
@@ -148,7 +148,7 @@ export function CompareModal({ open, onClose, predictions }: CompareModalProps) 
         cols.length === 2 ? "grid-cols-2" : "grid-cols-3"
       )}>
         {cols.map((p) => (
-          <div key={p.event_id} className="border border-surface-border rounded-lg p-3">
+          <div key={p.event_id} className="border border-white/8 rounded-lg p-3">
             <PredCol p={p} />
           </div>
         ))}

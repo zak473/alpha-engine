@@ -102,7 +102,7 @@ export function WatchlistModule({ predictions }: WatchlistModuleProps) {
     >
       {/* Quick add panel */}
       {showAdd && (
-        <div className="px-4 py-3 border-b border-surface-border bg-surface-base/40">
+        <div className="px-4 py-3 border-b border-white/8 bg-white/[0.02]">
           <input
             type="text"
             placeholder="Search to add…"
@@ -116,7 +116,7 @@ export function WatchlistModule({ predictions }: WatchlistModuleProps) {
               <button
                 key={s.id}
                 onClick={() => { add(s); setShowAdd(false); setQuery(""); }}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border border-surface-border text-text-muted hover:text-text-primary hover:border-zinc-600 transition-colors capitalize"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border border-white/8 text-text-muted hover:text-text-primary hover:border-zinc-600 transition-colors capitalize"
               >
                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sportColor(s.sport) }} />
                 {s.name}
@@ -141,7 +141,7 @@ export function WatchlistModule({ predictions }: WatchlistModuleProps) {
               <button
                 key={s.id}
                 onClick={() => add(s)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs border border-surface-border text-text-muted hover:text-text-primary hover:border-zinc-600 transition-colors"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs border border-white/8 text-text-muted hover:text-text-primary hover:border-zinc-600 transition-colors"
               >
                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sportColor(s.sport) }} />
                 {s.name}
@@ -150,7 +150,7 @@ export function WatchlistModule({ predictions }: WatchlistModuleProps) {
           </div>
         </div>
       ) : (
-        <div className="divide-y divide-surface-border/50">
+        <div className="divide-y divide-white/[0.04]">
           {entries.map((entry) => {
             const fixture = nextFixture(entry);
             return (

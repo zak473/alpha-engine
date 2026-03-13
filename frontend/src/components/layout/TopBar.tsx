@@ -189,7 +189,7 @@ export function TopBar({ title, subtitle }: TopBarProps) {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
 
   return (
-    <header className="sticky top-0 z-30 flex h-[74px] items-center gap-3 border-b border-white/8 bg-[rgba(8,18,14,0.84)] px-4 backdrop-blur-xl lg:px-6">
+    <header className="sticky top-0 z-30 flex h-[74px] items-center gap-3 border-b border-white/8 bg-white/[0.04] px-4 backdrop-blur-xl lg:px-6">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <button
           className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/72 lg:hidden"
@@ -241,7 +241,7 @@ export function TopBar({ title, subtitle }: TopBarProps) {
       </div>
 
       {showMobileSearch && (
-        <div className="absolute left-0 right-0 top-[74px] z-40 border-b border-white/8 bg-[rgba(8,18,14,0.96)] px-4 py-3 backdrop-blur-xl md:hidden">
+        <div className="absolute left-0 right-0 top-[74px] z-40 border-b border-white/8 bg-white/[0.06] px-4 py-3 backdrop-blur-xl md:hidden">
           <SearchBox onClose={() => setShowMobileSearch(false)} />
         </div>
       )}

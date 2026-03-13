@@ -18,7 +18,7 @@ function MatchRow({ m }: { m: LiveMatchOut }) {
       href={`/sports/${m.sport}/matches/${m.id}`}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.025] transition-colors group border-b border-surface-border/40 last:border-0"
+      className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.025] transition-colors group border-b border-white/[0.032] last:border-0"
     >
       <div className="shrink-0 w-4 flex justify-center">
         {m.is_live ? (
@@ -84,9 +84,9 @@ export function InPlayModule({ matches }: InPlayModuleProps) {
   const hidden = activeRows.length - LIMIT;
 
   return (
-    <div className="bg-surface-overlay border border-surface-border rounded-xl overflow-hidden">
+    <div className="bg-white/[0.04] border border-white/8 rounded-xl overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-surface-border">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-white/8">
         {totalLive > 0 ? (
           <span className="relative flex h-2 w-2 shrink-0">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
@@ -104,7 +104,7 @@ export function InPlayModule({ matches }: InPlayModuleProps) {
       </div>
 
       {/* Sport tabs */}
-      <div className="flex items-center gap-0 border-b border-surface-border overflow-x-auto scrollbar-none">
+      <div className="flex items-center gap-0 border-b border-white/8 overflow-x-auto scrollbar-none">
         {ALL_SPORTS.filter((s) => groups[s]).map((sport) => {
           const liveCount = (groups[sport] ?? []).filter((m) => m.is_live).length;
           const isActive = activeSport === sport;
@@ -139,7 +139,7 @@ export function InPlayModule({ matches }: InPlayModuleProps) {
       ) : (
         <>
           {/* Status label */}
-          <div className="flex items-center justify-between px-4 py-1.5 bg-surface-base/40">
+          <div className="flex items-center justify-between px-4 py-1.5 bg-white/[0.02]">
             <span className="text-[10px] text-text-subtle">
               {liveInActive > 0 ? (
                 <span className="text-green-400 font-semibold">{liveInActive} live now</span>
@@ -160,7 +160,7 @@ export function InPlayModule({ matches }: InPlayModuleProps) {
           {hidden > 0 && (
             <button
               onClick={() => setExpanded((v) => !v)}
-              className="w-full px-4 py-2 text-[11px] text-text-subtle hover:text-text-muted transition-colors text-left border-t border-surface-border/40"
+              className="w-full px-4 py-2 text-[11px] text-text-subtle hover:text-text-muted transition-colors text-left border-t border-white/[0.032]"
             >
               {expanded ? "▲ Show less" : `▼ See ${hidden} more`}
             </button>

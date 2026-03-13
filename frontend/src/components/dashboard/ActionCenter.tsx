@@ -105,7 +105,7 @@ function CommandBtn({
         "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border text-left transition-all",
         ran
           ? "bg-accent-green/10 border-accent-green/20 text-accent-green"
-          : "bg-surface-base/60 border-surface-border text-text-muted hover:text-text-primary hover:border-zinc-600"
+          : "bg-white/[0.025] border-white/8 text-text-muted hover:text-text-primary hover:border-zinc-600"
       )}
     >
       <Icon size={13} className="shrink-0" />
@@ -203,13 +203,13 @@ export function ActionCenter({
       {/* Rail */}
       <div
         className={cn(
-          "fixed top-0 right-0 h-full w-72 z-40 bg-surface-overlay border-l border-surface-border",
+          "fixed top-0 right-0 h-full w-72 z-40 bg-white/[0.04] border-l border-white/8",
           "flex flex-col shadow-2xl transition-transform duration-200 ease-out",
           open ? "translate-x-0" : "translate-x-full"
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/8">
           <div>
             <p className="text-sm font-semibold text-text-primary">Action Center</p>
             <p className="text-2xs text-text-muted">What to do next</p>
@@ -237,7 +237,7 @@ export function ActionCenter({
                   <a
                     key={a.id}
                     href={a.href ?? "#"}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-surface-border bg-surface-base/40 hover:bg-white/[0.025] hover:border-zinc-600 transition-all group"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-white/8 bg-white/[0.02] hover:bg-white/[0.025] hover:border-zinc-600 transition-all group"
                   >
                     <div className="w-7 h-7 rounded-lg bg-accent-blue/10 border border-accent-blue/20 flex items-center justify-center shrink-0">
                       <a.icon size={13} className="text-accent-blue" />
@@ -278,7 +278,7 @@ export function ActionCenter({
               ].map(([key, desc]) => (
                 <div key={key} className="flex items-center justify-between">
                   <span>{desc}</span>
-                  <kbd className="px-1.5 py-0.5 rounded bg-surface-border text-text-subtle text-2xs font-mono">{key}</kbd>
+                  <kbd className="px-1.5 py-0.5 rounded bg-white/8 text-text-subtle text-2xs font-mono">{key}</kbd>
                 </div>
               ))}
             </div>

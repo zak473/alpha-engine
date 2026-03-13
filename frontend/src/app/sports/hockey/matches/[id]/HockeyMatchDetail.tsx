@@ -60,7 +60,7 @@ function outcomeLabel(o: string | null | undefined): string {
 // ─── Layout components ────────────────────────────────────────────────────────
 function PanelCard({ title, children, className }: { title?: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("bg-surface-overlay border border-surface-border rounded-xl p-4", className)}>
+    <div className={cn("bg-white/[0.04] border border-white/8 rounded-xl p-4", className)}>
       {title && <div className="text-[10px] uppercase tracking-widest text-text-subtle mb-3">{title}</div>}
       {children}
     </div>
@@ -96,7 +96,7 @@ function StatDuel({
   homeWins?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between py-1 border-b border-surface-border/40 last:border-0">
+    <div className="flex items-center justify-between py-1 border-b border-white/[0.032] last:border-0">
       <span className={cn("text-xs w-[38%] text-right pr-3 tabular-nums font-mono", homeWins === true ? "text-accent-green font-semibold" : "text-text-muted")}>
         {home}
       </span>
@@ -125,14 +125,14 @@ function PeriodScoreTable({ match }: { match: TMatch }) {
     <div className="overflow-x-auto">
       <table className="text-xs font-mono tabular-nums text-right w-full border-collapse">
         <thead>
-          <tr className="text-text-subtle border-b border-surface-border/40">
+          <tr className="text-text-subtle border-b border-white/[0.032]">
             <th className="text-left font-normal pr-4 py-1 font-sans">Team</th>
             {periods.map(p => <th key={p} className="w-10 py-1">{p}</th>)}
             <th className="pl-4 py-1 text-text-muted font-semibold">T</th>
           </tr>
         </thead>
         <tbody>
-          <tr className="border-b border-surface-border/30">
+          <tr className="border-b border-white/[0.024]">
             <td className="text-left text-text-muted pr-4 py-1 font-sans font-medium">{match.home.name}</td>
             {hVals.map((v, i) => <td key={i} className="py-1 text-text-muted">{v ?? "—"}</td>)}
             <td className="pl-4 py-1 text-text-primary font-bold">{match.home_score ?? "—"}</td>
@@ -255,7 +255,7 @@ function KeyDrivers({ match }: { match: TMatch }) {
               <span className="text-text-muted capitalize">{d.feature.replace(/_/g, " ")}</span>
               <span className="text-text-subtle font-mono">{d.value != null ? fmt(d.value) : ""}</span>
             </div>
-            <div className="h-1.5 rounded-full bg-surface-border overflow-hidden">
+            <div className="h-1.5 rounded-full bg-white/8 overflow-hidden">
               <div className="h-full rounded-full" style={{ width: `${Math.round(d.importance * 100)}%`, background: C.blue }} />
             </div>
           </div>
@@ -297,7 +297,7 @@ function TeamStatsPanel({ home, away, homeName, awayName }: { home: HockeyTeamSt
 // ─── Form panel ───────────────────────────────────────────────────────────────
 function FormRow({ label, home, away }: { label: string; home: string; away: string }) {
   return (
-    <div className="flex items-center justify-between py-1 border-b border-surface-border/40 last:border-0">
+    <div className="flex items-center justify-between py-1 border-b border-white/[0.032] last:border-0">
       <span className="text-xs text-text-muted w-[38%] text-right">{home}</span>
       <span className="text-[10px] text-text-subtle w-[24%] text-center">{label}</span>
       <span className="text-xs text-text-muted w-[38%] text-left">{away}</span>
@@ -351,7 +351,7 @@ function EloChart({
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
         <XAxis dataKey="i" tick={{ fontSize: 9, fill: "#71717a" }} />
         <YAxis tick={{ fontSize: 9, fill: "#71717a" }} domain={["auto", "auto"]} />
-        <Tooltip contentStyle={{ background: "rgba(8,18,14,0.95)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11 }} />
+        <Tooltip contentStyle={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11 }} />
         <Legend wrapperStyle={{ fontSize: 10, color: "#a1a1aa" }} />
         <Line type="monotone" dataKey="home" name={homeName} stroke={C.blue} dot={false} strokeWidth={2} connectNulls />
         <Line type="monotone" dataKey="away" name={awayName} stroke="#a855f7" dot={false} strokeWidth={2} connectNulls />
@@ -388,7 +388,7 @@ function H2HPanel({ match }: { match: TMatch }) {
       {h2h.recent_matches.length > 0 && (
         <div className="space-y-1 pt-1">
           {h2h.recent_matches.slice(0, 5).map((m: any, i: number) => (
-            <div key={i} className="flex items-center justify-between text-xs text-text-subtle py-0.5 border-b border-surface-border/30 last:border-0">
+            <div key={i} className="flex items-center justify-between text-xs text-text-subtle py-0.5 border-b border-white/[0.024] last:border-0">
               <span className="text-[10px] text-text-subtle w-20 shrink-0">{m.date ? new Date(m.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" }) : "—"}</span>
               <span className="font-mono tabular-nums text-text-muted">{m.home_score ?? "?"} – {m.away_score ?? "?"}</span>
               <span className={cn("text-[10px] w-16 text-right", m.outcome === "home_win" ? "text-blue-400" : m.outcome === "away_win" ? "text-purple-400" : "text-text-subtle")}>
@@ -408,12 +408,12 @@ function OddsPanel({ match }: { match: TMatch }) {
   if (!hasOdds) return <EmptyState msg="Live odds not available." />;
   return (
     <div className="grid grid-cols-2 gap-3">
-      <div className="flex flex-col items-center justify-center rounded-lg border border-surface-border p-3 gap-1">
+      <div className="flex flex-col items-center justify-center rounded-lg border border-white/8 p-3 gap-1">
         <span className="text-[10px] text-text-subtle">{match.home.name}</span>
         <span className="text-xl font-black font-mono tabular-nums text-text-primary">{fmt(match.odds_home, 2)}</span>
         {match.fair_odds?.home_win && <span className="text-[10px] text-text-subtle">Fair: {fmt(match.fair_odds.home_win, 2)}</span>}
       </div>
-      <div className="flex flex-col items-center justify-center rounded-lg border border-surface-border p-3 gap-1">
+      <div className="flex flex-col items-center justify-center rounded-lg border border-white/8 p-3 gap-1">
         <span className="text-[10px] text-text-subtle">{match.away.name}</span>
         <span className="text-xl font-black font-mono tabular-nums text-text-primary">{fmt(match.odds_away, 2)}</span>
         {match.fair_odds?.away_win && <span className="text-[10px] text-text-subtle">Fair: {fmt(match.fair_odds.away_win, 2)}</span>}
@@ -456,7 +456,7 @@ function EventsFeed({ events, homeName, awayName }: { events: HockeyEventOut[]; 
       {allEvents.map((ev, i) => {
         const isHome = ev.team === "home";
         return (
-          <div key={i} className={cn("flex items-start gap-2 py-1.5 border-b border-surface-border/30 last:border-0", isHome ? "flex-row" : "flex-row-reverse")}>
+          <div key={i} className={cn("flex items-start gap-2 py-1.5 border-b border-white/[0.024] last:border-0", isHome ? "flex-row" : "flex-row-reverse")}>
             <div className={cn("flex items-center gap-1.5 min-w-[28px]", isHome ? "justify-start" : "justify-end")}>
               <EventTypeIcon type={ev.type} />
               {ev.period && <span className="text-[9px] text-text-subtle">P{ev.period}</span>}
@@ -519,7 +519,7 @@ function LineupSide({ lineup, isHome }: { lineup: HockeyLineupOut | null | undef
 function LineupPanel({ home, away, homeName, awayName }: { home: HockeyLineupOut | null | undefined; away: HockeyLineupOut | null | undefined; homeName: string; awayName: string }) {
   if (!home && !away) return <EmptyState msg="Lineups available closer to puck drop." />;
   return (
-    <div className="grid grid-cols-2 gap-4 divide-x divide-surface-border/40">
+    <div className="grid grid-cols-2 gap-4 divide-x divide-white/[0.032]">
       <div>
         <div className="text-[10px] font-semibold text-text-muted mb-2">{homeName}</div>
         <LineupSide lineup={home} isHome />
@@ -581,7 +581,7 @@ export function HockeyMatchDetail({ match: initialMatch, eloHomeHistory, eloAway
             <PanelCard title="Win Probability">
               <WinProbBar match={match} />
               {match.key_drivers?.length ? (
-                <div className="mt-4 pt-3 border-t border-surface-border/40">
+                <div className="mt-4 pt-3 border-t border-white/[0.032]">
                   <div className="text-[10px] uppercase tracking-widest text-text-subtle mb-3">Key Drivers</div>
                   <KeyDrivers match={match} />
                 </div>

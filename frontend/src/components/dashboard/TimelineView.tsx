@@ -75,9 +75,9 @@ export function TimelineView({ predictions, onSelect }: TimelineViewProps) {
             <div className="flex flex-col items-center w-14 shrink-0">
               <div className={cn(
                 "w-2 h-2 rounded-full border-2 mt-1 shrink-0",
-                hour < 1 ? "border-accent-amber bg-accent-amber/30" : "border-surface-border bg-surface-base"
+                hour < 1 ? "border-accent-amber bg-accent-amber/30" : "border-white/8 bg-white/[0.03]"
               )} />
-              <div className={cn("w-px flex-1 mt-1", idx < bucketKeys.length - 1 ? "bg-surface-border" : "bg-transparent")} />
+              <div className={cn("w-px flex-1 mt-1", idx < bucketKeys.length - 1 ? "bg-white/8" : "bg-transparent")} />
             </div>
 
             {/* Hour label + cards */}
@@ -93,7 +93,7 @@ export function TimelineView({ predictions, onSelect }: TimelineViewProps) {
                   <button
                     key={p.event_id}
                     onClick={() => onSelect?.(p)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border border-surface-border bg-surface-base/40 hover:bg-white/[0.03] hover:border-zinc-600 transition-all text-left"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border border-white/8 bg-white/[0.02] hover:bg-white/[0.03] hover:border-zinc-600 transition-all text-left"
                   >
                     <ConfDot value={p.confidence} />
                     <div className="min-w-0 flex-1">

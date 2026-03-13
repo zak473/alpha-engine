@@ -71,7 +71,7 @@ function fmtAvg(n: number | null | undefined): string {
 
 function PanelCard({ title, children, className }: { title?: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("bg-surface-overlay border border-surface-border rounded-xl p-4", className)}>
+    <div className={cn("bg-white/[0.04] border border-white/8 rounded-xl p-4", className)}>
       {title && <div className="text-[10px] uppercase tracking-widest text-text-subtle mb-3">{title}</div>}
       {children}
     </div>
@@ -96,7 +96,7 @@ function SideCol({ children }: { children: React.ReactNode }) {
 
 function StatDuel({ label, home, away, homeWins }: { label: string; home: string; away: string; homeWins?: boolean }) {
   return (
-    <div className="flex items-center justify-between py-1 border-b border-surface-border/40 last:border-0">
+    <div className="flex items-center justify-between py-1 border-b border-white/[0.032] last:border-0">
       <span className={cn("text-xs w-[38%] text-right pr-3 font-mono tabular-nums", homeWins === true ? "text-accent-green font-semibold" : "text-text-muted")}>{home}</span>
       <span className="text-[10px] text-text-subtle w-[24%] text-center">{label}</span>
       <span className={cn("text-xs w-[38%] text-left pl-3 font-mono tabular-nums", homeWins === false ? "text-accent-green font-semibold" : "text-text-muted")}>{away}</span>
@@ -115,7 +115,7 @@ function LineScoreInnings({ match }: { match: TMatch }) {
     <div className="overflow-x-auto">
       <table className="text-xs font-mono tabular-nums text-right w-full border-collapse">
         <thead>
-          <tr className="text-text-subtle border-b border-surface-border/40">
+          <tr className="text-text-subtle border-b border-white/[0.032]">
             <th className="text-left font-normal pr-4 py-1">Team</th>
             {innings.map(i => <th key={i.inning} className="w-7 py-1">{i.inning}</th>)}
             <th className="pl-3 py-1 font-normal text-text-subtle">R</th>
@@ -124,7 +124,7 @@ function LineScoreInnings({ match }: { match: TMatch }) {
           </tr>
         </thead>
         <tbody>
-          <tr className="border-b border-surface-border/30">
+          <tr className="border-b border-white/[0.024]">
             <td className="text-left text-text-muted pr-4 py-1 font-sans font-medium">{match.away.name}</td>
             {innings.map((i, idx) => <td key={idx} className="py-1 text-text-muted">{i.away ?? "0"}</td>)}
             <td className="pl-3 py-1 text-text-primary font-bold">{match.away_score ?? "—"}</td>
@@ -172,7 +172,7 @@ function TeamBlock({ elo, name, form, isHome }: { elo: BaseballEloPanelOut | nul
         <div className="flex items-center gap-1.5 text-xs text-text-subtle">
           <span>SP:</span>
           <span className="text-text-muted font-medium">{starter.name}</span>
-          {starter.hand && <span className="text-[10px] bg-surface-border rounded px-1">{starter.hand}HP</span>}
+          {starter.hand && <span className="text-[10px] bg-white/8 rounded px-1">{starter.hand}HP</span>}
           {starter.era != null && <span className="font-mono">{fmt(starter.era, 2)} ERA</span>}
         </div>
       )}
@@ -344,7 +344,7 @@ function StarterCard({ sp, teamName }: { sp: StarterPitcherOut; teamName: string
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
         <span className="text-sm font-semibold text-text-primary">{sp.name}</span>
-        {sp.hand && <span className="text-[10px] bg-surface-border rounded px-1.5 text-text-muted">{sp.hand}HP</span>}
+        {sp.hand && <span className="text-[10px] bg-white/8 rounded px-1.5 text-text-muted">{sp.hand}HP</span>}
         <span className="text-[10px] text-text-subtle ml-auto">{teamName}</span>
       </div>
       <div className="grid grid-cols-3 gap-2 text-xs font-mono tabular-nums">
@@ -363,7 +363,7 @@ function StarterCard({ sp, teamName }: { sp: StarterPitcherOut; teamName: string
         ))}
       </div>
       {sp.ip != null && (
-        <div className="border-t border-surface-border/40 pt-2 mt-1">
+        <div className="border-t border-white/[0.032] pt-2 mt-1">
           <div className="text-[10px] text-text-subtle uppercase tracking-widest mb-1">This Game</div>
           <div className="grid grid-cols-4 gap-2 text-xs font-mono tabular-nums">
             {[
@@ -403,7 +403,7 @@ function BullpenTable({ bp, teamName }: { bp: BullpenSummaryOut; teamName: strin
       <div className="overflow-x-auto">
         <table className="w-full text-xs font-mono tabular-nums border-collapse">
           <thead>
-            <tr className="text-text-subtle border-b border-surface-border/40 font-sans">
+            <tr className="text-text-subtle border-b border-white/[0.032] font-sans">
               <th className="text-left font-normal py-1">Pitcher</th>
               <th className="text-center font-normal py-1 px-2">H</th>
               <th className="text-right font-normal py-1 px-2">IP</th>
@@ -415,7 +415,7 @@ function BullpenTable({ bp, teamName }: { bp: BullpenSummaryOut; teamName: strin
           </thead>
           <tbody>
             {bp.pitchers.map((p, i) => (
-              <tr key={i} className="border-b border-surface-border/20 last:border-0">
+              <tr key={i} className="border-b border-white/[0.016] last:border-0">
                 <td className="py-1 font-sans text-text-muted">{p.name}</td>
                 <td className="py-1 px-2 text-center text-text-subtle">{p.hand}</td>
                 <td className="py-1 px-2 text-right text-text-muted">{p.ip != null ? fmt(p.ip, 1) : "—"}</td>
@@ -481,7 +481,7 @@ function OverviewTab({ match }: { match: TMatch }) {
             <div className="overflow-x-auto">
               <table className="w-full text-xs border-collapse">
                 <thead>
-                  <tr className="text-text-subtle border-b border-surface-border/40">
+                  <tr className="text-text-subtle border-b border-white/[0.032]">
                     <th className="text-left font-normal py-1 pr-2">Team</th>
                     <th className="text-left font-normal py-1 pr-2">Opp</th>
                     <th className="text-right font-normal py-1 pr-2">Score</th>
@@ -493,7 +493,7 @@ function OverviewTab({ match }: { match: TMatch }) {
                 </thead>
                 <tbody>
                   {[...(fh?.last_5 || []).map(e => ({ ...e, team: match.home.name })), ...(fa?.last_5 || []).map(e => ({ ...e, team: match.away.name }))].map((e, i) => (
-                    <tr key={i} className="border-b border-surface-border/30 last:border-0">
+                    <tr key={i} className="border-b border-white/[0.024] last:border-0">
                       <td className="py-1 pr-2 text-text-muted">{e.team}</td>
                       <td className="py-1 pr-2 font-mono text-text-subtle">{e.opponent}</td>
                       <td className="py-1 pr-2 font-mono text-text-muted text-right">{e.score}</td>
@@ -516,7 +516,7 @@ function OverviewTab({ match }: { match: TMatch }) {
         {/* Starters panel */}
         <PanelCard title="Starting Pitchers">
           {sh ? (
-            <div className="mb-4 pb-4 border-b border-surface-border/40">
+            <div className="mb-4 pb-4 border-b border-white/[0.032]">
               <StarterCard sp={sh} teamName={match.home.name} />
             </div>
           ) : null}
@@ -530,7 +530,7 @@ function OverviewTab({ match }: { match: TMatch }) {
             { bp: match.bullpen_home, name: match.home.name },
             { bp: match.bullpen_away, name: match.away.name },
           ].map(({ bp, name }) => bp ? (
-            <div key={name} className="flex items-center justify-between py-2 border-b border-surface-border/30 last:border-0">
+            <div key={name} className="flex items-center justify-between py-2 border-b border-white/[0.024] last:border-0">
               <div className="match-page-shell flex flex-col max-w-[1440px] mx-auto w-full px-4 py-4">
                 <span className="text-xs text-text-muted">{name}</span>
                 <span className="text-[10px] text-text-subtle">{bp.total_pitches_last_3d} P / last 3d</span>
@@ -576,7 +576,7 @@ function LineupsTab({ match }: { match: TMatch }) {
       <div>
         <table className="w-full text-xs border-collapse">
           <thead>
-            <tr className="text-text-subtle border-b border-surface-border/40">
+            <tr className="text-text-subtle border-b border-white/[0.032]">
               <th className="text-center font-normal py-1 w-6">#</th>
               <th className="text-left font-normal py-1 pl-2">Player</th>
               <th className="text-center font-normal py-1 px-2">Pos</th>
@@ -586,7 +586,7 @@ function LineupsTab({ match }: { match: TMatch }) {
           </thead>
           <tbody>
             {batting.batters.map((b, i) => (
-              <tr key={i} className="border-b border-surface-border/20 last:border-0">
+              <tr key={i} className="border-b border-white/[0.016] last:border-0">
                 <td className="py-1 text-center text-text-subtle font-mono">{b.batting_order}</td>
                 <td className="py-1 pl-2 text-text-muted">{b.name}</td>
                 <td className="py-1 px-2 text-center text-text-subtle">{b.position}</td>
@@ -597,7 +597,7 @@ function LineupsTab({ match }: { match: TMatch }) {
           </tbody>
         </table>
         {batting.team_avg != null && (
-          <div className="mt-2 flex items-center justify-between text-xs border-t border-surface-border/40 pt-2">
+          <div className="mt-2 flex items-center justify-between text-xs border-t border-white/[0.032] pt-2">
             <span className="text-text-subtle">Team AVG / OBP / SLG</span>
             <span className="font-mono text-text-muted">{fmtAvg(batting.team_avg)} / {fmtAvg(batting.team_obp)} / {fmtAvg(batting.team_slg)}</span>
           </div>
@@ -616,7 +616,7 @@ function LineupsTab({ match }: { match: TMatch }) {
       </MainCol>
       <SideCol>
         <PanelCard title="Starters">
-          {match.starter_home && <div className="mb-3 pb-3 border-b border-surface-border/40"><StarterCard sp={match.starter_home} teamName={match.home.name} /></div>}
+          {match.starter_home && <div className="mb-3 pb-3 border-b border-white/[0.032]"><StarterCard sp={match.starter_home} teamName={match.home.name} /></div>}
           {match.starter_away && <StarterCard sp={match.starter_away} teamName={match.away.name} />}
         </PanelCard>
       </SideCol>
@@ -675,7 +675,7 @@ function PitchingTab({ match }: { match: TMatch }) {
 
         {(match.bullpen_home || match.bullpen_away) && (
           <PanelCard title="Bullpen Usage">
-            {match.bullpen_home && <div className="mb-4 pb-4 border-b border-surface-border/40"><BullpenTable bp={match.bullpen_home} teamName={match.home.name} /></div>}
+            {match.bullpen_home && <div className="mb-4 pb-4 border-b border-white/[0.032]"><BullpenTable bp={match.bullpen_home} teamName={match.home.name} /></div>}
             {match.bullpen_away && <BullpenTable bp={match.bullpen_away} teamName={match.away.name} />}
           </PanelCard>
         )}
@@ -687,13 +687,13 @@ function PitchingTab({ match }: { match: TMatch }) {
             {sh?.pitch_arsenal && sh.pitch_arsenal.length > 0 && (
               <PanelCard title={`${match.home.name} Pitch Arsenal`}>
                 {sh.pitch_arsenal.map((p, i) => (
-                  <div key={i} className="py-1.5 border-b border-surface-border/30 last:border-0">
+                  <div key={i} className="py-1.5 border-b border-white/[0.024] last:border-0">
                     <div className="flex items-center justify-between mb-0.5 text-xs">
                       <span className="text-text-muted font-medium">{p.pitch_name}</span>
                       <span className="font-mono text-text-subtle">{(p.usage_pct * 100).toFixed(0)}%</span>
                     </div>
                     <div className="flex gap-2 items-center">
-                      <div className="flex-1 h-1.5 rounded bg-surface-border overflow-hidden">
+                      <div className="flex-1 h-1.5 rounded bg-white/8 overflow-hidden">
                         <div className="h-full bg-accent-blue/60 rounded" style={{ width: `${p.usage_pct * 100}%` }} />
                       </div>
                       <div className="flex gap-2 text-[10px] font-mono text-text-subtle">
@@ -708,13 +708,13 @@ function PitchingTab({ match }: { match: TMatch }) {
             {sa?.pitch_arsenal && sa.pitch_arsenal.length > 0 && (
               <PanelCard title={`${match.away.name} Pitch Arsenal`}>
                 {sa.pitch_arsenal.map((p, i) => (
-                  <div key={i} className="py-1.5 border-b border-surface-border/30 last:border-0">
+                  <div key={i} className="py-1.5 border-b border-white/[0.024] last:border-0">
                     <div className="flex items-center justify-between mb-0.5 text-xs">
                       <span className="text-text-muted font-medium">{p.pitch_name}</span>
                       <span className="font-mono text-text-subtle">{(p.usage_pct * 100).toFixed(0)}%</span>
                     </div>
                     <div className="flex gap-2 items-center">
-                      <div className="flex-1 h-1.5 rounded bg-surface-border overflow-hidden">
+                      <div className="flex-1 h-1.5 rounded bg-white/8 overflow-hidden">
                         <div className="h-full bg-accent-amber/60 rounded" style={{ width: `${p.usage_pct * 100}%` }} />
                       </div>
                       <div className="flex gap-2 text-[10px] font-mono text-text-subtle">
@@ -736,7 +736,7 @@ function PitchingTab({ match }: { match: TMatch }) {
         {/* Regression metrics / xStats */}
         {(sh || sa) && (
           <PanelCard title="Regression Metrics">
-            <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-surface-border/60 text-[10px] text-text-subtle font-medium">
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-white/[0.05] text-[10px] text-text-subtle font-medium">
               <span>{match.home.name}</span>
               <span className="text-center">Stat</span>
               <span className="text-right">{match.away.name}</span>
@@ -750,7 +750,7 @@ function PitchingTab({ match }: { match: TMatch }) {
               const hWins = hv != null && av != null && (lowerBetter ? hv < av : hv > av);
               const aWins = hv != null && av != null && (lowerBetter ? av < hv : av > hv);
               return (
-                <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 py-1.5 border-b border-surface-border/30 last:border-0 text-xs font-mono">
+                <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 py-1.5 border-b border-white/[0.024] last:border-0 text-xs font-mono">
                   <span className={cn("font-medium", hWins ? "text-accent-green" : "text-text-muted")}>{hv != null ? hv.toFixed(2) : "—"}</span>
                   <span className="text-[10px] text-text-subtle text-center">{label}</span>
                   <span className={cn("font-medium text-right", aWins ? "text-accent-green" : "text-text-muted")}>{av != null ? av.toFixed(2) : "—"}</span>
@@ -774,7 +774,7 @@ function BattingTable({ batting, teamName }: { batting: BaseballTeamBattingOut; 
       <div className="overflow-x-auto">
         <table className="w-full text-xs font-mono tabular-nums border-collapse">
           <thead>
-            <tr className="text-text-subtle border-b border-surface-border/40 font-sans">
+            <tr className="text-text-subtle border-b border-white/[0.032] font-sans">
               <th className="text-left font-normal py-1">Player</th>
               <th className="text-center font-normal py-1 px-1">Pos</th>
               <th className="text-right font-normal py-1 px-1">AB</th>
@@ -789,7 +789,7 @@ function BattingTable({ batting, teamName }: { batting: BaseballTeamBattingOut; 
           </thead>
           <tbody>
             {batting.batters.map((b, i) => (
-              <tr key={i} className="border-b border-surface-border/20 last:border-0">
+              <tr key={i} className="border-b border-white/[0.016] last:border-0">
                 <td className="py-1 font-sans text-text-muted">{b.name}</td>
                 <td className="py-1 px-1 text-center text-text-subtle">{b.position}</td>
                 <td className="py-1 px-1 text-right text-text-muted">{fmtInt(b.at_bats)}</td>
@@ -802,7 +802,7 @@ function BattingTable({ batting, teamName }: { batting: BaseballTeamBattingOut; 
                 <td className="py-1 text-right text-text-muted">{fmtAvg(b.batting_avg)}</td>
               </tr>
             ))}
-            <tr className="border-t border-surface-border/60 text-text-muted font-bold">
+            <tr className="border-t border-white/[0.05] text-text-muted font-bold">
               <td className="py-1 font-sans" colSpan={2}>Totals</td>
               <td className="py-1 px-1 text-right">{fmtInt(batting.batters.reduce((s, b) => s + (b.at_bats ?? 0), 0))}</td>
               <td className="py-1 px-1 text-right">{fmtInt(batting.total_runs)}</td>
@@ -861,7 +861,7 @@ function BattingTab({ match }: { match: TMatch }) {
             { t: match.home.name, b: bh },
             { t: match.away.name, b: ba },
           ].map(({ t, b }) => b ? (
-            <div key={t} className="mb-3 pb-3 border-b border-surface-border/40 last:border-0">
+            <div key={t} className="mb-3 pb-3 border-b border-white/[0.032] last:border-0">
               <div className="text-[10px] text-text-subtle mb-1">{t}</div>
               <div className="text-xs font-mono text-text-muted">
                 {fmtAvg(b.team_avg)} / {fmtAvg(b.team_obp)} / {fmtAvg(b.team_slg)} <span className="text-text-subtle text-[10px]">AVG/OBP/SLG</span>
@@ -882,12 +882,12 @@ function BattingTab({ match }: { match: TMatch }) {
               <div key={t} className="mb-3 last:mb-0">
                 <div className={cn("text-[10px] uppercase tracking-widest mb-1", col)}>{t}</div>
                 <div className="text-xs flex flex-col gap-0.5">
-                  {s.risp_avg != null && <div className="flex justify-between py-0.5 border-b border-surface-border/20"><span className="text-text-subtle">RISP AVG</span><span className="font-mono">{fmtAvg(s.risp_avg)}</span></div>}
-                  {s.risp_ops != null && <div className="flex justify-between py-0.5 border-b border-surface-border/20"><span className="text-text-subtle">RISP OPS</span><span className="font-mono">{fmtAvg(s.risp_ops)}</span></div>}
-                  {s.two_out_risp_avg != null && <div className="flex justify-between py-0.5 border-b border-surface-border/20"><span className="text-text-subtle">2-out RISP</span><span className="font-mono">{fmtAvg(s.two_out_risp_avg)}</span></div>}
-                  {s.vs_lhp_ops != null && <div className="flex justify-between py-0.5 border-b border-surface-border/20"><span className="text-text-subtle">vs LHP OPS</span><span className="font-mono">{fmtAvg(s.vs_lhp_ops)}</span></div>}
-                  {s.vs_rhp_ops != null && <div className="flex justify-between py-0.5 border-b border-surface-border/20"><span className="text-text-subtle">vs RHP OPS</span><span className="font-mono">{fmtAvg(s.vs_rhp_ops)}</span></div>}
-                  {s.late_close_avg != null && <div className="flex justify-between py-0.5 border-b border-surface-border/20"><span className="text-text-subtle">Late/Close</span><span className="font-mono">{fmtAvg(s.late_close_avg)}</span></div>}
+                  {s.risp_avg != null && <div className="flex justify-between py-0.5 border-b border-white/[0.016]"><span className="text-text-subtle">RISP AVG</span><span className="font-mono">{fmtAvg(s.risp_avg)}</span></div>}
+                  {s.risp_ops != null && <div className="flex justify-between py-0.5 border-b border-white/[0.016]"><span className="text-text-subtle">RISP OPS</span><span className="font-mono">{fmtAvg(s.risp_ops)}</span></div>}
+                  {s.two_out_risp_avg != null && <div className="flex justify-between py-0.5 border-b border-white/[0.016]"><span className="text-text-subtle">2-out RISP</span><span className="font-mono">{fmtAvg(s.two_out_risp_avg)}</span></div>}
+                  {s.vs_lhp_ops != null && <div className="flex justify-between py-0.5 border-b border-white/[0.016]"><span className="text-text-subtle">vs LHP OPS</span><span className="font-mono">{fmtAvg(s.vs_lhp_ops)}</span></div>}
+                  {s.vs_rhp_ops != null && <div className="flex justify-between py-0.5 border-b border-white/[0.016]"><span className="text-text-subtle">vs RHP OPS</span><span className="font-mono">{fmtAvg(s.vs_rhp_ops)}</span></div>}
+                  {s.late_close_avg != null && <div className="flex justify-between py-0.5 border-b border-white/[0.016]"><span className="text-text-subtle">Late/Close</span><span className="font-mono">{fmtAvg(s.late_close_avg)}</span></div>}
                   {s.clutch_score != null && <div className="flex justify-between py-0.5"><span className="text-text-subtle">Clutch Score</span><span className={cn("font-mono font-semibold", s.clutch_score > 0 ? "text-accent-green" : "text-t1")}>{s.clutch_score >= 0 ? "+" : ""}{s.clutch_score.toFixed(2)}</span></div>}
                 </div>
               </div>
@@ -902,7 +902,7 @@ function BattingTab({ match }: { match: TMatch }) {
         {/* Statcast / batted ball */}
         {(match.batted_ball_home || match.batted_ball_away) && (
           <PanelCard title="Statcast / Batted Ball">
-            <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-surface-border/60 text-[10px] text-text-subtle font-medium">
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-1 pb-1 mb-1 border-b border-white/[0.05] text-[10px] text-text-subtle font-medium">
               <span>{match.home.name}</span>
               <span className="text-center">Stat</span>
               <span className="text-right">{match.away.name}</span>
@@ -920,7 +920,7 @@ function BattingTab({ match }: { match: TMatch }) {
               const aWins = hv != null && av != null && av > hv;
               const d = label.includes("%") ? 1 : label.includes("Velo") ? 1 : 3;
               return (
-                <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 py-1.5 border-b border-surface-border/30 last:border-0 text-xs font-mono">
+                <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 py-1.5 border-b border-white/[0.024] last:border-0 text-xs font-mono">
                   <span className={cn("font-medium", hWins ? "text-accent-green" : "text-text-muted")}>{hv != null ? hv.toFixed(d) : "—"}</span>
                   <span className="text-[10px] text-text-subtle text-center whitespace-nowrap">{label}</span>
                   <span className={cn("font-medium text-right", aWins ? "text-accent-green" : "text-text-muted")}>{av != null ? av.toFixed(d) : "—"}</span>
@@ -988,9 +988,9 @@ function InningsTab({ match }: { match: TMatch }) {
                 <div key={inn}>
                   <div className="text-[10px] text-text-subtle uppercase tracking-widest mb-1">Inning {inn}</div>
                   {evts!.map((e, i) => (
-                    <div key={i} className={cn("flex items-start gap-2 py-1 border-b border-surface-border/20 last:border-0")}>
+                    <div key={i} className={cn("flex items-start gap-2 py-1 border-b border-white/[0.016] last:border-0")}>
                       <span className={cn("text-[10px] font-bold px-1 py-0.5 rounded mt-0.5",
-                        e.event_type === "HR" ? "bg-accent-amber/20 text-accent-amber" : "bg-surface-border text-text-subtle"
+                        e.event_type === "HR" ? "bg-accent-amber/20 text-accent-amber" : "bg-white/8 text-text-subtle"
                       )}>{e.event_type ?? "•"}</span>
                       <span className={cn("text-xs", e.team === "home" ? "text-positive" : "text-t1")}>{e.half === "bottom" ? "▼" : "▲"}</span>
                       <span className="text-xs text-text-muted">{e.description}</span>
@@ -1037,7 +1037,7 @@ function H2HTab({ match }: { match: TMatch }) {
           <PanelCard title="Recent Series">
             <table className="w-full text-xs border-collapse">
               <thead>
-                <tr className="text-text-subtle border-b border-surface-border/40">
+                <tr className="text-text-subtle border-b border-white/[0.032]">
                   <th className="text-left font-normal py-1">Date</th>
                   <th className="text-right font-normal py-1">Away</th>
                   <th className="text-center font-normal py-1 px-2">–</th>
@@ -1047,7 +1047,7 @@ function H2HTab({ match }: { match: TMatch }) {
               </thead>
               <tbody>
                 {h2h.recent_matches.map((m: any, i: number) => (
-                  <tr key={i} className="border-b border-surface-border/20 last:border-0">
+                  <tr key={i} className="border-b border-white/[0.016] last:border-0">
                     <td className="py-1 text-text-subtle">{m.date ? new Date(m.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }) : "—"}</td>
                     <td className="py-1 text-right font-mono text-text-muted">{m.away_score ?? "—"}</td>
                     <td className="py-1 text-center text-text-subtle px-2">–</td>
@@ -1129,7 +1129,7 @@ function EloTab({
                   {elo.pitcher_adj != null && <div className="flex justify-between py-0.5"><span className="text-text-subtle">SP Adj</span><span className={cn("font-mono", elo.pitcher_adj >= 0 ? "text-accent-green" : "text-t1")}>{elo.pitcher_adj >= 0 ? "+" : ""}{fmt(elo.pitcher_adj, 1)}</span></div>}
                   {elo.park_factor_applied != null && <div className="flex justify-between py-0.5"><span className="text-text-subtle">Park Factor</span><span className={cn("font-mono", elo.park_factor_applied > 0 ? "text-accent-amber" : "text-text-muted")}>{elo.park_factor_applied > 0 ? "+" : ""}{fmt(elo.park_factor_applied, 0)}</span></div>}
                   {elo.bullpen_fatigue_adj != null && <div className="flex justify-between py-0.5"><span className="text-text-subtle">Bullpen Adj</span><span className={cn("font-mono", elo.bullpen_fatigue_adj < 0 ? "text-t1" : "text-text-muted")}>{fmt(elo.bullpen_fatigue_adj, 1)}</span></div>}
-                  {elo.implied_win_prob != null && <div className="flex justify-between py-0.5 border-t border-surface-border/40 mt-1 pt-1"><span className="text-text-subtle">Elo Win Prob</span><span className="font-mono font-bold text-text-primary">{fmtPct(elo.implied_win_prob, 1)}</span></div>}
+                  {elo.implied_win_prob != null && <div className="flex justify-between py-0.5 border-t border-white/[0.032] mt-1 pt-1"><span className="text-text-subtle">Elo Win Prob</span><span className="font-mono font-bold text-text-primary">{fmtPct(elo.implied_win_prob, 1)}</span></div>}
                 </div>
               ))}
             </div>
@@ -1248,7 +1248,7 @@ function ModelTab({ match }: { match: TMatch }) {
                 const prob = label === 'Home' ? match.probabilities?.home_win : match.probabilities?.away_win;
                 const edge = prob != null ? (prob - 1 / Number(val)) * 100 : null;
                 return (
-                  <div key={label} className="flex-1 bg-surface-overlay border border-surface-border rounded-xl p-3 flex flex-col items-center gap-1">
+                  <div key={label} className="flex-1 bg-white/[0.04] border border-white/8 rounded-xl p-3 flex flex-col items-center gap-1">
                     <span className="text-[10px] text-text-muted">{label}</span>
                     <span className="text-lg font-bold font-mono text-text-primary">{Number(val).toFixed(2)}</span>
                     {edge != null && (
@@ -1294,7 +1294,7 @@ function ContextTab({ match }: { match: TMatch }) {
                   </span>
                 </div>
                 {/* Directional bar: centre=0, amber right=hitter-friendly, purple left=pitcher-friendly, range -30 to +30 */}
-                <div className="relative h-3 rounded-full bg-surface-border overflow-hidden">
+                <div className="relative h-3 rounded-full bg-white/8 overflow-hidden">
                   <div className="absolute inset-y-0 left-1/2 w-px bg-white/20" />
                   {mi.park_factor > 0 ? (
                     <div
@@ -1367,7 +1367,7 @@ function ContextTab({ match }: { match: TMatch }) {
         {(mi?.home_record || mi?.away_record) && (
           <PanelCard title="Season Records">
             {mi.home_record && (
-              <div className="flex items-center justify-between py-1 border-b border-surface-border/30 text-xs">
+              <div className="flex items-center justify-between py-1 border-b border-white/[0.024] text-xs">
                 <span className="text-text-subtle">{match.home.name}</span>
                 <div className="flex items-center gap-2">
                   <span className="font-mono font-semibold text-text-primary">{mi.home_record}</span>

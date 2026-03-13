@@ -134,17 +134,17 @@ function MatchDrawer({ p }: { p: MvpPrediction }) {
   const marketOdds = p.market_odds ?? undefined;
 
   return (
-    <div className="bg-surface-base border-b border-surface-border px-3 pb-4 pt-3">
+    <div className="bg-white/[0.03] border-b border-white/8 px-3 pb-4 pt-3">
       {/* Callout strip */}
       <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-overlay border border-surface-border">
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-white/[0.04] border border-white/8">
           <span className="text-[10px] text-text-muted">Edge</span>
           <span className={cn("num text-[12px] font-semibold", edge > 0 ? "text-accent-teal" : "text-text-muted")}>
             {edge > 0 ? "+" : ""}{edge}%
           </span>
         </div>
         {vol && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-overlay border border-surface-border">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-white/[0.04] border border-white/8">
             <span className="text-[10px] text-text-muted">Volatility</span>
             <span className={cn("text-[11px] font-medium", vol === "Stable" ? "text-accent-green" : "text-accent-amber")}>{vol}</span>
           </div>
@@ -154,7 +154,7 @@ function MatchDrawer({ p }: { p: MvpPrediction }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Probs */}
-        <div className="bg-surface-overlay rounded border border-surface-border p-2.5 space-y-2">
+        <div className="bg-white/[0.04] rounded border border-white/8 p-2.5 space-y-2">
           <p className="label">Probabilities</p>
           {[
             { label: "Home", name: p.participants.home.name, value: p.probabilities.home_win, mkt: marketOdds?.home_win, color: "#22c55e" },
@@ -169,7 +169,7 @@ function MatchDrawer({ p }: { p: MvpPrediction }) {
                   <span className="num text-[12px] font-semibold" style={{ color }}>{fmtPct(value)}</span>
                 </div>
               </div>
-              <div className="h-1.5 bg-surface-border rounded-full overflow-hidden">
+              <div className="h-1.5 bg-white/8 rounded-full overflow-hidden">
                 <div className="h-full rounded-full" style={{ width: `${value * 100}%`, backgroundColor: color }} />
               </div>
             </div>
@@ -177,7 +177,7 @@ function MatchDrawer({ p }: { p: MvpPrediction }) {
         </div>
 
         {/* Key drivers + explain */}
-        <div className="bg-surface-overlay rounded border border-surface-border p-2.5 space-y-2">
+        <div className="bg-white/[0.04] rounded border border-white/8 p-2.5 space-y-2">
           <p className="label">Key Drivers</p>
           {p.key_drivers?.length ? (
             <div className="space-y-2">
@@ -187,7 +187,7 @@ function MatchDrawer({ p }: { p: MvpPrediction }) {
                     <span className="text-[11px] text-text-muted font-mono truncate max-w-[110px]">{d.feature.replace(/_/g, " ")}</span>
                     <span className="num text-[11px] text-text-primary shrink-0">{(d.importance * 100).toFixed(0)}%</span>
                   </div>
-                  <div className="h-1 bg-surface-border rounded-full overflow-hidden">
+                  <div className="h-1 bg-white/8 rounded-full overflow-hidden">
                     <div className="h-full rounded-full bg-accent-teal/60" style={{ width: `${d.importance * 100}%` }} />
                   </div>
                 </div>
@@ -196,7 +196,7 @@ function MatchDrawer({ p }: { p: MvpPrediction }) {
           ) : (
             <p className="text-[11px] text-text-muted">No driver data</p>
           )}
-          <div className="pt-2 border-t border-surface-border">
+          <div className="pt-2 border-t border-white/8">
             <button onClick={() => setShowExplain((v) => !v)} className="flex items-center gap-1 text-[11px] text-accent-teal hover:opacity-80 transition-opacity">
               <Info size={10} />{showExplain ? "Hide" : "Explain →"}
             </button>
@@ -207,7 +207,7 @@ function MatchDrawer({ p }: { p: MvpPrediction }) {
         </div>
 
         {/* Simulation */}
-        <div className="bg-surface-overlay rounded border border-surface-border p-2.5 space-y-2">
+        <div className="bg-white/[0.04] rounded border border-white/8 p-2.5 space-y-2">
           <p className="label">Score Simulation</p>
           {p.simulation ? (
             <>
@@ -219,7 +219,7 @@ function MatchDrawer({ p }: { p: MvpPrediction }) {
               {p.simulation.distribution.slice(0, 5).map((d) => (
                 <div key={d.score} className="flex items-center gap-2">
                   <span className="num text-[11px] font-medium text-text-primary w-7 shrink-0">{d.score}</span>
-                  <div className="flex-1 h-1 bg-surface-border rounded-full overflow-hidden">
+                  <div className="flex-1 h-1 bg-white/8 rounded-full overflow-hidden">
                     <div className="h-full rounded-full bg-accent-purple/60" style={{ width: `${Math.min(d.probability * 500, 100)}%` }} />
                   </div>
                   <span className="num text-[10px] text-text-muted w-7 text-right">{fmtPct(d.probability)}</span>
@@ -404,11 +404,11 @@ export function MarketsTable({
       )}
 
       {/* Header controls */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-surface-border bg-surface-base sticky z-10" style={{ top: `${stickyOffset}px` }}>
+      <div className="flex items-center justify-between px-3 py-2 border-b border-white/8 bg-white/[0.03] sticky z-10" style={{ top: `${stickyOffset}px` }}>
         <div className="flex items-center gap-2">
           {onModeChange && (
-            <div className="flex items-center gap-0.5 bg-surface-raised border border-surface-border rounded p-0.5">
-              <button onClick={() => onModeChange("confidence")} className={cn("px-2 py-0.5 rounded text-[11px] transition-colors", mode === "confidence" ? "bg-surface-border text-text-primary" : "text-text-subtle hover:text-text-muted")}>Conf</button>
+            <div className="flex items-center gap-0.5 bg-white/[0.04] border border-white/8 rounded p-0.5">
+              <button onClick={() => onModeChange("confidence")} className={cn("px-2 py-0.5 rounded text-[11px] transition-colors", mode === "confidence" ? "bg-white/8 text-text-primary" : "text-text-subtle hover:text-text-muted")}>Conf</button>
               <button onClick={() => onModeChange("edge")} className={cn("px-2 py-0.5 rounded text-[11px] transition-colors", mode === "edge" ? "bg-accent-teal/15 text-accent-teal" : "text-text-subtle hover:text-text-muted")}>Edge</button>
             </div>
           )}

@@ -141,7 +141,7 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(10,21,16,0.96),rgba(8,18,14,0.96))] p-4 lg:p-5">
+      <section className="rounded-[28px] border border-white/8 bg-white/[0.04] p-4 lg:p-5">
         {/* Sport bar — same style as live page */}
         <div className="overflow-x-auto" style={{ scrollbarWidth: "none" }}>
           <div className="flex min-w-max items-center gap-2 rounded-[24px] border border-white/8 bg-white/[0.03] p-2">

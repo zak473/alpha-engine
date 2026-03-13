@@ -67,14 +67,14 @@ export function BettingDashboard({ matches, sport }: { matches: BettingMatch[]; 
   const displaySport: SportSlug = activeSport === "all" ? "soccer" : activeSport;
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden bg-[linear-gradient(180deg,#08120e_0%,#0a1510_100%)]">
+    <div className="flex min-h-0 flex-1 overflow-hidden">
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
           <BettingHero matches={sportFiltered} filteredCount={filtered.length} activeSportLabel={activeSportLabel} />
 
           <div className="px-4 lg:px-6">
             <section className="grid gap-4 pb-4 xl:grid-cols-[1.15fr_0.85fr]">
-              <div className="rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,rgba(10,21,16,0.98),rgba(8,18,14,0.98))] p-5 lg:p-6">
+              <div className="rounded-[30px] border border-white/8 bg-white/[0.04] p-5 lg:p-6">
                 <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/16 bg-emerald-300/8 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200">
                   <Sparkles size={12} />
                   Board controls

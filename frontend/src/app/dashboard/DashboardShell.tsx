@@ -219,7 +219,7 @@ export function DashboardShell({
         <div className="flex-1 overflow-y-auto min-w-0">
 
           {/* Filter bar (sticky within scroll container) */}
-          <div className="sticky top-0 z-20 bg-surface-base border-b border-surface-border">
+          <div className="sticky top-0 z-20 bg-white/[0.03] border-b border-white/8">
             <FilterBar
               sport={initialSport}
               range={initialRange}
@@ -241,7 +241,7 @@ export function DashboardShell({
           />
 
           {/* Bottom panels: InPlay + Performance + ELO + Challenges */}
-          <div className="p-4 space-y-4 border-t border-surface-border">
+          <div className="p-4 space-y-4 border-t border-white/8">
             {/* InPlay — full width if there are live matches */}
             {liveMatches.length > 0 && (
               <InPlayModule matches={liveMatches} />

@@ -88,7 +88,7 @@ function addToWatchlist(entry: { id: string; name: string; sport: string }) {
 function ConfBadge({ value }: { value: number }) {
   if (value >= 80) return <span className="inline-flex px-1.5 py-0.5 rounded text-2xs font-semibold bg-accent-green/15 text-accent-green border border-accent-green/25">HIGH</span>;
   if (value >= 65) return <span className="inline-flex px-1.5 py-0.5 rounded text-2xs font-semibold bg-accent-amber/15 text-accent-amber border border-accent-amber/25">MED</span>;
-  return <span className="inline-flex px-1.5 py-0.5 rounded text-2xs font-semibold bg-surface-border/50 text-text-muted border border-surface-border">LOW</span>;
+  return <span className="inline-flex px-1.5 py-0.5 rounded text-2xs font-semibold bg-white/[0.04] text-text-muted border border-white/8">LOW</span>;
 }
 
 // ── Mini prob bar ─────────────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ function PredictionDrawer({ p, mode }: { p: MvpPrediction; mode: SignalMode }) {
   const pick = impliedPick(p);
 
   return (
-    <div className="bg-surface-base/60 border-y border-surface-border">
+    <div className="bg-white/[0.025] border-y border-white/8">
       {/* Top callout row */}
       <div className="px-4 pt-3 pb-2 flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-accent-blue/10 border border-accent-blue/20">
@@ -122,7 +122,7 @@ function PredictionDrawer({ p, mode }: { p: MvpPrediction; mode: SignalMode }) {
             {edge > 0 ? "+" : ""}{edge}%
           </span>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-surface-overlay border border-surface-border">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-white/[0.04] border border-white/8">
           <span className="text-2xs text-text-muted">Lean</span>
           <span className="text-xs font-medium text-text-primary">{pick.label} ({pick.pct}%)</span>
         </div>
@@ -134,7 +134,7 @@ function PredictionDrawer({ p, mode }: { p: MvpPrediction; mode: SignalMode }) {
       {/* 3 mini-cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 px-4 pb-3">
         {/* Card 1: Probabilities + odds */}
-        <div className="bg-surface-overlay rounded-lg border border-surface-border p-3 space-y-2">
+        <div className="bg-white/[0.04] rounded-lg border border-white/8 p-3 space-y-2">
           <p className="label">Win Probabilities</p>
           {[
             { label: "Home", name: p.participants.home.name, value: prob.home_win, marketOdds: marketOdds?.home_win, color: "#22c55e" },
@@ -153,14 +153,14 @@ function PredictionDrawer({ p, mode }: { p: MvpPrediction; mode: SignalMode }) {
                     <span className="num text-xs font-semibold" style={{ color }}>{fmtPct(value)}</span>
                   </div>
                 </div>
-                <div className="h-1.5 bg-surface-border rounded-full overflow-hidden">
+                <div className="h-1.5 bg-white/8 rounded-full overflow-hidden">
                   <div className="h-full rounded-full" style={{ width: `${value * 100}%`, backgroundColor: color }} />
                 </div>
               </div>
             );
           })}
           {odds && (
-            <div className="pt-2 border-t border-surface-border">
+            <div className="pt-2 border-t border-white/8">
               <p className="label mb-1">Fair Odds</p>
               <div className="flex gap-3">
                 {odds.home_win > 0 && <div className="text-center"><p className="num text-sm font-semibold text-text-primary">{odds.home_win.toFixed(2)}</p><p className="text-2xs text-text-muted">Home</p></div>}
@@ -172,7 +172,7 @@ function PredictionDrawer({ p, mode }: { p: MvpPrediction; mode: SignalMode }) {
         </div>
 
         {/* Card 2: Key Drivers */}
-        <div className="bg-surface-overlay rounded-lg border border-surface-border p-3 space-y-2">
+        <div className="bg-white/[0.04] rounded-lg border border-white/8 p-3 space-y-2">
           <p className="label">Key Drivers</p>
           {drivers?.length ? (
             <div className="space-y-2.5">
@@ -182,7 +182,7 @@ function PredictionDrawer({ p, mode }: { p: MvpPrediction; mode: SignalMode }) {
                     <span className="text-xs text-text-muted font-mono truncate max-w-[120px]">{d.feature.replace(/_/g, " ")}</span>
                     <span className="num text-xs text-text-primary shrink-0 ml-1">{(d.importance * 100).toFixed(0)}%</span>
                   </div>
-                  <div className="h-1 bg-surface-border rounded-full overflow-hidden">
+                  <div className="h-1 bg-white/8 rounded-full overflow-hidden">
                     <div className="h-full rounded-full bg-accent-blue/70" style={{ width: `${d.importance * 100}%` }} />
                   </div>
                 </div>
@@ -193,7 +193,7 @@ function PredictionDrawer({ p, mode }: { p: MvpPrediction; mode: SignalMode }) {
           )}
 
           {/* Explain this */}
-          <div className="pt-2 border-t border-surface-border">
+          <div className="pt-2 border-t border-white/8">
             <button
               onClick={() => setShowExplain((v) => !v)}
               className="flex items-center gap-1 text-2xs text-accent-blue hover:text-accent-blue/80 transition-colors"
@@ -210,7 +210,7 @@ function PredictionDrawer({ p, mode }: { p: MvpPrediction; mode: SignalMode }) {
         </div>
 
         {/* Card 3: Simulation */}
-        <div className="bg-surface-overlay rounded-lg border border-surface-border p-3 space-y-2">
+        <div className="bg-white/[0.04] rounded-lg border border-white/8 p-3 space-y-2">
           <p className="label">Score Simulation</p>
           {sim ? (
             <>
@@ -229,7 +229,7 @@ function PredictionDrawer({ p, mode }: { p: MvpPrediction; mode: SignalMode }) {
                 {sim.distribution.slice(0, 5).map((d) => (
                   <div key={d.score} className="flex items-center gap-2">
                     <span className="num text-xs font-medium text-text-primary w-8 shrink-0">{d.score}</span>
-                    <div className="flex-1 h-1 bg-surface-border rounded-full overflow-hidden">
+                    <div className="flex-1 h-1 bg-white/8 rounded-full overflow-hidden">
                       <div className="h-full rounded-full bg-accent-purple/60" style={{ width: `${Math.min(d.probability * 500, 100)}%` }} />
                     </div>
                     <span className="num text-2xs text-text-muted w-8 text-right">{fmtPct(d.probability)}</span>
@@ -375,7 +375,7 @@ export function TopSignalsTable({
     <div className="flex items-center gap-1.5">
       {/* Mode toggle */}
       {onModeChange && (
-        <div className="flex items-center gap-0.5 bg-surface-overlay border border-surface-border rounded-md p-0.5">
+        <div className="flex items-center gap-0.5 bg-white/[0.04] border border-white/8 rounded-md p-0.5">
           <button
             onClick={() => onModeChange("confidence")}
             className={cn("px-2 py-0.5 rounded text-2xs transition-colors", mode === "confidence" ? "bg-accent-blue/15 text-accent-blue" : "text-text-muted hover:text-text-primary")}
@@ -417,7 +417,7 @@ export function TopSignalsTable({
   if (loading) {
     return (
       <PanelCard title="Top Signals" subtitle="By confidence" padding="flush">
-        <div className="divide-y divide-surface-border/50">
+        <div className="divide-y divide-white/[0.04]">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="flex items-center gap-3 px-4 py-3">
               <Skeleton className="w-4 h-4" />
@@ -486,7 +486,7 @@ export function TopSignalsTable({
       {sorted.length === 0 ? (
         <EmptyState icon={Inbox} title="No predictions available" description="Predictions will appear once the pipeline has run." />
       ) : (
-        <div className="divide-y divide-surface-border/50">
+        <div className="divide-y divide-white/[0.04]">
           {sorted.map((p, idx) => {
             const expanded  = expandedId === p.event_id;
             const isKeyboard = selectedIdx === idx;

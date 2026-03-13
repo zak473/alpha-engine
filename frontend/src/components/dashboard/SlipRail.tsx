@@ -94,7 +94,7 @@ export function SlipRail({
   // Collapsed icon-only mode
   if (!open) {
     return (
-      <div className="w-9 flex flex-col items-center py-3 gap-3 border-l border-surface-border bg-surface-raised shrink-0">
+      <div className="w-9 flex flex-col items-center py-3 gap-3 border-l border-white/8 bg-white/[0.04] shrink-0">
         <button onClick={onToggle} title="Expand slip" className="text-text-subtle hover:text-text-muted transition-colors">
           <PanelRightOpen size={15} />
         </button>
@@ -111,7 +111,7 @@ export function SlipRail({
 
   return (
     <div
-      className="flex flex-col border-l border-surface-border bg-surface-raised overflow-hidden shrink-0"
+      className="flex flex-col border-l border-white/8 bg-white/[0.04] overflow-hidden shrink-0"
       style={{ width: "var(--slip-rail-width)" }}
     >
       {/* Header */}
@@ -142,7 +142,7 @@ export function SlipRail({
               {sorted.map((item) => {
                 const isUrgent = new Date(item.startTime).getTime() - Date.now() < 3_600_000;
                 return (
-                  <div key={item.eventId} className="px-3 py-2.5 border-b border-surface-border hover:bg-white/[0.015] transition-colors">
+                  <div key={item.eventId} className="px-3 py-2.5 border-b border-white/8 hover:bg-white/[0.015] transition-colors">
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <div className="min-w-0 flex-1">
                         <p className="text-[12px] font-medium text-text-primary truncate">{item.home} vs {item.away}</p>
@@ -190,7 +190,7 @@ export function SlipRail({
         </section>
 
         {/* Divider */}
-        <div className="border-t border-surface-border" />
+        <div className="border-t border-white/8" />
 
         {/* Compact watchlist */}
         <section>
@@ -210,7 +210,7 @@ export function SlipRail({
                   return (isHome || isAway) && new Date(p.start_time).getTime() > now;
                 });
                 return (
-                  <div key={entry.id} className="flex items-center gap-2 px-3 py-1.5 border-b border-surface-border/40 group/we hover:bg-white/[0.015] transition-colors">
+                  <div key={entry.id} className="flex items-center gap-2 px-3 py-1.5 border-b border-white/[0.032] group/we hover:bg-white/[0.015] transition-colors">
                     <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: sportColor(entry.sport) }} />
                     <div className="min-w-0 flex-1">
                       <p className="text-[11px] text-text-primary truncate">{entry.name}</p>
@@ -239,7 +239,7 @@ export function SlipRail({
         </section>
 
         {/* Divider */}
-        {alerts.length > 0 && <div className="border-t border-surface-border" />}
+        {alerts.length > 0 && <div className="border-t border-white/8" />}
 
         {/* Alerts */}
         {alerts.length > 0 && (
@@ -250,7 +250,7 @@ export function SlipRail({
                 const Icon = a.level === "error" ? AlertCircle : a.level === "warn" ? AlertTriangle : CheckCircle;
                 const color = a.level === "error" ? "text-accent-red" : a.level === "warn" ? "text-accent-amber" : "text-accent-green";
                 return (
-                  <div key={a.id} className="flex items-start gap-2 px-3 py-2 border-b border-surface-border/40">
+                  <div key={a.id} className="flex items-start gap-2 px-3 py-2 border-b border-white/[0.032]">
                     <Icon size={11} className={cn("shrink-0 mt-0.5", color)} />
                     <p className="text-[11px] text-text-muted leading-snug">{a.message}</p>
                   </div>
