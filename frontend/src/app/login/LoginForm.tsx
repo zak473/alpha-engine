@@ -2,13 +2,15 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 
 export function LoginForm() {
   const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") ?? "/dashboard";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +22,7 @@ export function LoginForm() {
     setLoading(true);
     try {
       await login(email, password);
-      router.push("/dashboard");
+      router.push(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
