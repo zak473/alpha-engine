@@ -1,22 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const PROTECTED_ROUTES = [
-  "/dashboard",
-  "/profile",
-  "/record",
-  "/challenges",
-  "/performance",
-  "/admin",
-];
+const PUBLIC_PATHS = ["/login", "/register"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  const isProtected = PROTECTED_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(route + "/")
-  );
-
-  if (!isProtected) return NextResponse.next();
+  // Allow public pages
+  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
+    return NextResponse.next();
+  }
 
   const token = req.cookies.get("ae_token")?.value;
   if (!token) {
@@ -30,7 +22,6 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/(dashboard|profile|record|challenges|performance|admin)(.*)",
-  ],
+  // Run on every route except Next.js internals and static files
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 };
