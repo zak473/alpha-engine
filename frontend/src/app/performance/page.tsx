@@ -1,5 +1,3 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import { PerformanceClient } from "@/components/performance/PerformanceClient";
 import { getPicks, getPicksStats, getPerformance, getBankroll, getPredictionAccuracy } from "@/lib/api";
@@ -29,8 +27,6 @@ function buildRoiSeries(picks: PickOut[]): RoiPoint[] {
 }
 
 export default async function PerformancePage() {
-  const token = cookies().get("ae_token")?.value;
-  if (!token) redirect("/login?next=/performance");
 
   // Fetch everything in parallel, gracefully degrade on failure
   const [picks, overallStats, perfData, bankroll, accuracy, ...sportStatsList] = await Promise.all([
@@ -64,7 +60,7 @@ export default async function PerformancePage() {
     .slice(0, 20);
 
   return (
-    <AppShell title="Performance Lab" subtitle="ROI, bankroll trends, and model output analytics" requireAuth>
+    <AppShell title="Performance Lab" subtitle="ROI, bankroll trends, and model output analytics">
       <PerformanceClient
         overall={overallStats}
         roiSeries={roiSeries}

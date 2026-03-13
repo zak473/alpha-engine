@@ -1,19 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/register"];
+// Pages that do not require a login
+const AUTH_PAGES = ["/login", "/register", "/forgot-password"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const token = req.cookies.get("ae_token")?.value;
 
-  // Allow public pages
-  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
-    return NextResponse.next();
+  const isAuthPage = AUTH_PAGES.some(
+    (p) => pathname === p || pathname.startsWith(p + "/")
+  );
+
+  // Logged-in user hitting login/register → send to dashboard
+  if (isAuthPage && token) {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  const token = req.cookies.get("ae_token")?.value;
-  if (!token) {
-    const loginUrl = req.nextUrl.clone();
-    loginUrl.pathname = "/login";
+  // Unauthenticated user hitting any other page → send to login
+  if (!isAuthPage && !token) {
+    const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }

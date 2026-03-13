@@ -10,11 +10,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from api.deps import get_db
+from api.deps import get_db, get_current_user
 from db.models.basketball import BasketballTeamMatchStats
 from db.models.mvp import CoreMatch, CoreTeam
 
-router = APIRouter(prefix="/basketball", tags=["Basketball"])
+router = APIRouter(prefix="/basketball", tags=["Basketball"], dependencies=[Depends(get_current_user)])
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────

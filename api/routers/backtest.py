@@ -13,10 +13,10 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from api.deps import get_db
+from api.deps import get_db, get_current_user
 from core.types import PredictionResult, Sport
 
-router = APIRouter(prefix="/backtest", tags=["Backtest"])
+router = APIRouter(prefix="/backtest", tags=["Backtest"], dependencies=[Depends(get_current_user)])
 
 
 def _outcome_to_float(outcome: str | None) -> float | None:

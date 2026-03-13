@@ -1,5 +1,3 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import { BettingDashboard } from "@/components/betting/BettingDashboard";
 import { getSportMatches, type SportSlug } from "@/lib/api";
@@ -27,8 +25,6 @@ async function getMatches(): Promise<BettingMatch[]> {
 }
 
 export default async function DashboardPage() {
-  const token = cookies().get("ae_token")?.value;
-  if (!token) redirect("/login?next=/dashboard");
 
   const allMatches = await getMatches();
 
@@ -42,7 +38,7 @@ export default async function DashboardPage() {
   });
 
   return (
-    <AppShell title="Betting Board" subtitle="Never In Doubt live market view" compact requireAuth>
+    <AppShell title="Betting Board" subtitle="Never In Doubt live market view" compact>
       <BettingDashboard matches={sorted} />
     </AppShell>
   );

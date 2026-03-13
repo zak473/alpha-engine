@@ -10,10 +10,10 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from api.deps import get_db
+from api.deps import get_db, get_current_user
 from db.models.mvp import CoreMatch, CoreTeam, CoreLeague
 
-router = APIRouter(prefix="/matches", tags=["matches"])
+router = APIRouter(prefix="/matches", tags=["matches"], dependencies=[Depends(get_current_user)])
 
 ALL_SPORTS = ["soccer", "tennis", "esports", "basketball", "baseball", "hockey"]
 

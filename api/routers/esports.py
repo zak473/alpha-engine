@@ -7,11 +7,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from api.deps import get_session
+from api.deps import get_session, get_current_user
 from api.schemas.predictions import PredictionResponse, RatingResponse, HeadToHeadResponse
 from db.models import TeamRating, HeadToHead, Prediction
 
-router = APIRouter(prefix="/esports", tags=["Esports"])
+router = APIRouter(prefix="/esports", tags=["Esports"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/ratings/{team_id}", response_model=RatingResponse)

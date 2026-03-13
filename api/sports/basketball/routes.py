@@ -7,11 +7,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from api.deps import get_db
+from api.deps import get_db, get_current_user
 from api.sports.basketball.schemas import BasketballMatchDetail, BasketballMatchListResponse, EloHistoryPoint
 from api.sports.basketball.service import BasketballMatchService
 
-router = APIRouter(prefix="/sports/basketball", tags=["Basketball Matches"])
+router = APIRouter(prefix="/sports/basketball", tags=["Basketball Matches"], dependencies=[Depends(get_current_user)])
 _service = BasketballMatchService()
 
 

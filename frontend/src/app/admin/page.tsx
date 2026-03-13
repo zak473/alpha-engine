@@ -1,5 +1,3 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import { StatCard } from "@/components/ui/StatCard";
 import { SectionHeader } from "@/components/ui/SectionHeader";
@@ -25,8 +23,6 @@ const API_ENDPOINTS = [
 ];
 
 export default async function AdminPage() {
-  const token = cookies().get("ae_token")?.value;
-  if (!token) redirect("/login?next=/admin");
 
   let apiOk = false;
   let dbOk = false;
@@ -71,7 +67,7 @@ export default async function AdminPage() {
   ];
 
   return (
-    <AppShell title="Trading Desk Admin" subtitle={`System status, model stack, and deployment health · ${apiEnv.toUpperCase()}`} requireAuth>
+    <AppShell title="Trading Desk Admin" subtitle={`System status, model stack, and deployment health · ${apiEnv.toUpperCase()}`}>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {kpis.map((k) => (
           <StatCard key={k.label} {...k} />

@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from api.deps import get_db
+from api.deps import get_db, get_current_user
 from api.schemas.mvp import (
     FairOddsSchema,
     KeyDriverSchema,
@@ -36,7 +36,7 @@ from api.schemas.mvp import (
 )
 from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, ModelRegistry, PredMatch, RatingEloTeam
 
-router = APIRouter(prefix="/predictions", tags=["predictions"])
+router = APIRouter(prefix="/predictions", tags=["predictions"], dependencies=[Depends(get_current_user)])
 
 
 # ---------------------------------------------------------------------------

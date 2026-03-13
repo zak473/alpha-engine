@@ -12,12 +12,12 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from api.deps import get_db
+from api.deps import get_db, get_current_user
 from api.sports.soccer.schemas import EloHistoryPoint, SoccerMatchDetail, SoccerMatchListResponse
 from api.sports.soccer.service import SoccerMatchService
 from db.models.mvp import RatingEloTeam
 
-router = APIRouter(prefix="/sports/soccer", tags=["Soccer Matches"])
+router = APIRouter(prefix="/sports/soccer", tags=["Soccer Matches"], dependencies=[Depends(get_current_user)])
 
 _service = SoccerMatchService()
 

@@ -21,7 +21,7 @@ from api.deps import get_db, get_current_user
 from db.models.tipsters import TipsterFollow, TipsterTip
 from db.models.user import User
 
-router = APIRouter(prefix="/tipsters", tags=["Tipsters"])
+router = APIRouter(prefix="/tipsters", tags=["Tipsters"], dependencies=[Depends(get_current_user)])
 
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────

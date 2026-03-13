@@ -7,12 +7,12 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from api.deps import get_db
+from api.deps import get_db, get_current_user
 from api.sports.tennis.schemas import EloHistoryPoint, TennisMatchDetail, TennisMatchListResponse
 from api.sports.tennis.service import TennisMatchService
 from db.models.mvp import RatingEloTeam
 
-router = APIRouter(prefix="/sports/tennis", tags=["Tennis Matches"])
+router = APIRouter(prefix="/sports/tennis", tags=["Tennis Matches"], dependencies=[Depends(get_current_user)])
 _service = TennisMatchService()
 
 

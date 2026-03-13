@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from api.deps import get_db
+from api.deps import get_db, get_current_user
 from api.exceptions import register_exception_handlers
 from api.middleware import RequestLoggingMiddleware
 from api.routers import auth, backtest, basketball as basketball_router, baseball as baseball_router, challenges, esports, matches, notifications, picks, predictions, soccer, standings as standings_router, tennis, tipsters
@@ -358,7 +358,7 @@ app.include_router(hockey_sport.router,      prefix=settings.API_PREFIX)
 
 # ─── Shared endpoints ─────────────────────────────────────────────────────
 
-@app.get("/api/v1/sports/elo-movers", tags=["ELO"])
+@app.get("/api/v1/sports/elo-movers", tags=["ELO"], dependencies=[Depends(get_current_user)])
 def get_elo_movers(limit: int = 10, db: Session = Depends(get_db)):
     """Return top ELO rating movers (by absolute change) across all sports."""
     from datetime import datetime, timedelta, timezone
@@ -426,7 +426,7 @@ def health():
     return {"status": "ok", "env": settings.ENV}
 
 
-@app.post("/api/v1/admin/sync", tags=["Health"])
+@app.post("/api/v1/admin/sync", tags=["Admin"], dependencies=[Depends(get_current_user)])
 def trigger_sync(background_tasks=None):
     """
     Manually trigger a live-data fetch + prediction run.
@@ -468,7 +468,7 @@ def trigger_sync(background_tasks=None):
     return {"status": "sync started", "note": "Check server logs for progress."}
 
 
-@app.post("/api/v1/admin/sync-odds", tags=["Health"])
+@app.post("/api/v1/admin/sync-odds", tags=["Admin"], dependencies=[Depends(get_current_user)])
 def trigger_odds_sync(db: Session = Depends(get_db)):
     """Manually trigger fetch_odds and return how many matches were updated."""
     try:
@@ -482,7 +482,7 @@ def trigger_odds_sync(db: Session = Depends(get_db)):
         return {"status": "error", "detail": str(exc)}
 
 
-@app.get("/api/v1/admin/test-highlightly", tags=["Health"])
+@app.get("/api/v1/admin/test-highlightly", tags=["Admin"], dependencies=[Depends(get_current_user)])
 def test_highlightly_connection():
     """
     Test the Highlightly API key with a single request (avoids burning rate limit quota).
@@ -497,7 +497,7 @@ def test_highlightly_connection():
         return {"status": "error", "detail": str(exc)}
 
 
-@app.post("/api/v1/admin/sync-highlightly", tags=["Health"])
+@app.post("/api/v1/admin/sync-highlightly", tags=["Admin"], dependencies=[Depends(get_current_user)])
 def trigger_highlightly_sync(days_back: int = 90, db: Session = Depends(get_db)):
     """Manually trigger a Highlightly full sync and return row count."""
     try:
@@ -511,7 +511,7 @@ def trigger_highlightly_sync(days_back: int = 90, db: Session = Depends(get_db))
         return {"status": "error", "detail": str(exc)}
 
 
-@app.post("/api/v1/admin/sync-standings", tags=["Health"])
+@app.post("/api/v1/admin/sync-standings", tags=["Admin"], dependencies=[Depends(get_current_user)])
 def trigger_standings_sync():
     """Manually trigger a Highlightly standings sync for all active leagues."""
     import threading as _th
@@ -526,7 +526,7 @@ def trigger_standings_sync():
     return {"status": "started", "note": "Check server logs for progress."}
 
 
-@app.post("/api/v1/admin/sync-highlightly-history", tags=["Health"])
+@app.post("/api/v1/admin/sync-highlightly-history", tags=["Admin"], dependencies=[Depends(get_current_user)])
 def trigger_highlightly_history(days_back: int = 730):
     """
     Trigger a one-time Highlightly historical backfill in the background.
@@ -549,7 +549,7 @@ def trigger_highlightly_history(days_back: int = 730):
     }
 
 
-@app.post("/api/v1/admin/rebuild-tennis-data", tags=["Health"])
+@app.post("/api/v1/admin/rebuild-tennis-data", tags=["Admin"], dependencies=[Depends(get_current_user)])
 def trigger_rebuild_tennis_data():
     """
     Trigger full tennis data pipeline in background:
@@ -577,7 +577,7 @@ def trigger_rebuild_tennis_data():
     return {"status": "started", "note": "Tennis full data rebuild running in background. Check Railway logs."}
 
 
-@app.post("/api/v1/admin/rebuild-soccer-features", tags=["Health"])
+@app.post("/api/v1/admin/rebuild-soccer-features", tags=["Admin"], dependencies=[Depends(get_current_user)])
 def trigger_rebuild_soccer_features():
     """
     Rebuild feat_soccer_match rows from core_matches history.
@@ -595,7 +595,7 @@ def trigger_rebuild_soccer_features():
     return {"status": "started", "note": "Rebuilding feat_soccer_match. Check logs for progress."}
 
 
-@app.post("/api/v1/admin/rebuild-basketball-data", tags=["Health"])
+@app.post("/api/v1/admin/rebuild-basketball-data", tags=["Admin"], dependencies=[Depends(get_current_user)])
 def trigger_rebuild_basketball_data():
     """Full basketball data rebuild: backfill_history (NBA 2015-2025) → backfill_elo."""
     import threading as _th
@@ -613,7 +613,7 @@ def trigger_rebuild_basketball_data():
     return {"status": "started", "note": "Basketball data rebuild running. Check Railway logs."}
 
 
-@app.post("/api/v1/admin/rebuild-baseball-data", tags=["Health"])
+@app.post("/api/v1/admin/rebuild-baseball-data", tags=["Admin"], dependencies=[Depends(get_current_user)])
 def trigger_rebuild_baseball_data():
     """Full baseball data rebuild: backfill_history (MLB 2015-2025) → backfill_elo."""
     import threading as _th
@@ -631,7 +631,7 @@ def trigger_rebuild_baseball_data():
     return {"status": "started", "note": "Baseball data rebuild running. Check Railway logs."}
 
 
-@app.post("/api/v1/admin/rebuild-esports-data", tags=["Health"])
+@app.post("/api/v1/admin/rebuild-esports-data", tags=["Admin"], dependencies=[Depends(get_current_user)])
 def trigger_rebuild_esports_data():
     """Full esports data rebuild: backfill_history (PandaScore) → backfill_elo."""
     import threading as _th
@@ -649,7 +649,7 @@ def trigger_rebuild_esports_data():
     return {"status": "started", "note": "Esports data rebuild running. Check Railway logs."}
 
 
-@app.post("/api/v1/admin/rebuild-soccer-data", tags=["Health"])
+@app.post("/api/v1/admin/rebuild-soccer-data", tags=["Admin"], dependencies=[Depends(get_current_user)])
 def trigger_rebuild_soccer_data():
     """Full soccer data rebuild: highlightly history → backfill_elo → build_soccer_features."""
     import threading as _th
@@ -670,7 +670,7 @@ def trigger_rebuild_soccer_data():
     return {"status": "started", "note": "Soccer data rebuild running. Check Railway logs."}
 
 
-@app.post("/api/v1/admin/rebuild-hockey-data", tags=["Health"])
+@app.post("/api/v1/admin/rebuild-hockey-data", tags=["Admin"], dependencies=[Depends(get_current_user)])
 def trigger_rebuild_hockey_data():
     """Full hockey data rebuild: fetch_stats (NHL API, 30 days) → backfill_elo → train model."""
     import threading as _th
