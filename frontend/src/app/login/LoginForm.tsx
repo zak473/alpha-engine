@@ -31,6 +31,7 @@ export function LoginForm() {
   return (
     <div className="px-4 py-8 lg:px-6 lg:py-10">
       <div className="mx-auto grid w-full max-w-7xl gap-6 lg:grid-cols-[1.12fr_0.88fr]">
+        {/* Marketing panel */}
         <section className="relative overflow-hidden rounded-[36px] border border-[#1f2a22] bg-[#111315] p-6 text-white shadow-[0_25px_80px_rgba(0,0,0,0.28)] lg:p-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(46,219,108,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(46,219,108,0.08),transparent_28%)]" />
           <div className="relative z-10 flex h-full flex-col">
@@ -129,26 +130,27 @@ export function LoginForm() {
           </div>
         </section>
 
-        <section className="rounded-[36px] border border-[#d9e2d7] bg-white p-6 shadow-[0_20px_70px_rgba(17,19,21,0.08)] lg:p-8">
+        {/* Form panel */}
+        <section className="rounded-[36px] border border-[#1f2a22] bg-[#111315] p-6 text-white shadow-[0_25px_80px_rgba(0,0,0,0.28)] lg:p-8">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="inline-flex items-center rounded-full border border-[#dce6da] bg-[#f6faf5] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#2d7f4f]">
+              <div className="inline-flex items-center rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400">
                 Account Access
               </div>
-              <h3 className="mt-4 text-[30px] font-semibold leading-tight text-[#111315]">
+              <h3 className="mt-4 text-[30px] font-semibold leading-tight text-white">
                 Welcome back
               </h3>
-              <p className="mt-2 max-w-md text-sm leading-6 text-[#667066]">
+              <p className="mt-2 max-w-md text-sm leading-6 text-white/55">
                 Access your dashboard, follow our tipsters, and scan live opportunities in seconds.
               </p>
             </div>
 
-            <div className="hidden rounded-[20px] border border-[#d9e2d7] bg-[#f7f8f5] px-4 py-3 sm:block">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7b857b]">
+            <div className="hidden rounded-[20px] border border-white/10 bg-white/[0.05] px-4 py-3 sm:block">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">
                 Board status
               </div>
-              <div className="mt-2 text-sm font-semibold text-[#111315]">Live data synced</div>
-              <div className="mt-1 text-xs text-[#2d7f4f]">Ready to go</div>
+              <div className="mt-2 text-sm font-semibold text-white">Live data synced</div>
+              <div className="mt-1 text-xs text-emerald-400">Ready to go</div>
             </div>
           </div>
 
@@ -156,7 +158,7 @@ export function LoginForm() {
             {["Follow tipsters", "Track edges", "View in-play"].map((item) => (
               <div
                 key={item}
-                className="rounded-[18px] border border-[#d9e2d7] bg-[#f7f8f5] px-4 py-3 text-sm font-medium text-[#4f5950]"
+                className="rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-white/60"
               >
                 {item}
               </div>
@@ -165,7 +167,7 @@ export function LoginForm() {
 
           <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
             <div className="flex flex-col gap-2">
-              <label className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#667066]">
+              <label className="text-[12px] font-semibold uppercase tracking-[0.16em] text-white/50">
                 Email
               </label>
               <input
@@ -173,7 +175,7 @@ export function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="h-14 rounded-2xl border border-[#d9e2d7] bg-[#f7f8f5] px-4 text-[15px] text-[#111315] outline-none transition focus:border-[#2edb6c] focus:bg-white"
+                className="h-14 rounded-2xl border border-white/10 bg-white/[0.06] px-4 text-[15px] text-white placeholder:text-white/30 outline-none transition focus:border-emerald-500/50 focus:bg-white/[0.09]"
                 required
                 autoComplete="email"
               />
@@ -181,12 +183,12 @@ export function LoginForm() {
 
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-3">
-                <label className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#667066]">
+                <label className="text-[12px] font-semibold uppercase tracking-[0.16em] text-white/50">
                   Password
                 </label>
                 <Link
                   href="#"
-                  className="text-[12px] font-medium text-[#2d7f4f] transition hover:opacity-80"
+                  className="text-[12px] font-medium text-emerald-400 transition hover:opacity-80"
                 >
                   Forgot password?
                 </Link>
@@ -196,14 +198,14 @@ export function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="h-14 rounded-2xl border border-[#d9e2d7] bg-[#f7f8f5] px-4 text-[15px] text-[#111315] outline-none transition focus:border-[#2edb6c] focus:bg-white"
+                className="h-14 rounded-2xl border border-white/10 bg-white/[0.06] px-4 text-[15px] text-white placeholder:text-white/30 outline-none transition focus:border-emerald-500/50 focus:bg-white/[0.09]"
                 required
                 autoComplete="current-password"
               />
             </div>
 
             {error && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
                 {error}
               </div>
             )}
@@ -217,26 +219,26 @@ export function LoginForm() {
             </button>
           </form>
 
-          <div className="mt-6 rounded-[24px] border border-[#d9e2d7] bg-[#f7f8f5] p-4">
+          <div className="mt-6 rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <div className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#667066]">
+                <div className="text-[12px] font-semibold uppercase tracking-[0.16em] text-white/50">
                   New here?
                 </div>
-                <div className="mt-1 text-sm text-[#4f5950]">
+                <div className="mt-1 text-sm text-white/60">
                   Create an account and start following picks and tipsters.
                 </div>
               </div>
               <Link
                 href="/register"
-                className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl border border-[#cfe6d4] bg-white px-4 text-sm font-semibold text-[#2d7f4f] transition hover:bg-[#f4fbf6]"
+                className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 text-sm font-semibold text-emerald-400 transition hover:bg-emerald-500/20"
               >
                 Create account
               </Link>
             </div>
           </div>
 
-          <p className="mt-6 text-center text-xs text-[#7b857b]">
+          <p className="mt-6 text-center text-xs text-white/35">
             By continuing, you&apos;re accessing the Never In Doubt betting board.
           </p>
         </section>
