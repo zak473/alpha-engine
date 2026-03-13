@@ -81,6 +81,42 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Startup fetch_live failed to launch: %s", exc)
 
+    # Tennis Sackmann historical backfill — runs only when DB has < 500 finished tennis matches
+    try:
+        import threading as _th
+        from db.session import SessionLocal
+        from db.models.mvp import CoreMatch
+        _db = SessionLocal()
+        try:
+            _tennis_finished = _db.query(CoreMatch).filter(
+                CoreMatch.sport == "tennis", CoreMatch.status == "finished"
+            ).count()
+        finally:
+            _db.close()
+        if _tennis_finished < 500:
+            logger.info("Startup: DB has %d finished tennis matches — triggering Sackmann backfill.", _tennis_finished)
+            def _run_tennis_backfill():
+                try:
+                    from pipelines.tennis.backfill_history import run as bh_run
+                    n = bh_run()
+                    logger.info("Startup: tennis backfill complete (%d matches).", n)
+                    from pipelines.tennis.backfill_elo import run_backfill as elo_run
+                    elo_run()
+                    logger.info("Startup: tennis ELO backfill complete.")
+                    from pipelines.tennis.fetch_api_tennis import build_player_form
+                    n2 = build_player_form()
+                    logger.info("Startup: tennis player form built (%d rows).", n2)
+                    from pipelines.tennis.fetch_player_profiles import run as prof_run
+                    prof_run()
+                    logger.info("Startup: tennis player profiles linked.")
+                except Exception as _exc:
+                    logger.error("Startup tennis backfill chain failed: %s", _exc, exc_info=True)
+            _th.Thread(target=_run_tennis_backfill, daemon=True, name="tennis-history").start()
+        else:
+            logger.info("Startup: DB has %d finished tennis matches — skipping Sackmann backfill.", _tennis_finished)
+    except Exception as exc:
+        logger.warning("Startup tennis backfill check failed: %s", exc)
+
     # Highlightly historical backfill — runs only when DB has < 1000 finished matches
     # (first deploy or fresh DB). Skips on subsequent restarts.
     if settings.HIGHLIGHTLY_API_KEY:
@@ -415,6 +451,34 @@ def trigger_highlightly_history(days_back: int = 730):
         "days_back": days_back,
         "note": f"Fetching ~{days_back * 4} date/sport combinations. Check logs for progress.",
     }
+
+
+@app.post("/api/v1/admin/rebuild-tennis-data", tags=["Health"])
+def trigger_rebuild_tennis_data():
+    """
+    Trigger full tennis data pipeline in background:
+    backfill_history (Sackmann 2015-2024) → backfill_elo → build_player_form → fetch_player_profiles.
+    Safe to call multiple times (idempotent). Check Railway logs for progress.
+    """
+    import threading as _th
+    def _run():
+        try:
+            from pipelines.tennis.backfill_history import run as bh_run
+            n = bh_run()
+            logger.info("[tennis-rebuild] backfill_history: %d matches.", n)
+            from pipelines.tennis.backfill_elo import run_backfill as elo_run
+            elo_run()
+            logger.info("[tennis-rebuild] backfill_elo done.")
+            from pipelines.tennis.fetch_api_tennis import build_player_form
+            n2 = build_player_form()
+            logger.info("[tennis-rebuild] build_player_form: %d rows.", n2)
+            from pipelines.tennis.fetch_player_profiles import run as prof_run
+            prof_run()
+            logger.info("[tennis-rebuild] fetch_player_profiles done.")
+        except Exception as exc:
+            logger.error("[tennis-rebuild] failed: %s", exc, exc_info=True)
+    _th.Thread(target=_run, daemon=True, name="tennis-rebuild").start()
+    return {"status": "started", "note": "Tennis full data rebuild running in background. Check Railway logs."}
 
 
 @app.post("/api/v1/admin/rebuild-soccer-features", tags=["Health"])
