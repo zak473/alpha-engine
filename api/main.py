@@ -220,6 +220,27 @@ async def lifespan(app: FastAPI):
         except Exception as exc:
             logger.warning("Startup esports backfill check failed: %s", exc)
 
+    # Hockey — NHL stats API (free, no key) + ELO + train model
+    try:
+        _hockey_finished = _sport_count("hockey")
+        if _hockey_finished < 200:
+            logger.info("Startup: %d finished hockey matches — triggering NHL backfill.", _hockey_finished)
+            def _run_hockey_backfill():
+                try:
+                    from pipelines.hockey.fetch_stats import fetch_all as stats_run
+                    stats_run(days_back=30)
+                    logger.info("Startup: hockey stats fetch complete.")
+                    from pipelines.hockey.backfill_elo import run_backfill as _elo
+                    _elo()
+                    logger.info("Startup: hockey ELO backfill complete.")
+                except Exception as _exc:
+                    logger.error("Startup hockey backfill failed: %s", _exc, exc_info=True)
+            _th.Thread(target=_run_hockey_backfill, daemon=True, name="hockey-history").start()
+        else:
+            logger.info("Startup: %d finished hockey matches — skipping backfill.", _hockey_finished)
+    except Exception as exc:
+        logger.warning("Startup hockey backfill check failed: %s", exc)
+
     # ── API key health report ──────────────────────────────────────────────
     KEY_MAP = {
         "FOOTBALL_DATA_API_KEY": ("Soccer fixtures/results",     settings.FOOTBALL_DATA_API_KEY),
@@ -654,6 +675,27 @@ def trigger_rebuild_soccer_data():
             logger.error("[soccer-rebuild] failed: %s", exc, exc_info=True)
     _th.Thread(target=_run, daemon=True, name="soccer-rebuild").start()
     return {"status": "started", "note": "Soccer data rebuild running. Check Railway logs."}
+
+
+@app.post("/api/v1/admin/rebuild-hockey-data", tags=["Health"])
+def trigger_rebuild_hockey_data():
+    """Full hockey data rebuild: fetch_stats (NHL API, 30 days) → backfill_elo → train model."""
+    import threading as _th
+    def _run():
+        try:
+            from pipelines.hockey.fetch_stats import fetch_all as stats_run
+            n = stats_run(days_back=30)
+            logger.info("[hockey-rebuild] fetch_stats: %d games.", n)
+            from pipelines.hockey.backfill_elo import run_backfill as elo_run
+            elo_run()
+            logger.info("[hockey-rebuild] backfill_elo done.")
+            from pipelines.hockey.train_hockey_model import train
+            train()
+            logger.info("[hockey-rebuild] model trained.")
+        except Exception as exc:
+            logger.error("[hockey-rebuild] failed: %s", exc, exc_info=True)
+    _th.Thread(target=_run, daemon=True, name="hockey-rebuild").start()
+    return {"status": "started", "note": "Hockey data rebuild running. Check Railway logs."}
 
 
 @app.get("/ready", tags=["Health"])

@@ -120,6 +120,15 @@ def _job_fetch_live() -> None:
     except Exception as exc:
         log.error("[scheduler] baseball fetch failed: %s", exc, exc_info=True)
 
+    # Hockey
+    try:
+        from pipelines.hockey.fetch_live import fetch_all as fetch_hockey
+        n = fetch_hockey()
+        total += n
+        log.info("[scheduler] hockey: %d rows ingested.", n)
+    except Exception as exc:
+        log.error("[scheduler] hockey fetch failed: %s", exc, exc_info=True)
+
     log.info("[scheduler] fetch_live done — %d total rows.", total)
 
 
@@ -241,6 +250,13 @@ def _job_fetch_stats() -> None:
         log.info("[scheduler] baseball stats: %d rows upserted.", n)
     except Exception as exc:
         log.error("[scheduler] baseball stats failed: %s", exc, exc_info=True)
+
+    try:
+        from pipelines.hockey.fetch_stats import fetch_all as hockey_stats
+        n = hockey_stats()
+        log.info("[scheduler] hockey stats: %d rows upserted.", n)
+    except Exception as exc:
+        log.error("[scheduler] hockey stats failed: %s", exc, exc_info=True)
 
     log.info("[scheduler] fetch_stats done.")
 
@@ -389,6 +405,7 @@ def _job_retrain_models() -> None:
         ("baseball",   "pipelines.baseball.train_baseball_model",    "main"),
         ("tennis",     "pipelines.tennis.train_tennis_model",         "main"),
         ("esports",    "pipelines.esports.train_esports_model",       "main"),
+        ("hockey",     "pipelines.hockey.train_hockey_model",         "main"),
     ]:
         try:
             import importlib
