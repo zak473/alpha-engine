@@ -7,7 +7,7 @@ Sources (no API key required, MIT/CC0 licensed):
   WTA: https://github.com/JeffSackmann/tennis_wta
 
 Files downloaded: atp_matches_YYYY.csv / wta_matches_YYYY.csv
-Seasons: 2015-2024
+Seasons: 2015-2026
 
 Each row maps to a CoreMatch (finished) and two CoreTeam (player) records.
 Surface is stored in match context via league name.
@@ -434,7 +434,7 @@ def run_tour(
     return total
 
 
-def run(start_year: int = 2015, end_year: int = 2024, dry_run: bool = False) -> int:
+def run(start_year: int = 2015, end_year: int = 2026, dry_run: bool = False) -> int:
     db: Session = SessionLocal()
     years = list(range(start_year, end_year + 1))
     grand_total = 0
@@ -459,7 +459,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Ingest Jeff Sackmann ATP/WTA historical data")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--start-year", type=int, default=2015)
-    parser.add_argument("--end-year",   type=int, default=2024)
+    parser.add_argument("--end-year",   type=int, default=2026)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
     n = run(start_year=args.start_year, end_year=args.end_year, dry_run=args.dry_run)
