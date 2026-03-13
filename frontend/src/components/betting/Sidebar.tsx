@@ -40,7 +40,7 @@ export function Sidebar() {
       {open && (
         <div
           className="fixed inset-0 z-30 lg:hidden"
-          style={{ background: "rgba(0,0,0,0.55)" }}
+          style={{ background: "rgba(17,23,20,0.28)" }}
           onClick={() => setOpen(false)}
         />
       )}
@@ -54,7 +54,7 @@ export function Sidebar() {
           width: "var(--sidebar-width)",
           display: "flex",
           flexDirection: "column",
-          background: "#18181b",
+          background: "linear-gradient(180deg, #0f1511 0%, #121a15 100%)",
           borderRight: "1px solid rgba(255,255,255,0.06)",
           zIndex: 40,
           transform: open ? "translateX(0)" : undefined,
@@ -64,7 +64,7 @@ export function Sidebar() {
         className={open ? "" : "-translate-x-full lg:translate-x-0"}
       >
         <div className="px-4 pb-4 pt-4">
-          <div className="rounded-[24px] border border-white/10 bg-[#27272a] p-4 shadow-[0_20px_40px_rgba(0,0,0,0.22)]">
+          <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 shadow-[0_20px_40px_rgba(0,0,0,0.22)]">
             <div className="overflow-hidden rounded-[18px] border border-white/10 bg-white p-3">
               <Image
                 src="/never-in-doubt-logo.png"

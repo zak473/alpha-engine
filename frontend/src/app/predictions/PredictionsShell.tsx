@@ -30,8 +30,8 @@ function fmtKickoff(iso: string) {
 
 function ConfBar({ conf }: { conf: number }) {
   const pct = Math.round(conf * 100);
-  const bg = conf >= 0.7 ? "bg-emerald-500" : conf >= 0.5 ? "bg-amber-400" : "bg-red-400";
-  const textCol = conf >= 0.7 ? "text-emerald-400" : conf >= 0.5 ? "text-amber-400" : "text-red-400";
+  const bg = conf >= 0.7 ? "bg-emerald-400" : conf >= 0.5 ? "bg-amber-400" : "bg-red-400";
+  const textCol = conf >= 0.7 ? "text-emerald-300" : conf >= 0.5 ? "text-amber-400" : "text-red-400";
   return (
     <div className="flex items-center gap-2 min-w-[90px]">
       <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
@@ -44,7 +44,7 @@ function ConfBar({ conf }: { conf: number }) {
 
 function StatusPill({ status }: { status: string }) {
   if (status === "live") return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-400">
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-300">
       <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
       Live
     </span>
@@ -55,7 +55,7 @@ function StatusPill({ status }: { status: string }) {
     </span>
   );
   return (
-    <span className="inline-flex items-center rounded-full border border-[#27272a] bg-[#27272a] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/35">
+    <span className="inline-flex items-center rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/35">
       Finished
     </span>
   );
@@ -70,24 +70,24 @@ function KpiStrip({ items }: { items: MvpPrediction[] }) {
     ? items.reduce((s, p) => s + p.confidence, 0) / items.length : 0;
   const highConf = items.filter((p) => p.confidence >= 0.7).length;
 
-  const avgAccent = avgConf >= 0.7 ? "text-emerald-400" : avgConf >= 0.5 ? "text-amber-400" : "text-white/50";
+  const avgAccent = avgConf >= 0.7 ? "text-emerald-300" : avgConf >= 0.5 ? "text-amber-400" : "text-white/50";
 
   const stats = [
-    { label: "Total predictions", value: String(items.length),          icon: BrainCircuit, accent: "text-emerald-400" },
-    { label: "Today's picks",     value: String(todayItems.length),      icon: Calendar,     accent: "text-blue-400"   },
+    { label: "Total predictions", value: String(items.length),          icon: BrainCircuit, accent: "text-emerald-300" },
+    { label: "Today's picks",     value: String(todayItems.length),      icon: Calendar,     accent: "text-blue-300"   },
     { label: "Avg confidence",    value: items.length > 0 ? `${Math.round(avgConf * 100)}%` : "—", icon: TrendingUp, accent: avgAccent },
-    { label: "High confidence",   value: String(highConf),               icon: Zap,          accent: "text-purple-400" },
+    { label: "High confidence",   value: String(highConf),               icon: Zap,          accent: "text-purple-300" },
   ];
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {stats.map(({ label, value, icon: Icon, accent }) => (
-        <div key={label} className="rounded-[22px] border border-[#27272a] bg-[#18181b] px-4 py-4">
+        <div key={label} className="rounded-[22px] border border-white/8 bg-white/[0.05] px-4 py-4">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">{label}</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">{label}</span>
             <Icon size={13} className={cn(accent, "opacity-70")} />
           </div>
-          <p className={cn("mt-3 font-mono text-[32px] font-bold leading-none tabular-nums", accent)}>{value}</p>
+          <p className={cn("mt-3 font-mono text-[32px] font-semibold leading-none tabular-nums tracking-[-0.05em] text-white")}>{value}</p>
         </div>
       ))}
     </div>
@@ -135,8 +135,8 @@ function PillGroup<T extends string>({
 }) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40 shrink-0">{label}</span>
-      <div className="flex items-center gap-1 rounded-full border border-[#27272a] bg-[#18181b] p-1">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/38 shrink-0">{label}</span>
+      <div className="flex items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] p-1">
         {options.map((o) => (
           <button
             key={o.value}
@@ -144,8 +144,8 @@ function PillGroup<T extends string>({
             className={cn(
               "rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all",
               active === o.value
-                ? "bg-white/15 text-white shadow-sm"
-                : "text-white/50 hover:text-white"
+                ? "bg-[#2edb6c] text-[#07110d] shadow-sm"
+                : "text-white/55 hover:bg-white/[0.06] hover:text-white"
             )}
           >
             {o.label}
@@ -167,19 +167,27 @@ function PredictionCard({ pred }: { pred: MvpPrediction }) {
   const hPct = Math.round(p.home_win * 100);
   const aPct = Math.round(p.away_win * 100);
   const dPct = p.draw != null ? Math.round(p.draw * 100) : null;
-  const confColor = pred.confidence >= 0.7 ? "text-emerald-400" : pred.confidence >= 0.5 ? "text-amber-400" : "text-red-400";
-  const confBg   = pred.confidence >= 0.7 ? "bg-emerald-500/15 border-emerald-500/30" : pred.confidence >= 0.5 ? "bg-amber-500/15 border-amber-500/30" : "bg-red-500/15 border-red-500/30";
+  const isLive = pred.status === "live";
+  const confColor = pred.confidence >= 0.7 ? "text-emerald-300" : pred.confidence >= 0.5 ? "text-amber-400" : "text-red-400";
+  const confBg   = pred.confidence >= 0.7 ? "bg-emerald-400/10 border-emerald-400/20" : pred.confidence >= 0.5 ? "bg-amber-400/10 border-amber-400/20" : "bg-red-400/10 border-red-400/20";
 
   return (
     <Link
       href={detailHref}
-      className="group block overflow-hidden rounded-[28px] border border-[#27272a] bg-[#18181b] transition hover:border-white/15 hover:bg-[#1f1f1f]"
+      className={cn(
+        "group rounded-[28px] border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300/25 hover:shadow-[0_24px_60px_rgba(0,0,0,0.26)]",
+        isLive
+          ? "bg-[linear-gradient(180deg,rgba(12,28,20,0.98),rgba(8,18,14,0.98))] border-emerald-400/20"
+          : "bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] border-white/8"
+      )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 border-b border-[#27272a] px-5 py-3">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-base">{emoji}</span>
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50 capitalize">{pred.sport}</span>
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-white/55">
+            <span>{emoji}</span>
+            {pred.sport}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <StatusPill status={pred.status} />
@@ -188,44 +196,42 @@ function PredictionCard({ pred }: { pred: MvpPrediction }) {
       </div>
 
       {/* Teams + probs */}
-      <div className="px-5 py-4">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-          {/* Home */}
-          <div>
-            <p className="font-semibold text-white leading-tight">{pred.participants.home.name}</p>
-            <p className="mt-1 font-mono text-2xl font-bold text-emerald-400 tabular-nums">{hPct}%</p>
-            {fo?.home_win && <p className="mt-0.5 font-mono text-xs text-white/35">{fo.home_win.toFixed(2)} odds</p>}
-          </div>
-
-          {/* Center */}
-          <div className="flex flex-col items-center gap-1">
-            {dPct != null && (
-              <div className="rounded-xl border border-[#27272a] bg-[#27272a] px-3 py-1.5 text-center">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">Draw</p>
-                <p className="font-mono text-sm font-bold text-white tabular-nums">{dPct}%</p>
-              </div>
-            )}
-            <span className="text-[11px] font-medium text-white/35">vs</span>
-          </div>
-
-          {/* Away */}
-          <div className="text-right">
-            <p className="font-semibold text-white leading-tight">{pred.participants.away.name}</p>
-            <p className="mt-1 font-mono text-2xl font-bold text-amber-400 tabular-nums">{aPct}%</p>
-            {fo?.away_win && <p className="mt-0.5 font-mono text-xs text-white/35">{fo.away_win.toFixed(2)} odds</p>}
-          </div>
+      <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+        {/* Home */}
+        <div>
+          <p className="text-sm font-semibold text-white leading-tight">{pred.participants.home.name}</p>
+          <p className="mt-1 font-mono text-2xl font-bold text-emerald-300 tabular-nums">{hPct}%</p>
+          {fo?.home_win && <p className="mt-0.5 font-mono text-xs text-white/35">{fo.home_win.toFixed(2)} odds</p>}
         </div>
 
-        {/* Prob bar */}
-        <div className="mt-4 flex h-2 w-full overflow-hidden rounded-full bg-white/10">
-          <div className="h-full bg-emerald-500 transition-all" style={{ width: `${hPct}%` }} />
-          {dPct != null && <div className="h-full bg-white/20" style={{ width: `${dPct}%` }} />}
-          <div className="h-full flex-1 bg-amber-400" />
+        {/* Center */}
+        <div className="flex flex-col items-center gap-1">
+          {dPct != null && (
+            <div className="rounded-[24px] border border-white/8 bg-black/20 px-4 py-3 text-center">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">Draw</p>
+              <p className="font-mono text-sm font-bold text-white tabular-nums">{dPct}%</p>
+            </div>
+          )}
+          <span className="text-[11px] font-medium text-white/35">vs</span>
+        </div>
+
+        {/* Away */}
+        <div className="text-right">
+          <p className="text-sm font-semibold text-white leading-tight">{pred.participants.away.name}</p>
+          <p className="mt-1 font-mono text-2xl font-bold text-amber-400 tabular-nums">{aPct}%</p>
+          {fo?.away_win && <p className="mt-0.5 font-mono text-xs text-white/35">{fo.away_win.toFixed(2)} odds</p>}
         </div>
       </div>
 
+      {/* Prob bar */}
+      <div className="mt-4 flex h-2 w-full overflow-hidden rounded-full bg-white/10">
+        <div className="h-full bg-emerald-400 transition-all" style={{ width: `${hPct}%` }} />
+        {dPct != null && <div className="h-full bg-white/20" style={{ width: `${dPct}%` }} />}
+        <div className="h-full flex-1 bg-amber-400" />
+      </div>
+
       {/* Footer */}
-      <div className="flex items-center justify-between gap-3 border-t border-[#27272a] px-5 py-3">
+      <div className="mt-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40">Confidence</span>
           <ConfBar conf={pred.confidence} />
@@ -233,7 +239,7 @@ function PredictionCard({ pred }: { pred: MvpPrediction }) {
             {Math.round(pred.confidence * 100)}%
           </span>
         </div>
-        <div className="flex items-center gap-1 text-[12px] font-semibold text-emerald-400 opacity-0 transition group-hover:opacity-100">
+        <div className="flex items-center gap-1 text-[12px] font-semibold text-white/72 opacity-0 transition group-hover:opacity-100">
           View match <ChevronRight size={13} />
         </div>
       </div>
@@ -245,14 +251,10 @@ function PredictionCard({ pred }: { pred: MvpPrediction }) {
 
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center py-24 gap-4">
-      <div className="flex h-16 w-16 items-center justify-center rounded-[24px] border border-[#27272a] bg-[#18181b]">
-        <BrainCircuit size={28} className="text-emerald-400" />
-      </div>
-      <div className="text-center">
-        <p className="text-base font-semibold text-white">No predictions found</p>
-        <p className="mt-1 text-sm text-white/50 max-w-xs">Try a different sport, status, or date range.</p>
-      </div>
+    <div className="flex min-h-[280px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
+      <BrainCircuit size={28} className="text-white/35" />
+      <div className="mt-4 text-xl font-semibold text-white">No predictions found</div>
+      <div className="mt-2 max-w-md text-sm text-white/50">Try a different sport, status, or date range.</div>
     </div>
   );
 }
@@ -292,27 +294,43 @@ export function PredictionsShell({ initialData, initialSport, initialStatus, ini
     : initialData.items;
 
   return (
-    <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-5 px-4 py-5 md:px-6">
+    <div className="pb-12">
 
       {/* Hero */}
-      <div className="relative overflow-hidden rounded-[32px] border border-[#27272a] bg-[#18181b] px-6 py-7 text-white shadow-[0_20px_60px_rgba(0,0,0,0.2)]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(46,219,108,0.12),transparent_40%)]" />
-        <div className="relative z-10 flex flex-col gap-1">
-          <div className="inline-flex w-fit items-center rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">
-            Model predictions
+      <section className="overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.10),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-5 shadow-[0_26px_70px_rgba(0,0,0,0.24)] backdrop-blur xl:p-7">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <div className="inline-flex items-center rounded-full border border-emerald-300/16 bg-emerald-300/8 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200">
+              Model predictions
+            </div>
+            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-white lg:text-[2.7rem]">AI-Powered Match Predictions</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-white/58">
+              Win probabilities, fair odds, and confidence scores generated by our machine learning models across every sport.
+            </p>
           </div>
-          <h1 className="mt-3 text-3xl font-bold text-white lg:text-4xl">AI-Powered Match Predictions</h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-white/60">
-            Win probabilities, fair odds, and confidence scores generated by our machine learning models across every sport.
-          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-[22px] border border-white/8 bg-white/[0.05] px-4 py-4">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Total predictions</div>
+              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">{items.length}</div>
+            </div>
+            <div className="rounded-[22px] border border-white/8 bg-white/[0.05] px-4 py-4">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">High confidence</div>
+              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-emerald-300">
+                {items.filter((p) => p.confidence >= 0.7).length}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* KPI strip */}
-      <KpiStrip items={items} />
+      <div className="mt-4">
+        <KpiStrip items={items} />
+      </div>
 
       {/* Filters */}
-      <div className="overflow-hidden rounded-[28px] border border-[#27272a] bg-[#18181b] p-5">
+      <div className="mt-4 overflow-hidden rounded-[28px] border border-white/8 bg-white/[0.03] p-4">
         <div className="flex flex-wrap gap-4">
           <PillGroup
             label="Sport"
@@ -343,7 +361,7 @@ export function PredictionsShell({ initialData, initialSport, initialStatus, ini
 
       {/* Results count */}
       {items.length > 0 && (
-        <div className="flex items-center justify-between">
+        <div className="mt-4 flex items-center justify-between">
           <p className="text-sm text-white/50">
             Showing <span className="font-semibold text-white">{items.length}</span> prediction{items.length !== 1 ? "s" : ""}
           </p>
@@ -351,15 +369,17 @@ export function PredictionsShell({ initialData, initialSport, initialStatus, ini
       )}
 
       {/* Cards grid */}
-      {items.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {items.map((pred) => (
-            <PredictionCard key={pred.event_id} pred={pred} />
-          ))}
-        </div>
-      )}
+      <div className="mt-4">
+        {items.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {items.map((pred) => (
+              <PredictionCard key={pred.event_id} pred={pred} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

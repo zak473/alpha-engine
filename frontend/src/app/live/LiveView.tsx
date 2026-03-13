@@ -82,13 +82,13 @@ function MatchTile({ match }: { match: LiveMatchOut }) {
       className={cn(
         "group rounded-[28px] border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300/25 hover:shadow-[0_24px_60px_rgba(0,0,0,0.26)] lg:p-5",
         isLive
-          ? "bg-[#18181b] border-emerald-400/20"
-          : "bg-[#18181b] border-[#27272a]"
+          ? "bg-[linear-gradient(180deg,rgba(12,28,20,0.98),rgba(8,18,14,0.98))] border-emerald-400/20"
+          : "bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] border-white/8"
       )}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-full border border-[#27272a] bg-[#27272a] px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-white/55">
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-white/55">
             <span>{SPORT_ICONS[match.sport] ?? "🏅"}</span>
             {SPORT_LABELS[match.sport] ?? match.sport}
           </span>
@@ -203,7 +203,7 @@ export function LiveView({ initialMatches }: { initialMatches: LiveMatchOut[] })
   return (
     <div className="pb-12">
       {/* Hero */}
-      <section className="overflow-hidden rounded-[30px] border border-white/8 bg-[#18181b] p-5 shadow-[0_26px_70px_rgba(0,0,0,0.24)] xl:p-7">
+      <section className="overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.10),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-5 shadow-[0_26px_70px_rgba(0,0,0,0.24)] backdrop-blur xl:p-7">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/16 bg-emerald-300/8 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200">
@@ -217,17 +217,17 @@ export function LiveView({ initialMatches }: { initialMatches: LiveMatchOut[] })
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-[22px] border border-white/8 bg-[#18181b] px-4 py-4">
+            <div className="rounded-[22px] border border-white/8 bg-white/[0.05] px-4 py-4">
               <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Live matches</div>
               <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">{allLive.length}</div>
             </div>
-            <div className="rounded-[22px] border border-white/8 bg-[#18181b] px-4 py-4">
+            <div className="rounded-[22px] border border-white/8 bg-white/[0.05] px-4 py-4">
               <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Upcoming queued</div>
               <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">{allUpcoming.length}</div>
             </div>
             <button
               onClick={refresh}
-              className="inline-flex items-center justify-center gap-2 rounded-[22px] border border-white/8 bg-[#18181b] px-4 py-4 text-left transition hover:border-emerald-300/25 hover:bg-[#27272a]"
+              className="inline-flex items-center justify-center gap-2 rounded-[22px] border border-white/8 bg-white/[0.05] px-4 py-4 text-left transition hover:border-emerald-300/25 hover:bg-white/[0.08]"
             >
               <RefreshCw size={15} className={cn("text-emerald-200", isRefreshing && "animate-spin")} />
               <div>
@@ -243,7 +243,7 @@ export function LiveView({ initialMatches }: { initialMatches: LiveMatchOut[] })
 
       {/* Sport filter bar */}
       <div className="mt-4 overflow-x-auto no-scrollbar">
-        <div className="flex min-w-max items-center gap-2 rounded-[24px] border border-[#27272a] bg-[#18181b] p-2">
+        <div className="flex min-w-max items-center gap-2 rounded-[24px] border border-white/8 bg-white/[0.03] p-2">
           {ALL_SPORTS.map((sport) => {
             const count = sportCounts[sport] ?? 0;
             const isActive = activeSport === sport;
@@ -264,7 +264,7 @@ export function LiveView({ initialMatches }: { initialMatches: LiveMatchOut[] })
                 {liveCount > 0 && (
                   <span className={cn(
                     "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                    isActive ? "bg-black/20 text-[#07110d]" : "bg-emerald-400/20 text-emerald-300"
+                    isActive ? "bg-[#07110d]/20 text-[#07110d]" : "bg-emerald-400/20 text-emerald-300"
                   )}>
                     {liveCount} live
                   </span>
@@ -272,7 +272,7 @@ export function LiveView({ initialMatches }: { initialMatches: LiveMatchOut[] })
                 {count > 0 && liveCount === 0 && (
                   <span className={cn(
                     "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                    isActive ? "bg-black/20 text-[#07110d]" : "bg-white/10 text-white/50"
+                    isActive ? "bg-[#07110d]/20 text-[#07110d]" : "bg-white/10 text-white/50"
                   )}>
                     {count}
                   </span>
@@ -285,7 +285,7 @@ export function LiveView({ initialMatches }: { initialMatches: LiveMatchOut[] })
 
       {/* Content */}
       {matches.length === 0 ? (
-        <div className="mt-6 flex min-h-[280px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-[#18181b] p-8 text-center">
+        <div className="mt-6 flex min-h-[280px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
           <Radio size={28} className="text-white/35" />
           <div className="mt-4 text-xl font-semibold text-white">No match data available</div>
           <div className="mt-2 max-w-md text-sm text-white/50">The live feed is empty right now. Retry once the API has fresh fixtures available.</div>
@@ -293,14 +293,14 @@ export function LiveView({ initialMatches }: { initialMatches: LiveMatchOut[] })
       ) : (
         <div className="mt-4 grid gap-6">
           {/* Live */}
-          <section className="rounded-[30px] border border-white/8 bg-[#18181b] p-5 lg:p-6">
+          <section className="rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,rgba(10,21,16,0.98),rgba(8,18,14,0.98))] p-5 lg:p-6">
             <SectionHeader title="Live priority" meta={`${filteredLive.length} ${SPORT_LABELS[activeSport] ?? activeSport} matches in play`} accent />
             {filteredLive.length ? (
               <div className="grid gap-4 xl:grid-cols-2">
                 {filteredLive.map((match) => <MatchTile key={match.id} match={match} />)}
               </div>
             ) : (
-              <div className="rounded-[24px] border border-white/8 bg-[#18181b] p-6 text-sm text-white/50">
+              <div className="rounded-[24px] border border-white/8 bg-white/[0.03] p-6 text-sm text-white/50">
                 No live {SPORT_LABELS[activeSport]?.toLowerCase() ?? activeSport} matches right now — upcoming fixtures are shown below.
               </div>
             )}
@@ -308,7 +308,7 @@ export function LiveView({ initialMatches }: { initialMatches: LiveMatchOut[] })
 
           {/* Upcoming */}
           {filteredUpcoming.length > 0 && (
-            <section className="rounded-[30px] border border-white/8 bg-[#18181b] p-5 lg:p-6">
+            <section className="rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-5 lg:p-6">
               <SectionHeader title="Upcoming" meta={`Next ${SPORT_LABELS[activeSport] ?? activeSport} fixtures`} />
               <div className="grid gap-4 xl:grid-cols-2">
                 {filteredUpcoming.map((match) => <MatchTile key={match.id} match={match} />)}
@@ -317,7 +317,7 @@ export function LiveView({ initialMatches }: { initialMatches: LiveMatchOut[] })
           )}
 
           {filteredLive.length === 0 && filteredUpcoming.length === 0 && (
-            <div className="flex min-h-[200px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-[#18181b] p-8 text-center">
+            <div className="flex min-h-[200px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
               <span className="text-4xl">{SPORT_ICONS[activeSport]}</span>
               <div className="mt-4 text-lg font-semibold text-white">No {SPORT_LABELS[activeSport]} matches right now</div>
               <div className="mt-1 text-sm text-white/50">Check another sport or come back later.</div>

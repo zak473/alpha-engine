@@ -30,7 +30,7 @@ function predictedOutcome(m: Match) {
 
 function outcomeTone(status: Match["status"]) {
   if (status === "live") return "text-emerald-300 border-emerald-300/20 bg-emerald-300/10";
-  if (status === "finished") return "text-white/60 border-white/10 bg-[#18181b]";
+  if (status === "finished") return "text-white/60 border-white/10 bg-white/[0.05]";
   return "text-sky-200 border-sky-300/15 bg-sky-300/10";
 }
 
@@ -111,7 +111,7 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
 
   return (
     <div className="grid gap-6 pb-10">
-      <section className="overflow-hidden rounded-[30px] border border-white/8 bg-[#18181b] p-5 shadow-[0_26px_70px_rgba(0,0,0,0.24)] lg:p-6">
+      <section className="overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.10),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-5 shadow-[0_26px_70px_rgba(0,0,0,0.24)] lg:p-6">
         <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr] xl:items-end">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/16 bg-emerald-300/8 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200">
@@ -125,15 +125,15 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-[22px] border border-white/8 bg-[#18181b] p-4">
+            <div className="rounded-[22px] border border-white/8 bg-white/[0.05] p-4">
               <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Active markets</div>
               <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">{initialMatches.length}</div>
             </div>
-            <div className="rounded-[22px] border border-white/8 bg-[#18181b] p-4">
+            <div className="rounded-[22px] border border-white/8 bg-white/[0.05] p-4">
               <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Live right now</div>
               <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">{liveCount}</div>
             </div>
-            <div className="rounded-[22px] border border-white/8 bg-[#18181b] p-4">
+            <div className="rounded-[22px] border border-white/8 bg-white/[0.05] p-4">
               <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Avg confidence</div>
               <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">{Number.isFinite(avgConfidence) ? `${avgConfidence}%` : "—"}</div>
             </div>
@@ -141,10 +141,10 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-white/8 bg-[#18181b] p-4 lg:p-5">
+      <section className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(10,21,16,0.96),rgba(8,18,14,0.96))] p-4 lg:p-5">
         {/* Sport bar — same style as live page */}
         <div className="overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-          <div className="flex min-w-max items-center gap-2 rounded-[24px] border border-[#27272a] bg-[#18181b] p-2">
+          <div className="flex min-w-max items-center gap-2 rounded-[24px] border border-white/8 bg-white/[0.03] p-2">
             {SPORTS.map((item) => {
               const isActive = sport === item.value;
               const counts = item.value === "all" ? null : (sportCounts[item.value] ?? { total: 0, live: 0 });
@@ -197,11 +197,11 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
                   setPage(1);
                 }}
                 placeholder="Search teams or leagues"
-                className="h-11 w-full rounded-full border border-white/8 bg-[#27272a] pl-10 pr-4 text-sm text-white placeholder:text-white/28 outline-none transition focus:border-emerald-300/25"
+                className="h-11 w-full rounded-full border border-white/8 bg-white/[0.04] pl-10 pr-4 text-sm text-white placeholder:text-white/28 outline-none transition focus:border-emerald-300/25"
               />
             </div>
 
-            <div className="flex items-center gap-2 rounded-full border border-white/8 bg-[#27272a] px-3 py-2 text-sm text-white/65">
+            <div className="flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.04] px-3 py-2 text-sm text-white/65">
               <SlidersHorizontal size={15} />
               <button onClick={() => toggleSort("scheduled_at")} className={cn("rounded-full px-3 py-1", sortField === "scheduled_at" && "bg-white/[0.08] text-white")}>
                 Time
@@ -224,7 +224,7 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
             <button
               key={match.id}
               onClick={() => (window.location.href = `/sports/${match.sport}/matches/${match.id}`)}
-              className="rounded-[24px] border border-[#27272a] bg-[#18181b] p-4 text-left transition hover:-translate-y-0.5 hover:border-emerald-300/20"
+              className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 text-left transition hover:-translate-y-0.5 hover:border-emerald-300/20"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className={cn("rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em]", sportTone(match.sport))}>{match.sport}</div>
@@ -260,7 +260,7 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
         </div>
 
         {!loading && paginated.length === 0 && (
-          <div className="mt-5 rounded-[24px] border border-dashed border-white/10 bg-[#18181b] p-10 text-center">
+          <div className="mt-5 rounded-[24px] border border-dashed border-white/10 bg-white/[0.03] p-10 text-center">
             <div className="text-xl font-semibold text-white">No matches found</div>
             <div className="mt-2 text-sm text-white/50">Try a different sport filter or broaden your search.</div>
           </div>
@@ -272,7 +272,7 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
             <button
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
-              className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-[#27272a] px-4 py-2 text-white/70 transition disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.04] px-4 py-2 text-white/70 transition disabled:opacity-40"
             >
               <ChevronLeft size={14} />
               Prev
@@ -280,7 +280,7 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
             <button
               disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-[#27272a] px-4 py-2 text-white/70 transition disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.04] px-4 py-2 text-white/70 transition disabled:opacity-40"
             >
               Next
               <ChevronRight size={14} />
