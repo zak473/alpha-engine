@@ -115,7 +115,7 @@ function TeamBlock({
     <div className={cn("flex min-w-0 flex-col gap-3", !isHome && "items-end text-right")}>
       <div className={cn("flex items-center gap-4", !isHome && "flex-row-reverse")}>
         {logo_url ? (
-          <img src={logo_url} alt={name} className="h-14 w-14 rounded-[16px] border border-white/10 bg-white p-1.5 object-contain shadow-lg flex-shrink-0" />
+          <img src={logo_url} alt={name} className="h-14 w-14 rounded-[16px] border border-white/10 bg-white/[0.06] p-1.5 object-contain shadow-lg flex-shrink-0" />
         ) : (
           <div className="flex h-14 w-14 items-center justify-center rounded-[16px] border border-white/10 bg-white/10 text-sm font-bold text-white flex-shrink-0">
             {name.slice(0, 2).toUpperCase()}

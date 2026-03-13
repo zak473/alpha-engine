@@ -58,7 +58,7 @@ export function ProfileClient() {
     <div className="px-4 py-6 lg:px-6 max-w-xl mx-auto flex flex-col gap-6">
 
       {/* Account info card */}
-      <div className="rounded-2xl border overflow-hidden" style={{ borderColor: "var(--border0)", background: "#fff" }}>
+      <div className="rounded-2xl border overflow-hidden" style={{ borderColor: "rgba(255,255,255,0.08)", background: "linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))" }}>
         <div className="px-5 py-4 border-b flex items-center gap-2" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
           <User size={14} style={{ color: "var(--accent)" }} />
           <p className="text-xs font-bold uppercase tracking-wider text-text-primary">Account</p>
@@ -76,7 +76,7 @@ export function ProfileClient() {
       </div>
 
       {/* Display name card */}
-      <div className="rounded-2xl border overflow-hidden" style={{ borderColor: "var(--border0)", background: "#fff" }}>
+      <div className="rounded-2xl border overflow-hidden" style={{ borderColor: "rgba(255,255,255,0.08)", background: "linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))" }}>
         <div className="px-5 py-4 border-b flex items-center gap-2" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
           <User size={14} style={{ color: "var(--accent)" }} />
           <p className="text-xs font-bold uppercase tracking-wider text-text-primary">Display Name</p>
@@ -102,7 +102,7 @@ export function ProfileClient() {
       </div>
 
       {/* Change password card */}
-      <div className="rounded-2xl border overflow-hidden" style={{ borderColor: "var(--border0)", background: "#fff" }}>
+      <div className="rounded-2xl border overflow-hidden" style={{ borderColor: "rgba(255,255,255,0.08)", background: "linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))" }}>
         <div className="px-5 py-4 border-b flex items-center gap-2" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
           <Lock size={14} style={{ color: "var(--accent)" }} />
           <p className="text-xs font-bold uppercase tracking-wider text-text-primary">Change Password</p>

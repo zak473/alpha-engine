@@ -96,7 +96,7 @@ function gameBg(gameType: string | null | undefined) {
     case "lol":      return "bg-blue-500/15 text-blue-400 border border-blue-500/25";
     case "valorant": return "bg-rose-500/15 text-rose-400 border border-rose-500/25";
     case "dota2":    return "bg-red-500/15 text-red-400 border border-red-500/25";
-    default:         return "bg-zinc-700/30 text-t2 border border-zinc-700/40";
+    default:         return "bg-white/[0.04] text-white/50 border border-white/8";
   }
 }
 
@@ -385,10 +385,10 @@ function EsportsMatchHeader({ match }: { match: EsportsMatch }) {
 
 function KpiCell({ label, value, sub, accent }: { label: string; value: React.ReactNode; sub?: string; accent?: string }) {
   return (
-    <div className="min-w-[100px] rounded-[20px] border border-[#d9e2d7] bg-[#f7f8f5] px-4 py-3">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7b857b]">{label}</p>
-      <p className={cn("mt-1 font-mono text-[20px] font-bold leading-none tabular-nums truncate", accent ?? "text-[#111315]")}>{value}</p>
-      {sub && <p className="mt-1 text-[10px] font-mono text-[#7b857b]">{sub}</p>}
+    <div className="min-w-[100px] rounded-[20px] border border-white/8 bg-white/[0.04] px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">{label}</p>
+      <p className={cn("mt-1 font-mono text-[20px] font-bold leading-none tabular-nums truncate", accent ?? "text-white")}>{value}</p>
+      {sub && <p className="mt-1 text-[10px] font-mono text-white/40">{sub}</p>}
     </div>
   );
 }
@@ -423,16 +423,16 @@ function EsportsKpiStrip({ match }: { match: EsportsMatch }) {
       : { label: "Avg GD@15", value: "—" };
 
   return (
-    <div className="rounded-[30px] border border-[#d9e2d7] bg-white p-5 shadow-[0_10px_30px_rgba(17,19,21,0.05)]">
+    <div className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.26)]">
       <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <KpiCell label="Model P(A)" value={p ? `${Math.round(p.home_win * 100)}%` : "—"} sub={match.home.name.split(" ").slice(-1)[0]} accent={p ? "text-[#2d7f4f]" : undefined} />
-        <KpiCell label="Model P(B)" value={p ? `${Math.round(p.away_win * 100)}%` : "—"} sub={match.away.name.split(" ").slice(-1)[0]} accent={p ? "text-[#7c3aed]" : undefined} />
-        <KpiCell label="ELO P(A)" value={eloH} accent="text-[#2d7f4f]" />
-        <KpiCell label="ELO P(B)" value={eloA} accent="text-[#7c3aed]" />
+        <KpiCell label="Model P(A)" value={p ? `${Math.round(p.home_win * 100)}%` : "—"} sub={match.home.name.split(" ").slice(-1)[0]} accent={p ? "text-emerald-300" : undefined} />
+        <KpiCell label="Model P(B)" value={p ? `${Math.round(p.away_win * 100)}%` : "—"} sub={match.away.name.split(" ").slice(-1)[0]} accent={p ? "text-violet-400" : undefined} />
+        <KpiCell label="ELO P(A)" value={eloH} accent="text-emerald-300" />
+        <KpiCell label="ELO P(B)" value={eloA} accent="text-violet-400" />
         <KpiCell label="Fair odds A" value={fo?.home_win ? fo.home_win.toFixed(2) : "—"} />
         <KpiCell label="Fair odds B" value={fo?.away_win ? fo.away_win.toFixed(2) : "—"} />
-        <KpiCell label="Confidence" value={match.confidence != null ? `${match.confidence}%` : "—"} accent={match.confidence != null && match.confidence >= 65 ? "text-[#2d7f4f]" : match.confidence != null && match.confidence >= 45 ? "text-[#b45309]" : undefined} />
-        <KpiCell label="ELO diff" value={eloDiff !== "—" ? `${Number(eloDiff) > 0 ? "+" : ""}${eloDiff}` : "—"} accent={Number(eloDiff) > 0 ? "text-[#2d7f4f]" : "text-[#7c3aed]"} />
+        <KpiCell label="Confidence" value={match.confidence != null ? `${match.confidence}%` : "—"} accent={match.confidence != null && match.confidence >= 65 ? "text-emerald-300" : match.confidence != null && match.confidence >= 45 ? "text-amber-400" : undefined} />
+        <KpiCell label="ELO diff" value={eloDiff !== "—" ? `${Number(eloDiff) > 0 ? "+" : ""}${eloDiff}` : "—"} accent={Number(eloDiff) > 0 ? "text-emerald-300" : "text-violet-400"} />
         <KpiCell label="Series W% (A)" value={fH?.series_win_pct != null ? pct(fH.series_win_pct) : "—"} />
         <KpiCell label="Series W% (B)" value={fA?.series_win_pct != null ? pct(fA.series_win_pct) : "—"} />
         <KpiCell label="Map W% (A)" value={fH?.map_win_pct != null ? pct(fH.map_win_pct) : "—"} />
@@ -453,7 +453,7 @@ function Cs2VetoPanel({ match }: { match: EsportsMatch }) {
   const actionColor = { ban: "text-negative", pick: "text-positive", left_over: "text-t3" };
   const teamLabel = (t: string) => t === "a" ? match.home.name : t === "b" ? match.away.name : "Decider";
   return (
-    <div className="divide-y divide-zinc-800/40">
+    <div className="divide-y divide-white/8">
       {match.veto.map((v, i) => (
         <div key={i} className="flex items-center gap-3 py-1.5 text-xs">
           <span className="text-t3 font-mono w-4 text-right shrink-0">{i+1}</span>
@@ -471,7 +471,7 @@ function Cs2MapCard({ m, teamA, teamB }: { m: EsportsMapOut; teamA: string; team
   const aPct = total > 0 ? (m.team_a_score ?? 0) / total : 0.5;
 
   return (
-    <div className={cn("card p-3 border", m.winner ? "border-zinc-700/50" : "border-zinc-800/40")}>
+    <div className={cn("card p-3 border", m.winner ? "border-white/10" : "border-white/8")}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <span className="text-2xs text-t3 font-mono">Map {m.map_number}</span>
@@ -537,7 +537,7 @@ function Cs2PlayerTable({ players, teamName }: { players: EsportsPlayerStatsOut[
         </thead>
         <tbody>
           {players.sort((a, b) => (b.rating_2 ?? 0) - (a.rating_2 ?? 0)).map((p, i) => (
-            <tr key={i} className="border-b border-zinc-800/30 last:border-0 hover:bg-zinc-800/20">
+            <tr key={i} className="border-b border-white/8 last:border-0 hover:bg-white/[0.04]">
               <td className="py-1.5 px-2 font-medium text-t1">{p.player_name}</td>
               <td className="py-1.5 px-2 text-center font-mono text-t1">{p.kills ?? "—"}</td>
               <td className="py-1.5 px-2 text-center font-mono text-t2">{p.deaths ?? "—"}</td>
@@ -599,7 +599,7 @@ function LolGameCard({ g, teamA, teamB }: { g: EsportsGameOut; teamA: string; te
   const gd15 = g.gold_diff_at_15;
 
   return (
-    <div className={cn("card p-3 border", g.winner ? "border-zinc-700/50" : "border-zinc-800/40")}>
+    <div className={cn("card p-3 border", g.winner ? "border-white/10" : "border-white/8")}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <span className="text-2xs text-t3 font-mono">Game {g.game_number}</span>
@@ -647,7 +647,7 @@ function LolDraftPanel({ game, teamA, teamB }: { game: EsportsGameOut; teamA: st
 
   const ChampBadge = ({ name, role, isBan }: { name: string; role?: string | null; isBan?: boolean }) => (
     <div className={cn("flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs border",
-      isBan ? "bg-red-500/10 text-red-400 border-red-500/20 line-through opacity-60" : "bg-zinc-800/60 text-t1 border-zinc-700/40"
+      isBan ? "bg-red-500/10 text-red-400 border-red-500/20 line-through opacity-60" : "bg-white/[0.06] text-white/70 border-white/8"
     )}>
       <span className="truncate max-w-[80px]">{name}</span>
       {role && !isBan && <span className="text-t3 text-2xs shrink-0">{role}</span>}
@@ -696,10 +696,10 @@ function LolPlayerTable({ players, teamName }: { players: EsportsPlayerStatsOut[
         </thead>
         <tbody>
           {sorted.map((p, i) => (
-            <tr key={i} className="border-b border-zinc-800/30 last:border-0 hover:bg-zinc-800/20">
+            <tr key={i} className="border-b border-white/8 last:border-0 hover:bg-white/[0.04]">
               <td className="py-1.5 px-2 font-medium text-t1">{p.player_name}</td>
               <td className="py-1.5 px-2 text-center">
-                <span className="text-2xs px-1 py-0.5 rounded bg-zinc-700/40 text-t2">{p.role ?? "?"}</span>
+                <span className="text-2xs px-1 py-0.5 rounded bg-white/[0.06] text-white/50">{p.role ?? "?"}</span>
               </td>
               <td className="py-1.5 px-2 text-center font-mono text-accent-blue font-bold">{p.kda != null ? p.kda.toFixed(1) : "—"}</td>
               <td className="py-1.5 px-2 text-center font-mono">{p.kill_participation_pct != null ? `${(p.kill_participation_pct * 100).toFixed(0)}%` : "—"}</td>
@@ -861,7 +861,7 @@ function SeriesTab({ match }: { match: EsportsMatch }) {
             {match.games.map((gm, i) => (
               <button key={i} onClick={() => setSelectedGame(i)}
                 className={cn("text-xs px-3 py-1.5 rounded border transition-colors",
-                  selectedGame === i ? "bg-accent-blue/20 border-accent-blue/40 text-accent-blue" : "border-zinc-700 text-t3 hover:text-t1"
+                  selectedGame === i ? "bg-accent-blue/20 border-accent-blue/40 text-accent-blue" : "border-white/8 text-white/35 hover:text-white/70"
                 )}>
                 Game {gm.game_number} {gm.winner ? (gm.winner === "a" ? "✓A" : "✓B") : ""}
               </button>
@@ -898,7 +898,7 @@ function SeriesTab({ match }: { match: EsportsMatch }) {
                 const total = a + b;
                 const aPct = total > 0 ? (a / total) * 100 : 50;
                 return (
-                  <div key={label} className="py-1.5 border-b border-zinc-800/40 last:border-0">
+                  <div key={label} className="py-1.5 border-b border-white/8 last:border-0">
                     <div className="flex justify-between text-xs mb-1">
                       <span className="font-mono font-semibold text-accent-blue">{a}</span>
                       <span className="text-2xs text-t3">{label}</span>
@@ -918,7 +918,7 @@ function SeriesTab({ match }: { match: EsportsMatch }) {
             {match.games.some(g => g.gold_diff_at_15 != null) ? (
               <div className="space-y-1.5">
                 {match.games.map(g => (
-                  <div key={g.game_number} className="flex items-center justify-between text-xs py-1 border-b border-zinc-800/40 last:border-0">
+                  <div key={g.game_number} className="flex items-center justify-between text-xs py-1 border-b border-white/8 last:border-0">
                     <span className="text-t3">Game {g.game_number}</span>
                     <span className={cn("font-mono", g.gold_diff_at_15 != null && g.gold_diff_at_15 > 0 ? "text-accent-green" : "text-amber-400")}>
                       {g.gold_diff_at_15 != null ? `${g.gold_diff_at_15 > 0 ? "+" : ""}${g.gold_diff_at_15.toLocaleString()}` : "—"}
@@ -957,7 +957,7 @@ function SeriesTab({ match }: { match: EsportsMatch }) {
                   const hWins = h != null && a != null && h > a;
                   const aWins = h != null && a != null && a > h;
                   return (
-                    <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 py-1.5 border-b border-zinc-800/40 last:border-0 text-xs font-mono">
+                    <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 py-1.5 border-b border-white/8 last:border-0 text-xs font-mono">
                       <span className={cn("font-medium", hWins ? "text-accent-green" : "text-t1")}>{fmt(h)}</span>
                       <span className="text-2xs text-t3 text-center whitespace-nowrap">{label}</span>
                       <span className={cn("font-medium text-right", aWins ? "text-accent-green" : "text-t1")}>{fmt(a)}</span>
@@ -979,12 +979,12 @@ function SeriesTab({ match }: { match: EsportsMatch }) {
                   { team: match.home.name, comp: compH, color: "text-accent-blue" },
                   { team: match.away.name, comp: compA, color: "text-amber-400" },
                 ].map(({ team, comp, color }) => comp ? (
-                  <div key={team} className="mb-2 last:mb-0 pb-2 border-b border-zinc-800/40 last:border-0">
+                  <div key={team} className="mb-2 last:mb-0 pb-2 border-b border-white/8 last:border-0">
                     <div className={cn("text-2xs font-medium mb-1", color)}>{team}</div>
                     {comp.comp_tags && comp.comp_tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mb-1">
                         {comp.comp_tags.map((tag: string, i: number) => (
-                          <span key={i} className="text-2xs px-1.5 py-0.5 rounded bg-zinc-800/60 text-t2 border border-zinc-700/40">{tag}</span>
+                          <span key={i} className="text-2xs px-1.5 py-0.5 rounded bg-white/[0.06] text-white/50 border border-white/8">{tag}</span>
                         ))}
                       </div>
                     )}
@@ -1064,7 +1064,7 @@ function SeriesTab({ match }: { match: EsportsMatch }) {
                 const hWins = hPct != null && aPct != null && hPct > aPct;
                 const aWins = hPct != null && aPct != null && aPct > hPct;
                 return (
-                  <div key={label} className="py-1.5 border-b border-zinc-800/40 last:border-0">
+                  <div key={label} className="py-1.5 border-b border-white/8 last:border-0">
                     <div className="flex justify-between text-xs mb-0.5">
                       <span className={cn("font-mono font-medium", hWins ? "text-accent-green" : "text-t1")}>{hPct != null ? `${hPct}%` : "—"}</span>
                       <span className="text-2xs text-t3">{label}</span>
@@ -1103,7 +1103,7 @@ function SeriesTab({ match }: { match: EsportsMatch }) {
                 const hWins = hV != null && aV != null && hV > aV;
                 const aWins = hV != null && aV != null && aV > hV;
                 return (
-                  <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 py-1.5 border-b border-zinc-800/40 last:border-0 text-xs font-mono">
+                  <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 py-1.5 border-b border-white/8 last:border-0 text-xs font-mono">
                     <span className={cn("font-medium", hWins ? "text-accent-green" : "text-t1")}>{hV != null ? `${hV}${isPct ? "%" : ""}` : "—"}</span>
                     <span className="text-2xs text-t3 text-center whitespace-nowrap">{label}</span>
                     <span className={cn("font-medium text-right", aWins ? "text-accent-green" : "text-t1")}>{aV != null ? `${aV}${isPct ? "%" : ""}` : "—"}</span>
@@ -1199,7 +1199,7 @@ function RosterTab({ match }: { match: EsportsMatch }) {
               const hWins = hPct != null && aPct != null && hPct > aPct;
               const aWins = hPct != null && aPct != null && aPct > hPct;
               return (
-                <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 py-1.5 border-b border-zinc-800/40 last:border-0 text-xs font-mono">
+                <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 py-1.5 border-b border-white/8 last:border-0 text-xs font-mono">
                   <span className={cn("font-medium", hWins ? "text-accent-green" : "text-t1")}>{hPct != null ? `${hPct}%` : "—"}</span>
                   <span className="text-2xs text-t3 text-center whitespace-nowrap">{label}</span>
                   <span className={cn("font-medium text-right", aWins ? "text-accent-green" : "text-t1")}>{aPct != null ? `${aPct}%` : "—"}</span>
@@ -1252,7 +1252,7 @@ function H2HTab({ match }: { match: EsportsMatch }) {
               </thead>
               <tbody>
                 {h2h.recent_matches.map((m, i) => (
-                  <tr key={i} className="border-b border-zinc-800/30 last:border-0 hover:bg-zinc-800/20">
+                  <tr key={i} className="border-b border-white/8 last:border-0 hover:bg-white/[0.04]">
                     <td className="py-2 px-3 text-t2">{m.date ? fmtDateShort(m.date) : "—"}</td>
                     <td className="py-2 px-3 text-center font-mono text-t1">{m.team_a_score ?? "?"} – {m.team_b_score ?? "?"}</td>
                     <td className="py-2 px-3">
@@ -1400,7 +1400,7 @@ function ModelTab({ match }: { match: EsportsMatch }) {
                 return (
                   <div key={i} className="flex items-center gap-2">
                     <span className="text-2xs text-t2 w-36 shrink-0 truncate">{d.feature}</span>
-                    <div className="flex-1 h-1.5 rounded-full bg-zinc-800/60">
+                    <div className="flex-1 h-1.5 rounded-full bg-white/[0.08]">
                       <div className={cn("h-full rounded-full", d.importance > 0 ? "bg-accent-blue" : "bg-amber-500")} style={{ width: `${barW}%` }} />
                     </div>
                     <span className="text-2xs font-mono text-t3 w-12 text-right">{d.value != null ? d.value.toFixed(2) : "—"}</span>
@@ -1447,7 +1447,7 @@ function ModelTab({ match }: { match: EsportsMatch }) {
                 if (val == null) return null;
                 const edge = prob != null ? (prob - 1 / Number(val)) * 100 : null;
                 return (
-                  <div key={label} className="flex-1 bg-zinc-900 rounded border border-b0 p-3 flex flex-col items-center gap-1">
+                  <div key={label} className="flex-1 bg-white/[0.04] rounded border border-white/8 p-3 flex flex-col items-center gap-1">
                     <span className="text-2xs text-t2">{label}</span>
                     <span className="text-lg font-bold font-mono text-t0">{Number(val).toFixed(2)}</span>
                     {edge != null && (
@@ -1533,8 +1533,8 @@ function ContextTab({ match }: { match: EsportsMatch }) {
         <Panel title="Data Completeness">
           <div className="space-y-1">
             {checks.map(({ label, ok }) => (
-              <div key={label} className="flex items-center gap-2 py-1 border-b border-zinc-800/40 last:border-0">
-                {ok ? <CheckCircle2 size={11} className="text-accent-green shrink-0" /> : <XCircle size={11} className="text-zinc-600 shrink-0" />}
+              <div key={label} className="flex items-center gap-2 py-1 border-b border-white/8 last:border-0">
+                {ok ? <CheckCircle2 size={11} className="text-accent-green shrink-0" /> : <XCircle size={11} className="text-white/25 shrink-0" />}
                 <span className={cn("text-2xs", ok ? "text-t2" : "text-t3")}>{label}</span>
               </div>
             ))}

@@ -852,10 +852,10 @@ function ServeReturnTab({ match }: { match: TennisMatch }) {
                 </div>
                 <div className="flex items-center gap-2 text-2xs font-mono">
                   <span className="text-accent-blue w-10">{vH != null ? `${(vH * 100).toFixed(0)}%` : "—"}</span>
-                  <div className="flex-1 flex h-1.5 rounded overflow-hidden bg-zinc-800">
+                  <div className="flex-1 flex h-1.5 rounded overflow-hidden bg-white/[0.08]">
                     {vH != null && <div className="bg-accent-blue/60" style={{ width: `${(vH * 100).toFixed(0)}%` }} />}
                   </div>
-                  <div className="flex-1 flex h-1.5 rounded overflow-hidden bg-zinc-800">
+                  <div className="flex-1 flex h-1.5 rounded overflow-hidden bg-white/[0.08]">
                     {vAway != null && <div className="bg-amber-500/60 ml-auto" style={{ width: `${(vAway * 100).toFixed(0)}%` }} />}
                   </div>
                   <span className="text-amber-400 w-10 text-right">{vAway != null ? `${(vAway * 100).toFixed(0)}%` : "—"}</span>
@@ -918,7 +918,7 @@ function ServeReturnTab({ match }: { match: TennisMatch }) {
             }
             if (edges.length === 0) return <EmptyState icon={Zap} title="No significant edges detected" />;
             return (
-              <div className="divide-y divide-zinc-800/50">
+              <div className="divide-y divide-white/8">
                 {edges.map((e, i) => (
                   <div key={i} className="flex items-center justify-between py-2 text-xs">
                     <span className="text-t2">{e.label}</span>
@@ -981,7 +981,7 @@ function SetsTab({ match }: { match: TennisMatch }) {
                     { name: match.home.name, sets: match.home_score, side: "a" as const },
                     { name: match.away.name, sets: match.away_score, side: "b" as const },
                   ].map(({ name, sets: setTotal, side }) => (
-                    <tr key={side} className="border-b border-zinc-800/30 last:border-0">
+                    <tr key={side} className="border-b border-white/8 last:border-0">
                       <td className="py-2 font-medium text-t1 pr-3">{name}</td>
                       {sets.map((s, i) => {
                         const myScore = side === "a" ? s.a : s.b;
@@ -1154,7 +1154,7 @@ function H2HTab({ match }: { match: TennisMatch }) {
                 </thead>
                 <tbody>
                   {h2h.recent_matches.map((m, i) => (
-                    <tr key={i} className="border-b border-zinc-800/30 last:border-0 hover:bg-zinc-800/20">
+                    <tr key={i} className="border-b border-white/8 last:border-0 hover:bg-white/[0.08]/20">
                       <td className="py-2 px-3 text-t2">{m.date ? fmtDateShort(m.date) : "—"}</td>
                       <td className="py-2 px-3">
                         {m.surface ? (
@@ -1308,7 +1308,7 @@ function SurfaceTab({ match, eloHomeSurface, eloAwaySurface }: { match: TennisMa
               {info?.court_speed_index != null && (
                 <div className="mb-3">
                   <div className="text-2xs text-t3 mb-1">Court Speed Index <span className="text-t2 font-mono">{info.court_speed_index.toFixed(1)}</span> / 100</div>
-                  <div className="h-2 rounded-full bg-zinc-800/60 overflow-hidden">
+                  <div className="h-2 rounded-full bg-white/[0.08]/60 overflow-hidden">
                     <div
                       className={cn("h-full rounded-full", info.court_speed_index > 60 ? "bg-blue-400" : info.court_speed_index > 35 ? "bg-amber-400" : "bg-amber-700")}
                       style={{ width: `${info.court_speed_index}%` }}
@@ -1335,8 +1335,8 @@ function SurfaceTab({ match, eloHomeSurface, eloAwaySurface }: { match: TennisMa
                     </div>
                   </div>
                   <div className="flex gap-0.5 h-1.5">
-                    {vHome != null && <div className="flex-1 bg-zinc-800/60 rounded overflow-hidden"><div className="bg-accent-blue/50 h-full" style={{ width: `${(vHome * 100).toFixed(0)}%` }} /></div>}
-                    {vAway != null && <div className="flex-1 bg-zinc-800/60 rounded overflow-hidden"><div className="bg-amber-500/50 h-full" style={{ width: `${(vAway * 100).toFixed(0)}%` }} /></div>}
+                    {vHome != null && <div className="flex-1 bg-white/[0.08]/60 rounded overflow-hidden"><div className="bg-accent-blue/50 h-full" style={{ width: `${(vHome * 100).toFixed(0)}%` }} /></div>}
+                    {vAway != null && <div className="flex-1 bg-white/[0.08]/60 rounded overflow-hidden"><div className="bg-amber-500/50 h-full" style={{ width: `${(vAway * 100).toFixed(0)}%` }} /></div>}
                   </div>
                 </div>
               ) : null)}
@@ -1430,7 +1430,7 @@ function EloTab({ match, eloHomeOverall, eloAwayOverall, eloHomeSurface, eloAway
           action={
             <button
               onClick={() => setShowSurface(v => !v)}
-              className={cn("text-2xs px-2 py-0.5 rounded border transition-colors", showSurface ? surfaceBg(match.tennis_info?.surface) : "border-zinc-700 text-t3 hover:text-t1")}
+              className={cn("text-2xs px-2 py-0.5 rounded border transition-colors", showSurface ? surfaceBg(match.tennis_info?.surface) : "border-white/8 text-white/35 hover:text-white/70")}
             >
               {showSurface ? `${match.tennis_info?.surface ?? "Surface"} ELO` : "Overall ELO"}
             </button>
@@ -1594,7 +1594,7 @@ function ModelTab({ match }: { match: TennisMatch }) {
                 return (
                   <div key={i} className="flex items-center gap-2">
                     <span className="text-2xs text-t2 w-36 shrink-0 truncate">{d.feature}</span>
-                    <div className="flex-1 h-1.5 rounded-full bg-zinc-800/60">
+                    <div className="flex-1 h-1.5 rounded-full bg-white/[0.08]/60">
                       <div
                         className={cn("h-full rounded-full", d.importance > 0 ? "bg-accent-blue" : "bg-amber-500")}
                         style={{ width: `${barW}%` }}
@@ -1793,11 +1793,11 @@ function ContextTab({ match }: { match: TennisMatch }) {
         <Panel title="Data Completeness">
           <div className="space-y-1">
             {checks.map(({ label, ok }) => (
-              <div key={label} className="flex items-center gap-2 py-1 border-b border-zinc-800/40 last:border-0">
+              <div key={label} className="flex items-center gap-2 py-1 border-b border-white/8 last:border-0">
                 {ok ? (
                   <CheckCircle2 size={11} className="text-accent-green shrink-0" />
                 ) : (
-                  <XCircle size={11} className="text-zinc-600 shrink-0" />
+                  <XCircle size={11} className="text-white/25 shrink-0" />
                 )}
                 <span className={cn("text-2xs", ok ? "text-t2" : "text-t3")}>{label}</span>
               </div>

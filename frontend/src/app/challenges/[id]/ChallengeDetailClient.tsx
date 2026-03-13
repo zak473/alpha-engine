@@ -257,7 +257,7 @@ function SubmitEntryModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
-      <div className="w-full max-w-md rounded-2xl p-6 flex flex-col gap-4" style={{ background: "#fff", border: "1px solid var(--border0)" }}>
+      <div className="w-full max-w-md rounded-[28px] p-6 flex flex-col gap-4" style={{ background: "linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))", border: "1px solid rgba(255,255,255,0.10)" }}>
         <div className="flex items-center justify-between">
           <h2 style={{ fontSize: 15, fontWeight: 700 }}>Submit a Pick</h2>
           <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-text-primary"><X size={16} /></button>
