@@ -452,7 +452,7 @@ export function TipstersView() {
   return (
     <>
       {/* Page header */}
-      <div className="px-4 pt-5 pb-4 lg:px-6 border-b" style={{ borderColor: "var(--border0)" }}>
+      <div className="mx-4 mt-1 rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] px-5 pt-5 pb-4 lg:mx-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -486,7 +486,7 @@ export function TipstersView() {
       </div>
 
       {/* Tab bar */}
-      <div className="flex items-center gap-0 px-4 lg:px-6 border-b" style={{ borderColor: "var(--border0)" }}>
+      <div className="mx-4 mt-4 flex items-center gap-0 rounded-[24px] border border-white/8 bg-white/[0.03] px-2 lg:mx-6">
         {([["tipsters", "Tipsters", <Users key="u" size={12} />], ["leaderboard", "Leaderboard", <Trophy key="t" size={12} />]] as [Tab, string, React.ReactNode][]).map(([value, label, icon]) => (
           <button
             key={value}
@@ -505,7 +505,7 @@ export function TipstersView() {
 
       {tab === "tipsters" && <>
       {/* Toolbar */}
-      <div className="flex items-center gap-3 px-4 py-3 lg:px-6 border-b" style={{ borderColor: "var(--border0)" }}>
+      <div className="mx-4 mt-4 flex items-center gap-3 rounded-[24px] border border-white/8 bg-white/[0.03] px-4 py-3 lg:mx-6">
         <div className="relative flex-1 max-w-xs">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle pointer-events-none" />
           <input
@@ -538,7 +538,7 @@ export function TipstersView() {
       {/* Grid */}
       <div className="px-4 py-5 lg:px-6">
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-5">
+          <div className="mx-auto flex max-w-2xl flex-col items-center justify-center rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] py-20 gap-5 px-6">
             <div className="flex h-16 w-16 items-center justify-center rounded-full" style={{ background: "rgba(34,226,131,0.10)", border: "1px solid rgba(34,226,131,0.20)" }}>
               <Users size={28} style={{ color: "var(--accent)" }} />
             </div>
