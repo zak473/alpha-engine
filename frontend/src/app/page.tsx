@@ -27,9 +27,9 @@ const pillars = [
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,rgba(61,242,145,0.16),transparent_24%),linear-gradient(180deg,#07110d_0%,#091510_45%,#0b1712_100%)] text-white">
+    <main className="min-h-screen overflow-hidden bg-[#09090b] text-white">
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-8 lg:px-10">
-        <header className="flex items-center justify-between gap-4 rounded-full border border-white/10 bg-white/5 px-5 py-3 backdrop-blur">
+        <header className="flex items-center justify-between gap-4 rounded-full border border-white/10 bg-[#18181b] px-5 py-3">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#36f28f_0%,#15a95b_100%)] text-[#041109] shadow-[0_12px_30px_rgba(54,242,143,0.28)]">
               <Sparkles size={18} />
@@ -41,7 +41,7 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Link href="/login" className="hidden rounded-full border border-white/12 px-4 py-2 text-sm font-medium text-white/80 transition hover:bg-white/5 sm:inline-flex">
+            <Link href="/login" className="hidden rounded-full border border-white/12 px-4 py-2 text-sm font-medium text-white/80 transition hover:bg-[#18181b] sm:inline-flex">
               Log in
             </Link>
             <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#36f28f_0%,#1ac96b_100%)] px-5 py-2.5 text-sm font-semibold text-[#041109] shadow-[0_18px_40px_rgba(54,242,143,0.22)] transition hover:-translate-y-0.5">
@@ -72,14 +72,14 @@ export default function HomePage() {
                   Explore the board
                   <ArrowRight size={16} />
                 </Link>
-                <Link href="/predictions" className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-6 py-3 text-sm font-semibold text-white/88 transition hover:bg-white/8">
+                <Link href="/predictions" className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-[#18181b] px-6 py-3 text-sm font-semibold text-white/88 transition hover:bg-white/8">
                   View predictions
                 </Link>
               </div>
 
               <div className="mt-10 grid gap-3 sm:grid-cols-3">
                 {highlights.map((item) => (
-                  <div key={item.label} className="rounded-[24px] border border-white/10 bg-white/5 px-5 py-4 backdrop-blur">
+                  <div key={item.label} className="rounded-[24px] border border-white/10 bg-[#18181b] px-5 py-4">
                     <div className="text-[11px] uppercase tracking-[0.22em] text-white/45">{item.label}</div>
                     <div className="mt-2 text-xl font-semibold tracking-[-0.03em] text-white">{item.value}</div>
                   </div>
@@ -89,8 +89,8 @@ export default function HomePage() {
 
             <div className="relative">
               <div className="absolute inset-0 rounded-[32px] bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.22),transparent_48%)] blur-2xl" />
-              <div className="relative rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.04))] p-5 shadow-[0_30px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-                <div className="rounded-[28px] border border-white/10 bg-[#08120e] p-5">
+              <div className="relative rounded-[32px] border border-white/10 bg-[#18181b] p-5 shadow-[0_30px_80px_rgba(0,0,0,0.28)]">
+                <div className="rounded-[28px] border border-white/10 bg-[#27272a] p-5">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-[11px] uppercase tracking-[0.24em] text-white/45">Today’s board</div>
@@ -102,12 +102,12 @@ export default function HomePage() {
                   </div>
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-[22px] border border-white/8 bg-white/5 p-4">
+                    <div className="rounded-[22px] border border-white/8 bg-[#18181b] p-4">
                       <div className="text-[11px] uppercase tracking-[0.18em] text-white/42">Top edge</div>
                       <div className="mt-3 text-4xl font-semibold tracking-[-0.05em] text-emerald-300">+12.4%</div>
                       <div className="mt-2 text-sm text-white/52">Highest-ranked market on the board</div>
                     </div>
-                    <div className="rounded-[22px] border border-white/8 bg-white/5 p-4">
+                    <div className="rounded-[22px] border border-white/8 bg-[#18181b] p-4">
                       <div className="text-[11px] uppercase tracking-[0.18em] text-white/42">Live matches</div>
                       <div className="mt-3 text-4xl font-semibold tracking-[-0.05em] text-white">18</div>
                       <div className="mt-2 text-sm text-white/52">Auto-sorted into a calmer scanning flow</div>
@@ -120,7 +120,7 @@ export default function HomePage() {
                       ["Nuggets vs Celtics", "Live watchlist", "+5.4% edge"],
                       ["T1 vs G2", "Momentum signal", "+6.1% edge"],
                     ].map(([match, meta, edge]) => (
-                      <div key={match} className="flex items-center justify-between gap-3 rounded-[20px] border border-white/8 bg-white/[0.03] px-4 py-3">
+                      <div key={match} className="flex items-center justify-between gap-3 rounded-[20px] border border-white/8 bg-[#18181b] px-4 py-3">
                         <div>
                           <div className="text-sm font-semibold text-white">{match}</div>
                           <div className="mt-1 text-xs text-white/46">{meta}</div>
@@ -138,7 +138,7 @@ export default function HomePage() {
         <section className="pb-10 lg:pb-16">
           <div className="grid gap-4 lg:grid-cols-3">
             {pillars.map(({ icon: Icon, title, body }) => (
-              <div key={title} className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
+              <div key={title} className="rounded-[28px] border border-white/10 bg-[#18181b] p-6">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-300/10 text-emerald-200">
                   <Icon size={20} />
                 </div>
@@ -148,7 +148,7 @@ export default function HomePage() {
             ))}
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-[28px] border border-white/10 bg-white/5 px-6 py-5 backdrop-blur">
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-[28px] border border-white/10 bg-[#18181b] px-6 py-5">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-emerald-200">
                 <Trophy size={18} />

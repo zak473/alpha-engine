@@ -178,7 +178,7 @@ export function SportMatchHeader({
   const backLabel = sport.charAt(0).toUpperCase() + sport.slice(1);
 
   return (
-    <div className="overflow-hidden rounded-[34px] border border-[#1f2a22] bg-[#111315] text-white shadow-[0_24px_70px_rgba(0,0,0,0.24)]">
+    <div className="overflow-hidden rounded-[34px] border border-[#27272a] bg-[#18181b] text-white shadow-[0_24px_70px_rgba(0,0,0,0.24)]">
       {/* Top bar */}
       <div className="border-b border-white/8 px-5 py-4 md:px-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

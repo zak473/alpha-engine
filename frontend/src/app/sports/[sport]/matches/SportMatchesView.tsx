@@ -103,7 +103,7 @@ export function SportMatchesView({ sport, matches, total }: SportMatchesViewProp
       {/* Sport navigation bar */}
       <div className="px-4 pt-4 lg:px-6">
         <div className="overflow-x-auto no-scrollbar">
-          <div className="flex min-w-max items-center gap-2 rounded-[24px] border border-white/8 bg-white/[0.03] p-2">
+          <div className="flex min-w-max items-center gap-2 rounded-[24px] border border-[#27272a] bg-[#18181b] p-2">
             {SPORT_BAR.map((s) => {
               const isActive = s.slug === sport;
               const liveCount = liveCounts[s.slug] ?? 0;

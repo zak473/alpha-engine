@@ -239,7 +239,7 @@ export function MatchCard({ match, highlighted, sport, detailHref }: MatchCardPr
         "sportsbook-card flex flex-col gap-0 overflow-hidden transition-all duration-200",
         highlighted && "ring-2 ring-[var(--accent)]"
       )}
-      style={isLive ? { boxShadow: `0 0 0 1px ${cfg.color}22, 0 14px 28px rgba(17,24,17,0.10)` } : undefined}
+      style={isLive ? { boxShadow: `0 0 0 1px ${cfg.color}22, 0 14px 28px rgba(0,0,0,0.18)` } : undefined}
     >
       {detailHref ? (
         <Link href={detailHref} className="block transition-colors hover:bg-[var(--accent-muted)]">

@@ -8,11 +8,11 @@
   :root {
     color-scheme: dark;
 
-    --bg0: #09120e;
-    --bg1: #0d1712;
-    --bg2: #101d17;
-    --bg3: #15231c;
-    --bg-solid: #0b1511;
+    --bg0: #09090b;
+    --bg1: #18181b;
+    --bg2: #18181b;
+    --bg3: #27272a;
+    --bg-solid: #18181b;
 
     --text0: #edf7f0;
     --text1: rgba(237, 247, 240, 0.70);
@@ -87,7 +87,7 @@
   *, *::before, *::after { box-sizing: border-box; border-color: var(--border0); }
   html { height: 100%; }
   body {
-    background: radial-gradient(circle at top, rgba(54,242,143,0.08), transparent 20%), var(--bg0);
+    background: #09090b;
     color: var(--text0);
     font-family: 'Inter', system-ui, sans-serif;
     font-size: 14px;
@@ -190,7 +190,7 @@
 .sportsbook-hero,
 .page-intro {
   position: relative;
-  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+  background: #18181b;
   border: 1px solid var(--border0);
   box-shadow: var(--shadow-1);
   overflow: hidden;
@@ -207,7 +207,7 @@
 .brand-grid { background-image:none; }
 .brand-wordmark { letter-spacing: -0.04em; text-transform: uppercase; font-weight: 800; }
 .auth-brand-panel {
-  background: #111315;
+  background: #18181b;
   border: 1px solid rgba(255,255,255,0.08);
   box-shadow: 0 24px 60px rgba(0,0,0,0.18);
 }
@@ -220,7 +220,7 @@
 .page-intro__tags { display:flex; flex-wrap:wrap; gap:10px; }
 .page-chip { display:inline-flex; align-items:center; padding:8px 12px; border-radius:999px; border:1px solid var(--border0); background: var(--bg2); color: var(--text1); font-size:11px; font-weight:600; }
 .page-intro__brand { display:flex; flex-direction:column; align-items:stretch; justify-content:center; gap:14px; }
-.page-intro__logoWrap { padding:20px; border-radius:24px; border:1px solid var(--border0); background:#111315; box-shadow: 0 12px 28px rgba(0,0,0,0.12); }
+.page-intro__logoWrap { padding:20px; border-radius:24px; border:1px solid var(--border0); background:#18181b; box-shadow: 0 12px 28px rgba(0,0,0,0.12); }
 .page-intro__meta { display:inline-flex; align-items:center; gap:8px; align-self:flex-start; padding:8px 12px; border-radius:999px; border:1px solid rgba(46,219,108,0.18); background: rgba(46,219,108,0.08); color: var(--positive); font-size:11px; font-weight:600; }
 .page-intro__dot { width:8px; height:8px; border-radius:999px; background: var(--accent); box-shadow: 0 0 10px rgba(46,219,108,0.4); }
 
@@ -256,7 +256,7 @@
   border:1px solid rgba(255,255,255,0.08);
 }
 .match-avatar--dark {
-  background:#111315; color:#fff; border-color:rgba(255,255,255,0.06);
+  background:#18181b; color:#fff; border-color:rgba(255,255,255,0.06);
   box-shadow:none;
 }
 .match-hero-name { font-size:28px; line-height:1; letter-spacing:-.045em; font-weight:800; color:var(--text0); }

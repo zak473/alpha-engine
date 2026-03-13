@@ -21,7 +21,7 @@ function StatCard({
   subtext: string;
 }) {
   return (
-    <div className="rounded-[24px] border border-white/8 bg-white/[0.05] p-4 backdrop-blur">
+    <div className="rounded-[24px] border border-white/8 bg-[#18181b] p-4">
       <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-white/40">
         <Icon size={13} className="text-emerald-200" />
         {label}
@@ -42,7 +42,7 @@ export function BettingHero({ matches, filteredCount, activeSportLabel }: Bettin
 
   return (
     <section className="px-4 pb-4 pt-4 lg:px-6 lg:pb-5 lg:pt-6">
-      <div className="sportsbook-hero overflow-hidden rounded-[34px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(55,242,144,0.12),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))] p-5 shadow-[0_30px_80px_rgba(0,0,0,0.24)] backdrop-blur-xl lg:p-7">
+      <div className="sportsbook-hero overflow-hidden rounded-[34px] border border-white/8 bg-[#18181b] p-5 shadow-[0_30px_80px_rgba(0,0,0,0.24)] lg:p-7">
         <div className="grid gap-6 lg:grid-cols-[1.12fr_0.88fr] lg:items-end">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/16 bg-emerald-300/8 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200">
@@ -59,7 +59,7 @@ export function BettingHero({ matches, filteredCount, activeSportLabel }: Bettin
 
             <div className="mt-6 flex flex-wrap gap-3 text-xs text-white/58">
               {[activeSportLabel, `${filteredCount} visible markets`, "Premium dark shell", "Live-first ranking"].map((item) => (
-                <span key={item} className="rounded-full border border-white/8 bg-white/[0.04] px-3 py-2">
+                <span key={item} className="rounded-full border border-white/8 bg-[#27272a] px-3 py-2">
                   {item}
                 </span>
               ))}
@@ -70,7 +70,7 @@ export function BettingHero({ matches, filteredCount, activeSportLabel }: Bettin
                 Review best spots
                 <ArrowRight size={15} />
               </button>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/62">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#27272a] px-4 py-3 text-sm text-white/62">
                 <Sparkles size={15} className="text-emerald-200" />
                 Cleaner market hierarchy now applied across the board
               </div>

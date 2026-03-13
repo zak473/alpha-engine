@@ -18,7 +18,7 @@ function Avatar({ name, src }: { name: string; src?: string | null }) {
 
 function Section({ title, children, aside }: { title: string; children: ReactNode; aside?: ReactNode }) {
   return (
-    <section className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-5 lg:p-6">
+    <section className="rounded-[28px] border border-white/8 bg-[#18181b] p-5 lg:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="text-[11px] uppercase tracking-[0.2em] text-white/38">{title}</div>
         {aside}
@@ -77,15 +77,15 @@ export function MatchDetailShell({ match }: { match: SportMatchDetail; sport?: S
 
   return (
     <div className="grid gap-6 pb-10">
-      <section className="overflow-hidden rounded-[32px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.10),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-5 shadow-[0_26px_70px_rgba(0,0,0,0.24)] lg:p-7">
+      <section className="overflow-hidden rounded-[32px] border border-white/8 bg-[#18181b] p-5 shadow-[0_26px_70px_rgba(0,0,0,0.24)] lg:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link href={`/sports/${match.sport}/matches`} className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.04] px-4 py-2 text-sm text-white/65 transition hover:text-white">
+          <Link href={`/sports/${match.sport}/matches`} className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-[#27272a] px-4 py-2 text-sm text-white/65 transition hover:text-white">
             <ArrowLeft size={14} />
             Back to matches
           </Link>
 
           <div className="flex flex-wrap gap-2">
-            <span className="rounded-full border border-white/8 bg-white/[0.04] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-white/50">{match.league}</span>
+            <span className="rounded-full border border-white/8 bg-[#27272a] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-white/50">{match.league}</span>
             <span className="rounded-full border border-emerald-300/18 bg-emerald-300/10 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-emerald-200">{scoreState(match.status)}</span>
           </div>
         </div>
@@ -191,7 +191,7 @@ export function MatchDetailShell({ match }: { match: SportMatchDetail; sport?: S
               })}
             </div>
           ) : (
-            <div className="rounded-[20px] border border-dashed border-white/10 bg-white/[0.03] p-6 text-sm text-white/50">No driver breakdown has been provided for this match yet.</div>
+            <div className="rounded-[20px] border border-dashed border-white/10 bg-[#18181b] p-6 text-sm text-white/50">No driver breakdown has been provided for this match yet.</div>
           )}
         </Section>
       </div>
@@ -209,7 +209,7 @@ export function MatchDetailShell({ match }: { match: SportMatchDetail; sport?: S
               ))}
             </div>
           ) : (
-            <div className="rounded-[20px] border border-dashed border-white/10 bg-white/[0.03] p-6 text-sm text-white/50">Detailed stat splits are not available for this fixture.</div>
+            <div className="rounded-[20px] border border-dashed border-white/10 bg-[#18181b] p-6 text-sm text-white/50">Detailed stat splits are not available for this fixture.</div>
           )}
         </Section>
 

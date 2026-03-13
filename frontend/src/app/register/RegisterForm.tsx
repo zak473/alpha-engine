@@ -42,7 +42,7 @@ export function RegisterForm() {
     <div className="px-4 py-8 lg:px-6 lg:py-10">
       <div className="mx-auto grid w-full max-w-7xl gap-6 lg:grid-cols-[0.88fr_1.12fr]">
         {/* Form panel */}
-        <section className="rounded-[36px] border border-[#1f2a22] bg-[#111315] p-6 text-white shadow-[0_25px_80px_rgba(0,0,0,0.28)] lg:p-8">
+        <section className="rounded-[36px] border border-[#27272a] bg-[#18181b] p-6 text-white shadow-[0_25px_80px_rgba(0,0,0,0.28)] lg:p-8">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="inline-flex items-center rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400">
@@ -57,7 +57,7 @@ export function RegisterForm() {
               </p>
             </div>
 
-            <div className="hidden rounded-[20px] border border-white/10 bg-white/[0.05] px-4 py-3 sm:block">
+            <div className="hidden rounded-[20px] border border-white/10 bg-[#27272a] px-4 py-3 sm:block">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">
                 Platform access
               </div>
@@ -70,7 +70,7 @@ export function RegisterForm() {
             {["Follow tipsters", "Track edges", "Access in-play"].map((item) => (
               <div
                 key={item}
-                className="rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-white/60"
+                className="rounded-[18px] border border-white/10 bg-[#27272a] px-4 py-3 text-sm font-medium text-white/60"
               >
                 {item}
               </div>
@@ -87,7 +87,7 @@ export function RegisterForm() {
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Your name"
-                className="h-14 rounded-2xl border border-white/10 bg-white/[0.06] px-4 text-[15px] text-white placeholder:text-white/30 outline-none transition focus:border-emerald-500/50 focus:bg-white/[0.09]"
+                className="h-14 rounded-2xl border border-white/10 bg-[#27272a] px-4 text-[15px] text-white placeholder:text-white/30 outline-none transition focus:border-emerald-500/50 focus:bg-white/[0.09]"
                 autoComplete="name"
               />
             </div>
@@ -101,7 +101,7 @@ export function RegisterForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="h-14 rounded-2xl border border-white/10 bg-white/[0.06] px-4 text-[15px] text-white placeholder:text-white/30 outline-none transition focus:border-emerald-500/50 focus:bg-white/[0.09]"
+                className="h-14 rounded-2xl border border-white/10 bg-[#27272a] px-4 text-[15px] text-white placeholder:text-white/30 outline-none transition focus:border-emerald-500/50 focus:bg-white/[0.09]"
                 required
                 autoComplete="email"
               />
@@ -116,7 +116,7 @@ export function RegisterForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="h-14 rounded-2xl border border-white/10 bg-white/[0.06] px-4 text-[15px] text-white placeholder:text-white/30 outline-none transition focus:border-emerald-500/50 focus:bg-white/[0.09]"
+                className="h-14 rounded-2xl border border-white/10 bg-[#27272a] px-4 text-[15px] text-white placeholder:text-white/30 outline-none transition focus:border-emerald-500/50 focus:bg-white/[0.09]"
                 required
                 autoComplete="new-password"
                 minLength={6}
@@ -141,7 +141,7 @@ export function RegisterForm() {
             </button>
           </form>
 
-          <div className="mt-6 rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+          <div className="mt-6 rounded-[24px] border border-white/10 bg-[#27272a] p-4">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <div className="text-[12px] font-semibold uppercase tracking-[0.16em] text-white/50">
@@ -166,7 +166,7 @@ export function RegisterForm() {
         </section>
 
         {/* Marketing panel */}
-        <section className="relative overflow-hidden rounded-[36px] border border-[#1f2a22] bg-[#111315] p-6 text-white shadow-[0_25px_80px_rgba(0,0,0,0.28)] lg:p-8">
+        <section className="relative overflow-hidden rounded-[36px] border border-[#27272a] bg-[#18181b] p-6 text-white shadow-[0_25px_80px_rgba(0,0,0,0.28)] lg:p-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(46,219,108,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(46,219,108,0.08),transparent_28%)]" />
           <div className="relative z-10 flex h-full flex-col">
             <div className="inline-flex w-fit items-center rounded-full border border-[rgba(46,219,108,0.22)] bg-[rgba(46,219,108,0.08)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#2edb6c]">
@@ -186,7 +186,7 @@ export function RegisterForm() {
             </div>
 
             <div className="mt-7 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-              <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.04] p-4">
+              <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[#27272a] p-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#2edb6c]">
@@ -222,7 +222,7 @@ export function RegisterForm() {
               </div>
 
               <div className="grid gap-4">
-                <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+                <div className="rounded-[24px] border border-white/10 bg-[#27272a] p-4">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
                     Tipster focus
                   </div>
@@ -232,7 +232,7 @@ export function RegisterForm() {
                   </div>
                 </div>
 
-                <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+                <div className="rounded-[24px] border border-white/10 bg-[#27272a] p-4">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
                     Multi-sport board
                   </div>
@@ -252,7 +252,7 @@ export function RegisterForm() {
               ].map((item) => (
                 <div
                   key={item.label}
-                  className="rounded-[22px] border border-white/10 bg-white/[0.04] px-4 py-4"
+                  className="rounded-[22px] border border-white/10 bg-[#27272a] px-4 py-4"
                 >
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#2edb6c]">
                     {item.label}

@@ -48,7 +48,7 @@ export function Sidebar() {
           width: "var(--sidebar-width)",
           display: "flex",
           flexDirection: "column",
-          background: "linear-gradient(180deg,#060d0a 0%,#08110d 100%)",
+          background: "#18181b",
           borderRight: "1px solid rgba(255,255,255,0.08)",
           zIndex: 40,
           transform: open ? "translateX(0)" : undefined,
@@ -57,8 +57,8 @@ export function Sidebar() {
         }}
       >
         <div className="px-4 pb-3 pt-4">
-          <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.24)] backdrop-blur">
-            <div className="rounded-[22px] border border-emerald-300/14 bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.24),transparent_70%),#07110d] p-4">
+          <div className="rounded-[28px] border border-white/10 bg-[#27272a] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.24)]">
+            <div className="rounded-[22px] border border-emerald-300/14 bg-[#18181b] p-4">
               <div className="text-[11px] uppercase tracking-[0.24em] text-emerald-200/70">Never In Doubt</div>
               <div className="mt-2 text-xl font-semibold tracking-[-0.04em] text-white">Premium betting board</div>
               <p className="mt-3 text-[12px] leading-5 text-white/58">
@@ -70,7 +70,7 @@ export function Sidebar() {
                 ["Markets", "Live ranked"],
                 ["Signals", "Model-led"],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3">
+                <div key={label} className="rounded-2xl border border-white/8 bg-[#18181b] px-3 py-3">
                   <div className="text-[10px] uppercase tracking-[0.18em] text-white/38">{label}</div>
                   <div className="mt-1 text-sm font-semibold text-white/92">{value}</div>
                 </div>
