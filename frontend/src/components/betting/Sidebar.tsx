@@ -40,7 +40,7 @@ export function Sidebar() {
       {open && (
         <div
           className="fixed inset-0 z-30 lg:hidden"
-          style={{ background: "rgba(17,23,20,0.28)" }}
+          style={{ background: "rgba(0,0,0,0.20)" }}
           onClick={() => setOpen(false)}
         />
       )}
@@ -54,7 +54,7 @@ export function Sidebar() {
           width: "var(--sidebar-width)",
           display: "flex",
           flexDirection: "column",
-          background: "linear-gradient(180deg, #0f1511 0%, #121a15 100%)",
+          background: "linear-gradient(180deg,#08120e 0%,#0a1510 100%)",
           borderRight: "1px solid rgba(255,255,255,0.06)",
           zIndex: 40,
           transform: open ? "translateX(0)" : undefined,

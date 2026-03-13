@@ -66,7 +66,7 @@ export function BettingHero({ matches, filteredCount, activeSportLabel }: Bettin
             </div>
 
             <div className="mt-7 flex flex-wrap gap-3">
-              <button className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#07110d] transition hover:-translate-y-0.5">
+              <button className="inline-flex items-center gap-2 rounded-full bg-emerald-400 px-5 py-3 text-sm font-semibold text-[#07110d] transition hover:-translate-y-0.5">
                 Review best spots
                 <ArrowRight size={15} />
               </button>

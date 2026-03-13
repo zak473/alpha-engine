@@ -68,7 +68,7 @@ export default function HomePage() {
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#07110d] transition hover:-translate-y-0.5">
+                <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-full bg-emerald-400 px-6 py-3 text-sm font-semibold text-[#07110d] transition hover:-translate-y-0.5">
                   Explore the board
                   <ArrowRight size={16} />
                 </Link>
@@ -90,7 +90,7 @@ export default function HomePage() {
             <div className="relative">
               <div className="absolute inset-0 rounded-[32px] bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.22),transparent_48%)] blur-2xl" />
               <div className="relative rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.04))] p-5 shadow-[0_30px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-                <div className="rounded-[28px] border border-white/10 bg-[#08120e] p-5">
+                <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-5">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-[11px] uppercase tracking-[0.24em] text-white/45">Today’s board</div>

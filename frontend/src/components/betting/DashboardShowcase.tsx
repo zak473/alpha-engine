@@ -303,10 +303,10 @@ export function DashboardShowcase({
     <div className="space-y-5">
       <div className="rounded-[30px] border p-5 lg:p-6" style={{ background: "linear-gradient(180deg, #ffffff 0%, #f8fbf8 100%)", borderColor: "rgba(17,33,23,0.08)", boxShadow: "0 18px 40px rgba(15,23,42,0.04)" }}>
         <div className="flex flex-wrap items-center gap-3">
-          <button className={cn("inline-flex items-center gap-2 rounded-full border px-5 py-3 text-base font-semibold transition", !inPlayActive && "shadow-[0_12px_30px_rgba(46,219,108,0.10)]")} style={!inPlayActive ? { background: "#1fd06a", color: "#10311d", borderColor: "rgba(31,208,106,0.30)" } : { background: "#ffffff", color: "#243128", borderColor: "rgba(17,33,23,0.10)" }}>
+          <button className={cn("inline-flex items-center gap-2 rounded-full border px-5 py-3 text-base font-semibold transition", !inPlayActive && "shadow-[0_12px_30px_rgba(46,219,108,0.10)]")} style={!inPlayActive ? { background: "#1fd06a", color: "#10311d", borderColor: "rgba(31,208,106,0.30)" } : { background: "rgba(255,255,255,0.06)", color: "#fff", borderColor: "rgba(255,255,255,0.10)" }}>
             <Users size={17} /> All Sports
           </button>
-          <button onClick={onSetInPlay} className={cn("inline-flex items-center gap-2 rounded-full border px-5 py-3 text-base font-semibold transition", inPlayActive && "shadow-[0_12px_30px_rgba(46,219,108,0.10)]")} style={inPlayActive ? { background: "#1fd06a", color: "#10311d", borderColor: "rgba(31,208,106,0.30)" } : { background: "#ffffff", color: "#243128", borderColor: "rgba(17,33,23,0.10)" }}>
+          <button onClick={onSetInPlay} className={cn("inline-flex items-center gap-2 rounded-full border px-5 py-3 text-base font-semibold transition", inPlayActive && "shadow-[0_12px_30px_rgba(46,219,108,0.10)]")} style={inPlayActive ? { background: "#1fd06a", color: "#10311d", borderColor: "rgba(31,208,106,0.30)" } : { background: "rgba(255,255,255,0.06)", color: "#fff", borderColor: "rgba(255,255,255,0.10)" }}>
             <Radio size={17} /> In Play
           </button>
           <div className="ml-auto flex flex-wrap items-center gap-5 text-sm text-[#536157]">
