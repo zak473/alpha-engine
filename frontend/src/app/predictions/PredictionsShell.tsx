@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, BrainCircuit, TrendingUp, Calendar, Zap, ArrowRight, ChevronRight } from "lucide-react";
+import { BrainCircuit, TrendingUp, Calendar, Zap, ChevronRight } from "lucide-react";
 import type { MvpPrediction, MvpPredictionList } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -30,12 +30,11 @@ function fmtKickoff(iso: string) {
 
 function ConfBar({ conf }: { conf: number }) {
   const pct = Math.round(conf * 100);
-  const color = conf >= 0.7 ? "#2edb6c" : conf >= 0.5 ? "#f59e0b" : "#ef4444";
-  const bg = conf >= 0.7 ? "bg-[#2edb6c]" : conf >= 0.5 ? "bg-[#f59e0b]" : "bg-[#ef4444]";
-  const textCol = conf >= 0.7 ? "text-[#2d7f4f]" : conf >= 0.5 ? "text-[#b45309]" : "text-[#dc2626]";
+  const bg = conf >= 0.7 ? "bg-emerald-500" : conf >= 0.5 ? "bg-amber-400" : "bg-red-400";
+  const textCol = conf >= 0.7 ? "text-emerald-400" : conf >= 0.5 ? "text-amber-400" : "text-red-400";
   return (
     <div className="flex items-center gap-2 min-w-[90px]">
-      <div className="flex-1 h-1.5 rounded-full bg-[#e8efe6] overflow-hidden">
+      <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
         <div className={cn("h-full rounded-full", bg)} style={{ width: `${pct}%` }} />
       </div>
       <span className={cn("font-mono text-xs font-bold tabular-nums w-8 text-right", textCol)}>{pct}%</span>
@@ -45,18 +44,18 @@ function ConfBar({ conf }: { conf: number }) {
 
 function StatusPill({ status }: { status: string }) {
   if (status === "live") return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#bbf7d0]/60 bg-[#dcfce7] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#15803d]">
-      <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e] animate-pulse" />
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-400">
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
       Live
     </span>
   );
   if (status === "scheduled") return (
-    <span className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#dbeafe] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#1d4ed8]">
+    <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-400">
       Upcoming
     </span>
   );
   return (
-    <span className="inline-flex items-center rounded-full border border-[#d9e2d7] bg-[#f7f8f5] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#667066]">
+    <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/50">
       Finished
     </span>
   );
@@ -71,11 +70,13 @@ function KpiStrip({ items }: { items: MvpPrediction[] }) {
     ? items.reduce((s, p) => s + p.confidence, 0) / items.length : 0;
   const highConf = items.filter((p) => p.confidence >= 0.7).length;
 
+  const avgAccent = avgConf >= 0.7 ? "text-emerald-400" : avgConf >= 0.5 ? "text-amber-400" : "text-white/50";
+
   const stats = [
-    { label: "Total predictions", value: String(items.length), icon: BrainCircuit, accent: "text-[#2d7f4f]", bg: "bg-[#f0faf4]", border: "border-[#c6e8d3]" },
-    { label: "Today's picks", value: String(todayItems.length), icon: Calendar, accent: "text-[#1d4ed8]", bg: "bg-[#eff6ff]", border: "border-[#bfdbfe]" },
-    { label: "Avg confidence", value: items.length > 0 ? `${Math.round(avgConf * 100)}%` : "—", icon: TrendingUp, accent: avgConf >= 0.7 ? "text-[#2d7f4f]" : avgConf >= 0.5 ? "text-[#b45309]" : "text-[#667066]", bg: "bg-[#f7f8f5]", border: "border-[#d9e2d7]" },
-    { label: "High confidence", value: String(highConf), icon: Zap, accent: "text-[#7c3aed]", bg: "bg-[#f5f3ff]", border: "border-[#ddd6fe]" },
+    { label: "Total predictions", value: String(items.length),          icon: BrainCircuit, accent: "text-emerald-400", bg: "bg-emerald-500/10",  border: "border-emerald-500/20" },
+    { label: "Today's picks",     value: String(todayItems.length),      icon: Calendar,     accent: "text-blue-400",   bg: "bg-blue-500/10",     border: "border-blue-500/20"   },
+    { label: "Avg confidence",    value: items.length > 0 ? `${Math.round(avgConf * 100)}%` : "—", icon: TrendingUp, accent: avgAccent, bg: "bg-white/[0.04]", border: "border-white/10" },
+    { label: "High confidence",   value: String(highConf),               icon: Zap,          accent: "text-purple-400", bg: "bg-purple-500/10",   border: "border-purple-500/20" },
   ];
 
   return (
@@ -83,8 +84,8 @@ function KpiStrip({ items }: { items: MvpPrediction[] }) {
       {stats.map(({ label, value, icon: Icon, accent, bg, border }) => (
         <div key={label} className={cn("rounded-[24px] border p-5", bg, border)}>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#667066]">{label}</span>
-            <div className={cn("rounded-xl p-1.5", bg, border, "border")}>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50">{label}</span>
+            <div className={cn("rounded-xl p-1.5 border", bg, border)}>
               <Icon size={13} className={accent} />
             </div>
           </div>
@@ -98,28 +99,28 @@ function KpiStrip({ items }: { items: MvpPrediction[] }) {
 // ── Filter bar ────────────────────────────────────────────────────────────
 
 const SPORTS = [
-  { value: "all", label: "All sports" },
-  { value: "soccer", label: "⚽ Soccer" },
-  { value: "tennis", label: "🎾 Tennis" },
-  { value: "esports", label: "🎮 Esports" },
+  { value: "all",        label: "All sports"    },
+  { value: "soccer",     label: "⚽ Soccer"     },
+  { value: "tennis",     label: "🎾 Tennis"     },
+  { value: "esports",    label: "🎮 Esports"    },
   { value: "basketball", label: "🏀 Basketball" },
-  { value: "baseball", label: "⚾ Baseball" },
+  { value: "baseball",   label: "⚾ Baseball"   },
 ];
 
 const STATUSES = [
-  { value: "all", label: "All" },
+  { value: "all",       label: "All"      },
   { value: "scheduled", label: "Upcoming" },
-  { value: "live", label: "Live" },
+  { value: "live",      label: "Live"     },
 ];
 
 const RANGES = [
-  { value: "today", label: "Today" },
-  { value: "7d", label: "7 days" },
-  { value: "30d", label: "30 days" },
+  { value: "today", label: "Today"   },
+  { value: "7d",    label: "7 days"  },
+  { value: "30d",   label: "30 days" },
 ];
 
 const CONF_THRESHOLDS = [
-  { value: "0", label: "All" },
+  { value: "0",   label: "All"  },
   { value: "0.5", label: "50%+" },
   { value: "0.6", label: "60%+" },
   { value: "0.7", label: "70%+" },
@@ -136,8 +137,8 @@ function PillGroup<T extends string>({
 }) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7b857b] shrink-0">{label}</span>
-      <div className="flex items-center gap-1 rounded-full border border-[#d9e2d7] bg-[#f7f8f5] p-1">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40 shrink-0">{label}</span>
+      <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1">
         {options.map((o) => (
           <button
             key={o.value}
@@ -145,8 +146,8 @@ function PillGroup<T extends string>({
             className={cn(
               "rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all",
               active === o.value
-                ? "bg-[#111315] text-white shadow-sm"
-                : "text-[#667066] hover:text-[#111315]"
+                ? "bg-white/15 text-white shadow-sm"
+                : "text-white/50 hover:text-white"
             )}
           >
             {o.label}
@@ -169,23 +170,23 @@ function PredictionCard({ pred }: { pred: MvpPrediction }) {
   const aPct = Math.round(p.away_win * 100);
   const dPct = p.draw != null ? Math.round(p.draw * 100) : null;
   const conf = Math.round(pred.confidence * 100);
-  const confColor = pred.confidence >= 0.7 ? "text-[#2d7f4f]" : pred.confidence >= 0.5 ? "text-[#b45309]" : "text-[#dc2626]";
-  const confBg = pred.confidence >= 0.7 ? "bg-[#dcfce7] border-[#bbf7d0]" : pred.confidence >= 0.5 ? "bg-[#fef3c7] border-[#fde68a]" : "bg-[#fee2e2] border-[#fecaca]";
+  const confColor = pred.confidence >= 0.7 ? "text-emerald-400" : pred.confidence >= 0.5 ? "text-amber-400" : "text-red-400";
+  const confBg   = pred.confidence >= 0.7 ? "bg-emerald-500/15 border-emerald-500/30" : pred.confidence >= 0.5 ? "bg-amber-500/15 border-amber-500/30" : "bg-red-500/15 border-red-500/30";
 
   return (
     <Link
       href={detailHref}
-      className="group block overflow-hidden rounded-[28px] border border-[#d9e2d7] bg-white shadow-[0_4px_20px_rgba(17,19,21,0.05)] transition hover:border-[#b8d4c0] hover:shadow-[0_8px_30px_rgba(17,19,21,0.1)]"
+      className="group block overflow-hidden rounded-[28px] border border-[#27272a] bg-[#18181b] transition hover:border-white/20 hover:bg-[#1c1c1f]"
     >
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 border-b border-[#edf2ea] px-5 py-3">
+      <div className="flex items-center justify-between gap-3 border-b border-white/8 px-5 py-3">
         <div className="flex items-center gap-2">
           <span className="text-base">{emoji}</span>
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#667066] capitalize">{pred.sport}</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50 capitalize">{pred.sport}</span>
         </div>
         <div className="flex items-center gap-2">
           <StatusPill status={pred.status} />
-          <span className="text-[11px] text-[#7b857b]">{fmtKickoff(pred.start_time)}</span>
+          <span className="text-[11px] text-white/35">{fmtKickoff(pred.start_time)}</span>
         </div>
       </div>
 
@@ -194,48 +195,48 @@ function PredictionCard({ pred }: { pred: MvpPrediction }) {
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
           {/* Home */}
           <div>
-            <p className="font-semibold text-[#111315] leading-tight">{pred.participants.home.name}</p>
-            <p className="mt-1 font-mono text-2xl font-bold text-[#2d7f4f] tabular-nums">{hPct}%</p>
-            {fo?.home_win && <p className="mt-0.5 font-mono text-xs text-[#7b857b]">{fo.home_win.toFixed(2)} odds</p>}
+            <p className="font-semibold text-white leading-tight">{pred.participants.home.name}</p>
+            <p className="mt-1 font-mono text-2xl font-bold text-emerald-400 tabular-nums">{hPct}%</p>
+            {fo?.home_win && <p className="mt-0.5 font-mono text-xs text-white/35">{fo.home_win.toFixed(2)} odds</p>}
           </div>
 
           {/* Center */}
           <div className="flex flex-col items-center gap-1">
             {dPct != null && (
-              <div className="rounded-xl border border-[#d9e2d7] bg-[#f7f8f5] px-3 py-1.5 text-center">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7b857b]">Draw</p>
-                <p className="font-mono text-sm font-bold text-[#111315] tabular-nums">{dPct}%</p>
+              <div className="rounded-xl border border-white/10 bg-white/[0.05] px-3 py-1.5 text-center">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">Draw</p>
+                <p className="font-mono text-sm font-bold text-white tabular-nums">{dPct}%</p>
               </div>
             )}
-            <span className="text-[11px] font-medium text-[#7b857b]">vs</span>
+            <span className="text-[11px] font-medium text-white/35">vs</span>
           </div>
 
           {/* Away */}
           <div className="text-right">
-            <p className="font-semibold text-[#111315] leading-tight">{pred.participants.away.name}</p>
-            <p className="mt-1 font-mono text-2xl font-bold text-[#b45309] tabular-nums">{aPct}%</p>
-            {fo?.away_win && <p className="mt-0.5 font-mono text-xs text-[#7b857b]">{fo.away_win.toFixed(2)} odds</p>}
+            <p className="font-semibold text-white leading-tight">{pred.participants.away.name}</p>
+            <p className="mt-1 font-mono text-2xl font-bold text-amber-400 tabular-nums">{aPct}%</p>
+            {fo?.away_win && <p className="mt-0.5 font-mono text-xs text-white/35">{fo.away_win.toFixed(2)} odds</p>}
           </div>
         </div>
 
         {/* Prob bar */}
-        <div className="mt-4 flex h-2 w-full overflow-hidden rounded-full bg-[#e8efe6]">
-          <div className="h-full bg-[#2edb6c] transition-all" style={{ width: `${hPct}%` }} />
-          {dPct != null && <div className="h-full bg-[#d9e2d7]" style={{ width: `${dPct}%` }} />}
-          <div className="h-full flex-1 bg-[#f59e0b]" />
+        <div className="mt-4 flex h-2 w-full overflow-hidden rounded-full bg-white/10">
+          <div className="h-full bg-emerald-500 transition-all" style={{ width: `${hPct}%` }} />
+          {dPct != null && <div className="h-full bg-white/20" style={{ width: `${dPct}%` }} />}
+          <div className="h-full flex-1 bg-amber-400" />
         </div>
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between gap-3 border-t border-[#edf2ea] px-5 py-3">
+      <div className="flex items-center justify-between gap-3 border-t border-white/8 px-5 py-3">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7b857b]">Confidence</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40">Confidence</span>
           <ConfBar conf={pred.confidence} />
           <span className={cn("rounded-full border px-2 py-0.5 font-mono text-[11px] font-bold tabular-nums", confBg, confColor)}>
             {conf}%
           </span>
         </div>
-        <div className="flex items-center gap-1 text-[12px] font-semibold text-[#2d7f4f] opacity-0 transition group-hover:opacity-100">
+        <div className="flex items-center gap-1 text-[12px] font-semibold text-emerald-400 opacity-0 transition group-hover:opacity-100">
           View match <ChevronRight size={13} />
         </div>
       </div>
@@ -248,12 +249,12 @@ function PredictionCard({ pred }: { pred: MvpPrediction }) {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-4">
-      <div className="flex h-16 w-16 items-center justify-center rounded-[24px] border border-[#d9e2d7] bg-[#f7f8f5]">
-        <BrainCircuit size={28} className="text-[#2d7f4f]" />
+      <div className="flex h-16 w-16 items-center justify-center rounded-[24px] border border-white/10 bg-white/[0.05]">
+        <BrainCircuit size={28} className="text-emerald-400" />
       </div>
       <div className="text-center">
-        <p className="text-base font-semibold text-[#111315]">No predictions found</p>
-        <p className="mt-1 text-sm text-[#667066] max-w-xs">Try a different sport, status, or date range.</p>
+        <p className="text-base font-semibold text-white">No predictions found</p>
+        <p className="mt-1 text-sm text-white/50 max-w-xs">Try a different sport, status, or date range.</p>
       </div>
     </div>
   );
@@ -274,9 +275,9 @@ export function PredictionsShell({ initialData, initialSport, initialStatus, ini
   const [, startTransition] = useTransition();
   const [minConf, setMinConf] = useState("0");
 
-  const sport = searchParams.get("sport") ?? initialSport;
+  const sport  = searchParams.get("sport")  ?? initialSport;
   const status = searchParams.get("status") ?? initialStatus;
-  const range = searchParams.get("range") ?? initialRange;
+  const range  = searchParams.get("range")  ?? initialRange;
 
   function navigate(updates: Record<string, string>) {
     const p = new URLSearchParams(searchParams.toString());
@@ -297,7 +298,7 @@ export function PredictionsShell({ initialData, initialSport, initialStatus, ini
     <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-5 px-4 py-5 md:px-6">
 
       {/* Hero */}
-      <div className="overflow-hidden rounded-[32px] border border-[#1f2a22] bg-[#111315] px-6 py-7 text-white shadow-[0_20px_60px_rgba(0,0,0,0.2)]">
+      <div className="relative overflow-hidden rounded-[32px] border border-[#1f2a22] bg-[#111315] px-6 py-7 text-white shadow-[0_20px_60px_rgba(0,0,0,0.2)]">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(46,219,108,0.15),transparent_40%)]" />
         <div className="relative z-10 flex flex-col gap-1">
           <div className="inline-flex w-fit items-center rounded-full border border-[rgba(46,219,108,0.25)] bg-[rgba(46,219,108,0.08)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#2edb6c]">
@@ -314,7 +315,7 @@ export function PredictionsShell({ initialData, initialSport, initialStatus, ini
       <KpiStrip items={items} />
 
       {/* Filters */}
-      <div className="overflow-hidden rounded-[28px] border border-[#d9e2d7] bg-white p-5 shadow-[0_4px_20px_rgba(17,19,21,0.05)]">
+      <div className="overflow-hidden rounded-[28px] border border-[#27272a] bg-[#18181b] p-5">
         <div className="flex flex-wrap gap-4">
           <PillGroup
             label="Sport"
@@ -346,8 +347,8 @@ export function PredictionsShell({ initialData, initialSport, initialStatus, ini
       {/* Results count */}
       {items.length > 0 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-[#667066]">
-            Showing <span className="font-semibold text-[#111315]">{items.length}</span> prediction{items.length !== 1 ? "s" : ""}
+          <p className="text-sm text-white/50">
+            Showing <span className="font-semibold text-white">{items.length}</span> prediction{items.length !== 1 ? "s" : ""}
           </p>
         </div>
       )}
