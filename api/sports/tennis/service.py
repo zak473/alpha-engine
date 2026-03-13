@@ -725,6 +725,15 @@ class TennisMatchService(BaseMatchListService):
         match = db.get(CoreMatch, match_id)
         if match is None or match.sport != "tennis":
             raise HTTPException(status_code=404, detail=f"Tennis match {match_id} not found")
+        try:
+            return self._get_match_detail_inner(match_id, match, db)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            log.error("tennis_match_detail_failed match=%s err=%s", match_id, exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=f"tennis_detail_error: {type(exc).__name__}: {exc}")
+
+    def _get_match_detail_inner(self, match_id: str, match, db: Session) -> TennisMatchDetail:
 
         home_team = db.get(CoreTeam, match.home_team_id)
         away_team = db.get(CoreTeam, match.away_team_id)
