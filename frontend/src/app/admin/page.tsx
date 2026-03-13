@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import { StatCard } from "@/components/ui/StatCard";
 import { SectionHeader } from "@/components/ui/SectionHeader";
@@ -23,6 +25,9 @@ const API_ENDPOINTS = [
 ];
 
 export default async function AdminPage() {
+  const token = cookies().get("ae_token")?.value;
+  if (!token) redirect("/login?next=/admin");
+
   let apiOk = false;
   let dbOk = false;
   let apiEnv = "unknown";

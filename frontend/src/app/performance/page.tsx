@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import { PerformanceClient } from "@/components/performance/PerformanceClient";
 import { getPicks, getPicksStats, getPerformance, getBankroll, getPredictionAccuracy } from "@/lib/api";
@@ -27,6 +29,9 @@ function buildRoiSeries(picks: PickOut[]): RoiPoint[] {
 }
 
 export default async function PerformancePage() {
+  const token = cookies().get("ae_token")?.value;
+  if (!token) redirect("/login?next=/performance");
+
   // Fetch everything in parallel, gracefully degrade on failure
   const [picks, overallStats, perfData, bankroll, accuracy, ...sportStatsList] = await Promise.all([
     getPicks({ limit: 500 }).catch((): PickOut[] => []),
