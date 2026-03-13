@@ -18,11 +18,11 @@ function QueueItem({ sel, onRemove }: { sel: QueueSelection; onRemove: () => voi
   const edge = sel.edge ?? 0;
 
   return (
-    <div 
+    <div
       className="flex items-start gap-2.5 p-3 rounded-lg border relative group transition-all"
-      style={{ 
-        background: "#ffffff", 
-        borderColor: "var(--border0)" 
+      style={{
+        background: "var(--bg2)",
+        borderColor: "var(--border0)"
       }}
     >
       {/* Sport dot */}
@@ -117,7 +117,7 @@ function SummaryCell({
   color?: string;
 }) {
   return (
-    <div className="text-center py-2.5 px-2" style={{ background: "#ffffff" }}>
+    <div className="text-center py-2.5 px-2" style={{ background: "var(--bg2)" }}>
       <p className="text-[9px] text-text-muted uppercase tracking-wider mb-0.5">{label}</p>
       <p 
         className={cn("text-xs font-bold", mono && "font-mono tabular-nums")}
@@ -211,8 +211,8 @@ export function QueueRail({ matches }: QueueRailProps) {
       style={{
         width: "280px",
         borderColor: "var(--border0)",
-        background: "#f8faf7",
-        boxShadow: "inset 1px 0 0 rgba(216,224,212,0.8)",
+        background: "var(--bg1)",
+        boxShadow: "inset 1px 0 0 var(--border0)",
         position: "sticky",
         top: 0,
         height: "100vh",
@@ -306,7 +306,7 @@ export function QueueRail({ matches }: QueueRailProps) {
         style={{ borderColor: "var(--border0)" }}
       >
         <div className="flex items-center gap-2">
-          <Zap size={11} style={{ color: "#0f3d26" }} />
+          <Zap size={11} style={{ color: "var(--accent)" }} />
           <span className="text-[10px] text-text-muted">
             Track picks to monitor your ROI over time
           </span>
