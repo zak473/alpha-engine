@@ -1317,7 +1317,7 @@ function EloTab({ match, eloHomeHistory, eloAwayHistory }: Props) {
                 <XAxis dataKey="date" tick={{ fill: colors.textMuted, fontSize: 10 }} tickLine={false} />
                 <YAxis tick={{ fill: colors.textMuted, fontSize: 10 }} tickLine={false} width={45} domain={["auto", "auto"]} />
                 <RechartTooltip
-                  contentStyle={{ background: "#18181b", border: "1px solid #27272a", borderRadius: "6px", fontSize: "11px" }}
+                  contentStyle={{ background: "rgba(8,18,14,0.95)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px", fontSize: "11px" }}
                   labelStyle={{ color: colors.textMuted }}
                 />
                 <Line dataKey={match.home.name} stroke={colors.accentBlue} dot={false} strokeWidth={2} connectNulls />

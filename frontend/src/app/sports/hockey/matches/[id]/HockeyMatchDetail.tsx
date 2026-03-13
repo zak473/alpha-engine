@@ -27,8 +27,8 @@ import type {
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
   bg0:         "#09090b",
-  surface:     "#18181b",
-  border:      "#27272a",
+  surface:     "rgba(255,255,255,0.04)",
+  border:      "rgba(255,255,255,0.08)",
   textPrimary: "#f4f4f5",
   textMuted:   "#a1a1aa",
   textSubtle:  "#71717a",
@@ -348,10 +348,10 @@ function EloChart({
   return (
     <ResponsiveContainer width="100%" height={180}>
       <LineChart data={data} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
         <XAxis dataKey="i" tick={{ fontSize: 9, fill: "#71717a" }} />
         <YAxis tick={{ fontSize: 9, fill: "#71717a" }} domain={["auto", "auto"]} />
-        <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #27272a", borderRadius: 8, fontSize: 11 }} />
+        <Tooltip contentStyle={{ background: "rgba(8,18,14,0.95)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, fontSize: 11 }} />
         <Legend wrapperStyle={{ fontSize: 10, color: "#a1a1aa" }} />
         <Line type="monotone" dataKey="home" name={homeName} stroke={C.blue} dot={false} strokeWidth={2} connectNulls />
         <Line type="monotone" dataKey="away" name={awayName} stroke="#a855f7" dot={false} strokeWidth={2} connectNulls />

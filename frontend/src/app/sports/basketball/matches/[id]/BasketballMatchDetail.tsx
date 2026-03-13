@@ -39,8 +39,8 @@ import { BasketballCourtSVG } from "@/components/charts/BasketballCourtSVG";
 // ─── Design tokens ───────────────────────────────────────────────────────────
 const colors = {
   bg0:        "#09090b",
-  surface:    "#18181b",
-  border0:    "#27272a",
+  surface:    "rgba(255,255,255,0.04)",
+  border0:    "rgba(255,255,255,0.08)",
   textPrimary:"#f4f4f5",
   textMuted:  "#a1a1aa",
   textSubtle: "#71717a",
