@@ -460,11 +460,11 @@
   padding: 14px;
 }
 .detail-stat-card--neutral {
-  background: #fffdf8;
+  background: rgba(255,255,255,0.04);
   border-color: rgba(214,162,61,0.18);
 }
 .table-clean thead th {
-  background: #f8faf8;
+  background: rgba(255,255,255,0.04);
   color: var(--text1);
   font-size: 11px;
   font-weight: 700;
