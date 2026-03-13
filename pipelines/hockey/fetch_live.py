@@ -1,12 +1,8 @@
 """
-Fetch live NHL fixtures + scores from The Odds API and ingest them.
+Fetch live NHL fixtures + scores from the free NHL Stats API (no key required).
 
-Uses TENNIS_API_KEY (shared The Odds API key).
-Covers: NHL, AHL, KHL, SHL, Liiga, and other major leagues.
-
-Two passes per sport key:
-  1. /odds  — upcoming fixtures (status=scheduled)
-  2. /scores — commenced + not completed → status=live; completed → status=finished
+Source: https://api-web.nhle.com/v1
+Covers: NHL regular season, playoffs, preseason.
 
 Usage:
     python -m pipelines.hockey.fetch_live
@@ -18,200 +14,144 @@ from __future__ import annotations
 import argparse
 import logging
 import time
-from datetime import datetime, timezone
-from typing import Any
+from datetime import date, timedelta
+from typing import Any, Optional
 
 import httpx
 
-from config.settings import settings
 from pipelines.soccer.ingest_matches import ingest_from_dicts
 
 log = logging.getLogger(__name__)
 
-BASE_URL = "https://api.the-odds-api.com/v4"
+NHL_BASE = "https://api-web.nhle.com/v1"
 
 
-def _get(path: str, params: dict | None = None) -> Any:
-    url = f"{BASE_URL}{path}"
-    p = {"apiKey": settings.TENNIS_API_KEY, **(params or {})}
-    resp = httpx.get(url, params=p, timeout=15)
-    resp.raise_for_status()
-    return resp.json()
-
-
-def _get_active_hockey_sports() -> list[dict]:
+def _get(path: str) -> Optional[Any]:
     try:
-        sports = _get("/sports", {"all": "false"})
-        return [
-            s for s in sports
-            if s.get("group", "").lower() == "ice hockey"
-            and not s.get("has_outrights", False)
-            and "_winner" not in s.get("key", "")
-        ]
+        resp = httpx.get(f"{NHL_BASE}{path}", timeout=20, follow_redirects=True)
+        resp.raise_for_status()
+        return resp.json()
     except Exception as exc:
-        log.warning("Could not fetch sports list: %s", exc)
+        log.warning("NHL API error %s: %s", path, exc)
+        return None
+
+
+def _team_name(team: dict) -> str:
+    name = team.get("name", {})
+    if isinstance(name, dict):
+        return (name.get("default") or "").strip()
+    common = team.get("commonName", {})
+    if isinstance(common, dict):
+        place = (team.get("placeName", {}).get("default") or "").strip()
+        n = (common.get("default") or "").strip()
+        return f"{place} {n}".strip() if place else n
+    return str(name).strip()
+
+
+def _get_schedule(game_date: date) -> list[dict]:
+    data = _get(f"/schedule/{game_date.isoformat()}")
+    if not data:
         return []
+    games = []
+    for week in data.get("gameWeek", []):
+        games.extend(week.get("games", []))
+    return games
 
 
-def _extract_h2h_odds(event: dict[str, Any]) -> tuple[str, str]:
-    for bm in (event.get("bookmakers") or []):
-        for mkt in (bm.get("markets") or []):
-            if mkt.get("key") != "h2h":
-                continue
-            outcomes = {o["name"]: o["price"] for o in (mkt.get("outcomes") or [])}
-            home_t = event.get("home_team", "")
-            away_t = event.get("away_team", "")
-            h = outcomes.get(home_t) or outcomes.get("home")
-            a = outcomes.get(away_t) or outcomes.get("away")
-            if h and a:
-                return str(h), str(a)
-    return "", ""
+def _get_scores(game_date: date) -> list[dict]:
+    data = _get(f"/score/{game_date.isoformat()}")
+    if not data:
+        return []
+    return data.get("games", [])
 
 
-def _transform_fixture(event: dict[str, Any], sport_title: str, sport_key: str) -> dict[str, Any] | None:
-    home = (event.get("home_team") or "").strip()
-    away = (event.get("away_team") or "").strip()
-    if not home or not away:
-        return None
+def _build_rows(games: list[dict], game_date: date) -> list[dict]:
+    rows = []
+    season = str(game_date.year)
 
-    kickoff = event.get("commence_time", "")
-    season  = kickoff[:4] if kickoff else ""
-    odds_home, odds_away = _extract_h2h_odds(event)
+    for game in games:
+        game_id = str(game.get("id", ""))
+        if not game_id:
+            continue
 
-    return {
-        "sport":                  "hockey",
-        "provider_id":            f"odds-hockey-{event['id']}",
-        "league_provider_id":     f"odds-league-{sport_key}",
-        "league_name":            sport_title,
-        "home_team_provider_id":  f"odds-hockey-{sport_key}-{home.lower().replace(' ', '-')}",
-        "home_team_name":         home,
-        "away_team_provider_id":  f"odds-hockey-{sport_key}-{away.lower().replace(' ', '-')}",
-        "away_team_name":         away,
-        "kickoff_utc":            kickoff,
-        "status":                 "scheduled",
-        "home_score":             "",
-        "away_score":             "",
-        "outcome":                "",
-        "season":                 season,
-        "venue":                  "",
-        "odds_home":              odds_home,
-        "odds_away":              odds_away,
-    }
+        home_data = game.get("homeTeam", {})
+        away_data = game.get("awayTeam", {})
+        home_team = _team_name(home_data)
+        away_team = _team_name(away_data)
+        if not home_team or not away_team:
+            continue
 
+        game_state = (game.get("gameState") or "").upper()
+        game_type = game.get("gameType", 2)  # 1=preseason, 2=regular, 3=playoffs
 
-def _transform_score_event(event: dict[str, Any], sport_key: str) -> dict[str, Any] | None:
-    home = (event.get("home_team") or "").strip()
-    away = (event.get("away_team") or "").strip()
-    if not home or not away:
-        return None
+        if game_state in ("OFF", "FINAL"):
+            status = "finished"
+        elif game_state in ("LIVE", "CRIT", "LIVEOD"):
+            status = "live"
+        else:
+            status = "scheduled"
 
-    event_id    = event.get("id", "")
-    kickoff     = event.get("commence_time", "")
-    completed   = event.get("completed", False)
-    season      = kickoff[:4] if kickoff else ""
-    sport_title = event.get("sport_title", sport_key)
+        home_score = home_data.get("score")
+        away_score = away_data.get("score")
+        home_score_str = str(int(home_score)) if home_score is not None else ""
+        away_score_str = str(int(away_score)) if away_score is not None else ""
 
-    now = datetime.now(timezone.utc)
-    try:
-        commence_dt = datetime.fromisoformat(kickoff.replace("Z", "+00:00"))
-        started = commence_dt <= now
-    except Exception:
-        started = False
+        outcome = ""
+        if status == "finished" and home_score_str and away_score_str:
+            outcome = "H" if int(home_score_str) > int(away_score_str) else "A"
 
-    if completed:
-        status = "finished"
-    elif started:
-        status = "live"
-    else:
-        return None
+        start_time = game.get("startTimeUTC") or f"{game_date.isoformat()}T00:00:00Z"
+        venue = game.get("venue", {}).get("default", "") if isinstance(game.get("venue"), dict) else ""
 
-    scores = event.get("scores") or []
-    home_score = away_score = ""
-    outcome = ""
-    if len(scores) >= 2:
-        score_map = {s.get("name", ""): s.get("score", "") for s in scores}
-        h = score_map.get(home, "")
-        a = score_map.get(away, "")
-        try:
-            home_score = str(int(h)) if h else ""
-            away_score = str(int(a)) if a else ""
-            if completed and home_score and away_score:
-                outcome = "H" if int(home_score) > int(away_score) else "A"
-        except ValueError:
-            home_score = away_score = ""
+        league_type = {1: "NHL Preseason", 2: "NHL", 3: "NHL Playoffs"}.get(game_type, "NHL")
 
-    return {
-        "sport":                  "hockey",
-        "provider_id":            f"odds-hockey-{event_id}",
-        "league_provider_id":     f"odds-league-{sport_key}",
-        "league_name":            sport_title,
-        "home_team_provider_id":  f"odds-hockey-{sport_key}-{home.lower().replace(' ', '-')}",
-        "home_team_name":         home,
-        "away_team_provider_id":  f"odds-hockey-{sport_key}-{away.lower().replace(' ', '-')}",
-        "away_team_name":         away,
-        "kickoff_utc":            kickoff,
-        "status":                 status,
-        "home_score":             home_score,
-        "away_score":             away_score,
-        "outcome":                outcome,
-        "season":                 season,
-        "venue":                  "",
-    }
+        rows.append({
+            "sport":                  "hockey",
+            "provider_id":            f"nhl-{game_id}",
+            "league_provider_id":     f"nhl-league-{league_type.lower().replace(' ', '-')}",
+            "league_name":            league_type,
+            "home_team_provider_id":  f"nhl-team-{home_team.lower().replace(' ', '-')}",
+            "home_team_name":         home_team,
+            "away_team_provider_id":  f"nhl-team-{away_team.lower().replace(' ', '-')}",
+            "away_team_name":         away_team,
+            "kickoff_utc":            start_time,
+            "status":                 status,
+            "home_score":             home_score_str,
+            "away_score":             away_score_str,
+            "outcome":                outcome,
+            "season":                 season,
+            "venue":                  venue,
+            "odds_home":              "",
+            "odds_away":              "",
+        })
+
+    return rows
 
 
 def fetch_all(dry_run: bool = False) -> int:
-    if not settings.TENNIS_API_KEY:
-        log.error("TENNIS_API_KEY (The Odds API) not set.")
-        return 0
+    today = date.today()
+    all_rows: list[dict] = []
 
-    active_sports = _get_active_hockey_sports()
-    if not active_sports:
-        log.warning("No active hockey sports found.")
-        return 0
+    # Schedule: today + next 2 days
+    for delta in [0, 1, 2]:
+        d = today + timedelta(days=delta)
+        games = _get_schedule(d)
+        rows = _build_rows(games, d)
+        log.info("NHL schedule %s: %d games", d, len(rows))
+        all_rows.extend(rows)
+        time.sleep(0.2)
 
-    log.info("Active hockey leagues: %s", [s["title"] for s in active_sports])
-
-    fixture_rows: list[dict] = []
-    score_rows:   list[dict] = []
-
-    for sport in active_sports:
-        key   = sport["key"]
-        title = sport["title"]
-
-        try:
-            log.info("Fetching hockey fixtures: %s ...", title)
-            events = _get(f"/sports/{key}/odds", {"regions": "eu", "markets": "h2h", "oddsFormat": "decimal"})
-            rows = [r for ev in events if (r := _transform_fixture(ev, title, key))]
-            log.info("  → %d fixtures", len(rows))
-            fixture_rows.extend(rows)
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code != 404:
-                log.warning("  HTTP %s for %s/odds: %s", exc.response.status_code, key, exc)
-        except Exception as exc:
-            log.warning("  Fixture error for %s: %s", key, exc)
-        time.sleep(0.3)
-
-        try:
-            log.info("Fetching hockey scores: %s ...", key)
-            events = _get(f"/sports/{key}/scores", {"daysFrom": "2"})
-            rows = [r for ev in events if (r := _transform_score_event(ev, key))]
-            log.info("  → %d live/finished score rows", len(rows))
-            score_rows.extend(rows)
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code != 404:
-                log.warning("  HTTP %s for %s/scores: %s", exc.response.status_code, key, exc)
-        except Exception as exc:
-            log.warning("  Scores error for %s: %s", key, exc)
-        time.sleep(0.3)
-
-    all_rows = fixture_rows + score_rows
-    log.info(
-        "Total hockey rows to ingest: %d (%d fixtures + %d scores)",
-        len(all_rows), len(fixture_rows), len(score_rows),
-    )
+    # Scores: yesterday + today (live + finished)
+    for delta in [-1, 0]:
+        d = today + timedelta(days=delta)
+        games = _get_scores(d)
+        rows = _build_rows(games, d)
+        log.info("NHL scores %s: %d games", d, len(rows))
+        all_rows.extend(rows)
+        time.sleep(0.2)
 
     if not all_rows:
-        log.warning("No hockey data found.")
+        log.warning("No NHL data found.")
         return 0
 
     if dry_run:
@@ -223,7 +163,7 @@ def fetch_all(dry_run: bool = False) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Fetch live hockey fixtures + scores")
+    parser = argparse.ArgumentParser(description="Fetch live NHL fixtures + scores")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")

@@ -29,9 +29,6 @@ class Settings(BaseSettings):
     # Register at https://www.football-data.org/client/register
     FOOTBALL_DATA_API_KEY: str = ""
 
-    # Live data — The Odds API (free tier, tennis ATP/WTA)
-    TENNIS_API_KEY: str = ""
-
     # Live data — api-tennis.com (tennis fixtures, live scores, set scores, point-by-point)
     # Register at https://api-tennis.com → get API key
     TENNIS_LIVE_API_KEY: str = ""

@@ -1,11 +1,12 @@
 """
-Fetch live baseball fixtures + scores from The Odds API and ingest them.
-Covers: MLB, MLB Preseason, NCAA Baseball.
-Uses the same TENNIS_API_KEY (The Odds API).
+Fetch live MLB fixtures + scores from the free MLB Stats API (no key required).
 
-Two passes per sport key:
-  1. /odds  — upcoming fixtures (status=scheduled)
-  2. /scores — commenced + not completed → status=live; completed → status=finished
+Source: https://statsapi.mlb.com/api/v1/schedule
+Covers: MLB regular season, playoffs, spring training.
+
+Usage:
+    python -m pipelines.baseball.fetch_live
+    python -m pipelines.baseball.fetch_live --dry-run
 """
 
 from __future__ import annotations
@@ -13,196 +14,113 @@ from __future__ import annotations
 import argparse
 import logging
 import time
-from datetime import datetime, timezone
-from typing import Any
+from datetime import date, timedelta
 
 import httpx
 
-from config.settings import settings
 from pipelines.soccer.ingest_matches import ingest_from_dicts
 
 log = logging.getLogger(__name__)
-BASE_URL = "https://api.the-odds-api.com/v4"
+
+MLB_BASE = "https://statsapi.mlb.com/api/v1"
 
 
-def _get(path: str, params: dict | None = None) -> Any:
-    resp = httpx.get(
-        f"{BASE_URL}{path}",
-        params={"apiKey": settings.TENNIS_API_KEY, **(params or {})},
-        timeout=15,
-    )
-    resp.raise_for_status()
-    return resp.json()
-
-
-def _extract_h2h_odds(event: dict[str, Any]) -> tuple[str, str]:
-    """Extract best available h2h home/away decimal odds from an Odds API event."""
-    for bm in (event.get("bookmakers") or []):
-        for mkt in (bm.get("markets") or []):
-            if mkt.get("key") != "h2h":
-                continue
-            outcomes = {o["name"]: o["price"] for o in (mkt.get("outcomes") or [])}
-            h = outcomes.get(event.get("home_team", "")) or outcomes.get("home")
-            a = outcomes.get(event.get("away_team", "")) or outcomes.get("away")
-            if h and a:
-                return str(h), str(a)
-    return "", ""
-
-
-def _transform_fixture(event: dict[str, Any], sport_title: str, sport_key: str) -> dict[str, Any] | None:
-    home = (event.get("home_team") or "").strip()
-    away = (event.get("away_team") or "").strip()
-    if not home or not away:
-        return None
-    kickoff = event.get("commence_time", "")
-    odds_home, odds_away = _extract_h2h_odds(event)
-    return {
-        "sport":                  "baseball",
-        "provider_id":            f"odds-bb-{event['id']}",
-        "league_provider_id":     f"odds-league-{sport_key}",
-        "league_name":            sport_title,
-        "home_team_provider_id":  f"odds-bb-{sport_key}-{home.lower().replace(' ', '-')}",
-        "home_team_name":         home,
-        "away_team_provider_id":  f"odds-bb-{sport_key}-{away.lower().replace(' ', '-')}",
-        "away_team_name":         away,
-        "kickoff_utc":            kickoff,
-        "status":                 "scheduled",
-        "home_score":             "",
-        "away_score":             "",
-        "outcome":                "",
-        "season":                 kickoff[:4] if kickoff else "",
-        "venue":                  "",
-        "odds_home":              odds_home,
-        "odds_away":              odds_away,
-    }
-
-
-def _transform_score_event(event: dict[str, Any], sport_key: str) -> dict[str, Any] | None:
-    """Convert a /scores API event into an ingest row with live/finished status."""
-    home = (event.get("home_team") or "").strip()
-    away = (event.get("away_team") or "").strip()
-    if not home or not away:
-        return None
-
-    event_id  = event.get("id", "")
-    kickoff   = event.get("commence_time", "")
-    completed = event.get("completed", False)
-    season    = kickoff[:4] if kickoff else ""
-    sport_title = event.get("sport_title", sport_key)
-
-    now = datetime.now(timezone.utc)
+def _get_schedule(game_date: date) -> list[dict]:
     try:
-        commence_dt = datetime.fromisoformat(kickoff.replace("Z", "+00:00"))
-        started = commence_dt <= now
-    except Exception:
-        started = False
+        resp = httpx.get(
+            f"{MLB_BASE}/schedule",
+            params={"sportId": "1", "date": game_date.strftime("%Y-%m-%d"), "hydrate": "linescore,team"},
+            timeout=20,
+        )
+        resp.raise_for_status()
+        games = []
+        for d in resp.json().get("dates", []):
+            games.extend(d.get("games", []))
+        return games
+    except Exception as exc:
+        log.warning("MLB schedule error for %s: %s", game_date, exc)
+        return []
 
-    if completed:
-        status = "finished"
-    elif started:
-        status = "live"
-    else:
-        return None
 
-    # Scores: API returns [{"name": team, "score": "5"}, ...]
-    scores = event.get("scores") or []
-    home_score = away_score = ""
-    outcome = ""
-    if len(scores) >= 2:
-        score_map = {s.get("name", ""): s.get("score", "") for s in scores}
-        h = score_map.get(home, "")
-        a = score_map.get(away, "")
-        try:
-            home_score = str(int(h)) if h else ""
-            away_score = str(int(a)) if a else ""
-            if completed and home_score and away_score:
-                outcome = "H" if int(home_score) > int(away_score) else "A"
-        except ValueError:
-            home_score = away_score = ""
+def _build_rows(games: list[dict], game_date: date) -> list[dict]:
+    rows = []
+    season = str(game_date.year)
 
-    return {
-        "sport":                  "baseball",
-        "provider_id":            f"odds-bb-{event_id}",
-        "league_provider_id":     f"odds-league-{sport_key}",
-        "league_name":            sport_title,
-        "home_team_provider_id":  f"odds-bb-{sport_key}-{home.lower().replace(' ', '-')}",
-        "home_team_name":         home,
-        "away_team_provider_id":  f"odds-bb-{sport_key}-{away.lower().replace(' ', '-')}",
-        "away_team_name":         away,
-        "kickoff_utc":            kickoff,
-        "status":                 status,
-        "home_score":             home_score,
-        "away_score":             away_score,
-        "outcome":                outcome,
-        "season":                 season,
-        "venue":                  "",
-    }
+    for game in games:
+        game_pk = str(game.get("gamePk", ""))
+        if not game_pk:
+            continue
+
+        home_data = game.get("teams", {}).get("home", {})
+        away_data = game.get("teams", {}).get("away", {})
+        home_team = (home_data.get("team", {}).get("name") or "").strip()
+        away_team = (away_data.get("team", {}).get("name") or "").strip()
+        if not home_team or not away_team:
+            continue
+
+        abstract_state = game.get("status", {}).get("abstractGameState", "")
+        status_code = game.get("status", {}).get("statusCode", "")
+
+        if abstract_state == "Final" or status_code in ("F", "FT", "FR", "FO"):
+            status = "finished"
+        elif abstract_state == "Live" or status_code in ("I", "IR", "MA"):
+            status = "live"
+        else:
+            status = "scheduled"
+
+        home_score = home_data.get("score") or game.get("linescore", {}).get("teams", {}).get("home", {}).get("runs")
+        away_score = away_data.get("score") or game.get("linescore", {}).get("teams", {}).get("away", {}).get("runs")
+        home_score_str = str(int(home_score)) if home_score is not None else ""
+        away_score_str = str(int(away_score)) if away_score is not None else ""
+
+        outcome = ""
+        if status == "finished" and home_score_str and away_score_str:
+            outcome = "H" if int(home_score_str) > int(away_score_str) else "A"
+
+        kickoff = game.get("gameDate") or f"{game_date.isoformat()}T00:00:00Z"
+        venue_data = game.get("venue", {})
+        venue = venue_data.get("name", "") if isinstance(venue_data, dict) else ""
+
+        rows.append({
+            "sport":                  "baseball",
+            "provider_id":            f"mlb-{game_pk}",
+            "league_provider_id":     "mlb-league-mlb",
+            "league_name":            "MLB",
+            "home_team_provider_id":  f"mlb-team-{home_team.lower().replace(' ', '-')}",
+            "home_team_name":         home_team,
+            "away_team_provider_id":  f"mlb-team-{away_team.lower().replace(' ', '-')}",
+            "away_team_name":         away_team,
+            "kickoff_utc":            kickoff,
+            "status":                 status,
+            "home_score":             home_score_str,
+            "away_score":             away_score_str,
+            "outcome":                outcome,
+            "season":                 season,
+            "venue":                  venue,
+            "odds_home":              "",
+            "odds_away":              "",
+        })
+
+    return rows
 
 
 def fetch_all(dry_run: bool = False) -> int:
-    if not settings.TENNIS_API_KEY:
-        log.error("TENNIS_API_KEY (The Odds API) not set.")
-        return 0
+    today = date.today()
+    all_rows: list[dict] = []
 
-    sports = _get("/sports", {"all": "false"})
-    active = [
-        s for s in sports
-        if s.get("group", "").lower() == "baseball"
-        and not s.get("has_outrights", False)
-        and "_winner" not in s.get("key", "")
-    ]
-
-    if not active:
-        log.warning("No active baseball leagues found.")
-        return 0
-
-    log.info("Active baseball leagues: %s", [s["title"] for s in active])
-
-    fixture_rows: list[dict] = []
-    score_rows: list[dict] = []
-
-    for sport in active:
-        key, title = sport["key"], sport["title"]
-
-        # Pass 1: upcoming fixtures
-        try:
-            log.info("Fetching baseball fixtures: %s ...", title)
-            events = _get(f"/sports/{key}/odds", {"regions": "eu", "markets": "h2h", "oddsFormat": "decimal"})
-            rows = [r for ev in events if (r := _transform_fixture(ev, title, key))]
-            log.info("  → %d fixtures", len(rows))
-            fixture_rows.extend(rows)
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code != 404:
-                log.warning("  HTTP %s for %s/odds: %s", exc.response.status_code, key, exc)
-        except Exception as exc:
-            log.warning("  Fixture error for %s: %s", key, exc)
+    for delta in [-1, 0, 1]:
+        d = today + timedelta(days=delta)
+        games = _get_schedule(d)
+        rows = _build_rows(games, d)
+        log.info("MLB %s: %d games", d, len(rows))
+        all_rows.extend(rows)
         time.sleep(0.3)
-
-        # Pass 2: in-play / recent scores
-        try:
-            log.info("Fetching baseball scores: %s ...", key)
-            events = _get(f"/sports/{key}/scores", {"daysFrom": "2"})
-            rows = [r for ev in events if (r := _transform_score_event(ev, key))]
-            log.info("  → %d live/finished score rows", len(rows))
-            score_rows.extend(rows)
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code != 404:
-                log.warning("  HTTP %s for %s/scores: %s", exc.response.status_code, key, exc)
-        except Exception as exc:
-            log.warning("  Scores error for %s: %s", key, exc)
-        time.sleep(0.3)
-
-    # Fixtures first (scheduled), then scores (live/finished) — scores win on upsert
-    all_rows = fixture_rows + score_rows
-    log.info(
-        "Total baseball rows to ingest: %d (%d fixtures + %d scores)",
-        len(all_rows), len(fixture_rows), len(score_rows),
-    )
 
     if not all_rows:
+        log.warning("No MLB data found.")
         return 0
+
     if dry_run:
-        log.info("DRY RUN — skipping ingest.")
         return len(all_rows)
 
     ingested = ingest_from_dicts(all_rows)
@@ -211,11 +129,12 @@ def fetch_all(dry_run: bool = False) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Fetch live baseball fixtures + scores")
+    parser = argparse.ArgumentParser(description="Fetch live MLB fixtures + scores")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
-    print(f"Done. {fetch_all(dry_run=args.dry_run)} rows processed.")
+    n = fetch_all(dry_run=args.dry_run)
+    print(f"Done. {n} rows processed.")
 
 
 if __name__ == "__main__":
