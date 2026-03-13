@@ -52,6 +52,18 @@ logger = logging.getLogger("alpha_engine")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start background scheduler on startup; stop it on shutdown."""
+    # Run DB migrations on startup
+    try:
+        from alembic.config import Config
+        from alembic import command
+        import os
+        alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
+        alembic_cfg.set_main_option("script_location", os.path.join(os.path.dirname(__file__), "..", "alembic"))
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Startup: DB migrations applied.")
+    except Exception as exc:
+        logger.warning("Startup: DB migration failed (continuing): %s", exc)
+
     # Run stale-match cleanup + full fetch immediately on startup
     try:
         from pipelines.scheduler import _job_expire_stale
