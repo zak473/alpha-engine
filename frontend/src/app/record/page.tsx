@@ -10,7 +10,7 @@ export default async function RecordPage() {
   if (!token) redirect("/login?next=/record");
 
   return (
-    <AppShell title="Bet Record" subtitle="Settled picks, outcomes, and slip history">
+    <AppShell title="Bet Record" subtitle="Settled picks, outcomes, and slip history" requireAuth>
       <RecordView />
     </AppShell>
   );

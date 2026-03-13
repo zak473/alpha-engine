@@ -42,7 +42,7 @@ export default async function DashboardPage() {
   });
 
   return (
-    <AppShell title="Betting Board" subtitle="Never In Doubt live market view" compact>
+    <AppShell title="Betting Board" subtitle="Never In Doubt live market view" compact requireAuth>
       <BettingDashboard matches={sorted} />
     </AppShell>
   );

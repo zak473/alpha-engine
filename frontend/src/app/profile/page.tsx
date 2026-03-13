@@ -10,7 +10,7 @@ export default async function ProfilePage() {
   if (!token) redirect("/login?next=/profile");
 
   return (
-    <AppShell title="Profile & Settings" subtitle="Manage your account details">
+    <AppShell title="Profile & Settings" subtitle="Manage your account details" requireAuth>
       <ProfileClient />
     </AppShell>
   );

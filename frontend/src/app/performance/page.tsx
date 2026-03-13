@@ -64,7 +64,7 @@ export default async function PerformancePage() {
     .slice(0, 20);
 
   return (
-    <AppShell title="Performance Lab" subtitle="ROI, bankroll trends, and model output analytics">
+    <AppShell title="Performance Lab" subtitle="ROI, bankroll trends, and model output analytics" requireAuth>
       <PerformanceClient
         overall={overallStats}
         roiSeries={roiSeries}

@@ -71,7 +71,7 @@ export default async function AdminPage() {
   ];
 
   return (
-    <AppShell title="Trading Desk Admin" subtitle={`System status, model stack, and deployment health · ${apiEnv.toUpperCase()}`}>
+    <AppShell title="Trading Desk Admin" subtitle={`System status, model stack, and deployment health · ${apiEnv.toUpperCase()}`} requireAuth>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {kpis.map((k) => (
           <StatCard key={k.label} {...k} />

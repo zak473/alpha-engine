@@ -3,20 +3,23 @@ import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { BottomNav } from "./BottomNav";
 import { SidebarProvider } from "./SidebarContext";
+import { ClientAuthGuard } from "./ClientAuthGuard";
 
 interface AppShellProps {
   children: ReactNode;
   title: string;
   subtitle?: string;
   compact?: boolean;
+  requireAuth?: boolean;
 }
 
-export function AppShell({ children, title, subtitle, compact }: AppShellProps) {
+export function AppShell({ children, title, subtitle, compact, requireAuth }: AppShellProps) {
   return (
     <SidebarProvider>
       <div className="brand-shell relative min-h-screen bg-[radial-gradient(circle_at_top,rgba(53,242,143,0.10),transparent_18%),linear-gradient(180deg,#08120e_0%,#0a1510_100%)] text-text-primary">
         <Sidebar />
-        <div className={compact ? "relative z-[1] flex h-screen flex-col overflow-hidden lg:pl-56" : "relative z-[1] flex min-h-screen flex-col lg:pl-56"}>
+        {requireAuth && <ClientAuthGuard />}
+      <div className={compact ? "relative z-[1] flex h-screen flex-col overflow-hidden lg:pl-56" : "relative z-[1] flex min-h-screen flex-col lg:pl-56"}>
           <TopBar title={title} subtitle={subtitle} />
           <main className={compact ? "flex flex-1 flex-col overflow-y-auto pb-14 lg:pb-0" : "flex-1 px-4 pb-20 pt-4 lg:px-6 lg:pb-6 lg:pt-6"}>
             {!compact && (

@@ -24,7 +24,7 @@ export default async function ChallengesPage() {
   }
 
   return (
-    <AppShell title="Challenges Arena" subtitle="Compete on picks, leaderboards, and profit races">
+    <AppShell title="Challenges Arena" subtitle="Compete on picks, leaderboards, and profit races" requireAuth>
       <ChallengesClient
         allChallenges={allChallenges}
         myChallenges={myChallenges}
