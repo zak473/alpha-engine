@@ -1,25 +1,32 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, SlidersHorizontal, ChevronLeft, ChevronRight, ArrowUpDown, CalendarDays, Sparkles } from "lucide-react";
-import { formatDate, formatPercent } from "@/lib/utils";
+import { Search, ArrowUpDown, CalendarDays } from "lucide-react";
 import type { Match } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, formatDate, formatPercent } from "@/lib/utils";
 
 type SortField = "scheduled_at" | "confidence" | "competition";
 type SortDir = "asc" | "desc";
+type StatusFilter = "all" | "live" | "scheduled" | "finished";
 
 const SPORTS = [
-  { label: "All",        value: "all",        icon: "🏆" },
-  { label: "Soccer",     value: "soccer",     icon: "⚽" },
-  { label: "Tennis",     value: "tennis",     icon: "🎾" },
-  { label: "Basketball", value: "basketball", icon: "🏀" },
-  { label: "Baseball",   value: "baseball",   icon: "⚾" },
-  { label: "Hockey",     value: "hockey",     icon: "🏒" },
-  { label: "Esports",    value: "esports",    icon: "🎮" },
-];
+  { label: "All sports", value: "all" },
+  { label: "⚽ Soccer", value: "soccer" },
+  { label: "🎾 Tennis", value: "tennis" },
+  { label: "🎮 Esports", value: "esports" },
+  { label: "🏀 Basketball", value: "basketball" },
+  { label: "⚾ Baseball", value: "baseball" },
+  { label: "🏒 Hockey", value: "hockey" },
+] as const;
 
-const PAGE_SIZE = 12;
+const STATUSES = [
+  { label: "All", value: "all" },
+  { label: "Upcoming", value: "scheduled" },
+  { label: "Live", value: "live" },
+  { label: "Finished", value: "finished" },
+] as const;
+
+const PAGE_SIZE = 20;
 
 function predictedOutcome(m: Match) {
   if (m.p_home == null || m.p_away == null || m.p_draw == null) return "No model";
@@ -28,31 +35,29 @@ function predictedOutcome(m: Match) {
   return "Draw";
 }
 
-function outcomeTone(status: Match["status"]) {
-  if (status === "live") return "text-emerald-300 border-emerald-300/20 bg-emerald-300/10";
-  if (status === "finished") return "text-white/60 border-white/10 bg-white/[0.05]";
-  return "text-sky-200 border-sky-300/15 bg-sky-300/10";
+function statusTone(status: Match["status"]) {
+  if (status === "live") return "border-emerald-300/20 bg-emerald-300/10 text-emerald-300";
+  if (status === "finished") return "border-white/8 bg-white/[0.04] text-white/52";
+  return "border-sky-300/20 bg-sky-300/10 text-sky-200";
 }
 
-function sportTone(sport: string) {
-  switch (sport) {
-    case "soccer":
-      return "bg-emerald-300/10 text-emerald-200 border-emerald-300/20";
-    case "tennis":
-      return "bg-lime-300/10 text-lime-200 border-lime-300/20";
-    case "esports":
-      return "bg-violet-300/10 text-violet-200 border-violet-300/20";
-    case "basketball":
-      return "bg-amber-300/10 text-amber-200 border-amber-300/20";
-    case "baseball":
-      return "bg-rose-300/10 text-rose-200 border-rose-300/20";
-    default:
-      return "bg-cyan-300/10 text-cyan-200 border-cyan-300/20";
-  }
+function confidenceTone(confidence: number | null | undefined) {
+  if (confidence == null) return "text-white/40";
+  if (confidence >= 70) return "text-emerald-300";
+  if (confidence >= 50) return "text-amber-300";
+  return "text-red-300";
 }
 
-export function MatchesTable({ initialMatches, loading = false }: { initialMatches: Match[]; loading?: boolean }) {
-  const [sport, setSport] = useState("all");
+function sortButton(active: boolean) {
+  return cn(
+    "rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all",
+    active ? "bg-[#2edb6c] text-[#07110d]" : "text-white/55 hover:bg-white/[0.06] hover:text-white"
+  );
+}
+
+export function MatchesTable({ initialMatches }: { initialMatches: Match[]; loading?: boolean }) {
+  const [sport, setSport] = useState<string>("all");
+  const [status, setStatus] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("scheduled_at");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -60,15 +65,14 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
 
   const filtered = useMemo(() => {
     let items = [...initialMatches];
+
     if (sport !== "all") items = items.filter((m) => m.sport === sport);
+    if (status !== "all") items = items.filter((m) => m.status === status);
 
     if (search.trim()) {
       const q = search.toLowerCase();
-      items = items.filter(
-        (m) =>
-          m.home_name.toLowerCase().includes(q) ||
-          m.away_name.toLowerCase().includes(q) ||
-          m.competition.toLowerCase().includes(q)
+      items = items.filter((m) =>
+        [m.home_name, m.away_name, m.competition, m.sport].join(" ").toLowerCase().includes(q)
       );
     }
 
@@ -80,25 +84,11 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
     });
 
     return items;
-  }, [initialMatches, page, search, sortDir, sortField, sport]);
+  }, [initialMatches, search, sortDir, sortField, sport, status]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const liveCount = initialMatches.filter((m) => m.status === "live").length;
-
-  const sportCounts = useMemo(() => {
-    const counts: Record<string, { total: number; live: number }> = {};
-    initialMatches.forEach((m) => {
-      if (!counts[m.sport]) counts[m.sport] = { total: 0, live: 0 };
-      counts[m.sport].total++;
-      if (m.status === "live") counts[m.sport].live++;
-    });
-    return counts;
-  }, [initialMatches]);
-  const avgConfidence = Math.round(
-    (initialMatches.filter((m) => m.confidence != null).reduce((sum, m) => sum + (m.confidence ?? 0), 0) /
-      Math.max(1, initialMatches.filter((m) => m.confidence != null).length))
-  );
 
   function toggleSort(field: SortField) {
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -110,85 +100,53 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
   }
 
   return (
-    <div className="grid gap-6 pb-10">
-      <section className="overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.10),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-5 shadow-[0_26px_70px_rgba(0,0,0,0.24)] lg:p-6">
-        <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr] xl:items-end">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/16 bg-emerald-300/8 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200">
-              <Sparkles size={12} />
-              Market board redesign
-            </div>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-white lg:text-[2.75rem]">Turn the cluttered table into a board you can actually scan.</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-white/58">
-              Match cards now carry the key decision data first: matchup, time, model lean, confidence, and live state. The heavy spreadsheet feel stays available further down.
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-[22px] border border-white/8 bg-white/[0.05] p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Active markets</div>
-              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">{initialMatches.length}</div>
-            </div>
-            <div className="rounded-[22px] border border-white/8 bg-white/[0.05] p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Live right now</div>
-              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">{liveCount}</div>
-            </div>
-            <div className="rounded-[22px] border border-white/8 bg-white/[0.05] p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Avg confidence</div>
-              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">{Number.isFinite(avgConfidence) ? `${avgConfidence}%` : "—"}</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-[28px] border border-white/8 bg-white/[0.04] p-4 lg:p-5">
-        {/* Sport bar — same style as live page */}
-        <div className="overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-          <div className="flex min-w-max items-center gap-2 rounded-[24px] border border-white/8 bg-white/[0.03] p-2">
-            {SPORTS.map((item) => {
-              const isActive = sport === item.value;
-              const counts = item.value === "all" ? null : (sportCounts[item.value] ?? { total: 0, live: 0 });
-              const totalForSport = counts?.total ?? 0;
-              const liveForSport = counts?.live ?? 0;
-              return (
+    <div className="space-y-5 pb-10">
+      <section className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.22)]">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex min-w-max items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] p-1.5">
+              {SPORTS.map((item) => (
                 <button
                   key={item.value}
-                  onClick={() => { setSport(item.value); setPage(1); }}
+                  onClick={() => {
+                    setSport(item.value);
+                    setPage(1);
+                  }}
                   className={cn(
-                    "flex items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-all",
-                    isActive
-                      ? "bg-[#2edb6c] text-[#07110d] shadow-sm"
-                      : "text-white/60 hover:bg-white/[0.06] hover:text-white"
+                    "rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all",
+                    sport === item.value
+                      ? "bg-[#2edb6c] text-[#07110d]"
+                      : "text-white/55 hover:bg-white/[0.06] hover:text-white"
                   )}
                 >
-                  <span>{item.icon}</span>
-                  <span>{item.label}</span>
-                  {counts && liveForSport > 0 && (
-                    <span className={cn(
-                      "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                      isActive ? "bg-[#07110d]/20 text-[#07110d]" : "bg-emerald-400/20 text-emerald-300"
-                    )}>
-                      {liveForSport} live
-                    </span>
-                  )}
-                  {counts && liveForSport === 0 && totalForSport > 0 && (
-                    <span className={cn(
-                      "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                      isActive ? "bg-[#07110d]/20 text-[#07110d]" : "bg-white/10 text-white/50"
-                    )}>
-                      {totalForSport}
-                    </span>
-                  )}
+                  {item.label}
                 </button>
-              );
-            })}
+              ))}
+            </div>
+
+            <div className="flex min-w-max items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] p-1.5">
+              {STATUSES.map((item) => (
+                <button
+                  key={item.value}
+                  onClick={() => {
+                    setStatus(item.value);
+                    setPage(1);
+                  }}
+                  className={cn(
+                    "rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all",
+                    status === item.value
+                      ? "bg-[#2edb6c] text-[#07110d]"
+                      : "text-white/55 hover:bg-white/[0.06] hover:text-white"
+                  )}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between mt-4">
-
-          <div className="flex flex-col gap-3 md:flex-row">
-            <div className="relative min-w-[260px]">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative w-full max-w-sm">
               <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35" />
               <input
                 value={search}
@@ -196,98 +154,108 @@ export function MatchesTable({ initialMatches, loading = false }: { initialMatch
                   setSearch(e.target.value);
                   setPage(1);
                 }}
-                placeholder="Search teams or leagues"
+                placeholder="Search matches, teams, or leagues"
                 className="h-11 w-full rounded-full border border-white/8 bg-white/[0.04] pl-10 pr-4 text-sm text-white placeholder:text-white/28 outline-none transition focus:border-emerald-300/25"
               />
             </div>
 
-            <div className="flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.04] px-3 py-2 text-sm text-white/65">
-              <SlidersHorizontal size={15} />
-              <button onClick={() => toggleSort("scheduled_at")} className={cn("rounded-full px-3 py-1", sortField === "scheduled_at" && "bg-white/[0.08] text-white")}>
-                Time
-              </button>
-              <button onClick={() => toggleSort("competition")} className={cn("rounded-full px-3 py-1", sortField === "competition" && "bg-white/[0.08] text-white")}>
-                League
-              </button>
-              <button onClick={() => toggleSort("confidence")} className={cn("rounded-full px-3 py-1", sortField === "confidence" && "bg-white/[0.08] text-white")}>
-                Confidence
-              </button>
-              <div className="text-white/32">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-white/55">
+              <button onClick={() => toggleSort("scheduled_at")} className={sortButton(sortField === "scheduled_at")}>Time</button>
+              <button onClick={() => toggleSort("competition")} className={sortButton(sortField === "competition")}>League</button>
+              <button onClick={() => toggleSort("confidence")} className={sortButton(sortField === "confidence")}>Confidence</button>
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-white/40">
                 <ArrowUpDown size={14} />
-              </div>
+              </span>
             </div>
           </div>
         </div>
+      </section>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-2">
-          {paginated.map((match) => (
-            <button
-              key={match.id}
-              onClick={() => (window.location.href = `/sports/${match.sport}/matches/${match.id}`)}
-              className="rounded-[24px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 text-left transition hover:-translate-y-0.5 hover:border-emerald-300/20"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className={cn("rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em]", sportTone(match.sport))}>{match.sport}</div>
-                <div className={cn("rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em]", outcomeTone(match.status))}>{match.status}</div>
-              </div>
+      <div className="px-1 text-sm text-white/62">
+        Showing <span className="font-semibold text-white">{filtered.length}</span> matches
+        {liveCount > 0 && <span className="ml-3 text-emerald-300">• {liveCount} live</span>}
+      </div>
 
-              <div className="mt-4">
-                <div className="text-lg font-semibold tracking-[-0.03em] text-white">{match.home_name}</div>
-                <div className="mt-1 text-sm text-white/32">vs</div>
-                <div className="text-lg font-semibold tracking-[-0.03em] text-white">{match.away_name}</div>
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-[18px] border border-white/8 bg-black/15 p-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">League</div>
-                  <div className="mt-2 line-clamp-2 text-sm text-white/72">{match.competition}</div>
-                </div>
-                <div className="rounded-[18px] border border-white/8 bg-black/15 p-3">
-                  <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-white/35">
-                    <CalendarDays size={12} />
-                    Start
-                  </div>
-                  <div className="mt-2 text-sm text-white/72">{formatDate(match.scheduled_at, "long")}</div>
-                </div>
-                <div className="rounded-[18px] border border-white/8 bg-black/15 p-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">Model lean</div>
-                  <div className="mt-2 text-sm font-medium text-white">{predictedOutcome(match)}</div>
-                  <div className="mt-1 text-xs text-emerald-200">{match.confidence != null ? formatPercent(match.confidence / 100) : "No confidence"}</div>
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {!loading && paginated.length === 0 && (
-          <div className="mt-5 rounded-[24px] border border-dashed border-white/10 bg-white/[0.03] p-10 text-center">
-            <div className="text-xl font-semibold text-white">No matches found</div>
-            <div className="mt-2 text-sm text-white/50">Try a different sport filter or broaden your search.</div>
-          </div>
-        )}
-
-        <div className="mt-5 flex items-center justify-between gap-4 border-t border-white/8 pt-4 text-sm text-white/50">
-          <div>{filtered.length} total results · page {page} of {totalPages}</div>
-          <div className="flex items-center gap-2">
-            <button
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.04] px-4 py-2 text-white/70 transition disabled:opacity-40"
-            >
-              <ChevronLeft size={14} />
-              Prev
-            </button>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.04] px-4 py-2 text-white/70 transition disabled:opacity-40"
-            >
-              Next
-              <ChevronRight size={14} />
-            </button>
-          </div>
+      <section className="overflow-hidden rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] shadow-[0_24px_60px_rgba(0,0,0,0.2)]">
+        <div className="overflow-x-auto">
+          <table className="min-w-[980px] w-full text-left">
+            <thead className="border-b border-white/8 bg-white/[0.03]">
+              <tr className="text-[11px] uppercase tracking-[0.18em] text-white/38">
+                <th className="px-4 py-3 font-semibold">Sport</th>
+                <th className="px-4 py-3 font-semibold">Match</th>
+                <th className="px-4 py-3 font-semibold">League</th>
+                <th className="px-4 py-3 font-semibold">Start</th>
+                <th className="px-4 py-3 font-semibold">Status</th>
+                <th className="px-4 py-3 font-semibold text-right">Confidence</th>
+                <th className="px-4 py-3 font-semibold">Prediction</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-14 text-center text-sm text-white/50">
+                    No matches found for the current filters.
+                  </td>
+                </tr>
+              ) : (
+                paginated.map((match) => (
+                  <tr
+                    key={match.id}
+                    onClick={() => (window.location.href = `/sports/${match.sport}/matches/${match.id}`)}
+                    className="cursor-pointer border-b border-white/8 text-sm transition hover:bg-white/[0.04]"
+                  >
+                    <td className="px-4 py-3">
+                      <span className="inline-flex rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/58">
+                        {match.sport}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-white">{match.home_name}</div>
+                      <div className="mt-1 text-white/40">vs {match.away_name}</div>
+                    </td>
+                    <td className="px-4 py-3 text-white/64">{match.competition}</td>
+                    <td className="px-4 py-3 text-white/58">
+                      <div className="inline-flex items-center gap-2">
+                        <CalendarDays size={13} className="text-white/32" />
+                        {formatDate(match.scheduled_at, "long")}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]", statusTone(match.status))}>
+                        {match.status}
+                      </span>
+                    </td>
+                    <td className={cn("px-4 py-3 text-right font-mono font-semibold", confidenceTone(match.confidence))}>
+                      {match.confidence != null ? formatPercent(match.confidence / 100) : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-white/78">{predictedOutcome(match)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </section>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-end gap-2 px-1 text-sm text-white/58">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="rounded-full border border-white/8 bg-white/[0.04] px-4 py-2 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <span className="px-2 text-white/72">Page {page} of {totalPages}</span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="rounded-full border border-white/8 bg-white/[0.04] px-4 py-2 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   );
 }

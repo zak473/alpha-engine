@@ -48,7 +48,7 @@ export function Sidebar() {
           width: "var(--sidebar-width)",
           display: "flex",
           flexDirection: "column",
-          background: "linear-gradient(180deg,#07110d 0%,#091510 48%,#0b1712 100%)",
+          background: "linear-gradient(180deg,#08120e 0%,#0a1510 100%)",
           borderRight: "1px solid rgba(255,255,255,0.08)",
           zIndex: 40,
           transform: open ? "translateX(0)" : undefined,
@@ -57,8 +57,8 @@ export function Sidebar() {
         }}
       >
         <div className="px-4 pb-3 pt-4">
-          <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.03))] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.24)] backdrop-blur">
-            <div className="rounded-[22px] border border-emerald-300/14 bg-[radial-gradient(circle_at_top,rgba(46,219,108,0.14),transparent_70%),rgba(255,255,255,0.04)] p-4">
+          <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.24)] backdrop-blur">
+            <div className="rounded-[22px] border border-emerald-300/14 bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.20),transparent_70%),rgba(255,255,255,0.04)] p-4">
               <div className="text-[11px] uppercase tracking-[0.24em] text-emerald-200/70">Never In Doubt</div>
               <div className="mt-2 text-xl font-semibold tracking-[-0.04em] text-white">Premium betting board</div>
               <p className="mt-3 text-[12px] leading-5 text-white/58">
@@ -91,9 +91,9 @@ export function Sidebar() {
                     href={href}
                     onClick={() => setOpen(false)}
                     className="nav-link"
-                    style={active ? { background: "linear-gradient(135deg,rgba(46,219,108,0.18),rgba(46,219,108,0.08))", color: "#fff", border: "1px solid rgba(46,219,108,0.24)", boxShadow: "0 10px 24px rgba(46,219,108,0.08)" } : undefined}
+                    style={active ? { background: "linear-gradient(135deg,rgba(54,242,143,0.18),rgba(54,242,143,0.08))", color: "#fff", border: "1px solid rgba(54,242,143,0.24)", boxShadow: "0 10px 24px rgba(54,242,143,0.08)" } : { border: "1px solid transparent" }}
                   >
-                    <Icon size={15} style={{ flexShrink: 0, color: active ? "#a7f3c1" : "rgba(255,255,255,0.54)" }} />
+                    <Icon size={15} style={{ flexShrink: 0, color: active ? "#7af7b7" : "rgba(255,255,255,0.54)" }} />
                     {label}
                   </Link>
                 );
@@ -112,7 +112,7 @@ export function Sidebar() {
                     href={href}
                     onClick={() => setOpen(false)}
                     className="nav-link"
-                    style={active ? { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", color: "#fff" } : undefined}
+                    style={active ? { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", color: "#fff" } : { border: "1px solid transparent" }}
                   >
                     <Circle size={8} style={{ color, fill: color, flexShrink: 0 }} />
                     {label}
@@ -128,7 +128,7 @@ export function Sidebar() {
               href="/admin"
               onClick={() => setOpen(false)}
               className="nav-link"
-              style={isActive("/admin") ? { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", color: "#fff" } : undefined}
+              style={isActive("/admin") ? { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)", color: "#fff" } : { border: "1px solid transparent" }}
             >
               <ShieldCheck size={15} style={{ flexShrink: 0, color: "rgba(255,255,255,0.54)" }} />
               Admin
