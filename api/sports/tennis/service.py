@@ -582,12 +582,12 @@ def _h2h(db: Session, home_id: str, away_id: str, home_name: str = "", away_name
         away_lower = f"%{away_name.split()[-1].lower()}%"
         home_ids = [
             t.id for t in db.query(CoreTeam.id)
-            .filter(CoreTeam.sport == "tennis", CoreTeam.name.ilike(home_lower))
+            .filter(CoreTeam.name.ilike(home_lower))
             .all()
         ]
         away_ids = [
             t.id for t in db.query(CoreTeam.id)
-            .filter(CoreTeam.sport == "tennis", CoreTeam.name.ilike(away_lower))
+            .filter(CoreTeam.name.ilike(away_lower))
             .all()
         ]
         if home_ids and away_ids:
