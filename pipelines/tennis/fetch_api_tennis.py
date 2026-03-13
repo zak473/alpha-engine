@@ -798,7 +798,7 @@ def build_player_form(dry_run: bool = False) -> int:
 
     with Session(engine) as session:
         # Get all tennis players
-        players = session.query(CoreTeam).filter(CoreTeam.sport == "tennis").all()
+        players = session.query(CoreTeam).filter(CoreTeam.provider_id.like("apitns-player-%")).all()
         updated = 0
 
         for player in players:
