@@ -85,6 +85,14 @@ def _job_fetch_live() -> None:
     except Exception as exc:
         log.error("[scheduler] tennis api-tennis fetch failed: %s", exc, exc_info=True)
 
+    # Tennis player form (rolling stats from match history)
+    try:
+        from pipelines.tennis.fetch_api_tennis import build_player_form
+        n = build_player_form()
+        log.info("[scheduler] tennis player form: %d rows upserted.", n)
+    except Exception as exc:
+        log.error("[scheduler] tennis build_player_form failed: %s", exc, exc_info=True)
+
     # Esports
     try:
         from pipelines.esports.fetch_live import fetch_all as fetch_esports

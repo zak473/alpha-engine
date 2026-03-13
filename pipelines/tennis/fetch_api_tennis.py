@@ -259,6 +259,11 @@ def _upsert_match(session: Session, event: dict, dry_run: bool = False) -> Optio
     if not first_player or not second_player:
         return None
 
+    # Skip doubles matches (player names contain "/" indicating a pair)
+    if "/" in first_player or "/" in second_player:
+        log.debug("Skipping doubles match: %s vs %s", first_player, second_player)
+        return None
+
     event_key = str(event.get("event_key", ""))
     event_date = event.get("event_date", "")
     event_time = event.get("event_time", "")

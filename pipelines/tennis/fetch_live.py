@@ -82,6 +82,9 @@ def _transform_fixture(event: dict[str, Any], sport_title: str) -> dict[str, Any
     away = (event.get("away_team") or "").strip()
     if not home or not away:
         return None
+    # Skip doubles matches
+    if "/" in home or "/" in away:
+        return None
 
     sport_key = event.get("sport_key", "")
     event_id  = event.get("id", "")
@@ -116,6 +119,9 @@ def _transform_score_event(event: dict[str, Any], sport_title: str) -> dict[str,
     home = (event.get("home_team") or "").strip()
     away = (event.get("away_team") or "").strip()
     if not home or not away:
+        return None
+    # Skip doubles matches
+    if "/" in home or "/" in away:
         return None
 
     sport_key  = event.get("sport_key", "")
