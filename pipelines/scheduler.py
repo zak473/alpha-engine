@@ -93,32 +93,7 @@ def _job_fetch_live() -> None:
     except Exception as exc:
         log.error("[scheduler] esports fetch failed: %s", exc, exc_info=True)
 
-    # Basketball
-    try:
-        from pipelines.basketball.fetch_live import fetch_all as fetch_basketball
-        n = fetch_basketball()
-        total += n
-        log.info("[scheduler] basketball: %d rows ingested.", n)
-    except Exception as exc:
-        log.error("[scheduler] basketball fetch failed: %s", exc, exc_info=True)
-
-    # Baseball
-    try:
-        from pipelines.baseball.fetch_live import fetch_all as fetch_baseball
-        n = fetch_baseball()
-        total += n
-        log.info("[scheduler] baseball: %d rows ingested.", n)
-    except Exception as exc:
-        log.error("[scheduler] baseball fetch failed: %s", exc, exc_info=True)
-
-    # Hockey
-    try:
-        from pipelines.hockey.fetch_live import fetch_all as fetch_hockey
-        n = fetch_hockey()
-        total += n
-        log.info("[scheduler] hockey: %d rows ingested.", n)
-    except Exception as exc:
-        log.error("[scheduler] hockey fetch failed: %s", exc, exc_info=True)
+    # Basketball, Baseball, Hockey — handled by Highlightly (_job_fetch_highlightly runs every 10m)
 
     log.info("[scheduler] fetch_live done — %d total rows.", total)
 
