@@ -32,6 +32,7 @@ import { FormStreak } from "@/components/charts/FormStreak";
 import { TeamRadarChart, norm } from "@/components/charts/TeamRadarChart";
 import { ScoringTimeline } from "@/components/charts/ScoringTimeline";
 import { BaseballLivePanel } from "@/components/live/LiveMatchPanel";
+import { SportMatchHeader } from "@/components/match/SportMatchHeader";
 
 // ─── Design tokens ───────────────────────────────────────────────────────────
 const colors = {
@@ -239,17 +240,37 @@ function MatchBlock({ match }: { match: TMatch }) {
 }
 
 function BaseballMatchHeader({ match }: { match: TMatch }) {
+  const info = match.match_info;
   return (
-    <div className="bg-surface-base px-4 py-4">
-      <div className="flex items-center justify-between gap-4">
-        <TeamBlock elo={match.elo_home} name={match.home.name} form={match.form_home} isHome={true} />
-        <MatchBlock match={match} />
-        <TeamBlock elo={match.elo_away} name={match.away.name} form={match.form_away} isHome={false} />
-      </div>
-      <div className="mt-2">
-        <LineScoreInnings match={match} />
-      </div>
-    </div>
+    <SportMatchHeader
+      sport="baseball"
+      league={match.league}
+      season={null}
+      status={match.status}
+      kickoffUtc={match.kickoff_utc}
+      liveClock={match.live_clock ?? undefined}
+      home={match.home}
+      away={match.away}
+      homeScore={match.home_score}
+      awayScore={match.away_score}
+      outcome={match.outcome}
+      probabilities={match.probabilities}
+      eloHome={match.elo_home ? { rating: match.elo_home.rating, rating_change: match.elo_home.rating_change } : null}
+      eloAway={match.elo_away ? { rating: match.elo_away.rating, rating_change: match.elo_away.rating_change } : null}
+      formHome={match.form_home ? { wins: match.form_home.wins_last_5, losses: match.form_home.losses_last_5 } : null}
+      formAway={match.form_away ? { wins: match.form_away.wins_last_5, losses: match.form_away.losses_last_5 } : null}
+      venue={info?.ballpark ?? undefined}
+      homeExtras={match.starter_home ? (
+        <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-0.5 text-[10px] font-mono text-white/60">
+          SP: {match.starter_home.name}
+        </span>
+      ) : undefined}
+      awayExtras={match.starter_away ? (
+        <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-0.5 text-[10px] font-mono text-white/60">
+          SP: {match.starter_away.name}
+        </span>
+      ) : undefined}
+    />
   );
 }
 
@@ -1409,7 +1430,7 @@ export function BaseballMatchDetail({ match, eloHomeHistory, eloAwayHistory }: P
 
   return (
     <div className="match-page-shell flex flex-col max-w-[1440px] mx-auto w-full px-4 py-4">
-      <div className="match-hero-card overflow-hidden"><BaseballMatchHeader match={match} /></div>
+      <BaseballMatchHeader match={match} />
       <div className="match-kpi-strip match-kpi-strip--soft overflow-hidden"><BaseballKpiStrip match={match} /></div>
 
       {match.status === "live" && <div className="match-live-wrap px-4 pb-1"><BaseballLivePanel match={match as any} /></div>}

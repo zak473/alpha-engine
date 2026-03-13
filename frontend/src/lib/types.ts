@@ -1,6 +1,6 @@
 // ─── Core types matching FastAPI backend schemas ───────────────────────────
 
-export type Sport = "soccer" | "tennis" | "esports" | "basketball" | "baseball";
+export type Sport = "soccer" | "tennis" | "esports" | "basketball" | "baseball" | "hockey";
 
 export interface PredictionResponse {
   match_id: string;

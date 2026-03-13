@@ -31,6 +31,7 @@ import { colors, chartDefaults } from "@/lib/tokens";
 import { FormStreak } from "@/components/charts/FormStreak";
 import { TeamRadarChart, norm } from "@/components/charts/TeamRadarChart";
 import { EsportsLivePanel } from "@/components/live/LiveMatchPanel";
+import { SportMatchHeader } from "@/components/match/SportMatchHeader";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -352,107 +353,31 @@ function CenterBlock({ match }: { match: EsportsMatch }) {
 
 function EsportsMatchHeader({ match }: { match: EsportsMatch }) {
   const info = match.match_info;
-  const isLive = match.status === "live";
-  const isFinished = match.status === "finished";
-
   return (
-    <div className="overflow-hidden rounded-[34px] border border-[#1f2a22] bg-[#111315] text-white shadow-[0_24px_70px_rgba(0,0,0,0.24)]">
-      <div className="border-b border-white/[0.08] px-5 py-4 md:px-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <Link
-            href="/sports/esports/matches"
-            className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3.5 py-1.5 text-xs font-medium text-white/75 transition hover:bg-white/[0.08] hover:text-white"
-          >
-            <ArrowLeft size={13} />
-            Esports Matches
-          </Link>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {info?.game_type && (
-              <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/60">
-                {gameLabel(info.game_type)}
-              </span>
-            )}
-            {info?.series_format && (
-              <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/60">
-                {info.series_format.toUpperCase()}
-              </span>
-            )}
-            <StatusBadge status={match.status} />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-5 px-5 py-6 md:grid-cols-[1fr_340px_1fr] md:items-center md:px-6 md:py-7">
-        <TeamBlock match={match} side="home" />
-
-        <div className="flex flex-col items-center justify-center rounded-[30px] border border-white/10 bg-white/[0.05] px-6 py-6 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-          {isLive && (
-            <span className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#bbf7d0]/40 bg-[#22c55e]/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#86efac]">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#22c55e] opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#22c55e]" />
-              </span>
-              Live
-            </span>
-          )}
-
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-5xl font-bold tabular-nums text-white md:text-6xl">
-              {match.home_score ?? "—"}
-            </span>
-            <span className="font-mono text-2xl text-white/25">:</span>
-            <span className="font-mono text-5xl font-bold tabular-nums text-white md:text-6xl">
-              {match.away_score ?? "—"}
-            </span>
-          </div>
-
-          {isFinished && (
-            <span className="mt-4 inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">
-              Final
-            </span>
-          )}
-
-          {match.probabilities && (
-            <div className="mt-5 w-full max-w-[230px]">
-              <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-                Series win probabilities
-              </div>
-              <div className="flex h-2 w-full overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full bg-[#2edb6c]"
-                  style={{ width: `${Math.round(match.probabilities.home_win * 100)}%` }}
-                />
-                <div
-                  className="h-full bg-[#8b5cf6]"
-                  style={{ width: `${Math.round(match.probabilities.away_win * 100)}%` }}
-                />
-              </div>
-              <div className="mt-2 flex justify-between font-mono text-[11px] font-semibold tabular-nums">
-                <span className="text-[#86efac]">{Math.round(match.probabilities.home_win * 100)}%</span>
-                <span className="text-[#c4b5fd]">{Math.round(match.probabilities.away_win * 100)}%</span>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-5 flex flex-col items-center gap-1 text-center">
-            <span className="flex items-center gap-1 text-[11px] text-white/55">
-              <Calendar size={12} />
-              {fmtDate(match.kickoff_utc)}
-            </span>
-            <span className="flex items-center gap-1 text-[11px] text-white/55">
-              <Clock size={12} />
-              {fmtTime(match.kickoff_utc)}
-            </span>
-            <span className="text-[11px] text-white/55">
-              {info?.is_lan ? "LAN event" : "Online match"}
-            </span>
-          </div>
-        </div>
-
-        <TeamBlock match={match} side="away" />
-      </div>
-    </div>
+    <SportMatchHeader
+      sport="esports"
+      league={match.league}
+      season={null}
+      status={match.status}
+      kickoffUtc={match.kickoff_utc}
+      liveClock={match.live_clock ?? undefined}
+      home={match.home}
+      away={match.away}
+      homeScore={match.home_score}
+      awayScore={match.away_score}
+      outcome={match.outcome}
+      probabilities={match.probabilities}
+      eloHome={match.elo_home ? { rating: match.elo_home.overall_rating, rating_change: match.elo_home.rating_change } : null}
+      eloAway={match.elo_away ? { rating: match.elo_away.overall_rating, rating_change: match.elo_away.rating_change } : null}
+      formHome={null}
+      formAway={null}
+      venue={undefined}
+      centerExtras={info?.series_format ? (
+        <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/60">
+          {info.series_format.toUpperCase()}{info.game_type ? ` · ${info.game_type.toUpperCase()}` : ""}
+        </span>
+      ) : undefined}
+    />
   );
 }
 
@@ -1634,7 +1559,7 @@ export function EsportsMatchDetail({ match, eloHomeHistory, eloAwayHistory }: Pr
 
   return (
     <div className="match-page-shell match-page-shell--contained">
-      <div className="match-hero-card overflow-hidden"><EsportsMatchHeader match={match} /></div>
+      <EsportsMatchHeader match={match} />
       <div className="match-kpi-strip match-kpi-strip--soft overflow-hidden"><EsportsKpiStrip match={match} /></div>
 
       {match.status === "live" && <div className="match-live-wrap px-1"><EsportsLivePanel match={match as any} /></div>}

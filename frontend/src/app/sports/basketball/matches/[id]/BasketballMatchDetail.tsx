@@ -31,6 +31,7 @@ import type {
 } from "@/lib/types";
 import { FormStreak } from "@/components/charts/FormStreak";
 import { BasketballLivePanel } from "@/components/live/LiveMatchPanel";
+import { SportMatchHeader } from "@/components/match/SportMatchHeader";
 import { TeamRadarChart, norm } from "@/components/charts/TeamRadarChart";
 import { ScoringTimeline } from "@/components/charts/ScoringTimeline";
 import { BasketballCourtSVG } from "@/components/charts/BasketballCourtSVG";
@@ -249,16 +250,36 @@ function MatchBlock({ match }: { match: TMatch }) {
 
 function BasketballMatchHeader({ match }: { match: TMatch }) {
   return (
-    <div className="bg-surface-base px-4 py-4">
-      <div className="flex items-center justify-between gap-4">
-        <TeamBlock elo={match.elo_home} name={match.home.name} form={match.form_home} isHome={true} />
-        <MatchBlock match={match} />
-        <TeamBlock elo={match.elo_away} name={match.away.name} form={match.form_away} isHome={false} />
-      </div>
-      <div className="mt-2">
-        <ScoreByQuarter match={match} />
-      </div>
-    </div>
+    <SportMatchHeader
+      sport="basketball"
+      league={match.league}
+      season={null}
+      status={match.status}
+      kickoffUtc={match.kickoff_utc}
+      liveClock={match.live_clock ?? undefined}
+      home={match.home}
+      away={match.away}
+      homeScore={match.home_score}
+      awayScore={match.away_score}
+      outcome={match.outcome}
+      probabilities={match.probabilities}
+      eloHome={match.elo_home ? { rating: match.elo_home.rating, rating_change: match.elo_home.rating_change } : null}
+      eloAway={match.elo_away ? { rating: match.elo_away.rating, rating_change: match.elo_away.rating_change } : null}
+      formHome={match.form_home ? {
+        last_5: match.form_home.last_5?.map(g => ({ result: g.result })),
+        days_rest: match.form_home.days_rest,
+        back_to_back: match.form_home.back_to_back,
+        injury_count: match.form_home.injury_count,
+      } : null}
+      formAway={match.form_away ? {
+        last_5: match.form_away.last_5?.map(g => ({ result: g.result })),
+        days_rest: match.form_away.days_rest,
+        back_to_back: match.form_away.back_to_back,
+        injury_count: match.form_away.injury_count,
+      } : null}
+      venue={match.match_info?.arena}
+      centerExtras={<ScoreByQuarter match={match} />}
+    />
   );
 }
 
@@ -1404,7 +1425,7 @@ export function BasketballMatchDetail({ match, eloHomeHistory, eloAwayHistory }:
 
   return (
     <div className="match-page-shell flex flex-col max-w-[1440px] mx-auto w-full px-4 py-4">
-      <div className="match-hero-card overflow-hidden"><BasketballMatchHeader match={match} /></div>
+      <BasketballMatchHeader match={match} />
       <div className="match-kpi-strip match-kpi-strip--soft overflow-hidden"><BasketballKpiStrip match={match} /></div>
 
       {match.status === "live" && <div className="match-live-wrap px-4 pb-1"><BasketballLivePanel match={match} /></div>}

@@ -27,6 +27,7 @@ import { FormStreak } from "@/components/charts/FormStreak";
 import { TeamRadarChart, norm } from "@/components/charts/TeamRadarChart";
 import { ScoringTimeline } from "@/components/charts/ScoringTimeline";
 import { TennisLivePanel } from "@/components/live/LiveMatchPanel";
+import { SportMatchHeader } from "@/components/match/SportMatchHeader";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -432,37 +433,32 @@ function MatchBlock({ match }: { match: TennisMatch }) {
 // ─── 3-Col Match Header ───────────────────────────────────────────────────────
 
 function TennisMatchHeader({ match }: { match: TennisMatch }) {
+  const info = match.tennis_info;
   return (
-    <div className="overflow-hidden">
-      <div className="flex items-center gap-2 px-5 pt-4 pb-0">
-        <Link href="/sports/tennis/matches" className="inline-flex items-center gap-1 text-2xs text-t3 hover:text-t1 transition-colors">
-          <ArrowLeft size={12} />
-          Tennis Matches
-        </Link>
-      </div>
-
-      <div className="match-hero-shell">
-        <PlayerBlock
-          name={match.home.name}
-          isHome
-          elo={match.elo_home}
-          form={match.form_home}
-          info={match.tennis_info}
-          side="home"
-          profile={match.profile_home}
-        />
-        <MatchBlock match={match} />
-        <PlayerBlock
-          name={match.away.name}
-          isHome={false}
-          elo={match.elo_away}
-          form={match.form_away}
-          info={match.tennis_info}
-          side="away"
-          profile={match.profile_away}
-        />
-      </div>
-    </div>
+    <SportMatchHeader
+      sport="tennis"
+      league={match.league}
+      season={null}
+      status={match.status}
+      kickoffUtc={match.kickoff_utc}
+      liveClock={match.live_clock ?? undefined}
+      home={match.home}
+      away={match.away}
+      homeScore={match.home_score}
+      awayScore={match.away_score}
+      outcome={match.outcome}
+      probabilities={match.probabilities}
+      eloHome={match.elo_home ? { rating: match.elo_home.surface_rating ?? match.elo_home.overall_rating, rating_change: match.elo_home.rating_change } : null}
+      eloAway={match.elo_away ? { rating: match.elo_away.surface_rating ?? match.elo_away.overall_rating, rating_change: match.elo_away.rating_change } : null}
+      formHome={null}
+      formAway={null}
+      venue={info?.surface ?? undefined}
+      centerExtras={info?.surface ? (
+        <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/60">
+          {info.surface}
+        </span>
+      ) : undefined}
+    />
   );
 }
 
@@ -1827,7 +1823,7 @@ export function TennisMatchDetail({ match, eloHomeOverall, eloAwayOverall, eloHo
 
   return (
     <div className="match-page-shell match-page-shell--contained">
-      <div className="match-hero-card overflow-hidden"><TennisMatchHeader match={match} /></div>
+      <TennisMatchHeader match={match} />
       <div className="match-kpi-strip match-kpi-strip--soft overflow-hidden"><TennisKpiStrip match={match} /></div>
 
       {match.status === "live" && <div className="match-live-wrap px-1"><TennisLivePanel match={match as any} /></div>}

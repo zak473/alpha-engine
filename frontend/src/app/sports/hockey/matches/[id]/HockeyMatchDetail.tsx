@@ -14,6 +14,7 @@ import {
   Legend,
 } from "recharts";
 import { cn } from "@/lib/utils";
+import { SportMatchHeader } from "@/components/match/SportMatchHeader";
 import type {
   HockeyMatchDetail as TMatch,
   HockeyEloPanelOut,
@@ -550,32 +551,26 @@ export function HockeyMatchDetail({ match: initialMatch, eloHomeHistory, eloAway
     <div className="max-w-6xl mx-auto p-4 space-y-4">
 
       {/* ── Header card ── */}
-      <PanelCard>
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] uppercase tracking-widest text-text-subtle">{match.league}</span>
-          {match.season && <span className="text-[10px] text-text-subtle">{match.season}</span>}
-        </div>
-        <div className="grid grid-cols-3 items-center gap-2 py-2">
-          <TeamBlock elo={match.elo_home} name={match.home.name} form={match.form_home} isHome />
-          <MatchBlock match={match} />
-          <div className="flex justify-end">
-            <TeamBlock elo={match.elo_away} name={match.away.name} form={match.form_away} isHome={false} />
-          </div>
-        </div>
-        {(match.home_periods || match.away_periods) && (
-          <div className="mt-3 pt-3 border-t border-surface-border/40">
-            <PeriodScoreTable match={match} />
-          </div>
-        )}
-        {isFinished && match.outcome && (
-          <div className="mt-2 pt-2 border-t border-surface-border/40 text-center text-xs text-text-subtle">
-            Result: <span className="text-text-muted font-semibold">{outcomeLabel(match.outcome)}</span>
-          </div>
-        )}
-        {match.context?.venue_name && (
-          <div className="mt-1 text-center text-[10px] text-text-subtle">{match.context.venue_name}</div>
-        )}
-      </PanelCard>
+      <SportMatchHeader
+        sport="hockey"
+        league={match.league}
+        season={match.season}
+        status={match.status}
+        kickoffUtc={match.kickoff_utc}
+        liveClock={match.live_clock ?? undefined}
+        home={match.home}
+        away={match.away}
+        homeScore={match.home_score}
+        awayScore={match.away_score}
+        outcome={match.outcome}
+        probabilities={match.probabilities}
+        eloHome={match.elo_home ? { rating: match.elo_home.rating, rating_change: match.elo_home.rating_change } : null}
+        eloAway={match.elo_away ? { rating: match.elo_away.rating, rating_change: match.elo_away.rating_change } : null}
+        formHome={match.form_home ? { wins: match.form_home.wins, draws: match.form_home.draws, losses: match.form_home.losses } : null}
+        formAway={match.form_away ? { wins: match.form_away.wins, draws: match.form_away.draws, losses: match.form_away.losses } : null}
+        venue={match.context?.venue_name ?? undefined}
+        centerExtras={(match.home_periods || match.away_periods) ? <PeriodScoreTable match={match} /> : undefined}
+      />
 
       {/* ── Main content ── */}
       <SideGrid>
