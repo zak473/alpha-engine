@@ -466,7 +466,7 @@ def run_year(
 
 def run(
     start_year: int = 2015,
-    end_year: int = 2024,
+    end_year: int = 2025,
     dry_run: bool = False,
     box_scores: bool = True,
 ) -> int:

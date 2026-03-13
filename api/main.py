@@ -499,6 +499,81 @@ def trigger_rebuild_soccer_features():
     return {"status": "started", "note": "Rebuilding feat_soccer_match. Check logs for progress."}
 
 
+@app.post("/api/v1/admin/rebuild-basketball-data", tags=["Health"])
+def trigger_rebuild_basketball_data():
+    """Full basketball data rebuild: backfill_history (NBA 2015-2025) → backfill_elo."""
+    import threading as _th
+    def _run():
+        try:
+            from pipelines.basketball.backfill_history import run as bh_run
+            n = bh_run()
+            logger.info("[basketball-rebuild] backfill_history: %d matches.", n)
+            from pipelines.basketball.backfill_elo import run_backfill as elo_run
+            elo_run()
+            logger.info("[basketball-rebuild] backfill_elo done.")
+        except Exception as exc:
+            logger.error("[basketball-rebuild] failed: %s", exc, exc_info=True)
+    _th.Thread(target=_run, daemon=True, name="basketball-rebuild").start()
+    return {"status": "started", "note": "Basketball data rebuild running. Check Railway logs."}
+
+
+@app.post("/api/v1/admin/rebuild-baseball-data", tags=["Health"])
+def trigger_rebuild_baseball_data():
+    """Full baseball data rebuild: backfill_history (MLB 2015-2025) → backfill_elo."""
+    import threading as _th
+    def _run():
+        try:
+            from pipelines.baseball.backfill_history import run as bh_run
+            n = bh_run()
+            logger.info("[baseball-rebuild] backfill_history: %d matches.", n)
+            from pipelines.baseball.backfill_elo import run_backfill as elo_run
+            elo_run()
+            logger.info("[baseball-rebuild] backfill_elo done.")
+        except Exception as exc:
+            logger.error("[baseball-rebuild] failed: %s", exc, exc_info=True)
+    _th.Thread(target=_run, daemon=True, name="baseball-rebuild").start()
+    return {"status": "started", "note": "Baseball data rebuild running. Check Railway logs."}
+
+
+@app.post("/api/v1/admin/rebuild-esports-data", tags=["Health"])
+def trigger_rebuild_esports_data():
+    """Full esports data rebuild: backfill_history (PandaScore) → backfill_elo."""
+    import threading as _th
+    def _run():
+        try:
+            from pipelines.esports.backfill_history import run as bh_run
+            n = bh_run()
+            logger.info("[esports-rebuild] backfill_history: %d matches.", n)
+            from pipelines.esports.backfill_elo import run_backfill as elo_run
+            elo_run()
+            logger.info("[esports-rebuild] backfill_elo done.")
+        except Exception as exc:
+            logger.error("[esports-rebuild] failed: %s", exc, exc_info=True)
+    _th.Thread(target=_run, daemon=True, name="esports-rebuild").start()
+    return {"status": "started", "note": "Esports data rebuild running. Check Railway logs."}
+
+
+@app.post("/api/v1/admin/rebuild-soccer-data", tags=["Health"])
+def trigger_rebuild_soccer_data():
+    """Full soccer data rebuild: highlightly history → backfill_elo → build_soccer_features."""
+    import threading as _th
+    def _run():
+        try:
+            from pipelines.highlightly.fetch_all import fetch_historical
+            n = fetch_historical(days_back=730)
+            logger.info("[soccer-rebuild] highlightly history: %d rows.", n)
+            from pipelines.soccer.backfill_elo import run_backfill as elo_run
+            elo_run()
+            logger.info("[soccer-rebuild] backfill_elo done.")
+            from pipelines.soccer.build_soccer_features import run as feat_run
+            n2 = feat_run()
+            logger.info("[soccer-rebuild] build_soccer_features: %d rows.", n2)
+        except Exception as exc:
+            logger.error("[soccer-rebuild] failed: %s", exc, exc_info=True)
+    _th.Thread(target=_run, daemon=True, name="soccer-rebuild").start()
+    return {"status": "started", "note": "Soccer data rebuild running. Check Railway logs."}
+
+
 @app.get("/ready", tags=["Health"])
 def readiness_check(db: Session = Depends(get_db)):
     """

@@ -378,7 +378,7 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--start-season", default="2015-16",
                         help="First season to backfill e.g. '2015-16'")
-    parser.add_argument("--end-season",   default="2023-24",
+    parser.add_argument("--end-season",   default="2024-25",
                         help="Last season to backfill e.g. '2023-24'")
     parser.add_argument("--no-box-scores", dest="box_scores", action="store_false",
                         help="Skip fetching box score stats for each game")
