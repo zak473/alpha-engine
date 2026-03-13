@@ -177,7 +177,7 @@ function PredictionCard({ pred }: { pred: MvpPrediction }) {
       className={cn(
         "group rounded-[28px] border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300/25 hover:shadow-[0_24px_60px_rgba(0,0,0,0.26)]",
         isLive
-          ? "bg-[linear-gradient(180deg,rgba(12,28,20,0.98),rgba(8,18,14,0.98))] border-emerald-400/20"
+          ? "bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))] border-emerald-400/30"
           : "bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] border-white/8"
       )}
     >

@@ -82,7 +82,7 @@ function MatchTile({ match }: { match: LiveMatchOut }) {
       className={cn(
         "group rounded-[28px] border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300/25 hover:shadow-[0_24px_60px_rgba(0,0,0,0.26)] lg:p-5",
         isLive
-          ? "bg-[linear-gradient(180deg,rgba(12,28,20,0.98),rgba(8,18,14,0.98))] border-emerald-400/20"
+          ? "bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))] border-emerald-400/30"
           : "bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] border-white/8"
       )}
     >
@@ -293,7 +293,7 @@ export function LiveView({ initialMatches }: { initialMatches: LiveMatchOut[] })
       ) : (
         <div className="mt-4 grid gap-6">
           {/* Live */}
-          <section className="rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,rgba(10,21,16,0.98),rgba(8,18,14,0.98))] p-5 lg:p-6">
+          <section className="rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))] p-5 lg:p-6">
             <SectionHeader title="Live priority" meta={`${filteredLive.length} ${SPORT_LABELS[activeSport] ?? activeSport} matches in play`} accent />
             {filteredLive.length ? (
               <div className="grid gap-4 xl:grid-cols-2">

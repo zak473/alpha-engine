@@ -117,7 +117,7 @@ export function StickyFilterBar({
     <div
       className="sticky top-0 z-20 border-b flex-shrink-0"
       style={{
-        background: "rgba(9,18,14,0.95)",
+        background: "rgba(8,18,14,0.80)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
         borderColor: "var(--border0)",
