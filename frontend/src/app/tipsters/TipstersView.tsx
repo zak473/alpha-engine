@@ -111,9 +111,9 @@ function TipsterModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
-      <div className="w-full max-w-lg rounded-2xl overflow-hidden flex flex-col" style={{ background: "#f8faf7", border: "1px solid var(--border0)", maxHeight: "85vh" }}>
+      <div className="w-full max-w-lg rounded-2xl overflow-hidden flex flex-col" style={{ background: "rgba(8,18,14,0.97)", border: "1px solid var(--border0)", maxHeight: "85vh" }}>
         {/* Header */}
-        <div className="flex items-center gap-4 px-6 py-5 border-b" style={{ borderColor: "var(--border0)", background: "#fff" }}>
+        <div className="flex items-center gap-4 px-6 py-5 border-b" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.04)" }}>
           <div className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold text-white flex-shrink-0" style={{ background: color }}>
             {initials(tipster.username)}
           </div>
@@ -150,7 +150,7 @@ function TipsterModal({
             { label: "Won", value: String(tipster.won_picks) },
             { label: "Active tips", value: String(tipster.active_tips_count) },
           ].map(({ label, value }) => (
-            <div key={label} className="py-3 text-center" style={{ background: "#fff" }}>
+            <div key={label} className="py-3 text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
               <p className="text-[9px] uppercase tracking-wider text-text-muted mb-0.5">{label}</p>
               <p className="text-sm font-bold text-text-primary">{value}</p>
             </div>
@@ -158,7 +158,7 @@ function TipsterModal({
         </div>
 
         {/* Recent form */}
-        <div className="px-6 py-3 border-b flex items-center gap-2" style={{ borderColor: "var(--border0)", background: "#fff" }}>
+        <div className="px-6 py-3 border-b flex items-center gap-2" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.04)" }}>
           <span className="text-[10px] uppercase tracking-wider text-text-muted mr-1">Recent</span>
           {tipster.recent_results.map((r, i) => <ResultBadge key={i} result={r} />)}
         </div>
@@ -217,7 +217,7 @@ function PostTipModal({ onClose, onPosted }: { onClose: () => void; onPosted: ()
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
-      <div className="w-full max-w-md rounded-2xl p-6 flex flex-col gap-4" style={{ background: "#fff", border: "1px solid var(--border0)" }}>
+      <div className="w-full max-w-md rounded-2xl p-6 flex flex-col gap-4" style={{ background: "rgba(8,18,14,0.97)", border: "1px solid var(--border0)" }}>
         <div className="flex items-center justify-between">
           <h2 className="text-base font-bold text-text-primary">Post a Tip</h2>
           <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-text-primary"><X size={16} /></button>
@@ -300,7 +300,7 @@ function TipsterCard({
   return (
     <div
       className="rounded-2xl border flex flex-col overflow-hidden transition-all duration-150 hover:shadow-md cursor-pointer"
-      style={{ background: "#fff", borderColor: "var(--border0)" }}
+      style={{ background: "rgba(255,255,255,0.04)", borderColor: "var(--border0)" }}
       onClick={onOpen}
     >
       {/* Top section */}

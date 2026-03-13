@@ -2016,7 +2016,7 @@ export function SoccerMatchDetail({ match, eloHome, eloAway }: MatchProps) {
   const highlights = match.highlights ?? [];
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-screen-2xl flex-col gap-4 bg-[#09090b] px-3 py-4 md:px-4 md:py-5">
+    <div className="mx-auto flex min-h-screen w-full max-w-screen-2xl flex-col gap-4 px-3 py-4 md:px-4 md:py-5">
       <MatchHeader match={match} />
       <KpiStrip2Row match={match} />
       {match.status === "live" && (
@@ -2031,8 +2031,8 @@ export function SoccerMatchDetail({ match, eloHome, eloAway }: MatchProps) {
               <button key={t.id} onClick={() => setActiveTab(t.id)}
                 className={cn("shrink-0 rounded-full px-4 py-2.5 text-[12px] font-semibold transition-all",
                   activeTab === t.id
-                    ? "bg-white/[0.04] text-white shadow-sm"
-                    : "border border-transparent bg-white/[0.04] text-white/50 hover:border-white/8 hover:bg-white/[0.04] hover:text-white"
+                    ? "bg-[#2edb6c] text-[#07110d] shadow-sm"
+                    : "text-white/60 hover:bg-white/[0.06] hover:text-white"
                 )}>{t.label}</button>
             ))}
           </div>

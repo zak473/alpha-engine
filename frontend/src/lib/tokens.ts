@@ -1,20 +1,20 @@
 /**
- * Never In Doubt — Flat White Hybrid design tokens
+ * Alpha Engine — Dark Glass design tokens
  */
 
 export const colors = {
-  bg0:      "#f6f8f4",
-  bg1:      "#ffffff",
-  bg2:      "#eef2eb",
-  text0:    "#111315",
-  text1:    "#667066",
-  text2:    "#95a093",
-  border0:  "#d8e0d4",
-  border1:  "#c6d3c1",
+  bg0:      "#08120e",
+  bg1:      "rgba(255,255,255,0.04)",
+  bg2:      "rgba(255,255,255,0.06)",
+  text0:    "#ffffff",
+  text1:    "rgba(255,255,255,0.60)",
+  text2:    "rgba(255,255,255,0.38)",
+  border0:  "rgba(255,255,255,0.08)",
+  border1:  "rgba(255,255,255,0.12)",
   accent:   "#2edb6c",
-  positive: "#1d9a4d",
-  negative: "#d94b61",
-  warning:  "#d6a23d",
+  positive: "#36f28f",
+  negative: "#ef4444",
+  warning:  "#f59e0b",
   info:     "#64748b",
   soccer:     "#2edb6c",
   tennis:     "#22c55e",
@@ -22,20 +22,20 @@ export const colors = {
   basketball: "#f59e0b",
   baseball:   "#ef4444",
 
-  surfaceBase:    "#f6f8f4",
-  surfaceRaised:  "#ffffff",
-  surfaceOverlay: "#eef2eb",
-  surfaceBorder:  "#d8e0d4",
-  textPrimary:    "#111315",
-  textMuted:      "#667066",
-  textSubtle:     "#95a093",
-  accentGreen:    "#1d9a4d",
-  accentRed:      "#d94b61",
+  surfaceBase:    "#08120e",
+  surfaceRaised:  "rgba(255,255,255,0.04)",
+  surfaceOverlay: "rgba(255,255,255,0.06)",
+  surfaceBorder:  "rgba(255,255,255,0.08)",
+  textPrimary:    "#ffffff",
+  textMuted:      "rgba(255,255,255,0.60)",
+  textSubtle:     "rgba(255,255,255,0.38)",
+  accentGreen:    "#36f28f",
+  accentRed:      "#ef4444",
   accentBlue:     "#64748b",
-  accentAmber:    "#d6a23d",
+  accentAmber:    "#f59e0b",
   accentPurple:   "#8b5cf6",
   accentTeal:     "#2edb6c",
-  accentGold:     "#d6a23d",
+  accentGold:     "#f59e0b",
 } as const;
 
 export type ColorToken = keyof typeof colors;
@@ -44,7 +44,7 @@ export const radius = { sm: 6, md: 10 } as const;
 export const chartDefaults = {
   axis: {
     tick: {
-      fill: colors.text1,
+      fill: "rgba(255,255,255,0.38)",
       fontSize: 10,
       fontFamily: "'JetBrains Mono', monospace",
     },
@@ -52,23 +52,23 @@ export const chartDefaults = {
     tickLine: false,
   },
   yAxisWidth: 38,
-  cursor: { fill: "rgba(29,154,77,0.06)" },
+  cursor: { fill: "rgba(54,242,143,0.06)" },
   grid: {
-    stroke: colors.border0,
+    stroke: "rgba(255,255,255,0.08)",
     strokeDasharray: "2 4",
   },
   tooltip: {
     contentStyle: {
-      background: colors.bg1,
-      border: `1px solid ${colors.border1}`,
+      background: "#0d1f17",
+      border: "1px solid rgba(255,255,255,0.12)",
       borderRadius: radius.md,
       fontSize: 11,
       fontFamily: "'JetBrains Mono', monospace",
       padding: "6px 10px",
     },
-    labelStyle:  { color: colors.text1, marginBottom: 4, fontSize: 10 },
-    itemStyle:   { color: colors.text0, padding: 0 },
-    cursor:      { fill: "rgba(29,154,77,0.06)" },
+    labelStyle:  { color: "rgba(255,255,255,0.60)", marginBottom: 4, fontSize: 10 },
+    itemStyle:   { color: "#ffffff", padding: 0 },
+    cursor:      { fill: "rgba(54,242,143,0.06)" },
   },
 } as const;
 
