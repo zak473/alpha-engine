@@ -243,9 +243,7 @@ async def lifespan(app: FastAPI):
 
     # ── API key health report ──────────────────────────────────────────────
     KEY_MAP = {
-        "FOOTBALL_DATA_API_KEY": ("Soccer fixtures/results",     settings.FOOTBALL_DATA_API_KEY),
-        "TENNIS_API_KEY":        ("Tennis fixtures (Odds API)",   settings.TENNIS_API_KEY),
-        "TENNIS_LIVE_API_KEY":   ("Tennis live scores",           settings.TENNIS_LIVE_API_KEY),
+        "TENNIS_LIVE_API_KEY":   ("Tennis live scores (api-tennis.com)", settings.TENNIS_LIVE_API_KEY),
         "ESPORTS_API_KEY":       ("Esports (PandaScore)",         settings.ESPORTS_API_KEY),
         "ODDS_API_KEY":          ("Real market odds + auto-pick", settings.ODDS_API_KEY),
         "HIGHLIGHTLY_API_KEY":   ("Highlightly (soccer/basketball/baseball/hockey)", settings.HIGHLIGHTLY_API_KEY),
@@ -276,11 +274,6 @@ async def lifespan(app: FastAPI):
         from pipelines.scheduler import start as start_scheduler
         start_scheduler()
         logger.info("Background data scheduler started.")
-        if not settings.FOOTBALL_DATA_API_KEY:
-            logger.info(
-                "FOOTBALL_DATA_API_KEY not set — football-data.org soccer feed disabled. "
-                "Using Highlightly + other configured APIs instead."
-            )
     else:
         logger.info("Scheduler disabled via SCHEDULER_ENABLED=false.")
     yield

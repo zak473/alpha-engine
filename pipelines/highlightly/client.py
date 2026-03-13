@@ -22,12 +22,18 @@ H2H endpoint renamed:  headtohead    → head-2-head
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from typing import Any
 
 import httpx
 
 from config.settings import settings
+
+# Global semaphore: only 1 Highlightly request in-flight at a time across all threads.
+# Prevents the burst of parallel requests that triggers 429s on startup.
+_HL_LOCK = threading.Semaphore(1)
+_HL_REQUEST_INTERVAL = 1.2  # minimum seconds between requests
 
 log = logging.getLogger(__name__)
 
@@ -67,28 +73,31 @@ def _prefix(sport: str) -> str:
 # ── Core HTTP ─────────────────────────────────────────────────────────────────
 
 def get(path: str, params: dict | None = None, timeout: int = 15) -> dict[str, Any]:
-    """GET {BASE_URL}/{path}. Handles 429 with one retry."""
+    """GET {BASE_URL}/{path}. Serialized via global semaphore; handles 429 with one retry."""
     if not settings.HIGHLIGHTLY_API_KEY:
         raise RuntimeError("HIGHLIGHTLY_API_KEY is not set")
     url = f"{BASE_URL}/{path.lstrip('/')}"
-    resp = httpx.get(url, params=params or {}, headers=_headers(), timeout=timeout)
 
-    if resp.status_code == 401:
-        raise RuntimeError(
-            f"Highlightly 401 Unauthorized — check HIGHLIGHTLY_API_KEY. URL: {url}"
-        )
-    if resp.status_code == 403:
-        raise RuntimeError(
-            f"Highlightly 403 Forbidden — plan may not include this endpoint. URL: {url}"
-        )
-    if resp.status_code == 429:
-        retry_after = int(resp.headers.get("retry-after", 60))
-        log.warning("[highlightly] 429 on %s — retrying after %ds", url, retry_after)
-        time.sleep(retry_after)
+    with _HL_LOCK:
         resp = httpx.get(url, params=params or {}, headers=_headers(), timeout=timeout)
 
-    resp.raise_for_status()
-    return resp.json()
+        if resp.status_code == 401:
+            raise RuntimeError(
+                f"Highlightly 401 Unauthorized — check HIGHLIGHTLY_API_KEY. URL: {url}"
+            )
+        if resp.status_code == 403:
+            raise RuntimeError(
+                f"Highlightly 403 Forbidden — plan may not include this endpoint. URL: {url}"
+            )
+        if resp.status_code == 429:
+            retry_after = int(resp.headers.get("retry-after", 60))
+            log.warning("[highlightly] 429 on %s — retrying after %ds", url, retry_after)
+            time.sleep(retry_after)
+            resp = httpx.get(url, params=params or {}, headers=_headers(), timeout=timeout)
+
+        resp.raise_for_status()
+        time.sleep(_HL_REQUEST_INTERVAL)  # pace requests to avoid bursts
+        return resp.json()
 
 
 def _payload(data: dict[str, Any]) -> Any:
