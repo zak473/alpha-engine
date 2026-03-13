@@ -67,16 +67,7 @@ def _job_fetch_live() -> None:
     except Exception as exc:
         log.error("[scheduler] soccer fetch failed: %s", exc, exc_info=True)
 
-    # Tennis (The Odds API for basic fixtures)
-    try:
-        from pipelines.tennis.fetch_live import fetch_all as fetch_tennis
-        n = fetch_tennis()
-        total += n
-        log.info("[scheduler] tennis (odds): %d rows ingested.", n)
-    except Exception as exc:
-        log.error("[scheduler] tennis fetch failed: %s", exc, exc_info=True)
-
-    # Tennis (api-tennis.com: set scores + serve stats)
+    # Tennis (api-tennis.com: fixtures + live scores + set scores + serve stats)
     try:
         from pipelines.tennis.fetch_api_tennis import fetch_all as fetch_tennis_deep
         n = fetch_tennis_deep()
