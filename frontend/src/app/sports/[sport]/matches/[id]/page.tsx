@@ -4,7 +4,7 @@ import type { SportSlug } from "@/lib/api";
 import { MatchDetailShell } from "./MatchDetailShell";
 import { notFound } from "next/navigation";
 
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 const VALID_SPORTS: SportSlug[] = ["soccer", "tennis", "esports", "basketball", "baseball", "hockey"];
 

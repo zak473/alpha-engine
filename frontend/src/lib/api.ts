@@ -75,7 +75,7 @@ function getAuthHeaders(): Record<string, string> {
 
 async function request<T>(
   path: string,
-  options?: { revalidate?: number; retries?: number }
+  options?: { retries?: number }
 ): Promise<T> {
   const maxRetries = options?.retries ?? 2;
   let lastError: Error = new Error("Request failed");
@@ -83,7 +83,7 @@ async function request<T>(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const res = await fetch(`${BASE}${path}`, {
-        next: { revalidate: options?.revalidate ?? 30 },
+        cache: "no-store",   // never cache — auth responses are user-specific
         headers: getAuthHeaders(),
       });
 
@@ -114,7 +114,7 @@ async function request<T>(
 // ─── Health + Readiness ───────────────────────────────────────────────────
 
 export async function getHealth(): Promise<{ status: string; env: string }> {
-  const res = await fetch(`${API_ORIGIN}/health`, { next: { revalidate: 10 } });
+  const res = await fetch(`${API_ORIGIN}/health`, { cache: "no-store" });
   if (!res.ok) throw new ApiError("Health check failed", res.status, "/health");
   return res.json();
 }
@@ -248,11 +248,11 @@ export async function getChallenges(params?: {
   if (params?.mine) qs.set("mine", "true");
   if (params?.visibility) qs.set("visibility", params.visibility);
   const suffix = qs.toString() ? `?${qs}` : "";
-  return request<Challenge[]>(`/challenges${suffix}`, { revalidate: 0 });
+  return request<Challenge[]>(`/challenges${suffix}`);
 }
 
 export async function getChallenge(id: string): Promise<Challenge> {
-  return request<Challenge>(`/challenges/${id}`, { revalidate: 0 });
+  return request<Challenge>(`/challenges/${id}`);
 }
 
 export async function createChallenge(data: ChallengeCreate): Promise<Challenge> {
@@ -287,11 +287,11 @@ export async function getChallengeEntries(
   if (params?.page) qs.set("page", String(params.page));
   if (params?.page_size) qs.set("page_size", String(params.page_size));
   const suffix = qs.toString() ? `?${qs}` : "";
-  return request<EntryFeedPage>(`/challenges/${id}/entries${suffix}`, { revalidate: 0 });
+  return request<EntryFeedPage>(`/challenges/${id}/entries${suffix}`);
 }
 
 export async function getLeaderboard(id: string): Promise<LeaderboardOut> {
-  return request<LeaderboardOut>(`/challenges/${id}/leaderboard`, { revalidate: 0 });
+  return request<LeaderboardOut>(`/challenges/${id}/leaderboard`);
 }
 
 // ─── Sport-specific match endpoints ──────────────────────────────────────
@@ -318,8 +318,7 @@ export async function getSportMatches(
   if (params?.offset)    qs.set("offset",    String(params.offset));
   const suffix = qs.toString() ? `?${qs}` : "";
   return request<{ items: SportMatchListItem[]; total: number; sport: string }>(
-    `/sports/${sport}/matches${suffix}`,
-    { revalidate: 30 }
+    `/sports/${sport}/matches${suffix}`
   );
 }
 
@@ -327,11 +326,11 @@ export async function getSportMatchDetail(
   sport: SportSlug,
   matchId: string
 ): Promise<SportMatchDetail> {
-  return request<SportMatchDetail>(`/sports/${sport}/matches/${matchId}`, { revalidate: 30 });
+  return request<SportMatchDetail>(`/sports/${sport}/matches/${matchId}`);
 }
 
 export async function getEsportsMatchDetail(matchId: string): Promise<EsportsMatchDetail> {
-  return request<EsportsMatchDetail>(`/sports/esports/matches/${matchId}`, { revalidate: 30 });
+  return request<EsportsMatchDetail>(`/sports/esports/matches/${matchId}`);
 }
 
 export async function getEsportsTeamEloHistory(
@@ -341,14 +340,14 @@ export async function getEsportsTeamEloHistory(
 ): Promise<Array<{ date: string; rating: number; match_id?: string | null }>> {
   try {
     const qs = mapName ? `?map_name=${mapName}&limit=${limit}` : `?limit=${limit}`;
-    return await request(`/sports/esports/teams/${teamId}/elo-history${qs}`, { revalidate: 60 });
+    return await request(`/sports/esports/teams/${teamId}/elo-history${qs}`);
   } catch {
     return [];
   }
 }
 
 export async function getTennisMatchDetail(matchId: string): Promise<TennisMatchDetail> {
-  return request<TennisMatchDetail>(`/sports/tennis/matches/${matchId}`, { revalidate: 30 });
+  return request<TennisMatchDetail>(`/sports/tennis/matches/${matchId}`);
 }
 
 export async function getTennisPlayerEloHistory(
@@ -358,7 +357,7 @@ export async function getTennisPlayerEloHistory(
 ): Promise<Array<{ date: string; rating: number; match_id?: string | null }>> {
   try {
     const qs = surface ? `?surface=${surface}&limit=${limit}` : `?limit=${limit}`;
-    return await request(`/sports/tennis/players/${playerId}/elo-history${qs}`, { revalidate: 60 });
+    return await request(`/sports/tennis/players/${playerId}/elo-history${qs}`);
   } catch {
     return [];
   }
@@ -369,14 +368,14 @@ export async function getSoccerTeamEloHistory(
   limit = 30
 ): Promise<Array<{ date: string; rating: number; match_id?: string | null }>> {
   try {
-    return await request(`/sports/soccer/teams/${teamId}/elo-history?limit=${limit}`, { revalidate: 60 });
+    return await request(`/sports/soccer/teams/${teamId}/elo-history?limit=${limit}`);
   } catch {
     return [];
   }
 }
 
 export async function getBasketballMatchDetail(matchId: string): Promise<BasketballMatchDetail> {
-  return request<BasketballMatchDetail>(`/sports/basketball/matches/${matchId}`, { revalidate: 30 });
+  return request<BasketballMatchDetail>(`/sports/basketball/matches/${matchId}`);
 }
 
 export async function getBasketballTeamEloHistory(
@@ -384,14 +383,14 @@ export async function getBasketballTeamEloHistory(
   limit = 30
 ): Promise<Array<{ date: string; rating: number; match_id?: string | null }>> {
   try {
-    return await request(`/sports/basketball/teams/${teamId}/elo-history?limit=${limit}`, { revalidate: 60 });
+    return await request(`/sports/basketball/teams/${teamId}/elo-history?limit=${limit}`);
   } catch {
     return [];
   }
 }
 
 export async function getBaseballMatchDetail(matchId: string): Promise<BaseballMatchDetail> {
-  return request<BaseballMatchDetail>(`/sports/baseball/matches/${matchId}`, { revalidate: 30 });
+  return request<BaseballMatchDetail>(`/sports/baseball/matches/${matchId}`);
 }
 
 export async function getBaseballTeamEloHistory(
@@ -399,14 +398,14 @@ export async function getBaseballTeamEloHistory(
   limit = 30
 ): Promise<Array<{ date: string; rating: number; match_id?: string | null }>> {
   try {
-    return await request(`/sports/baseball/teams/${teamId}/elo-history?limit=${limit}`, { revalidate: 60 });
+    return await request(`/sports/baseball/teams/${teamId}/elo-history?limit=${limit}`);
   } catch {
     return [];
   }
 }
 
 export async function getHockeyMatchDetail(matchId: string): Promise<HockeyMatchDetail> {
-  return request<HockeyMatchDetail>(`/sports/hockey/matches/${matchId}`, { revalidate: 30 });
+  return request<HockeyMatchDetail>(`/sports/hockey/matches/${matchId}`);
 }
 
 export async function getHockeyTeamEloHistory(
@@ -414,7 +413,7 @@ export async function getHockeyTeamEloHistory(
   limit = 30
 ): Promise<Array<{ date: string; rating: number; match_id?: string | null }>> {
   try {
-    return await request(`/sports/hockey/teams/${teamId}/elo-history?limit=${limit}`, { revalidate: 60 });
+    return await request(`/sports/hockey/teams/${teamId}/elo-history?limit=${limit}`);
   } catch {
     return [];
   }
@@ -440,7 +439,7 @@ export interface LiveMatchOut {
 }
 
 export async function getLiveMatches(): Promise<LiveMatchOut[]> {
-  return request<LiveMatchOut[]>("/matches/live", { revalidate: 15 });
+  return request<LiveMatchOut[]>("/matches/live");
 }
 
 // ─── Picks / Record ───────────────────────────────────────────────────────
@@ -617,7 +616,7 @@ export async function triggerSync(): Promise<{ status: string; note: string }> {
 }
 
 export async function getEloMovers(limit = 10): Promise<RatingEntry[]> {
-  return request(`/sports/elo-movers?limit=${limit}`, { revalidate: 300 });
+  return request(`/sports/elo-movers?limit=${limit}`);
 }
 
 // ─── Picks ROI series ─────────────────────────────────────────────────────
@@ -670,7 +669,7 @@ export async function runBacktest(params?: {
   if (params?.staking)  qs.set("staking",  params.staking);
   if (params?.min_edge !== undefined) qs.set("min_edge", String(params.min_edge));
   const suffix = qs.toString() ? `?${qs}` : "";
-  return request<BacktestRunResult>(`/backtest/run${suffix}`, { revalidate: 300 });
+  return request<BacktestRunResult>(`/backtest/run${suffix}`);
 }
 
 // ─── Edge utility ─────────────────────────────────────────────────────────
@@ -698,7 +697,7 @@ export interface SearchResult {
 export async function searchMatches(q: string, limit = 10): Promise<SearchResult[]> {
   if (!q || q.trim().length < 2) return [];
   const qs = new URLSearchParams({ q: q.trim(), limit: String(limit) });
-  return request<SearchResult[]>(`/matches/search?${qs}`, { revalidate: 0 });
+  return request<SearchResult[]>(`/matches/search?${qs}`);
 }
 
 // ─── Prediction accuracy ──────────────────────────────────────────────────
@@ -712,7 +711,7 @@ export interface PredictionAccuracy {
 
 export async function getPredictionAccuracy(sport?: string): Promise<PredictionAccuracy> {
   const qs = sport ? `?sport=${sport}` : "";
-  return request<PredictionAccuracy>(`/predictions/accuracy${qs}`, { revalidate: 300 });
+  return request<PredictionAccuracy>(`/predictions/accuracy${qs}`);
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────
@@ -728,11 +727,11 @@ export interface Notification {
 }
 
 export async function getNotifications(limit = 50): Promise<Notification[]> {
-  return request(`/notifications?limit=${limit}`, { revalidate: 0 });
+  return request(`/notifications?limit=${limit}`);
 }
 
 export async function getUnreadNotificationCount(): Promise<number> {
-  const r = await request<{ count: number }>(`/notifications/unread-count`, { revalidate: 0 });
+  const r = await request<{ count: number }>(`/notifications/unread-count`);
   return r.count;
 }
 
@@ -752,12 +751,12 @@ export async function updateProfile(data: { display_name?: string; current_passw
 
 export async function getStandingsBySport(sport: string, season?: string): Promise<StandingsResponse[]> {
   const suffix = season ? `?season=${encodeURIComponent(season)}` : "";
-  return request<StandingsResponse[]>(`/standings/${sport}${suffix}`, { revalidate: 300 });
+  return request<StandingsResponse[]>(`/standings/${sport}${suffix}`);
 }
 
 export async function getStandingsForMatch(matchId: string): Promise<StandingsResponse | null> {
   try {
-    return await request<StandingsResponse>(`/standings/match/${matchId}`, { revalidate: 300 });
+    return await request<StandingsResponse>(`/standings/match/${matchId}`);
   } catch {
     return null;
   }

@@ -3,7 +3,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { getBasketballMatchDetail, getBasketballTeamEloHistory } from "@/lib/api";
 import { BasketballMatchDetail } from "./BasketballMatchDetail";
 
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 interface Props {
   params: { id: string };

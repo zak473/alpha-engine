@@ -4,7 +4,7 @@ import { getPredictions } from "@/lib/api";
 import { mvpToMatch } from "@/lib/transforms";
 import type { Match } from "@/lib/types";
 
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 export default async function MatchesPage() {
   let matches: Match[];

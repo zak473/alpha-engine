@@ -18,7 +18,7 @@ import { notFound } from "next/navigation";
 import type { MvpPrediction, SimBucket } from "@/lib/types";
 import { BarChart2, Clock, Trophy } from "lucide-react";
 
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 /* ── Reusable card primitives ───────────────────────────────────────────── */
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {

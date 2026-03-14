@@ -7,7 +7,7 @@ import { getHealth, getReady, getPerformance, runBacktest, type BacktestRunResul
 import type { MvpModelMetrics } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 const API_ENDPOINTS = [
   "GET /soccer/predictions/:id",

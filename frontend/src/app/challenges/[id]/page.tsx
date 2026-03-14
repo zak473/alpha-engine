@@ -4,7 +4,7 @@ import { getChallenge, getLeaderboard, getChallengeEntries } from "@/lib/api";
 import type { Challenge, EntryFeedPage, LeaderboardOut } from "@/lib/types";
 import { ChallengeDetailClient } from "./ChallengeDetailClient";
 
-export const revalidate = 0;
+export const dynamic = "force-dynamic";
 
 interface Props {
   params: { id: string };

@@ -3,7 +3,7 @@ import { getLiveMatches } from "@/lib/api";
 import type { LiveMatchOut } from "@/lib/api";
 import { LiveView } from "./LiveView";
 
-export const revalidate = 15;
+export const dynamic = "force-dynamic";
 
 export default async function LivePage() {
   let matches: LiveMatchOut[] = [];
