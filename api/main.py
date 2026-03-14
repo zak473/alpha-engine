@@ -198,27 +198,6 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Startup baseball backfill check failed: %s", exc)
 
-    # Esports — PandaScore history → ELO
-    if settings.ESPORTS_API_KEY:
-        try:
-            _esports_finished = _sport_count("esports")
-            if _esports_finished < 500:
-                logger.info("Startup: %d finished esports matches — triggering PandaScore backfill.", _esports_finished)
-                def _run_esports_backfill():
-                    try:
-                        from pipelines.esports.backfill_history import run as bh_run
-                        n = bh_run()
-                        logger.info("Startup: esports backfill complete (%d matches).", n)
-                        from pipelines.esports.backfill_elo import run_backfill as _elo
-                        _elo()
-                        logger.info("Startup: esports ELO backfill complete.")
-                    except Exception as _exc:
-                        logger.error("Startup esports backfill failed: %s", _exc, exc_info=True)
-                _th.Thread(target=_run_esports_backfill, daemon=True, name="esports-history").start()
-            else:
-                logger.info("Startup: %d finished esports matches — skipping backfill.", _esports_finished)
-        except Exception as exc:
-            logger.warning("Startup esports backfill check failed: %s", exc)
 
     # Hockey — NHL stats API (free, no key) + ELO + train model
     try:
@@ -244,7 +223,7 @@ async def lifespan(app: FastAPI):
     # ── API key health report ──────────────────────────────────────────────
     KEY_MAP = {
         "TENNIS_LIVE_API_KEY":   ("Tennis live scores (api-tennis.com)", settings.TENNIS_LIVE_API_KEY),
-        "ESPORTS_API_KEY":       ("Esports (PandaScore)",         settings.ESPORTS_API_KEY),
+
         "ODDS_API_KEY":          ("Real market odds + auto-pick", settings.ODDS_API_KEY),
         "HIGHLIGHTLY_API_KEY":   ("Highlightly (soccer/basketball/baseball/hockey)", settings.HIGHLIGHTLY_API_KEY),
     }
@@ -633,13 +612,10 @@ def trigger_rebuild_baseball_data():
 
 @app.post("/api/v1/admin/rebuild-esports-data", tags=["Admin"], dependencies=[Depends(get_current_user)])
 def trigger_rebuild_esports_data():
-    """Full esports data rebuild: backfill_history (PandaScore) → backfill_elo."""
+    """Esports ELO backfill (recalculates ratings from existing match history)."""
     import threading as _th
     def _run():
         try:
-            from pipelines.esports.backfill_history import run as bh_run
-            n = bh_run()
-            logger.info("[esports-rebuild] backfill_history: %d matches.", n)
             from pipelines.esports.backfill_elo import run_backfill as elo_run
             elo_run()
             logger.info("[esports-rebuild] backfill_elo done.")

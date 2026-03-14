@@ -29,7 +29,6 @@ services:
       - ENV=development
       - FOOTBALL_DATA_API_KEY=${FOOTBALL_DATA_API_KEY:-}
       - TENNIS_API_KEY=${TENNIS_API_KEY:-}
-      - ESPORTS_API_KEY=${ESPORTS_API_KEY:-}
       - SCHEDULER_ENABLED=${SCHEDULER_ENABLED:-true}
     volumes:
       - .:/app

@@ -33,10 +33,6 @@ class Settings(BaseSettings):
     # Register at https://api-tennis.com → get API key
     TENNIS_LIVE_API_KEY: str = ""
 
-    # Live data — PandaScore (free tier, esports: CS2/LoL/Dota2/Valorant)
-    # Register at https://pandascore.co → Dashboard → API token
-    ESPORTS_API_KEY: str = ""
-
     # Real market odds — The Odds API (free tier: 500 req/month)
     # Register at https://the-odds-api.com → Get API Key
     ODDS_API_KEY: str = ""

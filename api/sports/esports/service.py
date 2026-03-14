@@ -372,7 +372,7 @@ class EsportsMatchService(BaseMatchListService):
             log.warning("esports_map_data_failed match=%s err=%s", match_id, exc)
             db.rollback()
 
-        # Try HLTV scraped data (CS2 only) if no PandaScore data
+        # Try HLTV scraped data (CS2 only) if no map data
         if not has_real_data and game_type in ("cs2", "valorant"):
             try:
                 hltv = db.query(HltvMatchStats).filter_by(core_match_id=match_id).first()
