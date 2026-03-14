@@ -6,22 +6,31 @@ function bdlHeaders(): Record<string, string> {
   return { Authorization: process.env.BALLDONTLIE_API_KEY ?? "" };
 }
 
-export async function GET(req: NextRequest) {
-  const datesParam = req.nextUrl.searchParams.get("dates"); // "2026-03-14,2026-03-13"
-  const today = new Date().toISOString().split("T")[0];
-  const dates = datesParam ? datesParam.split(",") : [today];
-
-  const qs = new URLSearchParams();
-  dates.forEach((d) => qs.append("dates[]", d));
-  qs.set("per_page", "100");
-
+export async function GET(_req: NextRequest) {
   try {
-    const res = await fetch(`${BDL_BASE}/matches?${qs}`, {
-      headers: bdlHeaders(),
-      cache: "no-store",
-    });
-    if (!res.ok) return NextResponse.json({ data: [], meta: {} }, { status: res.status });
-    return NextResponse.json(await res.json());
+    // Fetch live + upcoming matches in parallel; dates[] filter is not supported by this API
+    const [runningRes, upcomingRes, finishedRes] = await Promise.all([
+      fetch(`${BDL_BASE}/matches?status=running&per_page=50`, {
+        headers: bdlHeaders(),
+        cache: "no-store",
+      }),
+      fetch(`${BDL_BASE}/matches?status=upcoming&per_page=50`, {
+        headers: bdlHeaders(),
+        cache: "no-store",
+      }),
+      fetch(`${BDL_BASE}/matches?status=finished&per_page=20`, {
+        headers: bdlHeaders(),
+        cache: "no-store",
+      }),
+    ]);
+
+    const running = runningRes.ok ? (await runningRes.json()).data ?? [] : [];
+    const upcoming = upcomingRes.ok ? (await upcomingRes.json()).data ?? [] : [];
+    const finished = finishedRes.ok ? (await finishedRes.json()).data ?? [] : [];
+
+    const all = [...running, ...upcoming, ...finished];
+
+    return NextResponse.json({ data: all, meta: { total: all.length } });
   } catch {
     return NextResponse.json({ data: [], meta: {} }, { status: 500 });
   }
