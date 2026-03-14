@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   }
   try {
     const res = await fetch(
-      `${BDL_BASE}/nba/plays?game_id=${gameId}&per_page=50`,
+      `${BDL_BASE}/plays?game_id=${gameId}&per_page=50`,
       { headers: bdlHeaders(), cache: "no-store" }
     );
     if (!res.ok) {

@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     new Date().toISOString().split("T")[0];
   try {
     const res = await fetch(
-      `${BDL_BASE}/nba/games?dates[]=${date}&per_page=100`,
+      `${BDL_BASE}/games?dates[]=${date}&per_page=100`,
       { headers: bdlHeaders(), cache: "no-store" }
     );
     if (!res.ok) {

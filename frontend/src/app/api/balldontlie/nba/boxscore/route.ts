@@ -12,9 +12,9 @@ export async function GET(req: NextRequest) {
 
   let url: string;
   if (gameId) {
-    url = `${BDL_BASE}/nba/box_scores?game_ids[]=${gameId}`;
+    url = `${BDL_BASE}/box_scores?game_ids[]=${gameId}`;
   } else if (date) {
-    url = `${BDL_BASE}/nba/box_scores?date=${date}`;
+    url = `${BDL_BASE}/box_scores?date=${date}`;
   } else {
     return NextResponse.json({ error: "game_id or date required" }, { status: 400 });
   }

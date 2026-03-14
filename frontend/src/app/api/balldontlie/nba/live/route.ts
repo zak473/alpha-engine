@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     req.nextUrl.searchParams.get("date") ??
     new Date().toISOString().split("T")[0];
   try {
-    const res = await fetch(`${BDL_BASE}/nba/live_box_scores?date=${date}`, {
+    const res = await fetch(`${BDL_BASE}/box_scores/live?date=${date}`, {
       headers: bdlHeaders(),
       cache: "no-store",
     });

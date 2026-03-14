@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BDL_BASE = "https://api.balldontlie.io/v1";
+const BDL_BASE = "https://api.balldontlie.io/cs/v1";
 
 function bdlHeaders(): Record<string, string> {
   return { Authorization: process.env.BALLDONTLIE_API_KEY ?? "" };
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   qs.set("per_page", "100");
 
   try {
-    const res = await fetch(`${BDL_BASE}/cs2/match_maps?${qs}`, {
+    const res = await fetch(`${BDL_BASE}/match_maps?${qs}`, {
       headers: bdlHeaders(),
       cache: "no-store",
     });
