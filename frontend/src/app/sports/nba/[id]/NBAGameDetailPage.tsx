@@ -120,7 +120,7 @@ interface BdlPlayerProp {
   bookmaker: string;
 }
 
-type TabId = "overview" | "boxscore" | "plays" | "teamstats" | "odds" | "h2h" | "trends" | "injuries";
+type TabId = "overview" | "boxscore" | "plays" | "teamstats" | "odds" | "h2h" | "injuries";
 type PlayFilter = "all" | "scoring" | "fouls" | "turnovers";
 
 // ─── Micro-components ─────────────────────────────────────────────────────────
@@ -688,7 +688,6 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: "teamstats", label: "Team Stats", icon: <TrendingUp className="h-3.5 w-3.5" /> },
   { id: "odds", label: "Odds", icon: <Target className="h-3.5 w-3.5" /> },
   { id: "h2h", label: "H2H", icon: <Crosshair className="h-3.5 w-3.5" /> },
-  { id: "trends", label: "Trends", icon: <Zap className="h-3.5 w-3.5" /> },
   { id: "injuries", label: "Injuries", icon: <Shield className="h-3.5 w-3.5" /> },
 ];
 
@@ -1853,54 +1852,51 @@ export function NBAGameDetailPage({ gameId }: { gameId: string }) {
   const [odds, setOdds] = useState<BdlOdds[]>([]);
   const [injuries, setInjuries] = useState<BdlInjury[]>([]);
   const [standings, setStandings] = useState<BdlStanding[]>([]);
-  const [homeGames, setHomeGames] = useState<BdlGame[]>([]);
-  const [awayGames, setAwayGames] = useState<BdlGame[]>([]);
   const [h2hGames, setH2hGames] = useState<BdlGame[]>([]);
-  const [advancedStats, setAdvancedStats] = useState<BdlAdvancedStat[]>([]);
-  const [playerProps, setPlayerProps] = useState<BdlPlayerProp[]>([]);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [loading, setLoading] = useState(true);
-  const [secondaryLoading, setSecondaryLoading] = useState(false);
+  const [h2hLoading, setH2hLoading] = useState(false);
+  const [injuriesLoading, setInjuriesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState(new Date());
   const [playFilter, setPlayFilter] = useState<PlayFilter>("all");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const secondaryFetchedRef = useRef(false);
+  const h2hFetchedRef = useRef(false);
+  const injuriesFetchedRef = useRef(false);
 
   const game = boxScore?.game ?? fallbackGame ?? null;
   const live = game != null && isGameLive(game.status);
 
-  const fetchPrimary = useCallback(async (quiet = false) => {
+  // Single bundle fetch — 5 BDL requests max, all cached server-side
+  const fetchBundle = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
     else setSyncing(true);
     try {
-      const [bsRes, plRes, gameRes] = await Promise.all([
-        fetch(`/api/balldontlie/nba/boxscore?game_id=${gameId}`, { cache: "no-store" }),
-        fetch(`/api/balldontlie/nba/plays?game_id=${gameId}`, { cache: "no-store" }),
-        fetch(`/api/balldontlie/nba/game/${gameId}`, { cache: "no-store" }),
-      ]);
-      if (bsRes.ok) {
-        const bsJson = await bsRes.json() as { data: BdlBoxScore[] };
-        setBoxScore(bsJson.data?.[0] ?? null);
+      const res = await fetch(`/api/balldontlie/nba/game-bundle/${gameId}`, { cache: "no-store" });
+      if (!res.ok) {
+        if (!quiet) setError(`Failed to load game (${res.status})`);
+        return;
       }
-      if (plRes.ok) {
-        const plJson = await plRes.json() as { data: BdlPlay[] };
-        setPlays(plJson.data ?? []);
+      const j = await res.json() as {
+        game: BdlGame | null;
+        boxScore: BdlBoxScore | null;
+        plays: BdlPlay[];
+        standings: BdlStanding[];
+        odds: BdlOdds[];
+      };
+      if (j.boxScore) setBoxScore(j.boxScore);
+      if (j.game) setFallbackGame(j.game);
+      if (!j.game && !j.boxScore && !quiet) {
+        setError("Game not found");
+        return;
       }
-      // Always fetch basic game data as fallback when box scores require higher tier
-      if (gameRes.ok) {
-        const gJson = await gameRes.json();
-        // BDL returns { data: {...} } for single resources, but handle flat object too
-        const gameData: BdlGame = gJson.data ?? gJson;
-        if (gameData?.id) setFallbackGame(gameData);
-      } else if (!quiet) {
-        const errText = await gameRes.text().catch(() => "");
-        setError(`Game fetch failed (${gameRes.status})${errText ? `: ${errText.slice(0, 80)}` : ""}`);
-      }
+      setPlays(j.plays ?? []);
+      setStandings(j.standings ?? []);
+      setOdds(j.odds ?? []);
       setLastSynced(new Date());
-      if (!quiet && gameRes.ok) setError(null);
-    } catch (e) {
+      if (!quiet) setError(null);
+    } catch {
       if (!quiet) setError("Failed to load game data.");
     } finally {
       if (!quiet) setLoading(false);
@@ -1908,93 +1904,64 @@ export function NBAGameDetailPage({ gameId }: { gameId: string }) {
     }
   }, [gameId]);
 
-  const fetchSecondary = useCallback(async (homeId: number, awayId: number, gId: number) => {
-    setSecondaryLoading(true);
+  // Lazy H2H fetch — only fires when H2H tab is clicked (1 BDL request, cached 10 min)
+  const fetchH2H = useCallback(async (homeId: number, awayId: number) => {
+    if (h2hFetchedRef.current) return;
+    h2hFetchedRef.current = true;
+    setH2hLoading(true);
     try {
-      const [oddsRes, injRes, standRes, hGamesRes, aGamesRes, h2hRes, advRes, propsRes] = await Promise.all([
-        fetch(`/api/balldontlie/nba/odds?game_id=${gId}`, { cache: "no-store" }),
-        fetch(`/api/balldontlie/nba/injuries?team_ids=${homeId},${awayId}`, { cache: "no-store" }),
-        fetch(`/api/balldontlie/nba/standings?season=2024`, { cache: "no-store" }),
-        fetch(`/api/balldontlie/nba/team-games?team_id=${homeId}&season=2024`, { cache: "no-store" }),
-        fetch(`/api/balldontlie/nba/team-games?team_id=${awayId}&season=2024`, { cache: "no-store" }),
-        fetch(`/api/balldontlie/nba/h2h-games?team1_id=${homeId}&team2_id=${awayId}`, { cache: "no-store" }),
-        fetch(`/api/balldontlie/nba/advanced-stats?game_id=${gId}`, { cache: "no-store" }),
-        fetch(`/api/balldontlie/nba/player-props?game_id=${gId}`, { cache: "no-store" }),
-      ]);
-
-      if (oddsRes.ok) {
-        const j = await oddsRes.json() as { data: BdlOdds[] };
-        setOdds(j.data ?? []);
-      }
-      if (injRes.ok) {
-        const j = await injRes.json() as { data: BdlInjury[] };
-        setInjuries(j.data ?? []);
-      }
-      if (standRes.ok) {
-        const j = await standRes.json() as { data: BdlStanding[] };
-        setStandings(j.data ?? []);
-      }
-      if (hGamesRes.ok) {
-        const j = await hGamesRes.json() as { data: BdlGame[] };
-        setHomeGames(j.data ?? []);
-      }
-      if (aGamesRes.ok) {
-        const j = await aGamesRes.json() as { data: BdlGame[] };
-        setAwayGames(j.data ?? []);
-      }
-      if (h2hRes.ok) {
-        const j = await h2hRes.json() as { data: BdlGame[] };
+      const res = await fetch(`/api/balldontlie/nba/h2h-games?team1_id=${homeId}&team2_id=${awayId}`);
+      if (res.ok) {
+        const j = await res.json() as { data: BdlGame[] };
         setH2hGames(j.data ?? []);
       }
-      if (advRes.ok) {
-        const j = await advRes.json() as { data: BdlAdvancedStat[] };
-        setAdvancedStats(j.data ?? []);
-      }
-      if (propsRes.ok) {
-        const j = await propsRes.json() as { data: BdlPlayerProp[] };
-        setPlayerProps(j.data ?? []);
+    } finally {
+      setH2hLoading(false);
+    }
+  }, []);
+
+  // Lazy Injuries fetch — only fires when Injuries tab is clicked (1 BDL request, cached 2 min)
+  const fetchInjuries = useCallback(async (homeId: number, awayId: number) => {
+    if (injuriesFetchedRef.current) return;
+    injuriesFetchedRef.current = true;
+    setInjuriesLoading(true);
+    try {
+      const res = await fetch(`/api/balldontlie/nba/injuries?team_ids=${homeId},${awayId}`);
+      if (res.ok) {
+        const j = await res.json() as { data: BdlInjury[] };
+        setInjuries(j.data ?? []);
       }
     } finally {
-      setSecondaryLoading(false);
+      setInjuriesLoading(false);
     }
   }, []);
 
   // Initial load
   useEffect(() => {
-    fetchPrimary(false);
-  }, [fetchPrimary]);
+    fetchBundle(false);
+  }, [fetchBundle]);
 
-  // Trigger secondary fetch from ANY game data — boxScore or fallback
-  // Delay 500ms to avoid bursting the BDL rate limit alongside the primary fetch
-  useEffect(() => {
-    if (secondaryFetchedRef.current) return;
-    const g = boxScore?.game ?? fallbackGame;
-    if (!g) return;
-    secondaryFetchedRef.current = true;
-    const timer = setTimeout(() => {
-      fetchSecondary(g.home_team.id, g.visitor_team.id, g.id);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [boxScore, fallbackGame, fetchSecondary]);
-
-  // Live polling
+  // Live polling — every 60s (respects 5 RPM limit)
   useEffect(() => {
     if (live) {
-      intervalRef.current = setInterval(() => {
-        fetchPrimary(true);
-      }, 30000);
+      intervalRef.current = setInterval(() => fetchBundle(true), 60000);
     }
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [live, fetchPrimary]);
+  }, [live, fetchBundle]);
+
+  // Trigger lazy fetches when tabs are clicked
+  const handleTabChange = useCallback((tab: TabId) => {
+    setActiveTab(tab);
+    if (!game) return;
+    if (tab === "h2h") fetchH2H(game.home_team.id, game.visitor_team.id);
+    if (tab === "injuries") fetchInjuries(game.home_team.id, game.visitor_team.id);
+  }, [game, fetchH2H, fetchInjuries]);
 
   const handleRefresh = useCallback(() => {
-    fetchPrimary(true);
-    if (game) {
-      fetchSecondary(game.home_team.id, game.visitor_team.id, game.id);
-    }
-  }, [fetchPrimary, fetchSecondary, game]);
+    fetchBundle(true);
+  }, [fetchBundle]);
 
   if (loading) {
     return (
@@ -2011,7 +1978,7 @@ export function NBAGameDetailPage({ gameId }: { gameId: string }) {
         <AlertCircle className="h-8 w-8" />
         <span className="text-sm">{error ?? "Game not found"}</span>
         <button
-          onClick={() => fetchPrimary(false)}
+          onClick={() => fetchBundle(false)}
           className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/60 transition-colors hover:bg-white/[0.08]"
         >
           <RefreshCw className="h-4 w-4" />
@@ -2035,7 +2002,7 @@ export function NBAGameDetailPage({ gameId }: { gameId: string }) {
       />
 
       {/* Tab bar */}
-      <TabBar active={activeTab} onChange={setActiveTab} live={live} />
+      <TabBar active={activeTab} onChange={handleTabChange} live={live} />
 
       {/* Tab content */}
       <div>
@@ -2045,11 +2012,11 @@ export function NBAGameDetailPage({ gameId }: { gameId: string }) {
             boxScore={boxScore}
             plays={plays}
             odds={odds}
-            homeGames={homeGames}
-            awayGames={awayGames}
+            homeGames={[]}
+            awayGames={[]}
             h2hGames={h2hGames}
             injuries={injuries}
-            secondaryLoading={secondaryLoading}
+            secondaryLoading={false}
           />
         )}
         {activeTab === "boxscore" && <BoxScoreTab boxScore={boxScore} />}
@@ -2062,30 +2029,21 @@ export function NBAGameDetailPage({ gameId }: { gameId: string }) {
           />
         )}
         {activeTab === "teamstats" && (
-          <TeamStatsTab game={game} boxScore={boxScore} advancedStats={advancedStats} />
+          <TeamStatsTab game={game} boxScore={boxScore} advancedStats={[]} />
         )}
         {activeTab === "odds" && (
           <OddsTab
             game={game}
             odds={odds}
-            playerProps={playerProps}
-            loading={secondaryLoading}
+            playerProps={[]}
+            loading={false}
           />
         )}
         {activeTab === "h2h" && (
-          <H2HTab game={game} h2hGames={h2hGames} loading={secondaryLoading} />
-        )}
-        {activeTab === "trends" && (
-          <TrendsTab
-            game={game}
-            homeGames={homeGames}
-            awayGames={awayGames}
-            standings={standings}
-            loading={secondaryLoading}
-          />
+          <H2HTab game={game} h2hGames={h2hGames} loading={h2hLoading} />
         )}
         {activeTab === "injuries" && (
-          <InjuriesTab game={game} injuries={injuries} loading={secondaryLoading} />
+          <InjuriesTab game={game} injuries={injuries} loading={injuriesLoading} />
         )}
       </div>
     </div>
