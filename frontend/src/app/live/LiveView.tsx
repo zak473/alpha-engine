@@ -785,7 +785,12 @@ export function LiveView({ initialMatches }: { initialMatches: LiveMatchOut[] })
         {activeSport === "basketball" ? (
           <NBASection />
         ) : activeSport === "esports" ? (
-          <CS2Section />
+          <>
+            <GenericSportSection activeSport="esports" matches={matches} />
+            <div className="mt-6">
+              <CS2Section />
+            </div>
+          </>
         ) : matches.length === 0 ? (
           <div className="mt-2 flex min-h-[280px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.025] p-8 text-center">
             <Radio size={26} className="text-white/30" />
