@@ -41,6 +41,7 @@ const SPORT_LABELS: Record<string, string> = {
   hockey: "Hockey",
   tennis: "Tennis",
   esports: "Esports",
+  cs2bdl: "CSGO (BallDontLie)",
 };
 
 const SPORT_ICONS: Record<string, string> = {
@@ -50,9 +51,10 @@ const SPORT_ICONS: Record<string, string> = {
   hockey: "🏒",
   tennis: "🎾",
   esports: "🎮",
+  cs2bdl: "🔫",
 };
 
-const ALL_SPORTS = ["basketball", "soccer", "tennis", "baseball", "hockey", "esports"] as const;
+const ALL_SPORTS = ["basketball", "soccer", "tennis", "baseball", "hockey", "esports", "cs2bdl"] as const;
 
 // ─── Shared micro-components ──────────────────────────────────────────────
 
@@ -703,7 +705,7 @@ export function LiveView({ initialMatches }: { initialMatches: LiveMatchOut[] })
             const count = sport === "basketball" ? nbaGameCount : (sportCounts[sport] ?? 0);
             const liveCount =
               sport === "basketball" ? 0 : allLive.filter((m) => m.sport === sport).length;
-            const isBdl = sport === "basketball" || sport === "esports";
+            const isBdl = sport === "basketball" || sport === "esports" || sport === "cs2bdl";
 
             return (
               <button
@@ -779,11 +781,21 @@ export function LiveView({ initialMatches }: { initialMatches: LiveMatchOut[] })
           </p>
         </div>
       )}
+      {activeSport === "cs2bdl" && (
+        <div className="mt-3 flex items-center gap-2.5 rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.05] px-4 py-3">
+          <Zap size={13} className="shrink-0 text-emerald-300" />
+          <p className="text-[12px] text-emerald-200/80">
+            <span className="font-semibold text-emerald-200">BallDontLie GOAT only</span> — isolated CS2 feed, no other data sources. Use this tab to verify the BallDontLie API is working correctly.
+          </p>
+        </div>
+      )}
 
       {/* Content area */}
       <div className="mt-4">
         {activeSport === "basketball" ? (
           <NBASection />
+        ) : activeSport === "cs2bdl" ? (
+          <CS2Section />
         ) : activeSport === "esports" ? (
           <>
             <GenericSportSection activeSport="esports" matches={matches} />
