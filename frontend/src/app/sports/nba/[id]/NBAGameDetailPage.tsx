@@ -1842,6 +1842,7 @@ function InjuriesTab({
 
 export function NBAGameDetailPage({ gameId }: { gameId: string }) {
   const [boxScore, setBoxScore] = useState<BdlBoxScore | null>(null);
+  const [fallbackGame, setFallbackGame] = useState<BdlGame | null>(null);
   const [plays, setPlays] = useState<BdlPlay[]>([]);
   const [odds, setOdds] = useState<BdlOdds[]>([]);
   const [injuries, setInjuries] = useState<BdlInjury[]>([]);
@@ -1860,16 +1861,17 @@ export function NBAGameDetailPage({ gameId }: { gameId: string }) {
   const [playFilter, setPlayFilter] = useState<PlayFilter>("all");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const game = boxScore?.game ?? null;
+  const game = boxScore?.game ?? fallbackGame ?? null;
   const live = game != null && isGameLive(game.status);
 
   const fetchPrimary = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
     else setSyncing(true);
     try {
-      const [bsRes, plRes] = await Promise.all([
+      const [bsRes, plRes, gameRes] = await Promise.all([
         fetch(`/api/balldontlie/nba/boxscore?game_id=${gameId}`, { cache: "no-store" }),
         fetch(`/api/balldontlie/nba/plays?game_id=${gameId}`, { cache: "no-store" }),
+        fetch(`/api/balldontlie/nba/game/${gameId}`, { cache: "no-store" }),
       ]);
       if (bsRes.ok) {
         const bsJson = await bsRes.json() as { data: BdlBoxScore[] };
@@ -1878,6 +1880,11 @@ export function NBAGameDetailPage({ gameId }: { gameId: string }) {
       if (plRes.ok) {
         const plJson = await plRes.json() as { data: BdlPlay[] };
         setPlays(plJson.data ?? []);
+      }
+      // Always fetch basic game data as fallback when box scores require higher tier
+      if (gameRes.ok) {
+        const gJson = await gameRes.json() as { data: BdlGame };
+        if (gJson.data) setFallbackGame(gJson.data);
       }
       setLastSynced(new Date());
       if (!quiet) setError(null);
@@ -1984,7 +1991,7 @@ export function NBAGameDetailPage({ gameId }: { gameId: string }) {
     );
   }
 
-  if (error || !boxScore || !game) {
+  if (error || !game) {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center gap-4 text-white/40">
         <AlertCircle className="h-8 w-8" />
