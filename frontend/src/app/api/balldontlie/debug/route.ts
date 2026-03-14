@@ -2,33 +2,30 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   const key = process.env.BALLDONTLIE_API_KEY ?? "";
-  const keySet = key.length > 0;
 
-  let apiStatus: number | null = null;
-  let apiSample: unknown = null;
-
-  if (keySet) {
+  async function test(label: string, url: string) {
     try {
-      const res = await fetch("https://api.balldontlie.io/cs/v1/matches?per_page=3", {
+      const res = await fetch(url, {
         headers: { Authorization: key },
         cache: "no-store",
       });
-      apiStatus = res.status;
-      if (res.ok) {
-        const json = await res.json();
-        apiSample = json.data?.slice(0, 2) ?? [];
-      } else {
-        apiSample = await res.text();
-      }
+      const body = await res.text();
+      let parsed: unknown;
+      try { parsed = JSON.parse(body); } catch { parsed = body; }
+      return { status: res.status, data: parsed };
     } catch (e) {
-      apiSample = String(e);
+      return { status: null, data: String(e) };
     }
   }
 
+  const nba = await test("nba-games", "https://api.balldontlie.io/v1/games?per_page=1");
+  const cs2 = await test("cs2-matches", "https://api.balldontlie.io/cs/v1/matches?per_page=1");
+
   return NextResponse.json({
-    keySet,
-    keyPrefix: keySet ? key.slice(0, 8) + "..." : null,
-    apiStatus,
-    apiSample,
+    keyLength: key.length,
+    keyStart: key.slice(0, 8),
+    keyEnd: key.slice(-4),
+    nba,
+    cs2,
   });
 }
