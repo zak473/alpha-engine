@@ -19,6 +19,7 @@ class Settings(BaseSettings):
 
     # Auth
     AUTH_SECRET: str = "change-me-in-production"
+    JWT_SECRET: str = "change-me-in-production"
     AUTH_ALGORITHM: str = "HS256"
     AUTH_ACCESS_TOKEN_MINUTES: int = 120
 
@@ -32,6 +33,10 @@ class Settings(BaseSettings):
     # Live data — api-tennis.com (tennis fixtures, live scores, set scores, point-by-point)
     # Register at https://api-tennis.com → get API key
     TENNIS_LIVE_API_KEY: str = ""
+    TENNIS_API_KEY: str = ""
+
+    # BallDontLie GOAT API (NBA, NFL, MLB, NHL, esports, etc.)
+    BALLDONTLIE_API_KEY: str = ""
 
     # Real market odds — The Odds API (free tier: 500 req/month)
     # Register at https://the-odds-api.com → Get API Key
