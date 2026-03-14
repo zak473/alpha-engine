@@ -11,16 +11,21 @@ from __future__ import annotations
 
 import hashlib
 import os
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from urllib.parse import urlencode
 
+import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from pydantic import BaseModel, EmailStr
+from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from api.deps import get_db
+from config.settings import settings
 from db.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -150,6 +155,99 @@ def get_token(body: TokenIn, db: Session = Depends(get_db)):
         email=user.email,
         display_name=user.display_name,
     )
+
+
+# ── Google OAuth ──────────────────────────────────────────────────────────────
+
+_GOOGLE_AUTH_URL  = "https://accounts.google.com/o/oauth2/v2/auth"
+_GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+_GOOGLE_INFO_URL  = "https://www.googleapis.com/oauth2/v3/userinfo"
+
+
+@router.get("/google")
+def google_login():
+    """Redirect the browser to Google's OAuth consent screen."""
+    if not settings.GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=501, detail="Google OAuth is not configured")
+    redirect_uri = f"{settings.FRONTEND_URL}/api/v1/auth/google/callback"
+    qs = urlencode({
+        "client_id":     settings.GOOGLE_CLIENT_ID,
+        "redirect_uri":  redirect_uri,
+        "response_type": "code",
+        "scope":         "openid email profile",
+        "state":         secrets.token_urlsafe(16),
+        "access_type":   "offline",
+        "prompt":        "select_account",
+    })
+    return RedirectResponse(url=f"{_GOOGLE_AUTH_URL}?{qs}")
+
+
+@router.get("/google/callback")
+def google_callback(
+    code: Optional[str] = None,
+    error: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Handle Google OAuth callback: exchange code → get user info → issue JWT."""
+    if error or not code:
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=google_cancelled")
+
+    if not settings.GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=501, detail="Google OAuth is not configured")
+
+    redirect_uri = f"{settings.FRONTEND_URL}/api/v1/auth/google/callback"
+
+    # Exchange authorization code for access token
+    token_resp = httpx.post(_GOOGLE_TOKEN_URL, data={
+        "code":          code,
+        "client_id":     settings.GOOGLE_CLIENT_ID,
+        "client_secret": settings.GOOGLE_CLIENT_SECRET,
+        "redirect_uri":  redirect_uri,
+        "grant_type":    "authorization_code",
+    }, timeout=10)
+    if not token_resp.is_success:
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=google_failed")
+
+    access_token = token_resp.json().get("access_token")
+
+    # Fetch Google user profile
+    info_resp = httpx.get(_GOOGLE_INFO_URL, headers={"Authorization": f"Bearer {access_token}"}, timeout=10)
+    if not info_resp.is_success:
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=google_failed")
+
+    g = info_resp.json()
+    email       = (g.get("email") or "").lower().strip()
+    google_sub  = g.get("sub", "")
+    display_name = g.get("name") or g.get("given_name") or email.split("@")[0]
+
+    if not email:
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=google_no_email")
+
+    # Find or create the user
+    user = db.query(User).filter_by(email=email).first()
+    if not user:
+        user = User(
+            id=str(uuid.uuid4()),
+            email=email,
+            password_hash=f"!google:{google_sub}",   # sentinel — cannot be used to log in with password
+            display_name=display_name,
+        )
+        db.add(user)
+        try:
+            db.commit()
+            db.refresh(user)
+        except IntegrityError:
+            db.rollback()
+            user = db.query(User).filter_by(email=email).first()
+
+    jwt = _create_token(user.id)
+    qs = urlencode({
+        "token":        jwt,
+        "user_id":      user.id,
+        "email":        user.email,
+        "display_name": user.display_name or "",
+    })
+    return RedirectResponse(url=f"{settings.FRONTEND_URL}/auth/callback?{qs}")
 
 
 class UpdateProfileIn(BaseModel):

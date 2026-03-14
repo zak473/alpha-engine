@@ -85,6 +85,11 @@ class Settings(BaseSettings):
     MC_DEFAULT_N_SIMULATIONS: int = 10_000
     MC_RANDOM_SEED: int = 42
 
+    # Google OAuth
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    FRONTEND_URL: str = "http://localhost:3000"   # Override in Railway/Vercel
+
     # API
     API_PREFIX: str = "/api/v1"
     CORS_ORIGINS: list[str] = ["*"]

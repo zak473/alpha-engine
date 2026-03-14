@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Pages that do not require a login
-const AUTH_PAGES = ["/login", "/register", "/forgot-password"];
+const AUTH_PAGES = ["/login", "/register", "/forgot-password", "/auth/callback"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
