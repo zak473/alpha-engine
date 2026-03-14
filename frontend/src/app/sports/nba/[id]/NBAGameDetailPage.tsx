@@ -67,18 +67,24 @@ interface BdlInjury {
 
 interface BdlStanding {
   team: BdlTeam;
-  season: number;
-  wins: number;
-  losses: number;
-  conference: string;
-  conference_rank: number;
-  home_record: string;
-  visitor_record: string;
-  last_10_record: string;
-  win_percentage: number;
-  streak: string;
-  points_per_game: number;
-  opponent_points_per_game: number;
+  season?: number;
+  wins?: number;
+  losses?: number;
+  conference?: string;
+  conference_rank?: number;
+  division_rank?: number;
+  home_record?: string;
+  visitor_record?: string;
+  road_record?: string;
+  last_10_record?: string;
+  win_percentage?: number;
+  win_pct?: number;
+  streak?: string;
+  current_streak?: string;
+  points_per_game?: number;
+  opponent_points_per_game?: number;
+  // Alternative field names BDL sometimes uses
+  [key: string]: unknown;
 }
 
 interface BdlAdvancedStat {
@@ -1650,10 +1656,10 @@ function TrendsTab({
           <div className="space-y-2.5">
             <div className="grid grid-cols-2 gap-2">
               {[
-                { label: "Record", val: `${standing.wins}-${standing.losses}` },
-                { label: "Win%", val: (standing.win_percentage * 100).toFixed(1) + "%" },
-                { label: "Conf Rank", val: `#${standing.conference_rank} ${standing.conference}` },
-                { label: "Streak", val: standing.streak },
+                { label: "Record", val: `${standing.wins ?? 0}-${standing.losses ?? 0}` },
+                { label: "Win%", val: ((standing.win_percentage ?? standing.win_pct ?? ((standing.wins ?? 0) / Math.max((standing.wins ?? 0) + (standing.losses ?? 0), 1))) * 100).toFixed(1) + "%" },
+                { label: "Conf Rank", val: `#${standing.conference_rank ?? standing.division_rank ?? "—"} ${standing.conference ?? ""}` },
+                { label: "Streak", val: String(standing.streak ?? standing.current_streak ?? "—") },
               ].map(({ label, val }) => (
                 <div key={label} className="flex flex-col gap-0.5 rounded-xl border border-white/6 bg-white/[0.02] p-2.5">
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-white/30">{label}</span>
@@ -1664,9 +1670,9 @@ function TrendsTab({
 
             <div className="grid grid-cols-3 gap-2">
               {[
-                { label: "Home", val: standing.home_record },
-                { label: "Away", val: standing.visitor_record },
-                { label: "Last 10", val: standing.last_10_record },
+                { label: "Home", val: standing.home_record ?? "—" },
+                { label: "Away", val: standing.visitor_record ?? standing.road_record ?? "—" },
+                { label: "Last 10", val: standing.last_10_record ?? "—" },
               ].map(({ label, val }) => (
                 <div key={label} className="flex flex-col gap-0.5 rounded-xl border border-white/6 bg-white/[0.02] p-2.5">
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-white/30">{label}</span>
@@ -1678,11 +1684,11 @@ function TrendsTab({
             <div className="grid grid-cols-2 gap-2">
               <div className="flex flex-col gap-0.5 rounded-xl border border-white/6 bg-white/[0.02] p-2.5">
                 <span className="text-[10px] font-semibold uppercase tracking-widest text-white/30">PPG</span>
-                <span className="font-mono text-sm text-white">{standing.points_per_game.toFixed(1)}</span>
+                <span className="font-mono text-sm text-white">{standing.points_per_game?.toFixed(1) ?? "—"}</span>
               </div>
               <div className="flex flex-col gap-0.5 rounded-xl border border-white/6 bg-white/[0.02] p-2.5">
                 <span className="text-[10px] font-semibold uppercase tracking-widest text-white/30">Opp PPG</span>
-                <span className="font-mono text-sm text-white">{standing.opponent_points_per_game.toFixed(1)}</span>
+                <span className="font-mono text-sm text-white">{standing.opponent_points_per_game?.toFixed(1) ?? "—"}</span>
               </div>
             </div>
 
@@ -1860,6 +1866,7 @@ export function NBAGameDetailPage({ gameId }: { gameId: string }) {
   const [lastSynced, setLastSynced] = useState(new Date());
   const [playFilter, setPlayFilter] = useState<PlayFilter>("all");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const secondaryFetchedRef = useRef(false);
 
   const game = boxScore?.game ?? fallbackGame ?? null;
   const live = game != null && isGameLive(game.status);
@@ -1952,16 +1959,14 @@ export function NBAGameDetailPage({ gameId }: { gameId: string }) {
     fetchPrimary(false);
   }, [fetchPrimary]);
 
-  // Once boxScore loaded, fetch secondary
+  // Trigger secondary fetch from ANY game data — boxScore or fallback
   useEffect(() => {
-    if (boxScore) {
-      fetchSecondary(
-        boxScore.game.home_team.id,
-        boxScore.game.visitor_team.id,
-        boxScore.game.id
-      );
-    }
-  }, [boxScore?.game.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (secondaryFetchedRef.current) return;
+    const g = boxScore?.game ?? fallbackGame;
+    if (!g) return;
+    secondaryFetchedRef.current = true;
+    fetchSecondary(g.home_team.id, g.visitor_team.id, g.id);
+  }, [boxScore, fallbackGame, fetchSecondary]);
 
   // Live polling
   useEffect(() => {

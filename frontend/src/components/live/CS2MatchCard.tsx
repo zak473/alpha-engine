@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Trophy, Clock3, Zap } from "lucide-react";
 import {
@@ -90,7 +91,7 @@ function MapPip({
 interface CS2MatchCardProps {
   match: Cs2Match;
   maps: Cs2MatchMap[];
-  onClick: () => void;
+  onClick?: () => void;
 }
 
 export function CS2MatchCard({ match, maps, onClick }: CS2MatchCardProps) {
@@ -116,10 +117,11 @@ export function CS2MatchCard({ match, maps, onClick }: CS2MatchCardProps) {
     : null;
 
   return (
-    <button
+    <Link
+      href={`/sports/esports/cs2/${match.id}`}
       onClick={onClick}
       className={cn(
-        "group w-full rounded-[22px] border p-5 text-left transition-all duration-200",
+        "group block w-full rounded-[22px] border p-5 text-left transition-all duration-200",
         "hover:-translate-y-0.5 hover:shadow-[0_20px_60px_rgba(0,0,0,0.40)]",
         live
           ? "border-emerald-400/25 bg-[linear-gradient(160deg,rgba(54,242,143,0.07),rgba(255,255,255,0.025))] hover:border-emerald-400/40"
@@ -234,6 +236,6 @@ export function CS2MatchCard({ match, maps, onClick }: CS2MatchCardProps) {
           {live ? "Live match center" : "Match center"}
         </span>
       </div>
-    </button>
+    </Link>
   );
 }

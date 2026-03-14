@@ -16,6 +16,8 @@ import {
   TrendingUp,
   Zap,
   Users,
+  BarChart2,
+  Target,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -23,10 +25,18 @@ import {
   type Cs2MatchMap,
   type Cs2RoundStat,
   type Cs2PlayerMapStat,
+  type EloPoint,
+  type EloResult,
+  type Cs2PlayerAccuracyStat,
   getCS2Match,
   getCS2Maps,
   getCS2MapStats,
   getCS2PlayerMapStats,
+  getCS2H2HMatches,
+  getCS2TeamMatches,
+  getCS2PlayerAccuracy,
+  computeElo,
+  eloWinProbability,
   isMatchLive,
   isMatchFinished,
   isMatchUpcoming,
@@ -1242,6 +1252,422 @@ function UpcomingPreview({ match }: { match: Cs2Match }) {
   );
 }
 
+// ─── Intel tab types & components ─────────────────────────────────────────
+
+interface IntelData {
+  h2hMatches: Cs2Match[];
+  team1Recent: Cs2Match[];
+  team2Recent: Cs2Match[];
+  team1Elo: EloResult;
+  team2Elo: EloResult;
+  playerAccuracy: Record<number, Cs2PlayerAccuracyStat[]>;
+}
+
+function EloSparkline({ history }: { history: EloPoint[] }) {
+  const recent = history.slice(-12);
+  if (recent.length < 2) return <span className="text-[10px] text-white/20">—</span>;
+  const ratings = recent.map((h) => h.rating);
+  const min = Math.min(...ratings) - 3;
+  const max = Math.max(...ratings) + 3;
+  const range = Math.max(max - min, 1);
+  const W = 130, H = 36, pad = 3;
+  const toX = (i: number) => pad + (i / (recent.length - 1)) * (W - pad * 2);
+  const toY = (r: number) => H - pad - ((r - min) / range) * (H - pad * 2);
+  const line = recent
+    .map((h, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(h.rating).toFixed(1)}`)
+    .join(" ");
+  return (
+    <svg width={W} height={H} className="overflow-visible">
+      <path d={line} fill="none" stroke="rgba(52,211,153,0.45)" strokeWidth={1.5} />
+      {recent.map((h, i) => (
+        <circle
+          key={i}
+          cx={toX(i)}
+          cy={toY(h.rating)}
+          r={2.5}
+          fill={h.result === "W" ? "rgb(52,211,153)" : "rgb(248,113,113)"}
+          stroke="rgba(0,0,0,0.35)"
+          strokeWidth={0.5}
+        />
+      ))}
+    </svg>
+  );
+}
+
+function AccuracySection({
+  match,
+  playerAccuracy,
+}: {
+  match: Cs2Match;
+  playerAccuracy: Record<number, Cs2PlayerAccuracyStat[]>;
+}) {
+  const allTeams = [
+    { team: match.team1, label: match.team1?.acronym ?? match.team1?.name ?? "T1" },
+    { team: match.team2, label: match.team2?.acronym ?? match.team2?.name ?? "T2" },
+  ];
+
+  const HIT_ORDER = ["head", "chest", "stomach", "left_arm", "right_arm", "left_leg", "right_leg"];
+  const HIT_LABEL: Record<string, string> = {
+    head: "Head", chest: "Chest", stomach: "Stomach",
+    left_arm: "L Arm", right_arm: "R Arm", left_leg: "L Leg", right_leg: "R Leg",
+  };
+
+  // Collect all player IDs we have accuracy for
+  const playerIds = Object.keys(playerAccuracy).map(Number).filter((id) => playerAccuracy[id]?.length > 0);
+  if (playerIds.length === 0) return null;
+
+  // Find player names from match bundles — we need player info from somewhere
+  // Players are embedded in Cs2PlayerMapStat which we don't have here. Use team data.
+  return (
+    <div className="rounded-[20px] border border-white/8 bg-white/[0.025] p-5">
+      <div className="mb-4 flex items-center gap-2">
+        <Target size={12} className="text-emerald-300/60" />
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-white/35">Career Accuracy</span>
+        <span className="ml-auto text-[9px] text-white/20">{playerIds.length} players</span>
+      </div>
+      <div className="space-y-4">
+        {allTeams.map(({ team, label }) => {
+          if (!team) return null;
+          return (
+            <div key={team.id}>
+              <div className="mb-2 text-[10px] font-semibold text-white/50">{label}</div>
+              {/* We don't have per-player names without bundles — show aggregate accuracy per hit group */}
+              <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-7">
+                {HIT_ORDER.map((hg) => {
+                  // Aggregate across all players for this team
+                  const rows = playerIds.flatMap((id) =>
+                    (playerAccuracy[id] ?? []).filter((s) => s.hit_group === hg)
+                  );
+                  const totalHits = rows.reduce((s, r) => s + r.hits, 0);
+                  const totalShots = rows.reduce((s, r) => s + r.total_shots, 0);
+                  const acc = totalShots > 0 ? (totalHits / totalShots) * 100 : 0;
+                  return (
+                    <div key={hg} className="flex flex-col items-center gap-1 rounded-xl border border-white/6 bg-white/[0.02] p-2">
+                      <div className="text-[9px] text-white/30">{HIT_LABEL[hg]}</div>
+                      <div className="text-[12px] font-bold text-white">{acc.toFixed(1)}%</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function IntelTabContent({
+  match,
+  intelData,
+  intelLoading,
+}: {
+  match: Cs2Match;
+  intelData: IntelData | null;
+  intelLoading: boolean;
+}) {
+  const t1 = match.team1;
+  const t2 = match.team2;
+  const t1Id = t1?.id ?? 0;
+  const t2Id = t2?.id ?? 0;
+  const t1Name = t1?.acronym ?? t1?.name ?? "T1";
+  const t2Name = t2?.acronym ?? t2?.name ?? "T2";
+
+  if (intelLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16">
+        <Loader2 size={18} className="animate-spin text-emerald-400" />
+        <div className="mt-3 text-[11px] text-white/35">Loading intel…</div>
+      </div>
+    );
+  }
+
+  if (!intelData) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-white/30">
+        <BarChart2 size={20} className="text-white/15" />
+        <div className="mt-2 text-[12px]">Intel data unavailable</div>
+      </div>
+    );
+  }
+
+  // H2H wins
+  const finishedH2H = intelData.h2hMatches.filter((m) => isMatchFinished(m.status));
+  let t1Wins = 0, t2Wins = 0;
+  for (const m of finishedH2H) {
+    const mt1 = m.team1?.id;
+    const mt2 = m.team2?.id;
+    const s1 = m.team1_score ?? 0;
+    const s2 = m.team2_score ?? 0;
+    if (mt1 === t1Id) { s1 > s2 ? t1Wins++ : t2Wins++; }
+    else if (mt2 === t1Id) { s2 > s1 ? t1Wins++ : t2Wins++; }
+    else if (mt1 === t2Id) { s1 > s2 ? t2Wins++ : t1Wins++; }
+    else if (mt2 === t2Id) { s2 > s1 ? t2Wins++ : t1Wins++; }
+  }
+  const total = t1Wins + t2Wins;
+  const t1Pct = total > 0 ? (t1Wins / total) * 100 : 50;
+
+  const { team1Elo, team2Elo } = intelData;
+  const winProb = eloWinProbability(team1Elo.rating, team2Elo.rating);
+
+  const recentMeetings = [...finishedH2H]
+    .sort(
+      (a, b) =>
+        new Date(b.end_at ?? b.scheduled_at ?? "").getTime() -
+        new Date(a.end_at ?? a.scheduled_at ?? "").getTime()
+    )
+    .slice(0, 6);
+
+  return (
+    <div className="space-y-4">
+      {/* ── ELO Analysis ─────────────────────────────────────────────────── */}
+      <div className="rounded-[20px] border border-white/8 bg-white/[0.025] p-5">
+        <div className="mb-5 flex items-center gap-2">
+          <TrendingUp size={12} className="text-emerald-300/60" />
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-white/35">ELO Analysis</span>
+          <span className="ml-auto text-[9px] text-white/20">Derived from recent match history · K=32</span>
+        </div>
+
+        <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-6">
+          {/* Team 1 ELO */}
+          <div className="space-y-3">
+            <div className="text-[11px] font-semibold text-white/60">{t1Name}</div>
+            <div>
+              <div className="text-4xl font-bold tabular-nums text-white">{team1Elo.rating}</div>
+              <div className={cn(
+                "mt-1 text-[11px] font-semibold tabular-nums",
+                team1Elo.delta30d >= 0 ? "text-emerald-300" : "text-red-300"
+              )}>
+                {team1Elo.delta30d >= 0 ? "+" : ""}{team1Elo.delta30d}
+                <span className="ml-1 font-normal text-white/25">30d</span>
+              </div>
+            </div>
+            <EloSparkline history={team1Elo.history} />
+            <div className="text-[9px] text-white/25">{team1Elo.gamesPlayed} matches analysed</div>
+          </div>
+
+          {/* Win probability column */}
+          <div className="flex flex-col items-center gap-2 pt-6">
+            <div className="text-[9px] uppercase tracking-widest text-white/20">Win prob</div>
+            <div className="relative h-24 w-4 overflow-hidden rounded-full bg-white/8">
+              <div
+                className="absolute bottom-0 w-full rounded-b-full bg-emerald-400/55 transition-all duration-500"
+                style={{ height: `${winProb * 100}%` }}
+              />
+            </div>
+            <div className="space-y-0.5 text-center">
+              <div className="text-[12px] font-bold text-white">{(winProb * 100).toFixed(0)}%</div>
+              <div className="text-[9px] text-white/30">{t1Name}</div>
+              <div className="text-[9px] text-white/15">–</div>
+              <div className="text-[9px] text-white/30">{t2Name}</div>
+              <div className="text-[12px] font-bold text-white">{((1 - winProb) * 100).toFixed(0)}%</div>
+            </div>
+          </div>
+
+          {/* Team 2 ELO */}
+          <div className="space-y-3 text-right">
+            <div className="text-[11px] font-semibold text-white/60">{t2Name}</div>
+            <div>
+              <div className="text-4xl font-bold tabular-nums text-white">{team2Elo.rating}</div>
+              <div className={cn(
+                "mt-1 text-[11px] font-semibold tabular-nums",
+                team2Elo.delta30d >= 0 ? "text-emerald-300" : "text-red-300"
+              )}>
+                {team2Elo.delta30d >= 0 ? "+" : ""}{team2Elo.delta30d}
+                <span className="ml-1 font-normal text-white/25">30d</span>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <EloSparkline history={team2Elo.history} />
+            </div>
+            <div className="text-[9px] text-white/25">{team2Elo.gamesPlayed} matches analysed</div>
+          </div>
+        </div>
+
+        {/* ELO diff bar */}
+        <div className="mt-5 space-y-1.5">
+          <div className="flex justify-between text-[9px] text-white/25">
+            <span>{t1Name} {team1Elo.rating > team2Elo.rating ? "▲" : ""}</span>
+            <span>ELO Δ {Math.abs(team1Elo.rating - team2Elo.rating)}</span>
+            <span>{team2Elo.rating > team1Elo.rating ? "▲" : ""} {t2Name}</span>
+          </div>
+          <div className="flex h-2 overflow-hidden rounded-full bg-white/8">
+            <div
+              className="h-full bg-emerald-400/50 transition-all duration-500"
+              style={{ width: `${(winProb * 100).toFixed(1)}%` }}
+            />
+            <div className="h-full flex-1 bg-sky-400/30" />
+          </div>
+        </div>
+      </div>
+
+      {/* ── H2H Record ───────────────────────────────────────────────────── */}
+      <div className="rounded-[20px] border border-white/8 bg-white/[0.025] p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <Shield size={12} className="text-emerald-300/60" />
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-white/35">Head-to-Head</span>
+          <span className="ml-auto text-[9px] text-white/20">{total} all-time meetings</span>
+        </div>
+        {total > 0 ? (
+          <div className="grid grid-cols-[1fr_2fr_1fr] items-center gap-4">
+            <div className="text-center">
+              <div className="text-5xl font-bold text-white">{t1Wins}</div>
+              <div className="mt-1.5 text-[10px] text-white/40">{t1Name}</div>
+            </div>
+            <div className="space-y-2 text-center">
+              <div className="text-[9px] uppercase tracking-widest text-white/20">series wins</div>
+              <div className="mx-auto flex h-2 max-w-[160px] overflow-hidden rounded-full bg-white/8">
+                <div className="h-full bg-emerald-400/60" style={{ width: `${t1Pct.toFixed(0)}%` }} />
+                <div className="h-full flex-1 bg-sky-400/30" />
+              </div>
+              <div className="text-[10px] text-white/30">
+                {t1Pct.toFixed(0)}% — {(100 - t1Pct).toFixed(0)}%
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-5xl font-bold text-white">{t2Wins}</div>
+              <div className="mt-1.5 text-[10px] text-white/40">{t2Name}</div>
+            </div>
+          </div>
+        ) : (
+          <div className="py-5 text-center text-[12px] text-white/25">No previous meetings found in dataset</div>
+        )}
+      </div>
+
+      {/* ── Recent Meetings ──────────────────────────────────────────────── */}
+      {recentMeetings.length > 0 && (
+        <div className="rounded-[20px] border border-white/8 bg-white/[0.025] p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <Clock3 size={12} className="text-emerald-300/60" />
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-white/35">Recent Meetings</span>
+          </div>
+          <div className="space-y-2">
+            {recentMeetings.map((m) => {
+              const mt1Id = m.team1?.id;
+              const isT1asTeam1 = mt1Id === t1Id;
+              const myScore = isT1asTeam1 ? (m.team1_score ?? 0) : (m.team2_score ?? 0);
+              const oppScore = isT1asTeam1 ? (m.team2_score ?? 0) : (m.team1_score ?? 0);
+              const t1Won = myScore > oppScore;
+              const date = m.end_at ?? m.scheduled_at;
+              return (
+                <Link
+                  key={m.id}
+                  href={`/sports/esports/cs2/${m.id}`}
+                  className="flex items-center gap-3 rounded-xl border border-white/6 bg-white/[0.02] px-3 py-2.5 transition hover:bg-white/[0.04]"
+                >
+                  <span className={cn(
+                    "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold",
+                    t1Won ? "bg-emerald-400/20 text-emerald-300" : "bg-red-400/20 text-red-300"
+                  )}>
+                    {t1Won ? "W" : "L"}
+                  </span>
+                  <span className="font-mono text-[12px] font-bold text-white">
+                    {t1Name} {myScore}–{oppScore} {t2Name}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[10px] text-white/35">{m.tournament?.name}</span>
+                  {date && (
+                    <span className="shrink-0 text-[10px] text-white/25">
+                      {new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" })}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Recent Form ──────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {[
+          { teamId: t1Id, name: t1Name, matches: intelData.team1Recent },
+          { teamId: t2Id, name: t2Name, matches: intelData.team2Recent },
+        ].map(({ teamId: tid, name, matches }) => {
+          const finished = matches
+            .filter((m) => isMatchFinished(m.status))
+            .sort(
+              (a, b) =>
+                new Date(b.end_at ?? b.scheduled_at ?? "").getTime() -
+                new Date(a.end_at ?? a.scheduled_at ?? "").getTime()
+            )
+            .slice(0, 8);
+
+          // Compute current streak
+          let streakCount = 0, streakType = "";
+          for (const m of finished) {
+            const isT1 = m.team1?.id === tid;
+            const myS = isT1 ? (m.team1_score ?? 0) : (m.team2_score ?? 0);
+            const oppS = isT1 ? (m.team2_score ?? 0) : (m.team1_score ?? 0);
+            const r = myS > oppS ? "W" : "L";
+            if (streakCount === 0) { streakType = r; streakCount = 1; }
+            else if (r === streakType) streakCount++;
+            else break;
+          }
+
+          const winsInLast = finished.filter((m) => {
+            const isT1 = m.team1?.id === tid;
+            const myS = isT1 ? (m.team1_score ?? 0) : (m.team2_score ?? 0);
+            const oppS = isT1 ? (m.team2_score ?? 0) : (m.team1_score ?? 0);
+            return myS > oppS;
+          }).length;
+
+          return (
+            <div key={tid} className="rounded-[20px] border border-white/8 bg-white/[0.025] p-4">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold text-white/60">{name}</span>
+                <div className="flex items-center gap-2">
+                  {streakCount >= 2 && (
+                    <span className={cn(
+                      "rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider",
+                      streakType === "W"
+                        ? "bg-emerald-400/15 text-emerald-300"
+                        : "bg-red-400/15 text-red-300"
+                    )}>
+                      {streakCount}{streakType}
+                    </span>
+                  )}
+                  <span className="text-[10px] text-white/25">
+                    {winsInLast}W–{finished.length - winsInLast}L
+                  </span>
+                </div>
+              </div>
+              {finished.length === 0 ? (
+                <div className="text-[10px] text-white/20">No recent data</div>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {finished.map((m) => {
+                    const isT1 = m.team1?.id === tid;
+                    const myS = isT1 ? (m.team1_score ?? 0) : (m.team2_score ?? 0);
+                    const oppS = isT1 ? (m.team2_score ?? 0) : (m.team1_score ?? 0);
+                    const won = myS > oppS;
+                    const opp = isT1 ? m.team2 : m.team1;
+                    return (
+                      <Link key={m.id} href={`/sports/esports/cs2/${m.id}`}>
+                        <div
+                          className={cn(
+                            "flex h-7 w-7 items-center justify-center rounded-lg text-[10px] font-bold transition hover:opacity-75",
+                            won ? "bg-emerald-400/20 text-emerald-300" : "bg-red-400/20 text-red-300"
+                          )}
+                          title={`vs ${opp?.name ?? "?"}: ${myS}–${oppS} · ${m.tournament?.name ?? ""}`}
+                        >
+                          {won ? "W" : "L"}
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Player Career Accuracy ───────────────────────────────────────── */}
+      <AccuracySection match={match} playerAccuracy={intelData.playerAccuracy} />
+    </div>
+  );
+}
+
 // ─── Root component ───────────────────────────────────────────────────────
 
 interface CS2MatchDetailPageProps {
@@ -1252,12 +1678,43 @@ export function CS2MatchDetailPage({ matchId }: CS2MatchDetailPageProps) {
   const [match, setMatch] = useState<Cs2Match | null>(null);
   const [maps, setMaps] = useState<Cs2MatchMap[]>([]);
   const [bundles, setBundles] = useState<MapBundle[]>([]);
-  const [activeTab, setActiveTab] = useState<"series" | number>("series");
+  const [activeTab, setActiveTab] = useState<"series" | "intel" | number>("series");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState<Date>(new Date());
+  const [intelData, setIntelData] = useState<IntelData | null>(null);
+  const [intelLoading, setIntelLoading] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const intelLoadedRef = useRef(false);
+
+  const fetchIntelData = useCallback(async (t1Id: number, t2Id: number, allPlayers: number[]) => {
+    if (intelLoadedRef.current) return;
+    intelLoadedRef.current = true;
+    setIntelLoading(true);
+    try {
+      const [h2hMatches, team1Recent, team2Recent, ...accuracyResults] = await Promise.all([
+        getCS2H2HMatches(t1Id, t2Id),
+        getCS2TeamMatches(t1Id),
+        getCS2TeamMatches(t2Id),
+        ...allPlayers.map((pid) => getCS2PlayerAccuracy(pid)),
+      ]);
+
+      const team1Elo = computeElo(team1Recent, t1Id);
+      const team2Elo = computeElo(team2Recent, t2Id);
+
+      const playerAccuracy: Record<number, Cs2PlayerAccuracyStat[]> = {};
+      allPlayers.forEach((pid, i) => {
+        playerAccuracy[pid] = accuracyResults[i] as Cs2PlayerAccuracyStat[];
+      });
+
+      setIntelData({ h2hMatches, team1Recent, team2Recent, team1Elo, team2Elo, playerAccuracy });
+    } catch {
+      // Intel is non-critical; silently fail
+    } finally {
+      setIntelLoading(false);
+    }
+  }, []);
 
   const fetchAll = useCallback(async (quiet = false) => {
     if (quiet) setSyncing(true);
@@ -1286,12 +1743,24 @@ export function CS2MatchDetailPage({ matchId }: CS2MatchDetailPageProps) {
       );
       setBundles(bundleData);
 
-      // Auto-select first map with data, or "series"
+      // Auto-select first map with data, or "series" (upcoming defaults to "intel")
       setActiveTab((prev) => {
         if (prev !== "series") return prev; // keep user selection
+        if (isMatchUpcoming(matchData.status)) return "intel";
         const firstWithData = sortedMaps.find((_, i) => bundleData[i]?.players.length > 0);
         return firstWithData?.id ?? "series";
       });
+
+      // Kick off intel fetch once we have both team IDs
+      const t1Id = matchData.team1?.id;
+      const t2Id = matchData.team2?.id;
+      if (t1Id && t2Id) {
+        // Collect all unique player IDs from bundles
+        const playerIds = Array.from(
+          new Set(bundleData.flatMap((b) => b.players.map((p) => p.player_id)))
+        ).slice(0, 12); // cap at 12 players to avoid too many requests
+        fetchIntelData(t1Id, t2Id, playerIds);
+      }
 
       setLastSynced(new Date());
     } catch {
@@ -1300,7 +1769,7 @@ export function CS2MatchDetailPage({ matchId }: CS2MatchDetailPageProps) {
       setLoading(false);
       setSyncing(false);
     }
-  }, [matchId]);
+  }, [matchId, fetchIntelData]);
 
   useEffect(() => {
     fetchAll();
@@ -1363,14 +1832,27 @@ export function CS2MatchDetailPage({ matchId }: CS2MatchDetailPageProps) {
       />
 
       {/* Content */}
-      {upcoming ? (
-        <UpcomingPreview match={match} />
-      ) : (
-        <>
-          {/* Tab bar */}
-          <div className="overflow-x-auto no-scrollbar">
-            <div className="flex min-w-max items-center gap-1.5 rounded-[20px] border border-white/8 bg-white/[0.025] p-1.5">
-              {/* Series tab */}
+      <>
+        {/* Tab bar */}
+        <div className="overflow-x-auto no-scrollbar">
+          <div className="flex min-w-max items-center gap-1.5 rounded-[20px] border border-white/8 bg-white/[0.025] p-1.5">
+            {/* Intel tab */}
+            <button
+              onClick={() => setActiveTab("intel")}
+              className={cn(
+                "flex items-center gap-1.5 rounded-xl px-4 py-2 text-[12px] font-semibold transition-all",
+                activeTab === "intel"
+                  ? "bg-emerald-400/15 text-emerald-200 shadow-sm"
+                  : "text-white/45 hover:bg-white/[0.05] hover:text-white/70"
+              )}
+            >
+              <BarChart2 size={11} />
+              Intel
+              {intelLoading && <Loader2 size={9} className="animate-spin opacity-60" />}
+            </button>
+
+            {/* Series tab — only for non-upcoming */}
+            {!upcoming && (
               <button
                 onClick={() => setActiveTab("series")}
                 className={cn(
@@ -1383,9 +1865,10 @@ export function CS2MatchDetailPage({ matchId }: CS2MatchDetailPageProps) {
                 <Zap size={11} />
                 Series
               </button>
+            )}
 
-              {/* Map tabs */}
-              {bundles.map((b) => {
+            {/* Map tabs */}
+            {!upcoming && bundles.map((b) => {
                 const isActive = activeTab === b.map.id;
                 const isLiveMap = b.map.status === "running";
                 const ms1 = b.map.team1_score ?? 0;
@@ -1427,7 +1910,11 @@ export function CS2MatchDetailPage({ matchId }: CS2MatchDetailPageProps) {
 
           {/* Tab content */}
           <div>
-            {activeTab === "series" ? (
+            {activeTab === "intel" ? (
+              <IntelTabContent match={match} intelData={intelData} intelLoading={intelLoading} />
+            ) : upcoming ? (
+              <UpcomingPreview match={match} />
+            ) : activeTab === "series" ? (
               <SeriesOverviewTab match={match} bundles={bundles} />
             ) : activeBundle ? (
               <MapTabContent bundle={activeBundle} match={match} />
@@ -1438,7 +1925,7 @@ export function CS2MatchDetailPage({ matchId }: CS2MatchDetailPageProps) {
             )}
           </div>
         </>
-      )}
+
 
       {/* Data attribution */}
       <div className="flex items-center justify-end gap-2 pt-2 text-[10px] text-white/20">

@@ -172,15 +172,100 @@ export function fmtRating(rating: number): string {
   return rating.toFixed(2);
 }
 
+// ─── ELO types & utilities ────────────────────────────────────────────────
+
+export interface EloPoint {
+  date: string;
+  rating: number;
+  result: "W" | "L";
+  opponent: string;
+}
+
+export interface EloResult {
+  rating: number;
+  delta30d: number;
+  history: EloPoint[];
+  gamesPlayed: number;
+}
+
+export interface Cs2PlayerAccuracyStat {
+  hit_group: string; // "head" | "chest" | "stomach" | "left_arm" | "right_arm" | "left_leg" | "right_leg"
+  hits: number;
+  total_shots: number;
+  accuracy: number;
+}
+
+/**
+ * Compute a simplified ELO rating for a team from their match history.
+ * Opponent ELO is assumed to be 1500 (simplification when we don't have
+ * the full ecosystem of ratings). K=32.
+ */
+export function computeElo(matches: Cs2Match[], teamId: number): EloResult {
+  const K = 32;
+  let rating = 1500;
+  const history: EloPoint[] = [];
+  const cutoff30d = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  let ratingBefore30d: number | null = null;
+
+  const sorted = matches
+    .filter((m) => isMatchFinished(m.status))
+    .sort(
+      (a, b) =>
+        new Date(a.end_at ?? a.scheduled_at ?? "").getTime() -
+        new Date(b.end_at ?? b.scheduled_at ?? "").getTime()
+    );
+
+  for (const match of sorted) {
+    const isTeam1 = match.team1?.id === teamId;
+    const isTeam2 = match.team2?.id === teamId;
+    if (!isTeam1 && !isTeam2) continue;
+
+    const myScore = isTeam1 ? (match.team1_score ?? 0) : (match.team2_score ?? 0);
+    const oppScore = isTeam1 ? (match.team2_score ?? 0) : (match.team1_score ?? 0);
+    const opp = isTeam1 ? match.team2 : match.team1;
+    const date = match.end_at ?? match.scheduled_at ?? "";
+
+    if (ratingBefore30d === null && new Date(date).getTime() >= cutoff30d) {
+      ratingBefore30d = rating;
+    }
+
+    const result = myScore > oppScore ? 1 : 0;
+    // Opponent assumed at 1500; only our rating evolves
+    const expected = 1 / (1 + Math.pow(10, (1500 - rating) / 400));
+    rating = Math.round(rating + K * (result - expected));
+
+    history.push({ date, rating, result: result === 1 ? "W" : "L", opponent: opp?.name ?? "Unknown" });
+  }
+
+  return {
+    rating,
+    delta30d: rating - (ratingBefore30d ?? 1500),
+    history,
+    gamesPlayed: history.length,
+  };
+}
+
+/** ELO-based win probability for team1 vs team2. */
+export function eloWinProbability(elo1: number, elo2: number): number {
+  return 1 / (1 + Math.pow(10, (elo2 - elo1) / 400));
+}
+
 // ─── Client fetch functions ───────────────────────────────────────────────
 
-export async function getCS2Matches(dates?: string[]): Promise<Cs2Match[]> {
-  const today = new Date().toISOString().split("T")[0];
-  const ds = dates ?? [today];
+export async function getCS2Match(id: number | string): Promise<Cs2Match | null> {
   try {
-    const res = await fetch(`/api/balldontlie/cs2/matches?dates=${ds.join(",")}`, {
-      cache: "no-store",
-    });
+    const res = await fetch(`/api/balldontlie/cs2/match/${id}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.data ? normalizeMatch(json.data) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getCS2Matches(dates?: string[]): Promise<Cs2Match[]> {
+  try {
+    const res = await fetch(`/api/balldontlie/cs2/matches`, { cache: "no-store" });
     if (!res.ok) return [];
     const json = await res.json();
     return (json.data ?? []).map(normalizeMatch);
@@ -222,6 +307,48 @@ export async function getCS2PlayerMapStats(matchMapId: number): Promise<Cs2Playe
   try {
     const res = await fetch(
       `/api/balldontlie/cs2/player-map-stats?match_map_id=${matchMapId}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json.data ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getCS2H2HMatches(team1Id: number, team2Id: number): Promise<Cs2Match[]> {
+  try {
+    const res = await fetch(
+      `/api/balldontlie/cs2/h2h?team1_id=${team1Id}&team2_id=${team2Id}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return [];
+    const json = await res.json();
+    return (json.data ?? []).map(normalizeMatch);
+  } catch {
+    return [];
+  }
+}
+
+export async function getCS2TeamMatches(teamId: number): Promise<Cs2Match[]> {
+  try {
+    const res = await fetch(
+      `/api/balldontlie/cs2/team-matches?team_id=${teamId}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return [];
+    const json = await res.json();
+    return (json.data ?? []).map(normalizeMatch);
+  } catch {
+    return [];
+  }
+}
+
+export async function getCS2PlayerAccuracy(playerId: number): Promise<Cs2PlayerAccuracyStat[]> {
+  try {
+    const res = await fetch(
+      `/api/balldontlie/cs2/player-accuracy?player_id=${playerId}`,
       { cache: "no-store" }
     );
     if (!res.ok) return [];
