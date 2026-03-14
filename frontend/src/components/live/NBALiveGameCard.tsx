@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Clock3, Trophy } from "lucide-react";
 import {
@@ -125,7 +126,7 @@ function QuarterBar({ game }: { game: BdlGame }) {
 interface NBALiveGameCardProps {
   game: BdlGame;
   boxScore?: BdlBoxScore | null;
-  onClick: () => void;
+  onClick?: () => void;
 }
 
 export function NBALiveGameCard({ game, boxScore, onClick }: NBALiveGameCardProps) {
@@ -142,10 +143,11 @@ export function NBALiveGameCard({ game, boxScore, onClick }: NBALiveGameCardProp
   const awayLeading = game.visitor_team_score > game.home_team_score;
 
   return (
-    <button
+    <Link
+      href={`/sports/nba/${game.id}`}
       onClick={onClick}
       className={cn(
-        "group w-full rounded-[24px] border p-5 text-left transition-all duration-200",
+        "group block w-full rounded-[24px] border p-5 text-left transition-all duration-200",
         "hover:-translate-y-0.5 hover:shadow-[0_20px_60px_rgba(0,0,0,0.35)]",
         live
           ? "border-emerald-400/25 bg-[linear-gradient(160deg,rgba(54,242,143,0.08),rgba(255,255,255,0.03))] hover:border-emerald-400/40"
@@ -340,6 +342,6 @@ export function NBALiveGameCard({ game, boxScore, onClick }: NBALiveGameCardProp
           <ArrowRight size={12} />
         </span>
       </div>
-    </button>
+    </Link>
   );
 }

@@ -28,9 +28,7 @@ import {
   type Cs2MatchMap,
 } from "@/lib/balldontlie-cs2";
 import { NBALiveGameCard } from "@/components/live/NBALiveGameCard";
-import { NBABoxScoreDrawer } from "@/components/live/NBABoxScoreDrawer";
 import { CS2MatchCard } from "@/components/live/CS2MatchCard";
-import { CS2MatchDrawer } from "@/components/live/CS2MatchDrawer";
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
@@ -244,7 +242,6 @@ function SectionHeader({
 function NBASection() {
   const [games, setGames] = useState<BdlGame[]>([]);
   const [liveBoxScores, setLiveBoxScores] = useState<Map<number, BdlBoxScore>>(new Map());
-  const [selectedGame, setSelectedGame] = useState<BdlGame | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastSynced, setLastSynced] = useState<Date>(new Date());
   const [syncing, setSyncing] = useState(false);
@@ -318,8 +315,6 @@ function NBASection() {
 
   return (
     <>
-      <NBABoxScoreDrawer game={selectedGame} onClose={() => setSelectedGame(null)} />
-
       <div className="space-y-5">
         {/* Live games */}
         {liveGames.length > 0 && (
@@ -336,8 +331,7 @@ function NBASection() {
                   key={game.id}
                   game={game}
                   boxScore={liveBoxScores.get(game.id) ?? null}
-                  onClick={() => setSelectedGame(game)}
-                />
+                                  />
               ))}
             </div>
           </section>
@@ -357,8 +351,7 @@ function NBASection() {
                   key={game.id}
                   game={game}
                   boxScore={null}
-                  onClick={() => setSelectedGame(game)}
-                />
+                                  />
               ))}
             </div>
           </section>
@@ -377,8 +370,7 @@ function NBASection() {
                   key={game.id}
                   game={game}
                   boxScore={liveBoxScores.get(game.id) ?? null}
-                  onClick={() => setSelectedGame(game)}
-                />
+                                  />
               ))}
             </div>
           </section>
@@ -393,20 +385,15 @@ function NBASection() {
 function CS2Section() {
   const [matches, setMatches] = useState<Cs2Match[]>([]);
   const [maps, setMaps] = useState<Cs2MatchMap[]>([]);
-  const [selectedMatch, setSelectedMatch] = useState<Cs2Match | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastSynced, setLastSynced] = useState<Date>(new Date());
   const [syncing, setSyncing] = useState(false);
-
-  // Fetch today + yesterday to catch recent finished matches
-  const today = new Date().toISOString().split("T")[0];
-  const yesterday = new Date(Date.now() - 86_400_000).toISOString().split("T")[0];
 
   const fetchAll = useCallback(async (quiet = false) => {
     if (quiet) setSyncing(true);
     else setLoading(true);
     try {
-      const matchData = await getCS2Matches([today, yesterday]);
+      const matchData = await getCS2Matches();
       setMatches(matchData);
       if (matchData.length > 0) {
         const matchIds = matchData.map((m) => m.id);
@@ -418,7 +405,7 @@ function CS2Section() {
       setLoading(false);
       setSyncing(false);
     }
-  }, [today, yesterday]);
+  }, []);
 
   useEffect(() => {
     fetchAll();
@@ -461,27 +448,23 @@ function CS2Section() {
   );
 
   return (
-    <>
-      <CS2MatchDrawer match={selectedMatch} onClose={() => setSelectedMatch(null)} />
-
-      <div className="space-y-5">
-        {liveMatches.length > 0 && (
-          <section className="rounded-[28px] border border-emerald-400/20 bg-[linear-gradient(160deg,rgba(54,242,143,0.07),rgba(255,255,255,0.025))] p-5 lg:p-6">
-            <SectionHeader
-              title="Live Now"
-              meta={`${liveMatches.length} match${liveMatches.length !== 1 ? "es" : ""} in progress`}
-              accent
-              badge={dataLabel}
-            />
-            <div className="grid gap-4 xl:grid-cols-2">
-              {liveMatches.map((m) => (
-                <CS2MatchCard
-                  key={m.id}
-                  match={m}
-                  maps={maps}
-                  onClick={() => setSelectedMatch(m)}
-                />
-              ))}
+    <div className="space-y-5">
+      {liveMatches.length > 0 && (
+        <section className="rounded-[28px] border border-emerald-400/20 bg-[linear-gradient(160deg,rgba(54,242,143,0.07),rgba(255,255,255,0.025))] p-5 lg:p-6">
+          <SectionHeader
+            title="Live Now"
+            meta={`${liveMatches.length} match${liveMatches.length !== 1 ? "es" : ""} in progress`}
+            accent
+            badge={dataLabel}
+          />
+          <div className="grid gap-4 xl:grid-cols-2">
+            {liveMatches.map((m) => (
+              <CS2MatchCard
+                key={m.id}
+                match={m}
+                maps={maps}
+              />
+            ))}
             </div>
           </section>
         )}
@@ -495,12 +478,7 @@ function CS2Section() {
             />
             <div className="grid gap-4 xl:grid-cols-2">
               {upcomingMatches.map((m) => (
-                <CS2MatchCard
-                  key={m.id}
-                  match={m}
-                  maps={maps}
-                  onClick={() => setSelectedMatch(m)}
-                />
+                <CS2MatchCard key={m.id} match={m} maps={maps} />
               ))}
             </div>
           </section>
@@ -514,18 +492,12 @@ function CS2Section() {
             />
             <div className="grid gap-4 xl:grid-cols-2">
               {finishedMatches.map((m) => (
-                <CS2MatchCard
-                  key={m.id}
-                  match={m}
-                  maps={maps}
-                  onClick={() => setSelectedMatch(m)}
-                />
+                <CS2MatchCard key={m.id} match={m} maps={maps} />
               ))}
             </div>
           </section>
         )}
-      </div>
-    </>
+    </div>
   );
 }
 
