@@ -133,10 +133,11 @@ export function isMatchUpcoming(status: Cs2MatchStatus): boolean {
 
 /** Normalize a Cs2Match so team1/team2 and scores are always populated */
 export function normalizeMatch(m: Cs2Match): Cs2Match {
-  const t1 = m.opponents?.[0]?.opponent;
-  const t2 = m.opponents?.[1]?.opponent;
-  const s1 = m.results?.find((r) => r.team_id === t1?.id)?.score ?? 0;
-  const s2 = m.results?.find((r) => r.team_id === t2?.id)?.score ?? 0;
+  // BallDontLie returns team1/team2 directly; fall back to opponents[] for other sources
+  const t1 = m.team1 ?? m.opponents?.[0]?.opponent;
+  const t2 = m.team2 ?? m.opponents?.[1]?.opponent;
+  const s1 = m.team1_score ?? m.results?.find((r) => r.team_id === t1?.id)?.score ?? 0;
+  const s2 = m.team2_score ?? m.results?.find((r) => r.team_id === t2?.id)?.score ?? 0;
   return {
     ...m,
     team1: t1,
