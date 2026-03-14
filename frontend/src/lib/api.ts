@@ -53,25 +53,6 @@ export class ApiError extends Error {
 
 // ─── Auth token helper ────────────────────────────────────────────────────
 
-// Reads the token once per request on the server, memoised via React cache.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const _getServerToken: () => string | null = (() => {
-  try {
-    const { cache } = require("react") as { cache: <T extends (...a: unknown[]) => unknown>(fn: T) => T };
-    return cache((): string | null => {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { cookies } = require("next/headers") as { cookies: () => { get(k: string): { value: string } | undefined } };
-        return cookies().get("ae_token")?.value ?? null;
-      } catch {
-        return null;
-      }
-    });
-  } catch {
-    return () => null;
-  }
-})();
-
 function getAuthHeaders(): Record<string, string> {
   if (typeof window !== "undefined") {
     try {
@@ -80,9 +61,15 @@ function getAuthHeaders(): Record<string, string> {
     } catch {}
     return {};
   }
-  // Server-side: token read via React.cache() for correct request-context propagation
-  const token = _getServerToken();
-  if (token) return { Authorization: `Bearer ${token}` };
+  // Server-side: read ae_token cookie via next/headers
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { cookies } = require("next/headers") as { cookies: () => { get(k: string): { value: string } | undefined } };
+    const token = cookies().get("ae_token")?.value;
+    if (token) return { Authorization: `Bearer ${token}` };
+  } catch {
+    // Not in request context (build time, edge, etc.)
+  }
   return {};
 }
 
