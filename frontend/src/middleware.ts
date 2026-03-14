@@ -5,6 +5,12 @@ const AUTH_PAGES = ["/login", "/register", "/forgot-password", "/auth/callback"]
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // API routes: let the backend handle its own auth (returns 401, not a redirect)
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
+
   const token = req.cookies.get("ae_token")?.value;
 
   const isAuthPage = AUTH_PAGES.some(
