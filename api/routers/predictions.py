@@ -12,7 +12,7 @@ model_registry tables using the contract schema defined in api/schemas/mvp.py.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -226,36 +226,38 @@ def list_predictions(
     """
     List match predictions.
 
-    Joins core_matches → pred_match → model_registry when a live model exists.
-    Falls back to returning raw ingested fixtures (no probability scores) when
-    no model has been trained yet — so the dashboard shows real matches immediately
-    after the first data sync.
+    Joins core_matches → pred_match → model_registry when a live model exists
+    AND predictions exist for the current window. Falls back to raw ingested
+    fixtures (ELO-only) when no model is live or no predictions exist yet.
     """
     live_registry = session.query(ModelRegistry).filter_by(is_live=True).first()
+    use_predictions = False
 
     if live_registry is not None:
-        # ── Normal path: return model predictions ─────────────────────────
-        query = (
+        # ── Attempt normal path: return model predictions ──────────────────
+        pred_query = (
             session.query(CoreMatch, PredMatch, ModelRegistry)
             .join(PredMatch, PredMatch.match_id == CoreMatch.id)
             .join(ModelRegistry, ModelRegistry.model_name == PredMatch.model_version)
             .filter(ModelRegistry.is_live == True)
         )
         if sport:
-            query = query.filter(CoreMatch.sport == sport)
+            pred_query = pred_query.filter(CoreMatch.sport == sport)
         if date_from:
-            query = query.filter(CoreMatch.kickoff_utc >= date_from)
+            pred_query = pred_query.filter(CoreMatch.kickoff_utc >= date_from)
         if date_to:
-            query = query.filter(CoreMatch.kickoff_utc <= date_to)
+            pred_query = pred_query.filter(CoreMatch.kickoff_utc <= date_to)
         if status:
-            query = query.filter(CoreMatch.status == status)
+            pred_query = pred_query.filter(CoreMatch.status == status)
 
-        total = query.count()
-        rows = query.order_by(CoreMatch.kickoff_utc.asc()).offset(offset).limit(limit).all()
-        items = [_build_prediction_schema(session, m, p, r) for m, p, r in rows]
+        total = pred_query.count()
+        if total > 0:
+            use_predictions = True
+            rows = pred_query.order_by(CoreMatch.kickoff_utc.asc()).offset(offset).limit(limit).all()
+            items = [_build_prediction_schema(session, m, p, r) for m, p, r in rows]
 
-    else:
-        # ── Fallback: return raw fixtures so the dashboard isn't empty ─────
+    if not use_predictions:
+        # ── Fallback: raw fixtures (live + upcoming) ───────────────────────
         query = session.query(CoreMatch)
         if sport:
             query = query.filter(CoreMatch.sport == sport)
@@ -266,8 +268,8 @@ def list_predictions(
         if status:
             query = query.filter(CoreMatch.status == status)
         elif not date_from and not date_to:
-            # Default: only show upcoming matches when no date range or status is specified
-            query = query.filter(CoreMatch.kickoff_utc >= datetime.utcnow())
+            # Show live matches (kicked off in past 6h) and upcoming
+            query = query.filter(CoreMatch.kickoff_utc >= datetime.utcnow() - timedelta(hours=6))
 
         total = query.count()
         rows = query.order_by(CoreMatch.kickoff_utc.asc()).offset(offset).limit(limit).all()
