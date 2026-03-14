@@ -31,10 +31,12 @@ import type {
   HockeyMatchDetail,
 } from "./types";
 
-// Always use absolute URL — Vercel blocks proxied SSR requests to external origins.
+// Server: absolute URL (Next.js rewrites are browser-only)
+// Client: relative URL through Next.js proxy (same-origin, avoids CORS)
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
-const BASE = `${API_ORIGIN}/api/v1`;
+const BASE = typeof window === "undefined"
+  ? `${API_ORIGIN}/api/v1`
+  : "/api/v1";
 
 // ─── Typed error class ────────────────────────────────────────────────────
 
@@ -51,6 +53,25 @@ export class ApiError extends Error {
 
 // ─── Auth token helper ────────────────────────────────────────────────────
 
+// Reads the token once per request on the server, memoised via React cache.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const _getServerToken: () => string | null = (() => {
+  try {
+    const { cache } = require("react") as { cache: <T extends (...a: unknown[]) => unknown>(fn: T) => T };
+    return cache((): string | null => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { cookies } = require("next/headers") as { cookies: () => { get(k: string): { value: string } | undefined } };
+        return cookies().get("ae_token")?.value ?? null;
+      } catch {
+        return null;
+      }
+    });
+  } catch {
+    return () => null;
+  }
+})();
+
 function getAuthHeaders(): Record<string, string> {
   if (typeof window !== "undefined") {
     try {
@@ -59,15 +80,9 @@ function getAuthHeaders(): Record<string, string> {
     } catch {}
     return {};
   }
-  // Server-side: read ae_token cookie from the active Next.js request context
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { cookies } = require("next/headers") as { cookies: () => { get(k: string): { value: string } | undefined } };
-    const token = cookies().get("ae_token")?.value;
-    if (token) return { Authorization: `Bearer ${token}` };
-  } catch {
-    // Outside request context (build time) — no auth available
-  }
+  // Server-side: token read via React.cache() for correct request-context propagation
+  const token = _getServerToken();
+  if (token) return { Authorization: `Bearer ${token}` };
   return {};
 }
 
