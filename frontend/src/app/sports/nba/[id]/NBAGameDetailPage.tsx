@@ -1890,11 +1890,16 @@ export function NBAGameDetailPage({ gameId }: { gameId: string }) {
       }
       // Always fetch basic game data as fallback when box scores require higher tier
       if (gameRes.ok) {
-        const gJson = await gameRes.json() as { data: BdlGame };
-        if (gJson.data) setFallbackGame(gJson.data);
+        const gJson = await gameRes.json();
+        // BDL returns { data: {...} } for single resources, but handle flat object too
+        const gameData: BdlGame = gJson.data ?? gJson;
+        if (gameData?.id) setFallbackGame(gameData);
+      } else if (!quiet) {
+        const errText = await gameRes.text().catch(() => "");
+        setError(`Game fetch failed (${gameRes.status})${errText ? `: ${errText.slice(0, 80)}` : ""}`);
       }
       setLastSynced(new Date());
-      if (!quiet) setError(null);
+      if (!quiet && gameRes.ok) setError(null);
     } catch (e) {
       if (!quiet) setError("Failed to load game data.");
     } finally {
