@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(`${BDL_BASE}/games?${qs}`, {
       headers: bdlHeaders(),
-      cache: "no-store",
+      next: { revalidate: 600 }, // h2h history — refresh every 10 min
     });
     if (!res.ok) return NextResponse.json({ data: [] }, { status: res.status });
     const json = await res.json();

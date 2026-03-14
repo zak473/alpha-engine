@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(
       `${BDL_BASE}/stats/advanced?game_ids[]=${gameId}&per_page=30`,
-      { headers: bdlHeaders(), cache: "no-store" }
+      { headers: bdlHeaders(), next: { revalidate: 300 } } // advanced stats — refresh every 5 min
     );
     if (!res.ok) return NextResponse.json({ data: [] }, { status: res.status });
     return NextResponse.json(await res.json());

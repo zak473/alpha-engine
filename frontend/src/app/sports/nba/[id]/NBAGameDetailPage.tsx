@@ -1965,12 +1965,16 @@ export function NBAGameDetailPage({ gameId }: { gameId: string }) {
   }, [fetchPrimary]);
 
   // Trigger secondary fetch from ANY game data — boxScore or fallback
+  // Delay 500ms to avoid bursting the BDL rate limit alongside the primary fetch
   useEffect(() => {
     if (secondaryFetchedRef.current) return;
     const g = boxScore?.game ?? fallbackGame;
     if (!g) return;
     secondaryFetchedRef.current = true;
-    fetchSecondary(g.home_team.id, g.visitor_team.id, g.id);
+    const timer = setTimeout(() => {
+      fetchSecondary(g.home_team.id, g.visitor_team.id, g.id);
+    }, 500);
+    return () => clearTimeout(timer);
   }, [boxScore, fallbackGame, fetchSecondary]);
 
   // Live polling

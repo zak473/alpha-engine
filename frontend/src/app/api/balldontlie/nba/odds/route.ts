@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(`${BDL_BASE}/odds?game_ids[]=${gameId}&per_page=50`, {
       headers: bdlHeaders(),
-      cache: "no-store",
+      next: { revalidate: 60 }, // odds — refresh every minute
     });
     if (!res.ok) return NextResponse.json({ data: [] }, { status: res.status });
     return NextResponse.json(await res.json());

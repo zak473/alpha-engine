@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(`${BDL_BASE}/player_injuries?${qs}`, {
       headers: bdlHeaders(),
-      cache: "no-store",
+      next: { revalidate: 120 }, // injuries — refresh every 2 min
     });
     if (!res.ok) return NextResponse.json({ data: [] }, { status: res.status });
     return NextResponse.json(await res.json());

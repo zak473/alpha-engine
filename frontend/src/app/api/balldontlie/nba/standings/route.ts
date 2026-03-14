@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(`${BDL_BASE}/standings?season=${season}&per_page=30`, {
       headers: bdlHeaders(),
-      cache: "no-store",
+      next: { revalidate: 300 }, // standings don't change mid-game
     });
     if (!res.ok) return NextResponse.json({ data: [] }, { status: res.status });
     return NextResponse.json(await res.json());
