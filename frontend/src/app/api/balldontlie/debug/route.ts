@@ -6,10 +6,15 @@ export async function GET() {
   async function test(url: string) {
     try {
       const res = await fetch(url, { headers: { Authorization: key }, cache: "no-store" });
-      const json = await res.json();
-      return { status: res.status, count: json.data?.length ?? 0, sample: json.data?.slice(0, 1) };
+      const text = await res.text();
+      try {
+        const json = JSON.parse(text);
+        return { status: res.status, ok: res.ok, count: json.data?.length ?? (json.id ? 1 : 0), sample: json.data?.[0] ?? (json.id ? { id: json.id } : null) };
+      } catch {
+        return { status: res.status, ok: res.ok, count: 0, raw: text.slice(0, 120) };
+      }
     } catch (e) {
-      return { status: null, count: 0, sample: String(e) };
+      return { status: null, ok: false, count: 0, raw: String(e) };
     }
   }
 
