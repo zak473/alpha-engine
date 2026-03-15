@@ -151,6 +151,7 @@ def _real_player_profile(
     """Fetch real player profile from TennisPlayerProfile table."""
     import re
     import unicodedata
+    from db.models.mvp import CoreTeam
 
     def _norm(s: str) -> str:
         nfkd = unicodedata.normalize("NFKD", s)
@@ -158,15 +159,32 @@ def _real_player_profile(
 
     prof = db.query(TennisPlayerProfile).filter_by(player_id=player_id).first()
     if prof is None:
-        # Try name-based lookup
+        # Try full-name lookup: "Daniil Medvedev" → medvedev_daniil
         parts = player_name.strip().split()
         if len(parts) >= 2:
             first, last = parts[0], parts[-1]
             norm = f"{_norm(last)}_{_norm(first)}"
             prof = db.query(TennisPlayerProfile).filter_by(name_normalized=norm).first()
+    if prof is None:
+        # Fallback: last-name-only match for abbreviated names ("D. Medvedev" → "Medvedev")
+        parts = player_name.strip().split()
+        last = parts[-1] if parts else player_name
+        matches = db.query(TennisPlayerProfile).filter(
+            TennisPlayerProfile.name_last.ilike(last)
+        ).all()
+        if len(matches) == 1:
+            prof = matches[0]
+
+    # Also pull logo from CoreTeam if not on profile
+    team = db.query(CoreTeam).filter_by(id=player_id).first()
+    team_logo = team.logo_url if team else None
 
     if prof is None:
-        return TennisPlayerProfileOut(player_id=player_id, player_name=player_name)
+        return TennisPlayerProfileOut(
+            player_id=player_id,
+            player_name=player_name,
+            logo_url=team_logo,
+        )
 
     age = None
     if prof.dob:
@@ -176,11 +194,15 @@ def _real_player_profile(
             (today.month, today.day) < (prof.dob.month, prof.dob.day)
         )
 
+    logo = prof.logo_url or team_logo
+
     return TennisPlayerProfileOut(
         player_id=player_id,
         player_name=player_name,
         nationality=prof.nationality,
         age=age,
+        ranking=prof.ranking,
+        ranking_points=prof.ranking_points,
         height_cm=prof.height_cm,
         plays=prof.hand,
         turned_pro=prof.turned_pro,
@@ -189,6 +211,7 @@ def _real_player_profile(
         career_win_pct=prof.career_win_pct,
         season_wins=prof.season_wins,
         season_losses=prof.season_losses,
+        logo_url=logo,
     )
 
 

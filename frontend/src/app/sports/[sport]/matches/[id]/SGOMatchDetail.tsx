@@ -665,7 +665,9 @@ function TennisFormSection({ match, homeName, awayName }: { match: SportMatchDet
 function TennisProfileSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
   const ph = (match as unknown as Record<string, unknown>).profile_home as Record<string, unknown> | null | undefined;
   const pa = (match as unknown as Record<string, unknown>).profile_away as Record<string, unknown> | null | undefined;
-  if (!ph && !pa) return null;
+  // Show section even if only logos/names available
+  const hasAnyData = (p: typeof ph) => p && Object.values(p).some((v) => v != null && v !== p.player_id && v !== p.player_name);
+  if (!hasAnyData(ph) && !hasAnyData(pa)) return null;
 
   return (
     <Card title="Player Profiles">
@@ -673,34 +675,48 @@ function TennisProfileSection({ match, homeName, awayName }: { match: SportMatch
         {[{ name: homeName, p: ph }, { name: awayName, p: pa }].map(({ name, p }) => {
           if (!p) return null;
           const rankChange = p.ranking_change_week as number | undefined;
+          const logo = p.logo_url as string | undefined;
           return (
             <div key={name} className="rounded-xl border p-3 space-y-2" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-              <div className="flex items-center justify-between gap-1">
-                <span className="text-xs font-semibold text-text-primary truncate">{name}</span>
-                {p.ranking != null && (
-                  <span className="text-xs font-bold text-text-primary shrink-0">
-                    #{String(p.ranking)}
-                    {rankChange != null && (
-                      <span className={cn("ml-1 text-[9px]", rankChange < 0 ? "text-emerald-400" : "text-red-400")}>
-                        {rankChange < 0 ? `▲${Math.abs(rankChange)}` : `▼${rankChange}`}
-                      </span>
-                    )}
-                  </span>
+              {/* Header: photo + name + ranking */}
+              <div className="flex items-center gap-2">
+                {logo ? (
+                  <img src={logo} alt={name} className="h-8 w-8 rounded-full object-cover shrink-0" style={{ background: "var(--bg3)" }} />
+                ) : (
+                  <div className="h-8 w-8 rounded-full shrink-0 flex items-center justify-center text-xs font-bold text-text-muted" style={{ background: "var(--bg3)" }}>
+                    {name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
+                  </div>
                 )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-text-primary truncate">{name}</div>
+                  {p.ranking != null && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[11px] font-bold" style={{ color: "var(--accent)" }}>
+                        #{String(p.ranking)}
+                      </span>
+                      {p.ranking_points != null && (
+                        <span className="text-[10px] text-text-muted">{Number(p.ranking_points).toLocaleString()} pts</span>
+                      )}
+                      {rankChange != null && (
+                        <span className={cn("text-[9px] font-semibold", rankChange < 0 ? "text-emerald-400" : "text-red-400")}>
+                          {rankChange < 0 ? `▲${Math.abs(rankChange)}` : `▼${rankChange}`}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
                 {[
-                  ["Points", p.ranking_points ? Number(p.ranking_points).toLocaleString() : null],
-                  ["Age", p.age],
                   ["Nationality", p.nationality],
+                  ["Age", p.age],
                   ["Plays", p.plays],
-                  ["Backhand", p.backhand],
                   ["Height", p.height_cm ? `${p.height_cm}cm` : null],
                   ["Turned pro", p.turned_pro],
                   ["Career titles", p.career_titles],
                   ["Grand Slams", p.career_grand_slams ?? p.grand_slams],
                   ["Career W%", p.career_win_pct ? `${(Number(p.career_win_pct) * 100).toFixed(0)}%` : null],
-                  ["Season W/L", (p.season_wins != null && p.season_losses != null) ? `${p.season_wins}/${p.season_losses}` : null],
+                  ["Season W/L", (p.season_wins != null && p.season_losses != null) ? `${p.season_wins}W/${p.season_losses}L` : null],
                   ["Highest rank", p.highest_ranking ? `#${p.highest_ranking}` : null],
                   ["Prize YTD", p.prize_money_ytd_usd ? `$${Number(p.prize_money_ytd_usd).toLocaleString()}` : null],
                   ["Coach", p.coach],

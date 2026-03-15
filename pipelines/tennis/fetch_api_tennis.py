@@ -339,6 +339,7 @@ def _upsert_match(session: Session, event: dict, dry_run: bool = False) -> Optio
         session.flush()
 
     # --- Home player (first_player) ---
+    home_logo = (event.get("event_first_player_logo") or "").strip() or None
     home_pid = f"apitns-player-{first_player_key}" if first_player_key else f"apitns-player-{first_player.lower().replace(' ', '-')}"
     home_team = session.query(CoreTeam).filter_by(provider_id=home_pid).first()
     if home_team is None:
@@ -348,11 +349,15 @@ def _upsert_match(session: Session, event: dict, dry_run: bool = False) -> Optio
             provider_id=home_pid,
             name=first_player,
             short_name=first_player.split(".")[-1].strip() if "." in first_player else first_player,
+            logo_url=home_logo,
         )
         session.add(home_team)
         session.flush()
+    elif home_logo and not home_team.logo_url:
+        home_team.logo_url = home_logo
 
     # --- Away player (second_player) ---
+    away_logo = (event.get("event_second_player_logo") or "").strip() or None
     away_pid = f"apitns-player-{second_player_key}" if second_player_key else f"apitns-player-{second_player.lower().replace(' ', '-')}"
     away_team = session.query(CoreTeam).filter_by(provider_id=away_pid).first()
     if away_team is None:
@@ -362,9 +367,12 @@ def _upsert_match(session: Session, event: dict, dry_run: bool = False) -> Optio
             provider_id=away_pid,
             name=second_player,
             short_name=second_player.split(".")[-1].strip() if "." in second_player else second_player,
+            logo_url=away_logo,
         )
         session.add(away_team)
         session.flush()
+    elif away_logo and not away_team.logo_url:
+        away_team.logo_url = away_logo
 
     # Skip if both players resolved to the same entity (happens with some doubles formats)
     if home_team.id == away_team.id:

@@ -203,6 +203,7 @@ class TennisPlayerProfileOut(BaseModel):
     season_wins: Optional[int] = None
     season_losses: Optional[int] = None
     highest_ranking: Optional[int] = None
+    logo_url: Optional[str] = None
 
 
 class TennisTiebreakOut(BaseModel):

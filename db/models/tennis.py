@@ -169,6 +169,10 @@ class TennisPlayerProfile(Base):
     career_wins: Mapped[int] = mapped_column(Integer, nullable=True)
     career_losses: Mapped[int] = mapped_column(Integer, nullable=True)
     career_win_pct: Mapped[float] = mapped_column(Float, nullable=True)
+    # Live ranking (synced from api-tennis.com get_players)
+    ranking: Mapped[int] = mapped_column(Integer, nullable=True)
+    ranking_points: Mapped[int] = mapped_column(Integer, nullable=True)
+    logo_url: Mapped[str] = mapped_column(String(500), nullable=True)
     # Current season
     season_wins: Mapped[int] = mapped_column(Integer, nullable=True)
     season_losses: Mapped[int] = mapped_column(Integer, nullable=True)

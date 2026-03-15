@@ -36,6 +36,9 @@ log = logging.getLogger(__name__)
 ATP_PLAYERS_URL = "https://raw.githubusercontent.com/JeffSackmann/tennis_atp/master/atp_players.csv"
 WTA_PLAYERS_URL = "https://raw.githubusercontent.com/JeffSackmann/tennis_wta/master/wta_players.csv"
 
+# api-tennis.com base URL for player lookups
+API_TENNIS_BASE = "https://api.api-tennis.com/tennis/"
+
 # Sackmann hand codes → readable
 _HAND_MAP = {"R": "Right-handed", "L": "Left-handed", "U": None, "A": None}
 
@@ -126,6 +129,26 @@ def _compute_career_stats(session: Session, player_id: str) -> dict:
     }
 
 
+def _fetch_api_tennis_player(player_key: str) -> Optional[dict]:
+    """Fetch player info from api-tennis.com get_players endpoint."""
+    from config.settings import settings
+    api_key = getattr(settings, "TENNIS_LIVE_API_KEY", None)
+    if not api_key:
+        return None
+    try:
+        resp = httpx.get(
+            API_TENNIS_BASE,
+            params={"method": "get_players", "APIkey": api_key, "player_key": player_key},
+            timeout=10,
+        )
+        data = resp.json()
+        if data.get("success") == 1 and data.get("result"):
+            return data["result"][0]
+    except Exception as exc:
+        log.debug("api-tennis get_players(%s) failed: %s", player_key, exc)
+    return None
+
+
 def run(dry_run: bool = False) -> int:
     """Download player profiles and upsert into TennisPlayerProfile table."""
     from db.models.mvp import CoreTeam
@@ -159,14 +182,19 @@ def run(dry_run: bool = False) -> int:
             CoreTeam.provider_id.like("apitns-player-%")
         ).all()
         team_by_norm: dict[str, str] = {}
+        # Also build a last-name-only index for abbreviated names like "D. Medvedev"
+        team_by_lastname: dict[str, list[str]] = {}
         for t in teams:
-            # Try "last_first" and "first_last" patterns
             parts = t.name.strip().split()
             if len(parts) >= 2:
-                # "Novak Djokovic" → djokovic_novak
+                # "Novak Djokovic" → djokovic_novak  (full first name)
                 first, last = parts[0], parts[-1]
                 team_by_norm[f"{_normalize(last)}_{_normalize(first)}"] = t.id
                 team_by_norm[f"{_normalize(first)}_{_normalize(last)}"] = t.id
+                # "D. Medvedev" — first part is just an initial; index by last name only
+                if len(first.rstrip(".")) <= 2:
+                    ln = _normalize(last)
+                    team_by_lastname.setdefault(ln, []).append(t.id)
             # full name normalized
             team_by_norm[_normalize(t.name)] = t.id
 
@@ -219,6 +247,13 @@ def run(dry_run: bool = False) -> int:
                     team_by_norm.get(f"{_normalize(name_last)}_{_normalize(name_first)}") or
                     team_by_norm.get(_normalize(f"{name_first} {name_last}"))
                 )
+                # Fallback: match abbreviated names (e.g. "D. Medvedev") by last name only
+                # if exactly one abbreviated team has this last name
+                if matched_id is None:
+                    ln = _normalize(name_last)
+                    candidates = team_by_lastname.get(ln, [])
+                    if len(candidates) == 1:
+                        matched_id = candidates[0]
                 if matched_id:
                     # Check no other profile already claims this player_id
                     existing = session.query(TennisPlayerProfile).filter_by(player_id=matched_id).first()
@@ -249,6 +284,58 @@ def run(dry_run: bool = False) -> int:
             session.commit()
             log.info("fetch_player_profiles: upserted %d, linked %d, career stats updated for %d.",
                      upserted, linked, len(linked_profiles))
+
+            # Third pass: sync ranking + logo from api-tennis.com for all apitns- linked players
+            log.info("Syncing rankings from api-tennis.com...")
+            ranking_updated = 0
+            apitns_teams = session.query(CoreTeam).filter(
+                CoreTeam.provider_id.like("apitns-player-%")
+            ).all()
+            for team in apitns_teams:
+                player_key = team.provider_id.split("apitns-player-")[-1]
+                if not player_key.isdigit():
+                    continue
+                api_data = _fetch_api_tennis_player(player_key)
+                if not api_data:
+                    continue
+
+                # Store logo_url on CoreTeam
+                logo = api_data.get("player_logo")
+                if logo and not team.logo_url:
+                    team.logo_url = logo
+
+                # Find latest season stats for ranking/titles
+                stats_list = api_data.get("stats") or []
+                singles_stats = [s for s in stats_list if s.get("type") == "singles"]
+                if singles_stats:
+                    # Most recent season first
+                    latest = sorted(singles_stats, key=lambda s: s.get("season", "0"), reverse=True)[0]
+                    rank_raw = latest.get("rank")
+                    rank_val = int(rank_raw) if str(rank_raw or "").isdigit() else None
+
+                    # Update or create profile entry
+                    prof = session.query(TennisPlayerProfile).filter_by(player_id=team.id).first()
+                    if prof is None:
+                        prof = TennisPlayerProfile(player_id=team.id, player_name=team.name)
+                        session.add(prof)
+                    if rank_val is not None:
+                        prof.ranking = rank_val
+                    if logo:
+                        prof.logo_url = logo
+                    # Populate season W/L if not already populated
+                    won = latest.get("matches_won")
+                    lost = latest.get("matches_lost")
+                    if str(won or "").isdigit():
+                        prof.season_wins = int(won)
+                    if str(lost or "").isdigit():
+                        prof.season_losses = int(lost)
+                    ranking_updated += 1
+
+                import time as _time
+                _time.sleep(0.3)  # be kind to the API
+
+            session.commit()
+            log.info("Rankings synced for %d players.", ranking_updated)
         else:
             log.info("[dry-run] Would upsert %d profiles, link %d", upserted, linked)
 
