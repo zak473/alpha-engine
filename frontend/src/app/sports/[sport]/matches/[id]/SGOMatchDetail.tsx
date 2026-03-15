@@ -422,35 +422,242 @@ function SimulationSection({ match }: { match: SportMatchDetail }) {
 
 // ─── Tennis-specific sections ─────────────────────────────────────────────────
 
-function TennisInfoSection({ match }: { match: SportMatchDetail }) {
+function TennisInfoSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
   const info = (match as unknown as Record<string, unknown>).tennis_info as Record<string, unknown> | null | undefined;
   if (!info) return null;
+
+  const sets = (info.sets_detail as Array<Record<string, unknown>> | undefined) ?? [];
+  const retired = info.retired as boolean | undefined;
+
   return (
-    <Card title="Match Details">
-      <div className="grid gap-2 sm:grid-cols-2">
+    <Card title="Match Info">
+      {/* Set-by-set scoreboard */}
+      {sets.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11px]">
+            <thead>
+              <tr className="text-text-muted">
+                <th className="text-left font-medium pb-1 pr-3">Player</th>
+                {sets.map((s) => <th key={String(s.set_num)} className="text-center font-medium pb-1 px-2 min-w-[28px]">S{String(s.set_num)}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {[{ label: homeName, key: "a" }, { label: awayName, key: "b" }].map(({ label, key }) => (
+                <tr key={key} className="border-t" style={{ borderColor: "var(--border0)" }}>
+                  <td className="py-1.5 pr-3 text-text-primary font-medium whitespace-nowrap truncate max-w-[120px]">{label}</td>
+                  {sets.map((s) => {
+                    const games = s[key] as number | undefined;
+                    const tb = s[`tb_${key}` as keyof typeof s] as number | undefined;
+                    return (
+                      <td key={String(s.set_num)} className="py-1.5 px-2 text-center font-mono font-semibold text-text-primary">
+                        {games ?? "—"}{tb != null ? <sup className="text-[8px] text-text-muted ml-0.5">{tb}</sup> : ""}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {retired && <div className="text-[10px] text-amber-400 mt-1">Retired</div>}
+        </div>
+      )}
+
+      {/* Match metadata grid */}
+      <div className="grid gap-1.5 grid-cols-2">
         {[
           { label: "Surface", value: info.surface },
           { label: "Round", value: info.round_name },
           { label: "Format", value: info.best_of ? `Best of ${info.best_of}` : null },
-          { label: "Indoor", value: info.is_indoor != null ? (info.is_indoor ? "Indoor" : "Outdoor") : null },
+          { label: "Setting", value: info.is_indoor != null ? (info.is_indoor ? "Indoor" : "Outdoor") : null },
           { label: "Level", value: info.tournament_level },
-          { label: "Court speed", value: info.court_speed_index ? `${info.court_speed_index}/100` : null },
-          { label: "Prize pool", value: info.tournament_prize_pool_usd ? `$${Number(info.tournament_prize_pool_usd).toLocaleString()}` : null },
+          { label: "Court speed", value: info.court_speed_index ? `${Number(info.court_speed_index).toFixed(0)}/100` : null },
+          { label: "Balls", value: info.balls_brand },
           { label: "Draw size", value: info.draw_size },
+          { label: "Prize pool", value: info.tournament_prize_pool_usd ? `$${Number(info.tournament_prize_pool_usd).toLocaleString()}` : null },
+          { label: "Points on offer", value: info.points_on_offer },
+          { label: "Duration", value: info.match_duration_min ? `${info.match_duration_min}min` : null },
         ].filter((r) => r.value != null).map(({ label, value }) => (
-          <div key={label} className="rounded-xl border px-3 py-2.5" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-            <div className="text-[10px] uppercase tracking-[0.14em] text-text-muted">{label}</div>
-            <div className="text-sm text-text-primary">{String(value)}</div>
+          <div key={label} className="rounded-lg border px-2.5 py-1.5" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+            <div className="text-[9px] uppercase tracking-[0.12em] text-text-muted">{label}</div>
+            <div className="text-xs text-text-primary font-medium">{String(value)}</div>
           </div>
         ))}
       </div>
-      {/* Rest days */}
-      {(info.player_a_days_rest != null || info.player_b_days_rest != null) && (
-        <div className="flex gap-3 text-[11px] text-text-muted">
-          {info.player_a_days_rest != null && <span>Home rest: <b className="text-text-primary">{String(info.player_a_days_rest)}d</b></span>}
-          {info.player_b_days_rest != null && <span>Away rest: <b className="text-text-primary">{String(info.player_b_days_rest)}d</b></span>}
+
+      {/* Fatigue indicators */}
+      {(info.player_a_days_rest != null || info.player_a_matches_last_14d != null) && (
+        <div className="grid grid-cols-2 gap-1.5">
+          {[
+            { name: homeName, rest: info.player_a_days_rest as number | null, load: info.player_a_matches_last_14d as number | null },
+            { name: awayName, rest: info.player_b_days_rest as number | null, load: info.player_b_matches_last_14d as number | null },
+          ].map(({ name, rest, load }) => (
+            <div key={name} className="rounded-lg border px-2.5 py-1.5" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+              <div className="text-[9px] uppercase tracking-[0.12em] text-text-muted truncate">{name}</div>
+              <div className="text-[10px] text-text-primary mt-0.5">
+                {rest != null && <span>Rest: <b>{rest}d</b></span>}
+                {rest != null && load != null && <span className="mx-1 text-text-muted">·</span>}
+                {load != null && <span>14d load: <b>{load}</b></span>}
+              </div>
+            </div>
+          ))}
         </div>
       )}
+    </Card>
+  );
+}
+
+function TennisServeStatsSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
+  const sh = (match as unknown as Record<string, unknown>).stats_home as Record<string, unknown> | null | undefined;
+  const sa = (match as unknown as Record<string, unknown>).stats_away as Record<string, unknown> | null | undefined;
+  if (!sh && !sa) return null;
+
+  const rows: { label: string; hKey: string; aKey: string; pct?: boolean }[] = [
+    { label: "Aces",             hKey: "aces",                    aKey: "aces" },
+    { label: "Double Faults",    hKey: "double_faults",           aKey: "double_faults" },
+    { label: "1st Serve In %",   hKey: "first_serve_in_pct",      aKey: "first_serve_in_pct",      pct: true },
+    { label: "1st Serve Won %",  hKey: "first_serve_won_pct",     aKey: "first_serve_won_pct",     pct: true },
+    { label: "2nd Serve Won %",  hKey: "second_serve_won_pct",    aKey: "second_serve_won_pct",    pct: true },
+    { label: "Hold %",           hKey: "service_hold_pct",        aKey: "service_hold_pct",        pct: true },
+    { label: "BP Created",       hKey: "break_points_created",    aKey: "break_points_created" },
+    { label: "BP Conv %",        hKey: "bp_conversion_pct",       aKey: "bp_conversion_pct",       pct: true },
+    { label: "Winners",          hKey: "winners",                  aKey: "winners" },
+    { label: "Unforced Errors",  hKey: "unforced_errors",         aKey: "unforced_errors" },
+    { label: "W/UE Ratio",       hKey: "winner_ue_ratio",         aKey: "winner_ue_ratio" },
+    { label: "Net Win %",        hKey: "net_win_pct",             aKey: "net_win_pct",             pct: true },
+    { label: "Rally 0-4 Won %",  hKey: "rally_0_4_won_pct",      aKey: "rally_0_4_won_pct",       pct: true },
+    { label: "Rally 5-8 Won %",  hKey: "rally_5_8_won_pct",      aKey: "rally_5_8_won_pct",       pct: true },
+    { label: "Rally 9+ Won %",   hKey: "rally_9plus_won_pct",     aKey: "rally_9plus_won_pct",     pct: true },
+    { label: "1st Serve Avg",    hKey: "first_serve_avg_mph",     aKey: "first_serve_avg_mph" },
+    { label: "1st Serve Max",    hKey: "first_serve_max_mph",     aKey: "first_serve_max_mph" },
+  ];
+
+  const active = rows.filter(r => sh?.[r.hKey] != null || sa?.[r.aKey] != null);
+  if (!active.length) return null;
+
+  const fmtStat = (v: unknown, pct?: boolean): string => {
+    if (v == null) return "—";
+    const n = Number(v);
+    if (pct) return `${(n > 1 ? n : n * 100).toFixed(0)}%`;
+    return Number.isInteger(n) ? String(n) : n.toFixed(2);
+  };
+
+  return (
+    <Card title="Serve Stats">
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-x-2 mb-1">
+        <span className="text-right text-[10px] font-semibold text-text-muted truncate">{homeName}</span>
+        <span />
+        <span className="text-[10px] font-semibold text-text-muted truncate">{awayName}</span>
+      </div>
+      <div className="space-y-1">
+        {active.map(({ label, hKey, aKey, pct }) => (
+          <div key={label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-lg border px-2.5 py-1" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+            <span className="text-right text-xs text-text-primary">{fmtStat(sh?.[hKey], pct)}</span>
+            <span className="text-[9px] uppercase tracking-[0.12em] text-text-muted text-center min-w-[80px]">{label}</span>
+            <span className="text-xs text-text-primary">{fmtStat(sa?.[aKey], pct)}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function TennisTiebreakSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
+  const tb = (match as unknown as Record<string, unknown>).tiebreaks as Record<string, unknown> | null | undefined;
+  if (!tb) return null;
+  const list = (tb.tiebreaks as Array<Record<string, unknown>> | undefined) ?? [];
+  const aWon = tb.player_a_tiebreaks_won as number | undefined;
+  const bWon = tb.player_b_tiebreaks_won as number | undefined;
+  if (!list.length && aWon == null) return null;
+
+  return (
+    <Card title="Tiebreaks">
+      {(aWon != null || bWon != null) && (
+        <div className="grid grid-cols-2 gap-2">
+          {[{ name: homeName, won: aWon }, { name: awayName, won: bWon }].map(({ name, won }) => (
+            <div key={name} className="rounded-lg border px-2.5 py-2 text-center" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+              <div className="text-[9px] uppercase tracking-[0.12em] text-text-muted truncate">{name}</div>
+              <div className="text-xl font-bold text-text-primary">{won ?? 0}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {list.length > 0 && (
+        <div className="space-y-1">
+          {list.map((t, i) => {
+            const winner = t.winner === "a" ? homeName : awayName;
+            return (
+              <div key={i} className="flex items-center justify-between rounded-lg border px-2.5 py-1.5 text-xs" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+                <span className="text-text-muted">Set {String(t.set_num)}</span>
+                <span className="font-mono font-semibold text-text-primary">{String(t.score_a ?? "—")}–{String(t.score_b ?? "—")}</span>
+                <span className="text-emerald-400 text-[10px] truncate max-w-[80px]">{winner}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function TennisFormSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
+  const fh = (match as unknown as Record<string, unknown>).form_home as Record<string, unknown> | null | undefined;
+  const fa = (match as unknown as Record<string, unknown>).form_away as Record<string, unknown> | null | undefined;
+  if (!fh && !fa) return null;
+
+  const renderPlayer = (name: string, f: Record<string, unknown> | null | undefined) => {
+    if (!f) return null;
+    const wins = f.wins as number | undefined;
+    const losses = f.losses as number | undefined;
+    const winPct = f.win_pct as number | undefined;
+    const trend = f.ranking_trend as number | undefined;
+    return (
+      <div key={name} className="rounded-xl border p-3 space-y-2" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-semibold text-text-primary truncate">{name}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            {winPct != null && <span className="text-[10px] font-semibold text-emerald-400">{(winPct * (winPct > 1 ? 1 : 100)).toFixed(0)}% W</span>}
+            {trend != null && (
+              <span className={cn("text-[10px] font-semibold", trend < 0 ? "text-emerald-400" : "text-red-400")}>
+                {trend < 0 ? `▲${Math.abs(trend)}` : `▼${trend}`}
+              </span>
+            )}
+          </div>
+        </div>
+        {/* W/L record */}
+        {(wins != null || losses != null) && (
+          <div className="text-[10px] text-text-muted">
+            {wins != null && losses != null ? `${wins}W – ${losses}L` : wins != null ? `${wins}W` : `${losses}L`}
+            {(f.matches_played as number | undefined) != null && ` (${f.matches_played} matches)`}
+          </div>
+        )}
+        {/* Surface breakdown */}
+        {(f.win_pct_hard != null || f.win_pct_clay != null || f.win_pct_grass != null) && (
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-text-muted">
+            {f.win_pct_hard != null && <span>Hard: <b className="text-text-primary">{(Number(f.win_pct_hard) * 100).toFixed(0)}%</b></span>}
+            {f.win_pct_clay != null && <span>Clay: <b className="text-text-primary">{(Number(f.win_pct_clay) * 100).toFixed(0)}%</b></span>}
+            {f.win_pct_grass != null && <span>Grass: <b className="text-text-primary">{(Number(f.win_pct_grass) * 100).toFixed(0)}%</b></span>}
+          </div>
+        )}
+        {/* Serve/return averages */}
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-text-muted">
+          {f.avg_first_serve_in_pct != null && <span>1st In: <b className="text-text-primary">{(Number(f.avg_first_serve_in_pct) * 100).toFixed(0)}%</b></span>}
+          {f.avg_service_hold_pct != null && <span>Hold: <b className="text-text-primary">{(Number(f.avg_service_hold_pct) * 100).toFixed(0)}%</b></span>}
+          {f.avg_bp_conversion_pct != null && <span>BP Conv: <b className="text-text-primary">{(Number(f.avg_bp_conversion_pct) * 100).toFixed(0)}%</b></span>}
+          {f.tiebreak_win_pct != null && <span>TB Win: <b className="text-text-primary">{(Number(f.tiebreak_win_pct) * 100).toFixed(0)}%</b></span>}
+          {f.three_setters_pct != null && <span>3-setters: <b className="text-text-primary">{(Number(f.three_setters_pct) * 100).toFixed(0)}%</b></span>}
+          {f.avg_match_duration_min != null && <span>Avg duration: <b className="text-text-primary">{Math.round(Number(f.avg_match_duration_min))}min</b></span>}
+          {f.titles_ytd != null && <span>Titles YTD: <b className="text-text-primary">{String(f.titles_ytd)}</b></span>}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <Card title="Player Form">
+      <div className="grid gap-2 sm:grid-cols-2">
+        {renderPlayer(homeName, fh)}
+        {renderPlayer(awayName, fa)}
+      </div>
     </Card>
   );
 }
@@ -462,25 +669,40 @@ function TennisProfileSection({ match, homeName, awayName }: { match: SportMatch
 
   return (
     <Card title="Player Profiles">
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         {[{ name: homeName, p: ph }, { name: awayName, p: pa }].map(({ name, p }) => {
           if (!p) return null;
+          const rankChange = p.ranking_change_week as number | undefined;
           return (
             <div key={name} className="rounded-xl border p-3 space-y-2" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-              <div className="text-sm font-semibold text-text-primary">{name}</div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-xs font-semibold text-text-primary truncate">{name}</span>
+                {p.ranking != null && (
+                  <span className="text-xs font-bold text-text-primary shrink-0">
+                    #{String(p.ranking)}
+                    {rankChange != null && (
+                      <span className={cn("ml-1 text-[9px]", rankChange < 0 ? "text-emerald-400" : "text-red-400")}>
+                        {rankChange < 0 ? `▲${Math.abs(rankChange)}` : `▼${rankChange}`}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
                 {[
-                  ["Ranking", p.ranking ? `#${p.ranking}` : null],
-                  ["Points", p.ranking_points],
+                  ["Points", p.ranking_points ? Number(p.ranking_points).toLocaleString() : null],
                   ["Age", p.age],
                   ["Nationality", p.nationality],
                   ["Plays", p.plays],
                   ["Backhand", p.backhand],
                   ["Height", p.height_cm ? `${p.height_cm}cm` : null],
                   ["Turned pro", p.turned_pro],
-                  ["Titles", p.career_titles],
-                  ["Grand Slams", p.grand_slams],
+                  ["Career titles", p.career_titles],
+                  ["Grand Slams", p.career_grand_slams ?? p.grand_slams],
+                  ["Career W%", p.career_win_pct ? `${(Number(p.career_win_pct) * 100).toFixed(0)}%` : null],
                   ["Season W/L", (p.season_wins != null && p.season_losses != null) ? `${p.season_wins}/${p.season_losses}` : null],
+                  ["Highest rank", p.highest_ranking ? `#${p.highest_ranking}` : null],
+                  ["Prize YTD", p.prize_money_ytd_usd ? `$${Number(p.prize_money_ytd_usd).toLocaleString()}` : null],
                   ["Coach", p.coach],
                 ].filter(([, v]) => v != null).map(([label, value]) => (
                   <div key={String(label)}>
@@ -1045,15 +1267,30 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
       {hasInfoData && (
         <div className="grid gap-4 lg:grid-cols-2">
 
-          {/* Left info column: SGO live data */}
+          {/* Left info column */}
           <div className="space-y-3">
-            <SGOVenueSection event={event} />
-            <SGOTeamStatsSection event={event} homeName={match.home.name} awayName={match.away.name} />
-            {backendMatch && (isLive || isFinished) && <EventsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
-            <LiveStatsSection match={backendMatch ?? ({} as SportMatchDetail)} homeName={match.home.name} awayName={match.away.name} />
-            <SGOPlayerStatsSection event={event} homeName={match.home.name} awayName={match.away.name} />
-            {backendMatch && <LineupSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
-            {backendMatch && <InjuriesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
+            {sport === "tennis" ? (
+              /* Tennis: match info, serve stats, tiebreaks, profiles */
+              backendMatch && (
+                <>
+                  <TennisInfoSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                  <TennisServeStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                  <TennisTiebreakSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                  <TennisProfileSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                </>
+              )
+            ) : (
+              /* Other sports: SGO live data */
+              <>
+                <SGOVenueSection event={event} />
+                <SGOTeamStatsSection event={event} homeName={match.home.name} awayName={match.away.name} />
+                {backendMatch && (isLive || isFinished) && <EventsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
+                <LiveStatsSection match={backendMatch ?? ({} as SportMatchDetail)} homeName={match.home.name} awayName={match.away.name} />
+                <SGOPlayerStatsSection event={event} homeName={match.home.name} awayName={match.away.name} />
+                {backendMatch && <LineupSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
+                {backendMatch && <InjuriesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
+              </>
+            )}
           </div>
 
           {/* Right info column: model + analytics */}
@@ -1062,18 +1299,20 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
               <>
                 <ProbabilitiesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
                 <EloSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} eloHome={eloHome} eloAway={eloAway} cfg={cfg} />
-                <FormSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                {sport === "tennis" ? (
+                  <TennisFormSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                ) : (
+                  <FormSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                )}
                 <H2HSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                <LeagueContextSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                {sport !== "tennis" && <LeagueContextSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
                 <KeyDriversSection match={backendMatch} />
                 <SimulationSection match={backendMatch} />
-                <StatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                <AdvancedStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                {sport !== "tennis" && <StatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
+                {sport !== "tennis" && <AdvancedStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
                 <ContextSection match={backendMatch} />
-                {sport === "tennis" && <TennisInfoSection match={backendMatch} />}
-                {sport === "tennis" && <TennisProfileSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
                 {sport === "esports" && <EsportsInfoSection match={backendMatch} />}
-                <RefereeSection match={backendMatch} />
+                {sport !== "tennis" && <RefereeSection match={backendMatch} />}
               </>
             ) : (
               <div className="sportsbook-card p-5 text-sm text-text-muted">
