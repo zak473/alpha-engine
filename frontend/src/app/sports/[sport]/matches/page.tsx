@@ -38,7 +38,7 @@ export default function SportMatchesPage({ params }: PageProps) {
 
   return (
     <AppShell title={`${icon} ${label} Hub`} subtitle="Fixtures, live prices, and in-play reads">
-      <SportMatchesView sport={sport} matches={[]} total={0} />
+      <SportMatchesView sport={sport} />
     </AppShell>
   );
 }
