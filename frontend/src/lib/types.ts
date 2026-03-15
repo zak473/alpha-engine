@@ -431,6 +431,22 @@ export interface SportMatchDetail {
   }>;
   stats_home_live?: Record<string, unknown> | null;
   stats_away_live?: Record<string, unknown> | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  lineup_home?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  lineup_away?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  injuries_home?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  injuries_away?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  referee?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  league_context?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  adv_home?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  adv_away?: any;
 }
 
 // Soccer-specific ELO history point

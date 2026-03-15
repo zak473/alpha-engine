@@ -149,9 +149,9 @@ function ProbabilitiesSection({ match, homeName, awayName }: { match: SportMatch
           )}
         </div>
       )}
-      {match.model && (
+      {match.model?.accuracy != null && (
         <div className="text-[10px] text-text-muted pt-1">
-          Model: {match.model.version ?? "—"} · Acc: {match.model.accuracy != null ? `${(match.model.accuracy * 100).toFixed(1)}%` : "—"}
+          Model accuracy: {(match.model.accuracy * 100).toFixed(1)}%
         </div>
       )}
     </Card>
@@ -526,8 +526,8 @@ function EsportsInfoSection({ match }: { match: SportMatchDetail }) {
 // ─── Lineup section ───────────────────────────────────────────────────────────
 
 function LineupSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
-  const lh = (match as unknown as Record<string, unknown>).lineup_home as Record<string, unknown> | null | undefined;
-  const la = (match as unknown as Record<string, unknown>).lineup_away as Record<string, unknown> | null | undefined;
+  const lh = match.lineup_home as Record<string, unknown> | null | undefined;
+  const la = match.lineup_away as Record<string, unknown> | null | undefined;
   if (!lh && !la) return null;
 
   return (
@@ -564,8 +564,8 @@ function LineupSection({ match, homeName, awayName }: { match: SportMatchDetail;
 // ─── Injuries section ─────────────────────────────────────────────────────────
 
 function InjuriesSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
-  const ih = (match as unknown as Record<string, unknown>).injuries_home as Array<Record<string, unknown>> | null | undefined;
-  const ia = (match as unknown as Record<string, unknown>).injuries_away as Array<Record<string, unknown>> | null | undefined;
+  const ih = match.injuries_home as Array<Record<string, unknown>> | null | undefined;
+  const ia = match.injuries_away as Array<Record<string, unknown>> | null | undefined;
   if ((!ih || !ih.length) && (!ia || !ia.length)) return null;
 
   return (
@@ -595,7 +595,7 @@ function InjuriesSection({ match, homeName, awayName }: { match: SportMatchDetai
 // ─── Referee section ─────────────────────────────────────────────────────────
 
 function RefereeSection({ match }: { match: SportMatchDetail }) {
-  const ref = (match as unknown as Record<string, unknown>).referee as Record<string, unknown> | null | undefined;
+  const ref = match.referee as Record<string, unknown> | null | undefined;
   if (!ref?.name) return null;
   return (
     <Card title="Referee">
@@ -607,6 +607,107 @@ function RefereeSection({ match }: { match: SportMatchDetail }) {
           {ref.home_win_pct != null && <span>Home win%: <b className="text-text-primary">{fmt(ref.home_win_pct)}</b></span>}
           {ref.nationality != null && <span>Nationality: <b className="text-text-primary">{String(ref.nationality)}</b></span>}
         </div>
+      </div>
+    </Card>
+  );
+}
+
+// ─── League context section ───────────────────────────────────────────────────
+
+function LeagueContextSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
+  const lc = match.league_context as Record<string, unknown> | null | undefined;
+  if (!lc || (lc.home_position == null && lc.away_position == null)) return null;
+  return (
+    <Card title="League Standing">
+      <div className="grid grid-cols-2 gap-3">
+        {[{ name: homeName, pos: lc.home_position, pts: lc.home_points, played: lc.home_games_played },
+          { name: awayName, pos: lc.away_position, pts: lc.away_points, played: lc.away_games_played }].map(({ name, pos, pts, played }) => (
+          <div key={name} className="rounded-xl border p-3" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+            <div className="text-[10px] uppercase tracking-[0.14em] text-text-muted mb-1 truncate">{name}</div>
+            {pos != null && <div className="text-2xl font-bold text-text-primary">#{String(pos)}</div>}
+            <div className="flex gap-3 text-[10px] text-text-muted mt-1">
+              {pts != null && <span>Pts: <b className="text-text-primary">{String(pts)}</b></span>}
+              {played != null && <span>P: <b className="text-text-primary">{String(played)}</b></span>}
+            </div>
+          </div>
+        ))}
+      </div>
+      {lc.points_gap != null && (
+        <div className="text-[10px] text-text-muted text-center pt-1">
+          Points gap: <b className="text-text-primary">{Number(lc.points_gap) > 0 ? `+${lc.points_gap}` : String(lc.points_gap)}</b>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ─── Live stats section ───────────────────────────────────────────────────────
+
+const LIVE_STAT_LABELS: Record<string, string> = {
+  possession: "Possession %",
+  shots: "Shots",
+  shots_on_target: "On Target",
+  xg: "xG",
+  corners: "Corners",
+  fouls: "Fouls",
+  yellow_cards: "Yellow Cards",
+  red_cards: "Red Cards",
+  passes: "Passes",
+  pass_accuracy: "Pass Acc %",
+  offsides: "Offsides",
+  saves: "Saves",
+};
+
+function LiveStatsSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
+  const sh = match.stats_home_live as Record<string, unknown> | null | undefined;
+  const sa = match.stats_away_live as Record<string, unknown> | null | undefined;
+  if (!sh && !sa) return null;
+  const keys = Object.keys(LIVE_STAT_LABELS).filter((k) => sh?.[k] != null || sa?.[k] != null);
+  if (!keys.length) return null;
+  return (
+    <Card title="Live Stats">
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-x-2 mb-2">
+        <span className="text-right text-[10px] font-semibold text-text-muted">{homeName}</span>
+        <span />
+        <span className="text-[10px] font-semibold text-text-muted">{awayName}</span>
+      </div>
+      <div className="space-y-1.5">
+        {keys.map((k) => <StatRow key={k} label={LIVE_STAT_LABELS[k] ?? k} home={sh?.[k]} away={sa?.[k]} />)}
+      </div>
+    </Card>
+  );
+}
+
+// ─── Advanced stats section ───────────────────────────────────────────────────
+
+const ADV_STAT_LABELS: Record<string, string> = {
+  ppda: "PPDA (pressing)",
+  high_press_success_rate: "Press Success %",
+  big_chances_created: "Big Chances Created",
+  big_chances_missed: "Big Chances Missed",
+  big_chance_conversion_pct: "Chance Conv %",
+  set_piece_goals: "Set Piece Goals",
+  corners_won: "Corners Won",
+  aerial_duel_win_pct: "Aerial Duels Won %",
+  xpts: "xPoints",
+  final_third_entries: "Final 3rd Entries",
+};
+
+function AdvancedStatsSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
+  const ah = match.adv_home as Record<string, unknown> | null | undefined;
+  const aa = match.adv_away as Record<string, unknown> | null | undefined;
+  if (!ah && !aa) return null;
+  const keys = Object.keys(ADV_STAT_LABELS).filter((k) => ah?.[k] != null || aa?.[k] != null);
+  if (!keys.length) return null;
+  return (
+    <Card title="Advanced Stats">
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-x-2 mb-2">
+        <span className="text-right text-[10px] font-semibold text-text-muted">{homeName}</span>
+        <span />
+        <span className="text-[10px] font-semibold text-text-muted">{awayName}</span>
+      </div>
+      <div className="space-y-1.5">
+        {keys.map((k) => <StatRow key={k} label={ADV_STAT_LABELS[k] ?? k} home={ah?.[k]} away={aa?.[k]} />)}
       </div>
     </Card>
   );
@@ -789,7 +890,10 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
             {sport === "tennis" && <TennisProfileSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
             <KeyDriversSection match={backendMatch} />
             <H2HSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+            <LeagueContextSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+            <LiveStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
             <StatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+            <AdvancedStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
             <SimulationSection match={backendMatch} />
             <LineupSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
             <InjuriesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
