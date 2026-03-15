@@ -114,7 +114,7 @@ export function InPlayModule() {
         const json = await res.json();
         const events: SGOEvent[] = json.events ?? [];
         const items = events
-          .filter((e) => e.status?.live)
+          .filter((e) => e.status?.started && !e.status?.ended && !e.status?.completed && !e.status?.cancelled)
           .map(eventToItem);
         setMatches(items);
         // Auto-select the sport with most live matches

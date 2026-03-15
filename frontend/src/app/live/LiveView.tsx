@@ -164,7 +164,9 @@ export function LiveView() {
       if (!res.ok) return;
       const json = await res.json();
       const events: SGOEvent[] = json.events ?? [];
-      const live = events.filter((e) => e.status?.live).map(eventToMatch);
+      const live = events
+        .filter((e) => e.status?.started && !e.status?.ended && !e.status?.completed && !e.status?.cancelled)
+        .map(eventToMatch);
       setMatches(live);
       setLastUpdated(new Date());
     } catch {

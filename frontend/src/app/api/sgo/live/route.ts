@@ -46,9 +46,11 @@ export async function GET() {
   const events: unknown[] = [];
   for (const batch of results) {
     for (const e of batch) {
-      const ev = e as { eventID?: string; status?: { live?: boolean } };
+      const ev = e as { eventID?: string; status?: { live?: boolean; started?: boolean; ended?: boolean; completed?: boolean; cancelled?: boolean } };
       if (!ev.eventID || seen.has(ev.eventID)) continue;
-      if (!ev.status?.live) continue;   // only truly live
+      // Only show matches that have actually started and are not yet finished
+      if (!ev.status?.started) continue;
+      if (ev.status?.ended || ev.status?.completed || ev.status?.cancelled) continue;
       seen.add(ev.eventID);
       events.push(e);
     }
