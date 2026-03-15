@@ -244,7 +244,7 @@ export function DashboardShell({
           <div className="p-4 space-y-4 border-t border-white/8">
             {/* InPlay — full width if there are live matches */}
             {liveMatches.length > 0 && (
-              <InPlayModule matches={liveMatches} />
+              <InPlayModule />
             )}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               <PerformanceSnapshot performance={performance} />

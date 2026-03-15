@@ -9,6 +9,7 @@ import type { BettingMatch, BettingFilter, SportSlug } from "@/lib/betting-types
 import { DEFAULT_BETTING_FILTER, SPORT_CONFIG } from "@/lib/betting-types";
 import { applyBettingFilter, sortMatches } from "@/lib/betting-adapters";
 import { Activity, ArrowRight, Radar, Sparkles } from "lucide-react";
+import { InPlayModule } from "@/components/dashboard/InPlayModule";
 
 function InsightCard({ label, value, note }: { label: string; value: string; note: string }) {
   return (
@@ -128,6 +129,10 @@ export function BettingDashboard({ matches, sport }: { matches: BettingMatch[]; 
               totalShown={filtered.length}
               onShowTopPicks={handleShowTopPicks}
             />
+          </div>
+
+          <div className="px-4 pb-2 lg:px-6">
+            <InPlayModule />
           </div>
 
           <div className="px-4 py-4 lg:px-6 lg:py-5">
