@@ -7,7 +7,7 @@ import type { SportSlug, Market, Selection } from "@/lib/betting-types";
 import { SPORT_CONFIG } from "@/lib/betting-types";
 import { useBetting } from "@/components/betting/BettingContext";
 import { sgoEventToMatch } from "@/lib/sgo";
-import type { SGOEvent } from "@/lib/sgo";
+import type { SGOEvent, SGOTeamStats, SGOPlayer } from "@/lib/sgo";
 import type { SportMatchDetail } from "@/lib/types";
 import type { EloPoint } from "@/app/sports/_lib/fetchMatchPageData";
 
@@ -718,6 +718,157 @@ function AdvancedStatsSection({ match, homeName, awayName }: { match: SportMatch
   );
 }
 
+// ─── SGO Venue section ────────────────────────────────────────────────────────
+
+function SGOVenueSection({ event }: { event: SGOEvent }) {
+  const venue = event.info?.venue;
+  if (!venue?.name) return null;
+  return (
+    <Card title="Venue">
+      <div className="flex items-start gap-2 rounded-xl border px-3 py-2.5" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+        <MapPin size={13} className="mt-0.5 text-text-muted shrink-0" />
+        <div>
+          <div className="text-sm text-text-primary">{venue.name}{venue.city ? `, ${venue.city}` : ""}</div>
+          {venue.capacity != null && <div className="text-[10px] text-text-muted">Capacity: {venue.capacity.toLocaleString()}</div>}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ─── SGO Team stats section ───────────────────────────────────────────────────
+
+const SGO_TEAM_STAT_LABELS: Record<string, string> = {
+  possession: "Possession %",
+  shots: "Shots",
+  shotsOnTarget: "On Target",
+  corners: "Corners",
+  fouls: "Fouls",
+  yellowCards: "Yellow Cards",
+  redCards: "Red Cards",
+  passes: "Passes",
+  passesAccurate: "Passes Acc",
+  clearances: "Clearances",
+  offsides: "Offsides",
+  saves: "Saves",
+  attacks: "Attacks",
+  dangerousAttacks: "Dangerous Attacks",
+};
+
+function SGOTeamStatsSection({ event, homeName, awayName }: { event: SGOEvent; homeName: string; awayName: string }) {
+  const game = event.results?.game;
+  const sh = game?.home as SGOTeamStats | undefined;
+  const sa = game?.away as SGOTeamStats | undefined;
+  if (!sh && !sa) return null;
+  const keys = Object.keys(SGO_TEAM_STAT_LABELS).filter((k) => sh?.[k] != null || sa?.[k] != null);
+  if (!keys.length) return null;
+  return (
+    <Card title="Match Stats">
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-x-2 mb-2">
+        <span className="text-right text-[10px] font-semibold text-text-muted">{homeName}</span>
+        <span />
+        <span className="text-[10px] font-semibold text-text-muted">{awayName}</span>
+      </div>
+      <div className="space-y-1.5">
+        {keys.map((k) => <StatRow key={k} label={SGO_TEAM_STAT_LABELS[k] ?? k} home={sh?.[k]} away={sa?.[k]} />)}
+      </div>
+    </Card>
+  );
+}
+
+// ─── SGO Player stats section ─────────────────────────────────────────────────
+
+const SGO_PLAYER_STAT_KEYS = ["minutesPlayed", "playerRating", "shots", "passes_accurate", "tackles", "duels", "yellowCards", "redCards"] as const;
+const SGO_PLAYER_STAT_LABELS: Record<string, string> = {
+  minutesPlayed: "Min", playerRating: "Rat", shots: "Sh",
+  passes_accurate: "Pa", tackles: "Tck", duels: "Dls",
+  yellowCards: "YC", redCards: "RC",
+};
+
+function SGOPlayerStatsSection({ event, homeName, awayName }: { event: SGOEvent; homeName: string; awayName: string }) {
+  const game = event.results?.game;
+  const players = event.players;
+  if (!game || !players) return null;
+
+  const homeTeamID = event.teams.home.teamID;
+  const playerIDs = Object.keys(game).filter((k) => k !== "home" && k !== "away");
+  if (!playerIDs.length) return null;
+
+  type PlayerRow = { id: string; info: SGOPlayer; stats: Record<string, unknown> };
+  const homePlayers: PlayerRow[] = [];
+  const awayPlayers: PlayerRow[] = [];
+
+  for (const id of playerIDs) {
+    const info = players[id];
+    const stats = game[id] as Record<string, unknown> | undefined;
+    if (!info || !stats) continue;
+    if (Number(stats.minutesPlayed ?? 0) <= 0) continue;
+    const row = { id, info, stats };
+    if (info.teamID === homeTeamID) homePlayers.push(row);
+    else awayPlayers.push(row);
+  }
+
+  if (!homePlayers.length && !awayPlayers.length) return null;
+
+  homePlayers.sort((a, b) => Number(b.stats.playerRating ?? 0) - Number(a.stats.playerRating ?? 0));
+  awayPlayers.sort((a, b) => Number(b.stats.playerRating ?? 0) - Number(a.stats.playerRating ?? 0));
+
+  const renderTeam = (name: string, rows: PlayerRow[]) => {
+    if (!rows.length) return null;
+    return (
+      <div>
+        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted mb-1.5">{name}</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11px]">
+            <thead>
+              <tr className="text-text-muted">
+                <th className="text-left font-medium pb-1 pr-2">Player</th>
+                {SGO_PLAYER_STAT_KEYS.map((k) => (
+                  <th key={k} className="text-center font-medium pb-1 px-1 min-w-[28px]">{SGO_PLAYER_STAT_LABELS[k]}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ id, info, stats }) => {
+                const displayName = info.name ?? [info.firstName, info.lastName].filter(Boolean).join(" ") ?? id;
+                const nameParts = displayName.split(" ");
+                const shortDisplay = nameParts.length > 1 ? `${nameParts[0][0]}. ${nameParts.slice(-1)[0]}` : displayName;
+                return (
+                  <tr key={id} className="border-t" style={{ borderColor: "var(--border0)" }}>
+                    <td className="py-1.5 pr-2 text-text-primary font-medium whitespace-nowrap">{shortDisplay}</td>
+                    {SGO_PLAYER_STAT_KEYS.map((k) => {
+                      const v = stats[k];
+                      const isRating = k === "playerRating";
+                      const ratingNum = isRating && v != null ? Number(v) : null;
+                      const ratingColor = ratingNum != null
+                        ? ratingNum >= 7.5 ? "#22c55e" : ratingNum >= 6.5 ? "#f59e0b" : "#ef4444"
+                        : undefined;
+                      return (
+                        <td key={k} className="py-1.5 px-1 text-center" style={{ color: ratingColor ?? "var(--text-primary)" }}>
+                          {v != null ? (isRating ? Number(v).toFixed(1) : String(v)) : <span className="text-text-muted">–</span>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <Card title="Player Stats">
+      <div className="space-y-4">
+        {renderTeam(homeName, homePlayers)}
+        {renderTeam(awayName, awayPlayers)}
+      </div>
+    </Card>
+  );
+}
+
 // ─── Market grouping ──────────────────────────────────────────────────────────
 
 const CATEGORY_ORDER = ["Full Game", "1st Half", "2nd Half", "Quarters", "Periods", "Player Props"];
@@ -785,7 +936,7 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 lg:px-6">
-      <div className={cn("grid gap-6", backendMatch ? "lg:grid-cols-[1fr_400px]" : "")}>
+      <div className={cn("grid gap-6", (backendMatch || event.results?.game || event.info?.venue) ? "lg:grid-cols-[1fr_400px]" : "")}>
 
         {/* Left: hero + odds */}
         <div className="space-y-4">
@@ -878,31 +1029,40 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
           {isFinished && <p className="text-center text-sm text-text-muted py-2">This match has ended — odds are no longer available.</p>}
         </div>
 
-        {/* Right: all backend data */}
-        {!backendMatch && (
-          <div className="sportsbook-card p-5 text-sm text-text-muted">
-            No model data found for this match.
-          </div>
-        )}
-        {backendMatch && (
+        {/* Right: SGO + backend data */}
+        {(backendMatch || event.results?.game || event.info?.venue) && (
           <div className="space-y-4">
-            <ProbabilitiesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-            <EloSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} eloHome={eloHome} eloAway={eloAway} cfg={cfg} />
-            <ContextSection match={backendMatch} />
-            {sport === "tennis" && <TennisInfoSection match={backendMatch} />}
-            {sport === "esports" && <EsportsInfoSection match={backendMatch} />}
-            <FormSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-            {sport === "tennis" && <TennisProfileSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
-            <KeyDriversSection match={backendMatch} />
-            <H2HSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-            <LeagueContextSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-            <LiveStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-            <StatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-            <AdvancedStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-            <SimulationSection match={backendMatch} />
-            <LineupSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-            <InjuriesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-            <RefereeSection match={backendMatch} />
+            {/* SGO live/match data — always shown when available */}
+            <SGOVenueSection event={event} />
+            <SGOTeamStatsSection event={event} homeName={match.home.name} awayName={match.away.name} />
+            <SGOPlayerStatsSection event={event} homeName={match.home.name} awayName={match.away.name} />
+
+            {/* Backend model data */}
+            {backendMatch ? (
+              <>
+                <ProbabilitiesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                <EloSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} eloHome={eloHome} eloAway={eloAway} cfg={cfg} />
+                <ContextSection match={backendMatch} />
+                {sport === "tennis" && <TennisInfoSection match={backendMatch} />}
+                {sport === "esports" && <EsportsInfoSection match={backendMatch} />}
+                <FormSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                {sport === "tennis" && <TennisProfileSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
+                <KeyDriversSection match={backendMatch} />
+                <H2HSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                <LeagueContextSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                <LiveStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                <StatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                <AdvancedStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                <SimulationSection match={backendMatch} />
+                <LineupSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                <InjuriesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                <RefereeSection match={backendMatch} />
+              </>
+            ) : (
+              <div className="sportsbook-card p-5 text-sm text-text-muted">
+                No model prediction data available for this match.
+              </div>
+            )}
           </div>
         )}
       </div>

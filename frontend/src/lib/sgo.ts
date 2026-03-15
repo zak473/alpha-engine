@@ -37,6 +37,39 @@ export const LEAGUE_LABELS: Record<string, string> = {
 export interface SGOTeam {
   teamID: string;
   names: { long: string; medium?: string; short?: string };
+  score?: number | string;
+  colors?: { primary?: string; secondary?: string };
+}
+
+export interface SGOPlayer {
+  teamID: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+export interface SGOTeamStats {
+  possession?: number | string;
+  shots?: number;
+  shotsOnTarget?: number;
+  corners?: number;
+  fouls?: number;
+  yellowCards?: number;
+  redCards?: number;
+  passes?: number;
+  passesAccurate?: number;
+  clearances?: number;
+  offsides?: number;
+  saves?: number;
+  attacks?: number;
+  dangerousAttacks?: number;
+  [key: string]: unknown;
+}
+
+export interface SGOResultPeriod {
+  home?: SGOTeamStats;
+  away?: SGOTeamStats;
+  [playerID: string]: unknown;
 }
 
 export interface SGOBookmakerOdds {
@@ -74,8 +107,19 @@ export interface SGOEvent {
     startsAt: string;
     displayLong: string;
     currentPeriodID: string;
+    clock?: string;
   };
   odds: Record<string, SGOOdd>;
+  info?: {
+    venue?: { name?: string; capacity?: number; city?: string };
+  };
+  players?: Record<string, SGOPlayer>;
+  results?: {
+    game?: SGOResultPeriod;
+    "1h"?: SGOResultPeriod;
+    "2h"?: SGOResultPeriod;
+    [period: string]: SGOResultPeriod | undefined;
+  };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -250,9 +294,9 @@ export function sgoEventToMatch(event: SGOEvent, sport: SportSlug): BettingMatch
     league: LEAGUE_LABELS[event.leagueID] ?? event.leagueID,
     startTime: s.startsAt,
     status,
-    liveClock: s.live && s.currentPeriodID ? s.currentPeriodID : undefined,
-    homeScore: undefined,
-    awayScore: undefined,
+    liveClock: s.live ? (s.clock ? `${s.clock}'` : s.currentPeriodID || undefined) : undefined,
+    homeScore: event.teams.home.score != null ? Number(event.teams.home.score) : undefined,
+    awayScore: event.teams.away.score != null ? Number(event.teams.away.score) : undefined,
     home,
     away,
     featuredMarkets: allMarkets.slice(0, 2),
