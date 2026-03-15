@@ -144,7 +144,7 @@ export function NBALiveGameCard({ game, boxScore, onClick }: NBALiveGameCardProp
 
   return (
     <Link
-      href={`/sports/nba/${game.id}`}
+      href={`/sports/basketball/matches/${game.id}`}
       onClick={onClick}
       className={cn(
         "group block w-full rounded-[24px] border p-5 text-left transition-all duration-200",

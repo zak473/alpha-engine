@@ -246,7 +246,7 @@ function NBASection() {
   const [lastSynced, setLastSynced] = useState<Date>(new Date());
   const [syncing, setSyncing] = useState(false);
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 
   const fetchAll = useCallback(async (quiet = false) => {
     if (quiet) setSyncing(true);
@@ -256,9 +256,20 @@ function NBASection() {
         getNBAGames(today),
         getNBALiveBoxScores(today),
       ]);
-      setGames(gamesData);
+
+      // Build box score map
       const m = new Map<number, BdlBoxScore>();
       liveData.forEach((bs) => m.set(bs.game.id, bs));
+
+      // Merge: start from games endpoint, then inject any live games missing from it.
+      // This handles the case where games endpoint returns empty (e.g. date mismatch)
+      // but box_scores/live always returns currently-in-progress games.
+      const merged = new Map<number, BdlGame>(gamesData.map((g) => [g.id, g]));
+      liveData.forEach((bs) => {
+        if (!merged.has(bs.game.id)) merged.set(bs.game.id, bs.game);
+      });
+
+      setGames(Array.from(merged.values()));
       setLiveBoxScores(m);
       setLastSynced(new Date());
     } finally {

@@ -108,23 +108,34 @@ export interface BdlPlay {
 
 // ─── Status helpers ───────────────────────────────────────────────────────
 
-export function isGameLive(status: string): boolean {
-  if (!status) return false;
-  if (status === "Final") return false;
-  if (/^\d{4}-\d{2}-\d{2}/.test(status)) return false;
-  return true;
-}
+// BallDontLie actual status values:
+//   Scheduled  → ISO datetime "2026-03-14T20:00:00.000Z"  OR  time string "7:00 pm ET"
+//   Live       → "1st Qtr" | "2nd Qtr" | "Halftime" | "3rd Qtr" | "4th Qtr" | "1st OT" etc.
+//   Finished   → "Final"
 
 export function isGameFinished(status: string): boolean {
   return status === "Final";
 }
 
 export function isGameScheduled(status: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}/.test(status);
+  if (!status) return false;
+  // ISO datetime string
+  if (/^\d{4}-\d{2}-\d{2}/.test(status)) return true;
+  // Formatted time, e.g. "7:00 pm ET", "1:00 PM ET"
+  if (/\d+:\d+\s*(am|pm)/i.test(status)) return true;
+  return false;
+}
+
+export function isGameLive(status: string): boolean {
+  if (!status) return false;
+  return !isGameFinished(status) && !isGameScheduled(status);
 }
 
 export function getPeriodLabel(game: BdlGame): string {
   if (isGameScheduled(game.status)) {
+    // If status is already a formatted time string like "7:00 pm ET", use it directly
+    if (/\d+:\d+\s*(am|pm)/i.test(game.status)) return game.status;
+    // Otherwise parse the ISO datetime
     const src = game.datetime ?? game.date;
     const d = new Date(src);
     return d.toLocaleTimeString("en-US", {
@@ -134,9 +145,9 @@ export function getPeriodLabel(game: BdlGame): string {
     }) + " ET";
   }
   if (isGameFinished(game.status)) return "Final";
-  const p = game.period;
-  if (p >= 5) return p - 4 > 1 ? `OT${p - 4}` : "OT";
-  return `Q${p}`;
+  // Live: BallDontLie returns "1st Qtr", "2nd Qtr", "Halftime", "3rd Qtr", "4th Qtr", "1st OT" etc.
+  // Return the status string directly — it's already human-readable
+  return game.status;
 }
 
 export function getClockDisplay(game: BdlGame): string {
@@ -218,7 +229,7 @@ export function fmtShotPct(made: number, attempted: number): string {
 // ─── Client fetch functions ───────────────────────────────────────────────
 
 export async function getNBAGames(date?: string): Promise<BdlGame[]> {
-  const d = date ?? new Date().toISOString().split("T")[0];
+  const d = date ?? new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
   try {
     const res = await fetch(`/api/balldontlie/nba/games?date=${d}`, {
       cache: "no-store",
@@ -232,7 +243,7 @@ export async function getNBAGames(date?: string): Promise<BdlGame[]> {
 }
 
 export async function getNBALiveBoxScores(date?: string): Promise<BdlBoxScore[]> {
-  const d = date ?? new Date().toISOString().split("T")[0];
+  const d = date ?? new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
   try {
     const res = await fetch(`/api/balldontlie/nba/live?date=${d}`, {
       cache: "no-store",

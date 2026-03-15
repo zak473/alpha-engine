@@ -17,7 +17,7 @@ function bdlStatusToInternal(status: string): string {
  * Returns today's NBA games in SportMatchListItem format for the sports hub.
  */
 export async function GET() {
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 
   try {
     const res = await fetch(

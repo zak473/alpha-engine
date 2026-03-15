@@ -1,16 +1,15 @@
 /**
- * Adapts SportMatchListItem data into BettingMatch.
- * Markets are only built when real data exists:
- *   - 1X2/Moneyline: requires real model probabilities OR real API odds
- *   - Secondary markets (O/U, BTTS, etc.): only shown when real API odds exist
- * Nothing is fabricated or defaulted — missing data = no market shown.
+ * Adapts SportMatchListItem + optional SGOEvent into BettingMatch.
+ * When a full SGOEvent is provided every market is built from live bookmaker data.
+ * Falls back to model-probability-only markets when no SGO data exists.
  */
 import type { SportMatchListItem } from "@/lib/types";
 import type {
-  BettingMatch, BettingTeam, Market, SportSlug, BettingFilter
+  BettingMatch, BettingTeam, Market, Selection, SportSlug, BettingFilter
 } from "@/lib/betting-types";
+import { americanToDecimal, type SGOEvent, type SGOOdd } from "@/lib/odds";
 
-// ── Name helpers ────────────────────────────────────────────────────────────
+// ── Name helpers ─────────────────────────────────────────────────────────────
 
 const STRIP_WORDS = new Set(["fc", "cf", "ac", "as", "sd", "cd", "sc", "bv", "uc"]);
 
@@ -24,9 +23,8 @@ export function toShortName(name: string, maxLen = 10): string {
   return meaningful[0].slice(0, maxLen);
 }
 
-// ── Odds maths ──────────────────────────────────────────────────────────────
+// ── Odds maths ───────────────────────────────────────────────────────────────
 
-/** Convert a real model probability to fair decimal odds (no vig — we show fair odds). */
 function probToOdds(prob: number): number {
   if (!prob || prob <= 0.01 || prob >= 0.99) return 0;
   return Math.round((1 / prob) * 100) / 100;
@@ -38,114 +36,233 @@ function calcEdge(modelProb: number, bookOdds: number): number {
   return Math.round((modelProb - implied) * 1000) / 10;
 }
 
-// ── Market builders ─────────────────────────────────────────────────────────
+// ── SGO market builder ───────────────────────────────────────────────────────
 
-/**
- * Build 1X2 market. Returns null if neither real probabilities nor real odds exist.
- * Uses real API odds when available; falls back to model-implied fair odds.
- */
-function build1x2(
+// Non-team stat entity IDs — anything else is a playerID
+const TEAM_ENTITIES = new Set(["home", "away", "all", "draw", "not_draw", "home+draw", "away+draw"]);
+
+interface MarketDef {
+  id: string;
+  name: string;
+  homeKey: string;
+  awayKey: string;
+  drawKey?: string;
+  isOU?: boolean;
+}
+
+function spreadLabel(odd: SGOOdd): string {
+  if (odd.bookSpread == null) return "";
+  const n = parseFloat(odd.bookSpread);
+  return ` (${n > 0 ? "+" : ""}${n})`;
+}
+
+function getLine(odd: SGOOdd): string {
+  return odd.bookOverUnder ?? "";
+}
+
+function buildSGOMarket(
+  def: MarketDef,
+  odds: Record<string, SGOOdd>,
+  homeName: string,
+  awayName: string,
+  pHome = 0,
+  pAway = 0,
+  pDraw = 0,
+): Market | null {
+  const o1 = odds[def.homeKey];
+  const o2 = odds[def.awayKey];
+  if (!o1?.bookOddsAvailable || !o2?.bookOddsAvailable) return null;
+
+  const odds1 = americanToDecimal(o1.bookOdds);
+  const odds2 = americanToDecimal(o2.bookOdds);
+  if (odds1 == null || odds2 == null) return null;
+
+  const selections: Selection[] = [];
+
+  if (def.isOU) {
+    const line = getLine(o1);
+    selections.push(
+      { id: "over",  label: `Over${line  ? ` ${line}` : ""}`,  odds: odds1 },
+      { id: "under", label: `Under${line ? ` ${line}` : ""}`, odds: odds2 },
+    );
+  } else {
+    selections.push({
+      id: "home",
+      label: `${toShortName(homeName)}${spreadLabel(o1)}`,
+      odds: odds1,
+      edge: pHome ? calcEdge(pHome, odds1) : undefined,
+    });
+    if (def.drawKey) {
+      const od = odds[def.drawKey];
+      if (od?.bookOddsAvailable) {
+        const dOdds = americanToDecimal(od.bookOdds);
+        if (dOdds != null) {
+          selections.push({ id: "draw", label: "Draw", odds: dOdds, edge: pDraw ? calcEdge(pDraw, dOdds) : undefined });
+        }
+      }
+    }
+    selections.push({
+      id: "away",
+      label: `${toShortName(awayName)}${spreadLabel(o2)}`,
+      odds: odds2,
+      edge: pAway ? calcEdge(pAway, odds2) : undefined,
+    });
+  }
+
+  return { id: def.id, name: def.name, selections };
+}
+
+const GAME_MARKET_DEFS: MarketDef[] = [
+  // Primary game-level markets
+  { id: "ml",      name: "Moneyline",      homeKey: "points-home-game-ml-home",    awayKey: "points-away-game-ml-away" },
+  { id: "1x2",     name: "1X2",            homeKey: "points-home-reg-ml3way-home", awayKey: "points-away-reg-ml3way-away", drawKey: "points-all-reg-ml3way-draw" },
+  { id: "sp",      name: "Spread",         homeKey: "points-home-game-sp-home",    awayKey: "points-away-game-sp-away" },
+  { id: "ou",      name: "Total",          homeKey: "points-all-game-ou-over",     awayKey: "points-all-game-ou-under",    isOU: true },
+  // Team totals
+  { id: "home-ou", name: "Home Total",     homeKey: "points-home-game-ou-over",    awayKey: "points-home-game-ou-under",   isOU: true },
+  { id: "away-ou", name: "Away Total",     homeKey: "points-away-game-ou-over",    awayKey: "points-away-game-ou-under",   isOU: true },
+  // 1st half
+  { id: "1h-ml",   name: "1H Moneyline",   homeKey: "points-home-1h-ml-home",      awayKey: "points-away-1h-ml-away" },
+  { id: "1h-sp",   name: "1H Spread",      homeKey: "points-home-1h-sp-home",      awayKey: "points-away-1h-sp-away" },
+  { id: "1h-ou",   name: "1H Total",       homeKey: "points-all-1h-ou-over",       awayKey: "points-all-1h-ou-under",      isOU: true },
+  // 2nd half
+  { id: "2h-ml",   name: "2H Moneyline",   homeKey: "points-home-2h-ml-home",      awayKey: "points-away-2h-ml-away" },
+  { id: "2h-sp",   name: "2H Spread",      homeKey: "points-home-2h-sp-home",      awayKey: "points-away-2h-sp-away" },
+  { id: "2h-ou",   name: "2H Total",       homeKey: "points-all-2h-ou-over",       awayKey: "points-all-2h-ou-under",      isOU: true },
+  // Quarters (basketball)
+  { id: "1q-ml",   name: "1Q Moneyline",   homeKey: "points-home-1q-ml-home",      awayKey: "points-away-1q-ml-away" },
+  { id: "1q-sp",   name: "1Q Spread",      homeKey: "points-home-1q-sp-home",      awayKey: "points-away-1q-sp-away" },
+  { id: "1q-ou",   name: "1Q Total",       homeKey: "points-all-1q-ou-over",       awayKey: "points-all-1q-ou-under",      isOU: true },
+  { id: "2q-ml",   name: "2Q Moneyline",   homeKey: "points-home-2q-ml-home",      awayKey: "points-away-2q-ml-away" },
+  { id: "2q-sp",   name: "2Q Spread",      homeKey: "points-home-2q-sp-home",      awayKey: "points-away-2q-sp-away" },
+  { id: "2q-ou",   name: "2Q Total",       homeKey: "points-all-2q-ou-over",       awayKey: "points-all-2q-ou-under",      isOU: true },
+  { id: "3q-ml",   name: "3Q Moneyline",   homeKey: "points-home-3q-ml-home",      awayKey: "points-away-3q-ml-away" },
+  { id: "3q-sp",   name: "3Q Spread",      homeKey: "points-home-3q-sp-home",      awayKey: "points-away-3q-sp-away" },
+  { id: "3q-ou",   name: "3Q Total",       homeKey: "points-all-3q-ou-over",       awayKey: "points-all-3q-ou-under",      isOU: true },
+  { id: "4q-ml",   name: "4Q Moneyline",   homeKey: "points-home-4q-ml-home",      awayKey: "points-away-4q-ml-away" },
+  { id: "4q-sp",   name: "4Q Spread",      homeKey: "points-home-4q-sp-home",      awayKey: "points-away-4q-sp-away" },
+  { id: "4q-ou",   name: "4Q Total",       homeKey: "points-all-4q-ou-over",       awayKey: "points-all-4q-ou-under",      isOU: true },
+  // Periods (hockey)
+  { id: "1p-ml",   name: "1P Moneyline",   homeKey: "points-home-1p-ml-home",      awayKey: "points-away-1p-ml-away" },
+  { id: "1p-sp",   name: "1P Spread",      homeKey: "points-home-1p-sp-home",      awayKey: "points-away-1p-sp-away" },
+  { id: "1p-ou",   name: "1P Total",       homeKey: "points-all-1p-ou-over",       awayKey: "points-all-1p-ou-under",      isOU: true },
+  { id: "2p-ml",   name: "2P Moneyline",   homeKey: "points-home-2p-ml-home",      awayKey: "points-away-2p-ml-away" },
+  { id: "2p-sp",   name: "2P Spread",      homeKey: "points-home-2p-sp-home",      awayKey: "points-away-2p-sp-away" },
+  { id: "2p-ou",   name: "2P Total",       homeKey: "points-all-2p-ou-over",       awayKey: "points-all-2p-ou-under",      isOU: true },
+  { id: "3p-ml",   name: "3P Moneyline",   homeKey: "points-home-3p-ml-home",      awayKey: "points-away-3p-ml-away" },
+  { id: "3p-sp",   name: "3P Spread",      homeKey: "points-home-3p-sp-home",      awayKey: "points-away-3p-sp-away" },
+  { id: "3p-ou",   name: "3P Total",       homeKey: "points-all-3p-ou-over",       awayKey: "points-all-3p-ou-under",      isOU: true },
+];
+
+function buildMarketsFromSGO(
+  event: SGOEvent,
+  homeName: string,
+  awayName: string,
+  pHome = 0,
+  pAway = 0,
+  pDraw = 0,
+): Market[] {
+  const markets: Market[] = [];
+  const odds = event.odds;
+
+  // Standard structured markets
+  for (const def of GAME_MARKET_DEFS) {
+    const mkt = buildSGOMarket(def, odds, homeName, awayName, pHome, pAway, pDraw);
+    if (mkt) markets.push(mkt);
+  }
+
+  // Player props — group by playerID + statID
+  type PropAccum = { stat: string; over?: { odds: number; line: string }; under?: { odds: number; line: string } };
+  const playerProps = new Map<string, PropAccum>();
+
+  for (const odd of Object.values(odds)) {
+    if (!odd.bookOddsAvailable) continue;
+    if (TEAM_ENTITIES.has(odd.statEntityID)) continue;
+    if (odd.betTypeID !== "ou") continue;
+
+    const key = `${odd.statEntityID}::${odd.statID}`;
+    if (!playerProps.has(key)) playerProps.set(key, { stat: odd.statID });
+    const prop = playerProps.get(key)!;
+
+    const oddsVal = americanToDecimal(odd.bookOdds);
+    if (oddsVal == null) continue;
+    const line = odd.bookOverUnder ?? "";
+
+    if (odd.sideID === "over")  prop.over  = { odds: oddsVal, line };
+    if (odd.sideID === "under") prop.under = { odds: oddsVal, line };
+  }
+
+  for (const [key, prop] of Array.from(playerProps.entries())) {
+    if (!prop.over && !prop.under) continue;
+    const [playerID] = key.split("::");
+    // Convert "ANTHONY_EDWARDS_1_NBA" → "Anthony Edwards"
+    const nameParts = playerID.split("_");
+    const nameOnly = nameParts.slice(0, nameParts.length > 2 ? -2 : nameParts.length);
+    const playerName = nameOnly.map((w: string) => w.charAt(0) + w.slice(1).toLowerCase()).join(" ");
+    const statLabel = prop.stat.charAt(0).toUpperCase() + prop.stat.slice(1);
+    const line = prop.over?.line || prop.under?.line || "";
+
+    const selections: Selection[] = [];
+    if (prop.over)  selections.push({ id: "over",  label: `Over ${line}`,  odds: prop.over.odds });
+    if (prop.under) selections.push({ id: "under", label: `Under ${line}`, odds: prop.under.odds });
+
+    markets.push({ id: `prop-${key}`, name: `${playerName} ${statLabel}`, selections });
+  }
+
+  return markets;
+}
+
+// ── Fallback model-only market builders ──────────────────────────────────────
+
+function buildFallbackMarkets(
+  sport: SportSlug,
   pHome: number, pDraw: number, pAway: number,
   homeName: string, awayName: string,
   realOddsHome?: number | null, realOddsDraw?: number | null, realOddsAway?: number | null,
-): Market | null {
-  const hasReal = realOddsHome != null && realOddsHome > 1.0 && realOddsAway != null && realOddsAway > 1.0;
-  const hOdds = hasReal ? realOddsHome! : probToOdds(pHome);
-  const dOdds = hasReal
-    ? (realOddsDraw != null && realOddsDraw > 1.0 ? realOddsDraw : 0)
-    : probToOdds(pDraw);
-  const aOdds = hasReal ? realOddsAway! : probToOdds(pAway);
-
-  if (!hOdds || !aOdds) return null;
-
-  const selections = [
-    { id: "home", label: toShortName(homeName), odds: hOdds, impliedProb: 1/hOdds, edge: calcEdge(pHome, hOdds) },
-    ...(dOdds > 1 ? [{ id: "draw", label: "Draw", odds: dOdds, impliedProb: 1/dOdds }] : []),
-    { id: "away", label: toShortName(awayName), odds: aOdds, impliedProb: 1/aOdds, edge: calcEdge(pAway, aOdds) },
-  ];
-  return { id: "1x2", name: "1X2", selections };
-}
-
-function buildMoneyline(
-  pHome: number, pAway: number,
-  homeName: string, awayName: string,
-  realOddsHome?: number | null, realOddsAway?: number | null,
-  marketId = "ml", marketName = "Moneyline",
-): Market | null {
-  const hasReal = realOddsHome != null && realOddsHome > 1.0 && realOddsAway != null && realOddsAway > 1.0;
-  const hOdds = hasReal ? realOddsHome! : probToOdds(pHome);
-  const aOdds = hasReal ? realOddsAway! : probToOdds(pAway);
-  if (!hOdds || !aOdds) return null;
-  return {
-    id: marketId,
-    name: marketName,
-    selections: [
-      { id: "home", label: toShortName(homeName), odds: hOdds, impliedProb: 1/hOdds, edge: calcEdge(pHome, hOdds) },
-      { id: "away", label: toShortName(awayName), odds: aOdds, impliedProb: 1/aOdds, edge: calcEdge(pAway, aOdds) },
-    ],
-  };
-}
-
-function soccerMarkets(
-  pHome: number, pDraw: number, pAway: number,
-  homeName: string, awayName: string,
-  realOddsHome?: number | null, realOddsDraw?: number | null, realOddsAway?: number | null,
 ): Market[] {
   const markets: Market[] = [];
-  const m1x2 = build1x2(pHome, pDraw, pAway, homeName, awayName, realOddsHome, realOddsDraw, realOddsAway);
-  if (m1x2) markets.push(m1x2);
-  // Secondary markets only when real odds exist (no hardcoded values)
+
+  if (sport === "soccer") {
+    const hasReal = realOddsHome != null && realOddsHome > 1.0 && realOddsAway != null && realOddsAway > 1.0;
+    const hOdds = hasReal ? realOddsHome! : probToOdds(pHome);
+    const dOdds = hasReal ? (realOddsDraw != null && realOddsDraw > 1.0 ? realOddsDraw : 0) : probToOdds(pDraw);
+    const aOdds = hasReal ? realOddsAway! : probToOdds(pAway);
+    if (hOdds && aOdds) {
+      markets.push({
+        id: "1x2", name: "1X2",
+        selections: [
+          { id: "home", label: toShortName(homeName), odds: hOdds, edge: calcEdge(pHome, hOdds) },
+          ...(dOdds > 1 ? [{ id: "draw", label: "Draw", odds: dOdds }] : []),
+          { id: "away", label: toShortName(awayName), odds: aOdds, edge: calcEdge(pAway, aOdds) },
+        ],
+      });
+    }
+  } else {
+    const hasReal = realOddsHome != null && realOddsHome > 1.0 && realOddsAway != null && realOddsAway > 1.0;
+    const hOdds = hasReal ? realOddsHome! : probToOdds(pHome);
+    const aOdds = hasReal ? realOddsAway! : probToOdds(pAway);
+    if (hOdds && aOdds) {
+      const name = sport === "tennis" || sport === "esports" ? "Match Winner" : "Moneyline";
+      markets.push({
+        id: "ml", name,
+        selections: [
+          { id: "home", label: toShortName(homeName), odds: hOdds, edge: calcEdge(pHome, hOdds) },
+          { id: "away", label: toShortName(awayName), odds: aOdds, edge: calcEdge(pAway, aOdds) },
+        ],
+      });
+    }
+  }
+
   return markets;
 }
 
-function basketballMarkets(
-  pHome: number, pAway: number,
-  homeName: string, awayName: string,
-  realOddsHome?: number | null, realOddsAway?: number | null,
-): Market[] {
-  const markets: Market[] = [];
-  const ml = buildMoneyline(pHome, pAway, homeName, awayName, realOddsHome, realOddsAway);
-  if (ml) markets.push(ml);
-  return markets;
-}
+// ── Main adapter ──────────────────────────────────────────────────────────────
 
-function tennisMarkets(
-  pHome: number, pAway: number,
-  homeName: string, awayName: string,
-  realOddsHome?: number | null, realOddsAway?: number | null,
-): Market[] {
-  const markets: Market[] = [];
-  const ml = buildMoneyline(pHome, pAway, homeName, awayName, realOddsHome, realOddsAway, "winner", "Match Winner");
-  if (ml) markets.push(ml);
-  return markets;
-}
-
-function esportsMarkets(
-  pHome: number, pAway: number,
-  homeName: string, awayName: string,
-  realOddsHome?: number | null, realOddsAway?: number | null,
-): Market[] {
-  const markets: Market[] = [];
-  const ml = buildMoneyline(pHome, pAway, homeName, awayName, realOddsHome, realOddsAway, "winner", "Match Winner");
-  if (ml) markets.push(ml);
-  return markets;
-}
-
-function baseballMarkets(
-  pHome: number, pAway: number,
-  homeName: string, awayName: string,
-  realOddsHome?: number | null, realOddsAway?: number | null,
-): Market[] {
-  const markets: Market[] = [];
-  const ml = buildMoneyline(pHome, pAway, homeName, awayName, realOddsHome, realOddsAway, "ml", "Moneyline");
-  if (ml) markets.push(ml);
-  return markets;
-}
-
-// ── Main adapter ─────────────────────────────────────────────────────────────
-
-export function adaptToMatchCard(item: SportMatchListItem, sport: SportSlug): BettingMatch {
-  // Only use real probabilities — never default to 50/50
+export function adaptToMatchCard(
+  item: SportMatchListItem,
+  sport: SportSlug,
+  sgoEvent?: SGOEvent | null,
+): BettingMatch {
   const hasRealPrediction = item.p_home != null && item.p_away != null;
   const rawHome = hasRealPrediction ? item.p_home! : 0;
   const rawAway = hasRealPrediction ? item.p_away! : 0;
@@ -155,31 +272,23 @@ export function adaptToMatchCard(item: SportMatchListItem, sport: SportSlug): Be
   const pAway = rawAway / sum;
   const pDraw = rawDraw / sum;
 
-  // Confidence and edge only shown when real prediction exists
   const confidence = hasRealPrediction ? (item.confidence ?? null) : null;
   const edgePercent = confidence != null ? Math.round((confidence - 0.5) * 20 * 10) / 10 : null;
 
-  let featuredMarkets: Market[] = [];
-  switch (sport) {
-    case "soccer":
-      featuredMarkets = soccerMarkets(pHome, pDraw, pAway, item.home_name, item.away_name, item.odds_home, item.odds_draw, item.odds_away);
-      break;
-    case "basketball":
-      featuredMarkets = basketballMarkets(pHome, pAway, item.home_name, item.away_name, item.odds_home, item.odds_away);
-      break;
-    case "tennis":
-      featuredMarkets = tennisMarkets(pHome, pAway, item.home_name, item.away_name, item.odds_home, item.odds_away);
-      break;
-    case "esports":
-      featuredMarkets = esportsMarkets(pHome, pAway, item.home_name, item.away_name, item.odds_home, item.odds_away);
-      break;
-    case "baseball":
-      featuredMarkets = baseballMarkets(pHome, pAway, item.home_name, item.away_name, item.odds_home, item.odds_away);
-      break;
-    case "hockey":
-      featuredMarkets = basketballMarkets(pHome, pAway, item.home_name, item.away_name, item.odds_home, item.odds_away);
-      break;
+  let allMarkets: Market[];
+
+  if (sgoEvent) {
+    allMarkets = buildMarketsFromSGO(sgoEvent, item.home_name, item.away_name, pHome, pAway, pDraw);
+  } else {
+    allMarkets = buildFallbackMarkets(
+      sport, pHome, pDraw, pAway,
+      item.home_name, item.away_name,
+      item.odds_home, item.odds_draw, item.odds_away,
+    );
   }
+
+  // Featured = first 2 game-level markets (moneyline/1x2 + spread or total)
+  const featuredMarkets = allMarkets.slice(0, 2);
 
   const status: BettingMatch["status"] =
     item.status === "live"      ? "live"      :
@@ -201,7 +310,7 @@ export function adaptToMatchCard(item: SportMatchListItem, sport: SportSlug): Be
     home,
     away,
     featuredMarkets,
-    allMarkets: featuredMarkets,
+    allMarkets,
     modelConfidence: confidence ?? undefined,
     edgePercent: edgePercent ?? undefined,
     pHome: hasRealPrediction ? pHome : undefined,
@@ -210,7 +319,7 @@ export function adaptToMatchCard(item: SportMatchListItem, sport: SportSlug): Be
   };
 }
 
-// ── Filter helper ─────────────────────────────────────────────────────────────
+// ── Filter + sort ─────────────────────────────────────────────────────────────
 
 export function applyBettingFilter(matches: BettingMatch[], f: BettingFilter): BettingMatch[] {
   return matches.filter((m) => {
@@ -251,7 +360,6 @@ export function applyBettingFilter(matches: BettingMatch[], f: BettingFilter): B
   });
 }
 
-/** Sort: live first, then by edge desc, then by startTime asc */
 export function sortMatches(matches: BettingMatch[]): BettingMatch[] {
   return [...matches].sort((a, b) => {
     if (a.status === "live" && b.status !== "live") return -1;

@@ -139,6 +139,7 @@ export function MatchDetailShell({ match }: { match: SportMatchDetail; sport?: S
         <StatCard label="Fair odds B" value={match.fair_odds?.away_win != null ? match.fair_odds.away_win.toFixed(2) : "—"} />
       </section>
 
+
       <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
         <Section title="Match overview">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

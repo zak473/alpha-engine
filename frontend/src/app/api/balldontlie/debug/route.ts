@@ -40,7 +40,7 @@ export async function GET() {
     test(`https://api.balldontlie.io/nba/v1/games?dates%5B%5D=${today}&per_page=5`),
     test(`https://api.balldontlie.io/nba/v1/games?start_date=${today}&end_date=${today}&per_page=5`),
     test(`https://api.balldontlie.io/nba/v1/games?seasons[]=2025&per_page=5`),
-    test(`https://api.balldontlie.io/nba/v1/box_scores/live`),
+    test(`https://api.balldontlie.io/v1/box_scores/live`),
   ]);
 
   return NextResponse.json({
