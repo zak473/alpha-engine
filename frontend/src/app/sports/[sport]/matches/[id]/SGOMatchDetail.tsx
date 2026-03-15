@@ -739,25 +739,46 @@ function SGOVenueSection({ event }: { event: SGOEvent }) {
 // ─── SGO Team stats section ───────────────────────────────────────────────────
 
 const SGO_TEAM_STAT_LABELS: Record<string, string> = {
-  possession: "Possession %", possession_pct: "Possession %", possessionPct: "Possession %",
+  // Possession
+  possessionPercent: "Possession %", possession: "Possession %", possession_pct: "Possession %",
+  possessionPct: "Possession %", ball_possession: "Possession %", ballPossession: "Possession %",
+  // Shots
   shots: "Shots", total_shots: "Shots",
-  shotsOnTarget: "On Target", shots_on_target: "On Target", shotsOnGoal: "On Target",
-  corners: "Corners", corner_kicks: "Corners", cornerKicks: "Corners",
+  shots_onGoal: "On Target", shotsOnTarget: "On Target", shots_on_target: "On Target", shotsOnGoal: "On Target",
+  shots_offGoal: "Off Target",
+  shots_insideBox: "Shots (In Box)",
+  shots_outsideBox: "Shots (Out Box)",
+  shots_blocked: "Blocked Shots", blockedShots: "Blocked Shots",
+  shots_hitCrossbar: "Hit Crossbar",
+  // Set pieces
+  cornerKicks: "Corners", corners: "Corners", corner_kicks: "Corners",
+  // Fouls & cards
   fouls: "Fouls", total_fouls: "Fouls",
   yellowCards: "Yellow Cards", yellow_cards: "Yellow Cards",
   redCards: "Red Cards", red_cards: "Red Cards",
-  passes: "Passes", total_passes: "Passes", passes_total: "Passes",
-  passesAccurate: "Passes Acc", passes_accurate: "Passes Acc",
+  // Passing
+  passes_accurate: "Passes Acc", passesAccurate: "Passes Acc",
+  passes_attempted: "Passes", passes: "Passes", total_passes: "Passes",
+  passes_percent: "Pass Acc %",
+  longBalls_accurate: "Long Balls Acc",
+  longBalls_attempted: "Long Balls",
+  crosses_accurate: "Crosses Acc",
+  crosses_attempted: "Crosses",
+  // Defensive
   clearances: "Clearances", total_clearances: "Clearances",
+  interceptions: "Interceptions",
   offsides: "Offsides", total_offsides: "Offsides",
-  saves: "Saves", goalkeeper_saves: "Saves",
+  // Goalkeeping
+  goalie_saves: "Saves", saves: "Saves", goalkeeper_saves: "Saves",
+  // Dribbles
+  dribbles_attempted: "Dribbles",
+  dribbles_won: "Dribbles Won",
+  // Attacks
   attacks: "Attacks", dangerous_attacks: "Dangerous Attacks", dangerousAttacks: "Dangerous Attacks",
-  blocked_shots: "Blocked Shots", blockedShots: "Blocked Shots",
-  ball_possession: "Possession %", ballPossession: "Possession %",
 };
 
-// Keys to skip in team stats (non-stat metadata)
-const TEAM_STAT_SKIP = new Set(["teamID", "name", "score", "colors", "id"]);
+// Keys to skip in team stats (non-stat metadata or redundant)
+const TEAM_STAT_SKIP = new Set(["teamID", "name", "score", "colors", "id", "points"]);
 
 function formatStatKey(k: string): string {
   return k.replace(/_/g, " ").replace(/([A-Z])/g, " $1").trim()
@@ -804,9 +825,9 @@ const SGO_PLAYER_STAT_COLS: { label: string; keys: string[] }[] = [
   { label: "Min",  keys: ["minutesPlayed", "minutes_played", "minutes"] },
   { label: "Rat",  keys: ["playerRating", "player_rating", "rating"] },
   { label: "Sh",   keys: ["shots", "total_shots", "shots_total"] },
-  { label: "Pa",   keys: ["passes_accurate", "passesAccurate", "passes", "total_passes"] },
+  { label: "Pa",   keys: ["passes_accurate", "passesAccurate"] },
+  { label: "Tch",  keys: ["touches", "total_touches"] },
   { label: "Tck",  keys: ["tackles", "total_tackles", "tackles_total"] },
-  { label: "Dls",  keys: ["duels", "duels_total", "total_duels", "duels_won"] },
   { label: "YC",   keys: ["yellowCards", "yellow_cards", "yellow_card"] },
   { label: "RC",   keys: ["redCards", "red_cards", "red_card"] },
 ];
