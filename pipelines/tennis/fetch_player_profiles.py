@@ -176,26 +176,34 @@ def run(dry_run: bool = False) -> int:
     upserted = linked = 0
 
     with Session(engine) as session:
+        # Pre-load ALL existing profiles into memory (avoids one query per player)
+        existing_profiles_by_norm: dict[str, TennisPlayerProfile] = {}
+        existing_profiles_by_atpid: dict[str, TennisPlayerProfile] = {}
+        existing_profiles_by_playerid: dict[str, TennisPlayerProfile] = {}
+        for p in session.query(TennisPlayerProfile).all():
+            if p.name_normalized:
+                existing_profiles_by_norm[p.name_normalized] = p
+            if p.atp_id:
+                existing_profiles_by_atpid[p.atp_id] = p
+            if p.player_id:
+                existing_profiles_by_playerid[p.player_id] = p
+
         # Build a name→CoreTeam.id index for fast matching
-        # Tennis players are stored with provider_id starting with "apitns-player-"
         teams = session.query(CoreTeam).filter(
             CoreTeam.provider_id.like("apitns-player-%")
         ).all()
         team_by_norm: dict[str, str] = {}
-        # Also build a last-name-only index for abbreviated names like "D. Medvedev"
         team_by_lastname: dict[str, list[str]] = {}
         for t in teams:
             parts = t.name.strip().split()
             if len(parts) >= 2:
-                # "Novak Djokovic" → djokovic_novak  (full first name)
                 first, last = parts[0], parts[-1]
                 team_by_norm[f"{_normalize(last)}_{_normalize(first)}"] = t.id
                 team_by_norm[f"{_normalize(first)}_{_normalize(last)}"] = t.id
-                # "D. Medvedev" — first part is just an initial; index by last name only
+                # "D. Medvedev" — index by last name only for abbreviated names
                 if len(first.rstrip(".")) <= 2:
                     ln = _normalize(last)
                     team_by_lastname.setdefault(ln, []).append(t.id)
-            # full name normalized
             team_by_norm[_normalize(t.name)] = t.id
 
         for row in all_players:
@@ -214,10 +222,10 @@ def run(dry_run: bool = False) -> int:
 
             name_norm = _norm_full(name_first, name_last)
 
-            # Try to find existing profile
-            prof = session.query(TennisPlayerProfile).filter_by(name_normalized=name_norm).first()
+            # In-memory lookups — no per-row DB queries
+            prof = existing_profiles_by_norm.get(name_norm)
             if prof is None and atp_id:
-                prof = session.query(TennisPlayerProfile).filter_by(atp_id=atp_id).first()
+                prof = existing_profiles_by_atpid.get(atp_id)
 
             if prof is None:
                 prof = TennisPlayerProfile(
@@ -227,6 +235,10 @@ def run(dry_run: bool = False) -> int:
                     name_normalized=name_norm,
                 )
                 session.add(prof)
+                if name_norm:
+                    existing_profiles_by_norm[name_norm] = prof
+                if atp_id:
+                    existing_profiles_by_atpid[atp_id] = prof
 
             prof.atp_id = atp_id
             prof.name_first = name_first
@@ -240,26 +252,22 @@ def run(dry_run: bool = False) -> int:
             if height_cm:
                 prof.height_cm = height_cm
 
-            # Link to CoreTeam if not already linked
+            # Link to CoreTeam if not already linked (in-memory check)
             if prof.player_id is None:
                 matched_id = (
                     team_by_norm.get(name_norm) or
                     team_by_norm.get(f"{_normalize(name_last)}_{_normalize(name_first)}") or
                     team_by_norm.get(_normalize(f"{name_first} {name_last}"))
                 )
-                # Fallback: match abbreviated names (e.g. "D. Medvedev") by last name only
-                # if exactly one abbreviated team has this last name
                 if matched_id is None:
                     ln = _normalize(name_last)
                     candidates = team_by_lastname.get(ln, [])
                     if len(candidates) == 1:
                         matched_id = candidates[0]
-                if matched_id:
-                    # Check no other profile already claims this player_id
-                    existing = session.query(TennisPlayerProfile).filter_by(player_id=matched_id).first()
-                    if existing is None or existing.name_normalized == name_norm:
-                        prof.player_id = matched_id
-                        linked += 1
+                if matched_id and matched_id not in existing_profiles_by_playerid:
+                    prof.player_id = matched_id
+                    existing_profiles_by_playerid[matched_id] = prof
+                    linked += 1
 
             upserted += 1
 
