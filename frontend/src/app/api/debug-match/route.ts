@@ -3,6 +3,27 @@ import { NextResponse } from "next/server";
 const API_BASE = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/v1`;
 const SGO_KEY = process.env.SGO_API_KEY ?? "";
 
+function normalizeName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\b(fc|afc|cf|ac|as|sc|cd|rsc|fk|sk|bk|hc|hv)\b/g, "")
+    .replace(/[^a-z0-9]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function teamsMatch(a: string, b: string): boolean {
+  const na = normalizeName(a);
+  const nb = normalizeName(b);
+  if (na === nb) return true;
+  if (na.length > 3 && nb.includes(na)) return true;
+  if (nb.length > 3 && na.includes(nb)) return true;
+  const wa = na.split(" ").filter((w) => w.length > 2);
+  const wb = new Set(nb.split(" ").filter((w) => w.length > 2));
+  if (wa.some((w) => wb.has(w))) return true;
+  return false;
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const eventID = searchParams.get("eventID");
@@ -13,7 +34,6 @@ export async function GET(req: Request) {
     deploy_time: new Date().toISOString(),
   };
 
-  // Step 1: fetch SGO event
   let sgoHome = searchParams.get("home") ?? "";
   let sgoAway = searchParams.get("away") ?? "";
 
@@ -32,9 +52,6 @@ export async function GET(req: Request) {
           sgoAway = ev.teams?.away?.names?.long ?? "";
           info.sgoHome = sgoHome;
           info.sgoAway = sgoAway;
-          info.sgoLeague = ev.leagueID;
-        } else {
-          info.sgoError = "No event found";
         }
       }
     } catch (e) {
@@ -42,32 +59,53 @@ export async function GET(req: Request) {
     }
   }
 
-  info.searchingFor = { home: sgoHome, away: sgoAway, sport };
-
-  // Step 2: search backend
+  // Search backend
+  let bestId: string | null = null;
   if (sgoHome) {
     try {
-      const searchUrl = `${API_BASE}/matches/search?q=${encodeURIComponent(sgoHome)}&limit=20`;
-      info.searchUrl = searchUrl;
-      const res = await fetch(searchUrl, { cache: "no-store" });
+      const res = await fetch(
+        `${API_BASE}/matches/search?q=${encodeURIComponent(sgoHome)}&limit=20`,
+        { cache: "no-store" }
+      );
       info.searchStatus = res.status;
       if (res.ok) {
         const results = await res.json();
-        info.allResults = results;
         const candidates = results.filter((r: { type: string; sport: string; title: string }) =>
-          r.type === "match" && r.sport === sport
+          r.type === "match" &&
+          r.sport === sport &&
+          teamsMatch(sgoAway, r.title.split(" vs ").slice(-1)[0] ?? "")
         );
-        info.sportMatchCandidates = candidates;
-        // Show away name matching
-        info.awayMatching = candidates.map((r: { title: string; id: string }) => ({
-          id: r.id,
-          title: r.title,
-          awayInTitle: r.title.split(" vs ").slice(-1)[0],
-          sgoAway,
+        info.candidates = candidates.map((r: { id: string; title: string; subtitle: string }) => ({
+          id: r.id, title: r.title, subtitle: r.subtitle,
         }));
+        bestId = candidates[0]?.id ?? null;
+        info.bestId = bestId;
       }
     } catch (e) {
       info.searchError = String(e);
+    }
+  }
+
+  // Fetch match detail
+  if (bestId) {
+    try {
+      const detailRes = await fetch(
+        `${API_BASE}/sports/${sport}/matches/${bestId}`,
+        { cache: "no-store" }
+      );
+      info.detailStatus = detailRes.status;
+      if (detailRes.ok) {
+        const detail = await detailRes.json();
+        // Show which fields have data
+        info.detailFields = Object.entries(detail).reduce((acc, [k, v]) => {
+          (acc as Record<string, unknown>)[k] = v === null ? "null" : Array.isArray(v) ? `array(${(v as unknown[]).length})` : typeof v === "object" ? "object" : v;
+          return acc;
+        }, {} as Record<string, unknown>);
+      } else {
+        info.detailBody = await detailRes.text();
+      }
+    } catch (e) {
+      info.detailError = String(e);
     }
   }
 
