@@ -166,14 +166,30 @@ def _real_player_profile(
             norm = f"{_norm(last)}_{_norm(first)}"
             prof = db.query(TennisPlayerProfile).filter_by(name_normalized=norm).first()
     if prof is None:
+        # Look for other CoreTeam entries with the same player name (duplicate team records)
+        same_name_teams = db.query(CoreTeam).filter(
+            CoreTeam.name.ilike(player_name)
+        ).all()
+        for other_team in same_name_teams:
+            if other_team.id == player_id:
+                continue
+            p = db.query(TennisPlayerProfile).filter_by(player_id=other_team.id).first()
+            if p is not None:
+                prof = p
+                break
+    if prof is None:
         # Fallback: last-name-only match for abbreviated names ("D. Medvedev" → "Medvedev")
         parts = player_name.strip().split()
         last = parts[-1] if parts else player_name
-        matches = db.query(TennisPlayerProfile).filter(
+        candidates = db.query(TennisPlayerProfile).filter(
             TennisPlayerProfile.name_last.ilike(last)
         ).all()
-        if len(matches) == 1:
-            prof = matches[0]
+        # Prefer profiles with a ranking (active player data)
+        ranked = [p for p in candidates if p.ranking is not None]
+        if len(ranked) == 1:
+            prof = ranked[0]
+        elif len(candidates) == 1:
+            prof = candidates[0]
 
     # Also pull logo from CoreTeam if not on profile
     team = db.query(CoreTeam).filter_by(id=player_id).first()
