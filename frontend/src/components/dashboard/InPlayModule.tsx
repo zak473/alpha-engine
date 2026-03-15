@@ -4,23 +4,21 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { cn, sportColor, timeUntil } from "@/lib/utils";
 import type { SGOEvent } from "@/lib/sgo";
+import { SPORT_LEAGUES } from "@/lib/sgo";
 
 const LIMIT = 5;
 const POLL_INTERVAL = 30_000;
 
-// SGO sportID → our slug
-const SPORT_SLUG: Record<string, string> = {
-  SOCCER:           "soccer",
-  BASKETBALL:       "basketball",
-  BASEBALL:         "baseball",
-  HOCKEY:           "hockey",
-  TENNIS:           "tennis",
-  "AMERICAN-FOOTBALL": "american-football",
-  FOOTBALL:         "soccer",
-};
+// Build leagueID → sport slug from our existing SPORT_LEAGUES config
+const LEAGUE_TO_SPORT: Record<string, string> = {};
+for (const [sport, leagues] of Object.entries(SPORT_LEAGUES)) {
+  for (const leagueID of leagues) {
+    LEAGUE_TO_SPORT[leagueID] = sport;
+  }
+}
 
-function sgoSport(sportID: string): string {
-  return SPORT_SLUG[sportID] ?? sportID.toLowerCase().replace(/\s+/g, "-");
+function sgoSport(leagueID: string): string {
+  return LEAGUE_TO_SPORT[leagueID] ?? "other";
 }
 
 interface LiveItem {
@@ -42,7 +40,7 @@ function eventToItem(event: SGOEvent): LiveItem {
   const s = event.status;
   return {
     id:          event.eventID,
-    sport:       sgoSport(event.sportID),
+    sport:       sgoSport(event.leagueID),
     home_name:   home?.names?.long ?? "Home",
     away_name:   away?.names?.long ?? "Away",
     league:      event.leagueID,
