@@ -1090,23 +1090,41 @@ class SoccerMatchService(BaseMatchListService):
                 neutral_site=match.is_neutral or False,
             )
 
+        # For live matches missing lineups/events: try on-demand Highlightly fetch
+        extras_json = match.extras_json or {}
+        if match.status == "live" and not extras_json.get("lineups"):
+            hl_match_id: str | None = None
+            if match.provider_id and match.provider_id.startswith("hl-soccer-"):
+                hl_match_id = match.provider_id[len("hl-soccer-"):]
+            if hl_match_id:
+                try:
+                    from pipelines.highlightly.client import get_extras as hl_get_extras
+                    fresh = hl_get_extras("soccer", hl_match_id, include_players=True)
+                    if fresh:
+                        merged = {**extras_json, **fresh}
+                        match.extras_json = merged
+                        db.add(match)
+                        db.commit()
+                        extras_json = merged
+                except Exception as _exc:
+                    log.warning("[soccer:service] on-demand hl extras failed for %s: %s", match_id, _exc)
+
         # Parse lineups from Highlightly extras
         lineup_home, lineup_away = _extract_lineups(
-            match.extras_json,
+            extras_json,
             match.home_team_id, home_name,
             match.away_team_id, away_name,
         )
 
         # Parse highlights, events, live stats
         highlights = _parse_highlights(match.highlights_json)
-        events = _extract_events(match.extras_json, home_name, away_name)
-        stats_home_live, stats_away_live = _extract_live_stats(match.extras_json)
+        events = _extract_events(extras_json, home_name, away_name)
+        stats_home_live, stats_away_live = _extract_live_stats(extras_json)
 
         # Prefer Highlightly prematch data for form/H2H when available
-        extras = match.extras_json or {}
-        hl_form_home = _form_from_hl(extras.get("lastfivegames_home") or [], home_name)
-        hl_form_away = _form_from_hl(extras.get("lastfivegames_away") or [], away_name)
-        hl_h2h = _h2h_from_hl(extras.get("headtohead") or [], home_name, away_name)
+        hl_form_home = _form_from_hl(extras_json.get("lastfivegames_home") or [], home_name)
+        hl_form_away = _form_from_hl(extras_json.get("lastfivegames_away") or [], away_name)
+        hl_h2h = _h2h_from_hl(extras_json.get("headtohead") or [], home_name, away_name)
 
         form_home = (
             hl_form_home

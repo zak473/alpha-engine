@@ -252,7 +252,7 @@ function FormSection({ match, homeName, awayName }: { match: SportMatchDetail; h
       <div className="space-y-3">
         {[{ name: homeName, form: fh }, { name: awayName, form: fa }].map(({ name, form }) => {
           if (!form) return null;
-          const results: string[] = (form.recent_results as string[] | undefined) ?? [];
+          const results: string[] = (form.form_last_5 as string[] | undefined) ?? (form.recent_results as string[] | undefined) ?? [];
           const pts = form.form_pts ?? form.wins;
           const gf = form.goals_scored_avg ?? form.avg_runs_for ?? form.maps_won;
           const ga = form.goals_against_avg ?? form.avg_runs_against;
