@@ -23,15 +23,15 @@ export async function GET() {
   const [cs2Running, cs2Upcoming, nbaGames, nbaGame] = await Promise.all([
     test("https://api.balldontlie.io/cs/v1/matches?status=running&per_page=5"),
     test("https://api.balldontlie.io/cs/v1/matches?status=upcoming&per_page=5"),
-    test(`https://api.balldontlie.io/v1/games?dates[]=${today}&per_page=3`),
+    test(`https://api.balldontlie.io/nba/v1/games?dates[]=${today}&per_page=3`),
     // Test single game fetch with a known recent game ID from the list
     (async () => {
       try {
-        const listRes = await fetch(`https://api.balldontlie.io/v1/games?dates[]=${today}&per_page=1`, { headers: { Authorization: key }, cache: "no-store" });
+        const listRes = await fetch(`https://api.balldontlie.io/nba/v1/games?dates[]=${today}&per_page=1`, { headers: { Authorization: key }, cache: "no-store" });
         const listJson = await listRes.json();
         const firstId = listJson.data?.[0]?.id;
         if (!firstId) return { status: null, sample: "no games today to test single fetch" };
-        const res = await fetch(`https://api.balldontlie.io/v1/games/${firstId}`, { headers: { Authorization: key }, cache: "no-store" });
+        const res = await fetch(`https://api.balldontlie.io/nba/v1/games/${firstId}`, { headers: { Authorization: key }, cache: "no-store" });
         const json = await res.json();
         return { status: res.status, gameId: firstId, hasDataWrapper: "data" in json, keys: Object.keys(json).slice(0, 5) };
       } catch (e) {

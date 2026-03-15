@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BDL_BASE = "https://api.balldontlie.io/v1";
+const BDL_BASE = "https://api.balldontlie.io/nba/v1";
 
 function bdlHeaders(): Record<string, string> {
   return { Authorization: process.env.BALLDONTLIE_API_KEY ?? "" };
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     req.nextUrl.searchParams.get("date") ??
     new Date().toISOString().split("T")[0];
   try {
-    const res = await fetch(`${BDL_BASE}/box_scores/live?date=${date}`, {
+    const res = await fetch(`${BDL_BASE}/box_scores/live`, {
       headers: bdlHeaders(),
       cache: "no-store",
     });

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BDL_V1 = "https://api.balldontlie.io/v1";
-const BDL_V2 = "https://api.balldontlie.io/v2";
+const BDL_V1 = "https://api.balldontlie.io/nba/v1";
+const BDL_V2 = "https://api.balldontlie.io/nba/v2";
 
 function bdlHeaders(): Record<string, string> {
   return { Authorization: process.env.BALLDONTLIE_API_KEY ?? "" };
@@ -30,7 +30,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const [gameJson, boxJson, playsJson, standJson, oddsJson] = await Promise.all([
     bdlGet(`${BDL_V1}/games/${id}`, 60),
     bdlGet(`${BDL_V1}/box_scores?game_ids[]=${id}`, 60),
-    bdlGet(`${BDL_V1}/plays?game_id=${id}&per_page=100`, 60),
+    bdlGet(`${BDL_V1}/plays?game_ids[]=${id}&per_page=100`, 60),
     bdlGet(`${BDL_V1}/standings?season=2024&per_page=30`, 600),
     bdlGet(`${BDL_V2}/odds?game_ids[]=${id}&per_page=100`, 120),
   ]);
