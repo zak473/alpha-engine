@@ -62,7 +62,7 @@ function MarketSection({ market, matchId, matchLabel, sport, league, startTime, 
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="sportsbook-card p-5 space-y-3">
+    <div className="sportsbook-card p-4 space-y-2">
       <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-text-muted">{title}</div>
       {children}
     </div>
@@ -71,10 +71,10 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 
 function StatRow({ label, home, away }: { label: string; home: unknown; away: unknown }) {
   return (
-    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-xl border px-3 py-2.5" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-      <span className="text-right text-sm text-text-primary">{fmt(home)}</span>
-      <span className="text-[10px] uppercase tracking-[0.16em] text-text-muted text-center min-w-[80px]">{label.replace(/_/g, " ")}</span>
-      <span className="text-sm text-text-primary">{fmt(away)}</span>
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-lg border px-2.5 py-1.5" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+      <span className="text-right text-xs text-text-primary">{fmt(home)}</span>
+      <span className="text-[9px] uppercase tracking-[0.14em] text-text-muted text-center min-w-[72px]">{label.replace(/_/g, " ")}</span>
+      <span className="text-xs text-text-primary">{fmt(away)}</span>
     </div>
   );
 }
@@ -96,10 +96,10 @@ function EloSparkline({ points, color }: { points: EloPoint[]; color: string }) 
 function ProbCard({ label, prob, color }: { label: string; prob: number; color: string }) {
   const pct = Math.round(prob * 100);
   return (
-    <div className="rounded-[20px] border p-4 text-center" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-      <div className="text-[10px] uppercase tracking-[0.16em] text-text-muted mb-2 truncate">{label}</div>
-      <div className="text-3xl font-bold" style={{ color }}>{pct}%</div>
-      <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg3)" }}>
+    <div className="rounded-xl border p-3 text-center" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+      <div className="text-[9px] uppercase tracking-[0.14em] text-text-muted mb-1 truncate">{label}</div>
+      <div className="text-2xl font-bold" style={{ color }}>{pct}%</div>
+      <div className="mt-1.5 h-1 rounded-full overflow-hidden" style={{ background: "var(--bg3)" }}>
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
       </div>
     </div>
@@ -177,11 +177,11 @@ function EloCard({ name, elo, history, color }: { name: string; elo: Record<stri
   const rating = elo?.rating ?? elo?.overall_rating ?? elo?.surface_rating;
   const change = elo?.rating_change;
   return (
-    <div className="rounded-[20px] border p-4" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-      <div className="text-[10px] uppercase tracking-[0.16em] text-text-muted mb-1 truncate">{name}</div>
+    <div className="rounded-xl border p-3" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+      <div className="text-[9px] uppercase tracking-[0.14em] text-text-muted mb-1 truncate">{name}</div>
       <div className="flex items-end justify-between gap-2">
         <div>
-          <span className="text-2xl font-bold text-text-primary">{rating != null ? Math.round(Number(rating)) : "—"}</span>
+          <span className="text-xl font-bold text-text-primary">{rating != null ? Math.round(Number(rating)) : "—"}</span>
           {change != null && (
             <span className={cn("ml-2 text-xs font-semibold", Number(change) >= 0 ? "text-emerald-400" : "text-red-400")}>
               {Number(change) >= 0 ? "+" : ""}{Math.round(Number(change))}
@@ -993,11 +993,11 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
   const hasInfoData = !!(backendMatch || event.results?.game || event.info?.venue);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 lg:px-6 space-y-6">
+    <div className="mx-auto max-w-6xl px-4 py-4 lg:px-6 space-y-4">
 
       {/* Hero — full width */}
       <div className="sportsbook-card overflow-hidden">
-        <div className="flex items-center justify-between gap-3 px-5 pt-5">
+        <div className="flex items-center justify-between gap-3 px-4 pt-4">
           <div className="flex items-center gap-2.5">
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-full text-base" style={{ background: `${cfg.color}16`, color: cfg.color }}>{cfg.icon}</span>
             <div>
@@ -1019,7 +1019,7 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
           )}
         </div>
 
-        <div className="grid gap-4 px-5 py-6 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+        <div className="grid gap-3 px-4 py-4 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
           <div>
             <p className="text-[11px] uppercase tracking-[0.16em] text-text-subtle">Home</p>
             <p className="mt-1 text-2xl font-bold leading-tight text-text-primary">{match.home.name}</p>
@@ -1043,10 +1043,10 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
 
       {/* Info grid — two columns on desktop */}
       {hasInfoData && (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
 
           {/* Left info column: SGO live data */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <SGOVenueSection event={event} />
             <SGOTeamStatsSection event={event} homeName={match.home.name} awayName={match.away.name} />
             {backendMatch && (isLive || isFinished) && <EventsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
@@ -1057,7 +1057,7 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
           </div>
 
           {/* Right info column: model + analytics */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             {backendMatch ? (
               <>
                 <ProbabilitiesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
@@ -1085,7 +1085,7 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
       )}
 
       {/* Odds — full width at bottom */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted px-1">Betting Markets</div>
         {orderedCats.length === 0 && !isFinished && (
           <div className="rounded-[20px] border px-5 py-8 text-center text-sm text-text-muted" style={{ borderColor: "var(--border0)" }}>
@@ -1098,7 +1098,7 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
           const hasEdge = markets.some((m) => m.selections.some((s) => (s.edge ?? 0) >= 0.05));
           return (
             <div key={cat} className="sportsbook-card overflow-hidden">
-              <button onClick={() => toggleCat(cat)} className="flex w-full items-center justify-between px-5 py-4 transition-colors hover:bg-white/[0.02]">
+              <button onClick={() => toggleCat(cat)} className="flex w-full items-center justify-between px-4 py-3 transition-colors hover:bg-white/[0.02]">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-text-primary">{cat}</span>
                   <span className="rounded-full border px-2 py-0.5 text-[10px] font-medium text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>{markets.length}</span>
@@ -1112,7 +1112,7 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
                 {isExpanded ? <ChevronUp size={16} className="text-text-muted" /> : <ChevronDown size={16} className="text-text-muted" />}
               </button>
               {isExpanded && (
-                <div className="border-t px-5 py-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" style={{ borderColor: "var(--border0)" }}>
+                <div className="border-t px-4 py-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4" style={{ borderColor: "var(--border0)" }}>
                   {markets.map((mkt) => (
                     <MarketSection key={mkt.id} market={mkt} matchId={match.id} matchLabel={matchLabel}
                       sport={sport} league={match.league} startTime={match.startTime} isFinished={isFinished} />
