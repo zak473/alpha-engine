@@ -19,14 +19,19 @@ export async function GET(req: Request) {
 
     // For the event, show what top-level keys exist beyond odds
     const event = raw.data?.[0] ?? raw.events?.[0];
+    const gameResults = event?.results?.game;
+    const firstPlayerID = gameResults ? Object.keys(gameResults).find(k => k !== "home" && k !== "away") : null;
     const summary = event ? {
       topLevelKeys: Object.keys(event),
-      rawResults: event.results,
+      rawResultsGameHomeKeys: gameResults?.home ? Object.keys(gameResults.home) : null,
+      rawResultsGameAwayKeys: gameResults?.away ? Object.keys(gameResults.away) : null,
+      rawResultsGameHomeValues: gameResults?.home,
+      rawResultsGameAwayValues: gameResults?.away,
+      firstPlayerID,
+      firstPlayerStats: firstPlayerID ? gameResults?.[firstPlayerID] : null,
       rawPlayers: event.players,
       rawInfo: event.info,
-      rawLinks: event.links,
       rawClock: event.status?.clock,
-      rawPeriods: event.status?.periods,
       rawTeams: event.teams,
     } : { error: "no event found", raw };
 

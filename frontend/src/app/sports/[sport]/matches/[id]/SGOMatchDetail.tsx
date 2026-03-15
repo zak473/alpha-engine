@@ -739,29 +739,50 @@ function SGOVenueSection({ event }: { event: SGOEvent }) {
 // ─── SGO Team stats section ───────────────────────────────────────────────────
 
 const SGO_TEAM_STAT_LABELS: Record<string, string> = {
-  possession: "Possession %",
-  shots: "Shots",
-  shotsOnTarget: "On Target",
-  corners: "Corners",
-  fouls: "Fouls",
-  yellowCards: "Yellow Cards",
-  redCards: "Red Cards",
-  passes: "Passes",
-  passesAccurate: "Passes Acc",
-  clearances: "Clearances",
-  offsides: "Offsides",
-  saves: "Saves",
-  attacks: "Attacks",
-  dangerousAttacks: "Dangerous Attacks",
+  possession: "Possession %", possession_pct: "Possession %", possessionPct: "Possession %",
+  shots: "Shots", total_shots: "Shots",
+  shotsOnTarget: "On Target", shots_on_target: "On Target", shotsOnGoal: "On Target",
+  corners: "Corners", corner_kicks: "Corners", cornerKicks: "Corners",
+  fouls: "Fouls", total_fouls: "Fouls",
+  yellowCards: "Yellow Cards", yellow_cards: "Yellow Cards",
+  redCards: "Red Cards", red_cards: "Red Cards",
+  passes: "Passes", total_passes: "Passes", passes_total: "Passes",
+  passesAccurate: "Passes Acc", passes_accurate: "Passes Acc",
+  clearances: "Clearances", total_clearances: "Clearances",
+  offsides: "Offsides", total_offsides: "Offsides",
+  saves: "Saves", goalkeeper_saves: "Saves",
+  attacks: "Attacks", dangerous_attacks: "Dangerous Attacks", dangerousAttacks: "Dangerous Attacks",
+  blocked_shots: "Blocked Shots", blockedShots: "Blocked Shots",
+  ball_possession: "Possession %", ballPossession: "Possession %",
 };
+
+// Keys to skip in team stats (non-stat metadata)
+const TEAM_STAT_SKIP = new Set(["teamID", "name", "score", "colors", "id"]);
+
+function formatStatKey(k: string): string {
+  return k.replace(/_/g, " ").replace(/([A-Z])/g, " $1").trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 function SGOTeamStatsSection({ event, homeName, awayName }: { event: SGOEvent; homeName: string; awayName: string }) {
   const game = event.results?.game;
   const sh = game?.home as SGOTeamStats | undefined;
   const sa = game?.away as SGOTeamStats | undefined;
   if (!sh && !sa) return null;
-  const keys = Object.keys(SGO_TEAM_STAT_LABELS).filter((k) => sh?.[k] != null || sa?.[k] != null);
-  if (!keys.length) return null;
+
+  // Union of all keys from both objects, deduplicated by canonical label
+  const seen = new Set<string>();
+  const rows: { key: string; label: string }[] = [];
+  for (const k of Array.from(new Set([...Object.keys(sh ?? {}), ...Object.keys(sa ?? {})]))) {
+    if (TEAM_STAT_SKIP.has(k)) continue;
+    if (sh?.[k] == null && sa?.[k] == null) continue;
+    const label = SGO_TEAM_STAT_LABELS[k] ?? formatStatKey(k);
+    if (seen.has(label)) continue;
+    seen.add(label);
+    rows.push({ key: k, label });
+  }
+
+  if (!rows.length) return null;
   return (
     <Card title="Match Stats">
       <div className="grid grid-cols-[1fr_auto_1fr] gap-x-2 mb-2">
@@ -770,7 +791,7 @@ function SGOTeamStatsSection({ event, homeName, awayName }: { event: SGOEvent; h
         <span className="text-[10px] font-semibold text-text-muted">{awayName}</span>
       </div>
       <div className="space-y-1.5">
-        {keys.map((k) => <StatRow key={k} label={SGO_TEAM_STAT_LABELS[k] ?? k} home={sh?.[k]} away={sa?.[k]} />)}
+        {rows.map(({ key, label }) => <StatRow key={key} label={label} home={sh?.[key]} away={sa?.[key]} />)}
       </div>
     </Card>
   );
@@ -778,12 +799,24 @@ function SGOTeamStatsSection({ event, homeName, awayName }: { event: SGOEvent; h
 
 // ─── SGO Player stats section ─────────────────────────────────────────────────
 
-const SGO_PLAYER_STAT_KEYS = ["minutesPlayed", "playerRating", "shots", "passes_accurate", "tackles", "duels", "yellowCards", "redCards"] as const;
-const SGO_PLAYER_STAT_LABELS: Record<string, string> = {
-  minutesPlayed: "Min", playerRating: "Rat", shots: "Sh",
-  passes_accurate: "Pa", tackles: "Tck", duels: "Dls",
-  yellowCards: "YC", redCards: "RC",
-};
+// Ordered columns — try multiple key name variants per stat
+const SGO_PLAYER_STAT_COLS: { label: string; keys: string[] }[] = [
+  { label: "Min",  keys: ["minutesPlayed", "minutes_played", "minutes"] },
+  { label: "Rat",  keys: ["playerRating", "player_rating", "rating"] },
+  { label: "Sh",   keys: ["shots", "total_shots", "shots_total"] },
+  { label: "Pa",   keys: ["passes_accurate", "passesAccurate", "passes", "total_passes"] },
+  { label: "Tck",  keys: ["tackles", "total_tackles", "tackles_total"] },
+  { label: "Dls",  keys: ["duels", "duels_total", "total_duels", "duels_won"] },
+  { label: "YC",   keys: ["yellowCards", "yellow_cards", "yellow_card"] },
+  { label: "RC",   keys: ["redCards", "red_cards", "red_card"] },
+];
+
+function resolveStatCol(stats: Record<string, unknown>, keys: string[]): unknown {
+  for (const k of keys) {
+    if (stats[k] != null) return stats[k];
+  }
+  return null;
+}
 
 function SGOPlayerStatsSection({ event, homeName, awayName }: { event: SGOEvent; homeName: string; awayName: string }) {
   const game = event.results?.game;
@@ -802,7 +835,8 @@ function SGOPlayerStatsSection({ event, homeName, awayName }: { event: SGOEvent;
     const info = players[id];
     const stats = game[id] as Record<string, unknown> | undefined;
     if (!info || !stats) continue;
-    if (Number(stats.minutesPlayed ?? 0) <= 0) continue;
+    const mins = resolveStatCol(stats, SGO_PLAYER_STAT_COLS[0].keys);
+    if (Number(mins ?? 0) <= 0) continue;
     const row = { id, info, stats };
     if (info.teamID === homeTeamID) homePlayers.push(row);
     else awayPlayers.push(row);
@@ -810,8 +844,9 @@ function SGOPlayerStatsSection({ event, homeName, awayName }: { event: SGOEvent;
 
   if (!homePlayers.length && !awayPlayers.length) return null;
 
-  homePlayers.sort((a, b) => Number(b.stats.playerRating ?? 0) - Number(a.stats.playerRating ?? 0));
-  awayPlayers.sort((a, b) => Number(b.stats.playerRating ?? 0) - Number(a.stats.playerRating ?? 0));
+  const getRating = (row: PlayerRow) => Number(resolveStatCol(row.stats, SGO_PLAYER_STAT_COLS[1].keys) ?? 0);
+  homePlayers.sort((a, b) => getRating(b) - getRating(a));
+  awayPlayers.sort((a, b) => getRating(b) - getRating(a));
 
   const renderTeam = (name: string, rows: PlayerRow[]) => {
     if (!rows.length) return null;
@@ -823,8 +858,8 @@ function SGOPlayerStatsSection({ event, homeName, awayName }: { event: SGOEvent;
             <thead>
               <tr className="text-text-muted">
                 <th className="text-left font-medium pb-1 pr-2">Player</th>
-                {SGO_PLAYER_STAT_KEYS.map((k) => (
-                  <th key={k} className="text-center font-medium pb-1 px-1 min-w-[28px]">{SGO_PLAYER_STAT_LABELS[k]}</th>
+                {SGO_PLAYER_STAT_COLS.map((col) => (
+                  <th key={col.label} className="text-center font-medium pb-1 px-1 min-w-[28px]">{col.label}</th>
                 ))}
               </tr>
             </thead>
@@ -836,15 +871,15 @@ function SGOPlayerStatsSection({ event, homeName, awayName }: { event: SGOEvent;
                 return (
                   <tr key={id} className="border-t" style={{ borderColor: "var(--border0)" }}>
                     <td className="py-1.5 pr-2 text-text-primary font-medium whitespace-nowrap">{shortDisplay}</td>
-                    {SGO_PLAYER_STAT_KEYS.map((k) => {
-                      const v = stats[k];
-                      const isRating = k === "playerRating";
+                    {SGO_PLAYER_STAT_COLS.map((col) => {
+                      const v = resolveStatCol(stats, col.keys);
+                      const isRating = col.label === "Rat";
                       const ratingNum = isRating && v != null ? Number(v) : null;
                       const ratingColor = ratingNum != null
                         ? ratingNum >= 7.5 ? "#22c55e" : ratingNum >= 6.5 ? "#f59e0b" : "#ef4444"
                         : undefined;
                       return (
-                        <td key={k} className="py-1.5 px-1 text-center" style={{ color: ratingColor ?? "var(--text-primary)" }}>
+                        <td key={col.label} className="py-1.5 px-1 text-center" style={{ color: ratingColor ?? "var(--text-primary)" }}>
                           {v != null ? (isRating ? Number(v).toFixed(1) : String(v)) : <span className="text-text-muted">–</span>}
                         </td>
                       );
