@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BDL_BASE = "https://api.balldontlie.io/nba/v2";
+const BDL_BASE = "https://api.balldontlie.io/v2";
 
 function bdlHeaders(): Record<string, string> {
   return { Authorization: process.env.BALLDONTLIE_API_KEY ?? "" };
