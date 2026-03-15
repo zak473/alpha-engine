@@ -1,813 +1,294 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ArrowRight, Clock3, RefreshCw, Radio, Loader2, Zap } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { getLiveMatches } from "@/lib/api";
-import type { LiveMatchOut } from "@/lib/api";
-import { useLiveRefresh } from "@/lib/hooks/useLiveRefresh";
-import { cn, formatDate } from "@/lib/utils";
-import {
-  getNBAGames,
-  getNBALiveBoxScores,
-  isGameLive,
-  isGameFinished,
-  isGameScheduled,
-  getPeriodLabel,
-  type BdlGame,
-  type BdlBoxScore,
-} from "@/lib/balldontlie";
-import {
-  getCS2Matches,
-  getCS2Maps,
-  isMatchLive as isCS2Live,
-  isMatchFinished as isCS2Finished,
-  isMatchUpcoming as isCS2Upcoming,
-  type Cs2Match,
-  type Cs2MatchMap,
-} from "@/lib/balldontlie-cs2";
-import { NBALiveGameCard } from "@/components/live/NBALiveGameCard";
-import { CS2MatchCard } from "@/components/live/CS2MatchCard";
+import { RefreshCw } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { SGOEvent } from "@/lib/sgo";
+import { SPORT_LEAGUES, LEAGUE_LABELS } from "@/lib/sgo";
 
-// ─── Constants ────────────────────────────────────────────────────────────
+// ─── Sport mapping ────────────────────────────────────────────────────────────
 
-const SPORT_LABELS: Record<string, string> = {
-  soccer: "Soccer",
-  basketball: "Basketball",
-  baseball: "Baseball",
-  hockey: "Hockey",
-  tennis: "Tennis",
-  esports: "Esports",
-  cs2bdl: "CSGO (BallDontLie)",
+const LEAGUE_TO_SPORT: Record<string, string> = {};
+for (const [sport, leagues] of Object.entries(SPORT_LEAGUES)) {
+  for (const leagueID of leagues) LEAGUE_TO_SPORT[leagueID] = sport;
+}
+
+const SPORT_ORDER = ["soccer", "basketball", "baseball", "hockey", "tennis"];
+
+const SPORT_COLOR: Record<string, string> = {
+  soccer:     "#3b82f6",
+  basketball: "#f97316",
+  baseball:   "#22c55e",
+  hockey:     "#a78bfa",
+  tennis:     "#facc15",
+  other:      "#6b7280",
 };
 
-const SPORT_ICONS: Record<string, string> = {
-  soccer: "⚽",
+const SPORT_EMOJI: Record<string, string> = {
+  soccer:     "⚽",
   basketball: "🏀",
-  baseball: "⚾",
-  hockey: "🏒",
-  tennis: "🎾",
-  esports: "🎮",
-  cs2bdl: "🔫",
+  baseball:   "⚾",
+  hockey:     "🏒",
+  tennis:     "🎾",
+  other:      "🎮",
 };
 
-const ALL_SPORTS = ["basketball", "soccer", "tennis", "baseball", "hockey", "esports", "cs2bdl"] as const;
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-// ─── Shared micro-components ──────────────────────────────────────────────
-
-function LiveDot() {
-  return (
-    <span className="relative flex h-2.5 w-2.5 shrink-0">
-      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
-      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
-    </span>
-  );
+interface LiveMatch {
+  eventID:   string;
+  sport:     string;
+  leagueID:  string;
+  homeName:  string;
+  awayName:  string;
+  homeScore: number | null;
+  awayScore: number | null;
+  clock:     string | null;
+  period:    string | null;
+  startsAt:  string;
 }
 
-function Avatar({ name, src }: { name: string; src?: string | null }) {
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt={name}
-        className="h-10 w-10 rounded-full border border-white/10 bg-white/5 object-contain p-1"
-      />
-    );
-  }
-  return (
-    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xs font-semibold text-white/70">
-      {name.slice(0, 2).toUpperCase()}
-    </div>
-  );
+function eventToMatch(e: SGOEvent): LiveMatch {
+  const sport = LEAGUE_TO_SPORT[e.leagueID] ?? "other";
+  return {
+    eventID:   e.eventID,
+    sport,
+    leagueID:  e.leagueID,
+    homeName:  e.teams?.home?.names?.long ?? "Home",
+    awayName:  e.teams?.away?.names?.long ?? "Away",
+    homeScore: e.teams?.home?.score != null ? Number(e.teams.home.score) : null,
+    awayScore: e.teams?.away?.score != null ? Number(e.teams.away.score) : null,
+    clock:     e.status?.clock ?? null,
+    period:    e.status?.currentPeriodID ?? null,
+    startsAt:  e.status?.startsAt ?? "",
+  };
 }
 
-function TeamPill({
-  name,
-  logo,
-  align = "left",
-}: {
-  name: string;
-  logo?: string | null;
-  align?: "left" | "right";
-}) {
-  return (
-    <div className={cn("flex min-w-0 items-center gap-3", align === "right" && "justify-end")}>
-      {align === "right" ? (
-        <>
-          <div className="min-w-0 text-right">
-            <div className="truncate text-sm font-semibold text-white">{name}</div>
-          </div>
-          <Avatar name={name} src={logo} />
-        </>
-      ) : (
-        <>
-          <Avatar name={name} src={logo} />
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-white">{name}</div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
+// ─── Match card ───────────────────────────────────────────────────────────────
 
-// ─── Generic MatchTile (non-NBA sports) ───────────────────────────────────
+function MatchCard({ m }: { m: LiveMatch }) {
+  const color = SPORT_COLOR[m.sport] ?? SPORT_COLOR.other;
+  const hasScore = m.homeScore !== null && m.awayScore !== null;
+  const homeWin  = hasScore && m.homeScore! > m.awayScore!;
+  const awayWin  = hasScore && m.awayScore! > m.homeScore!;
 
-function MatchTile({ match }: { match: LiveMatchOut }) {
-  const href = `/sports/${match.sport}/matches/${match.id}`;
-  const isLive = match.is_live;
-  const statusLabel = isLive
-    ? match.live_clock || "Live"
-    : formatDate(match.kickoff_utc ?? new Date().toISOString(), "long");
+  const clockLabel = m.clock
+    ? `${m.clock}'`
+    : m.period
+    ? m.period.replace(/_/g, " ")
+    : "In Progress";
 
   return (
     <Link
-      href={href}
-      className={cn(
-        "group rounded-[24px] border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_20px_50px_rgba(0,0,0,0.28)] lg:p-5",
-        isLive
-          ? "border-emerald-400/25 bg-[linear-gradient(160deg,rgba(54,242,143,0.07),rgba(255,255,255,0.03))]"
-          : "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))]"
-      )}
+      href={`/sports/${m.sport}/matches/${m.eventID}`}
+      className="group relative flex flex-col gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.03] p-4 hover:bg-white/[0.06] hover:border-white/[0.12] transition-all duration-150"
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-white/50">
-            <span>{SPORT_ICONS[match.sport] ?? "🏅"}</span>
-            {SPORT_LABELS[match.sport] ?? match.sport}
+      {/* Live pill + league */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: color }} />
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: color }} />
           </span>
-          <span className="truncate text-xs text-white/30">{match.league}</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color }}>
+            {clockLabel}
+          </span>
         </div>
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-white/40">
-          {isLive ? (
-            <>
-              <LiveDot />
-              <span className="font-semibold text-emerald-300">Live</span>
-            </>
-          ) : (
-            <>
-              <Clock3 size={11} />
-              <span>{statusLabel}</span>
-            </>
-          )}
-        </div>
+        <span className="text-[10px] text-white/38 truncate ml-2">
+          {LEAGUE_LABELS[m.leagueID] ?? m.leagueID}
+        </span>
       </div>
 
-      <div className="mt-5 grid items-center gap-4 lg:grid-cols-[1fr_auto_1fr]">
-        <TeamPill name={match.home_name} logo={match.home_logo} />
-        <div className="flex flex-col items-center justify-center gap-2 rounded-[20px] border border-white/8 bg-black/20 px-4 py-3">
-          <div
-            className={cn(
-              "text-3xl font-semibold tracking-[-0.06em] text-white",
-              isLive && "text-emerald-300"
+      {/* Teams + score */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-1 min-w-0 flex-1">
+          {/* Home */}
+          <div className="flex items-center justify-between gap-2">
+            <span className={cn(
+              "text-[13px] font-semibold truncate",
+              homeWin ? "text-white" : "text-white/60"
+            )}>
+              {m.homeName}
+            </span>
+            {hasScore && (
+              <span className={cn(
+                "text-[18px] font-bold tabular-nums shrink-0",
+                homeWin ? "text-white" : "text-white/50"
+              )}>
+                {m.homeScore}
+              </span>
             )}
-          >
-            <span className="inline-block min-w-[1.5ch] text-right">
-              {match.home_score ?? "–"}
-            </span>
-            <span className="px-2 text-white/20">:</span>
-            <span className="inline-block min-w-[1.5ch] text-left">
-              {match.away_score ?? "–"}
-            </span>
           </div>
-          <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">
-            {isLive
-              ? match.current_period
-                ? `${
-                    match.sport === "basketball"
-                      ? "Q"
-                      : match.sport === "hockey"
-                      ? "P"
-                      : match.sport === "baseball"
-                      ? "Inn "
-                      : "Set "
-                  }${match.current_period}`
-                : "In play"
-              : "Scheduled"}
+          {/* Away */}
+          <div className="flex items-center justify-between gap-2">
+            <span className={cn(
+              "text-[13px] font-semibold truncate",
+              awayWin ? "text-white" : "text-white/60"
+            )}>
+              {m.awayName}
+            </span>
+            {hasScore && (
+              <span className={cn(
+                "text-[18px] font-bold tabular-nums shrink-0",
+                awayWin ? "text-white" : "text-white/50"
+              )}>
+                {m.awayScore}
+              </span>
+            )}
           </div>
         </div>
-        <TeamPill name={match.away_name} logo={match.away_logo} align="right" />
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
-        <div className="text-xs text-white/40">
-          {isLive ? "Open live matchup" : statusLabel}
-        </div>
-        <div className="inline-flex items-center gap-2 text-xs font-medium text-white/55 transition group-hover:text-white">
-          View board
-          <ArrowRight size={13} />
-        </div>
-      </div>
+      {/* View arrow on hover */}
+      <span className="absolute bottom-3 right-3 text-[11px] text-white/30 opacity-0 group-hover:opacity-100 transition-opacity">
+        View →
+      </span>
     </Link>
   );
 }
 
-// ─── Section header ───────────────────────────────────────────────────────
+// ─── Main view ────────────────────────────────────────────────────────────────
 
-function SectionHeader({
-  title,
-  meta,
-  accent = false,
-  badge,
-}: {
-  title: string;
-  meta: string;
-  accent?: boolean;
-  badge?: React.ReactNode;
-}) {
-  return (
-    <div className="mb-4 flex items-start justify-between gap-3">
-      <div>
-        <div
-          className={cn(
-            "flex items-center gap-2 text-[10px] uppercase tracking-[0.22em]",
-            accent ? "text-emerald-300" : "text-white/35"
-          )}
-        >
-          {accent && <LiveDot />}
-          {title}
-        </div>
-        <div className="mt-1 text-[17px] font-semibold tracking-[-0.03em] text-white">
-          {meta}
-        </div>
-      </div>
-      {badge}
-    </div>
-  );
-}
+const POLL_MS = 30_000;
 
-// ─── NBA Section (BallDontLie GOAT data) ─────────────────────────────────
+export function LiveView() {
+  const [matches,     setMatches]     = useState<LiveMatch[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [activeSport, setActiveSport] = useState<string>("all");
 
-function NBASection() {
-  const [games, setGames] = useState<BdlGame[]>([]);
-  const [liveBoxScores, setLiveBoxScores] = useState<Map<number, BdlBoxScore>>(new Map());
-  const [loading, setLoading] = useState(true);
-  const [lastSynced, setLastSynced] = useState<Date>(new Date());
-  const [syncing, setSyncing] = useState(false);
-
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
-
-  const fetchAll = useCallback(async (quiet = false) => {
-    if (quiet) setSyncing(true);
-    else setLoading(true);
+  const fetchLive = useCallback(async () => {
     try {
-      const [gamesData, liveData] = await Promise.all([
-        getNBAGames(today),
-        getNBALiveBoxScores(today),
-      ]);
-
-      // Build box score map
-      const m = new Map<number, BdlBoxScore>();
-      liveData.forEach((bs) => m.set(bs.game.id, bs));
-
-      // Merge: start from games endpoint, then inject any live games missing from it.
-      // This handles the case where games endpoint returns empty (e.g. date mismatch)
-      // but box_scores/live always returns currently-in-progress games.
-      const merged = new Map<number, BdlGame>(gamesData.map((g) => [g.id, g]));
-      liveData.forEach((bs) => {
-        if (!merged.has(bs.game.id)) merged.set(bs.game.id, bs.game);
-      });
-
-      setGames(Array.from(merged.values()));
-      setLiveBoxScores(m);
-      setLastSynced(new Date());
-    } finally {
-      setLoading(false);
-      setSyncing(false);
-    }
-  }, [today]);
-
-  useEffect(() => {
-    fetchAll();
-    const iv = setInterval(() => fetchAll(true), 30_000);
-    return () => clearInterval(iv);
-  }, [fetchAll]);
-
-  // A game is live if the games API says so, OR if box_scores/live returned data for it
-  // (nba/v1/games status can lag behind real-time, but box_scores/live is always current)
-  const liveGames = useMemo(
-    () => games.filter((g) => isGameLive(g.status) || liveBoxScores.has(g.id)),
-    [games, liveBoxScores]
-  );
-  const scheduledGames = useMemo(
-    () => games.filter((g) => isGameScheduled(g.status) && !liveBoxScores.has(g.id)),
-    [games, liveBoxScores]
-  );
-  const finishedGames = useMemo(
-    () => games.filter((g) => isGameFinished(g.status) && !liveBoxScores.has(g.id)),
-    [games, liveBoxScores]
-  );
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <Loader2 size={22} className="animate-spin text-emerald-400" />
-        <div className="mt-3 text-sm text-white/40">Fetching NBA games…</div>
-      </div>
-    );
-  }
-
-  if (!games.length) {
-    return (
-      <div className="flex min-h-[240px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.025] p-8 text-center">
-        <span className="text-4xl">🏀</span>
-        <div className="mt-4 text-lg font-semibold text-white">No NBA games today</div>
-        <div className="mt-1 text-sm text-white/40">Check back on game days.</div>
-      </div>
-    );
-  }
-
-  const dataLabel = (
-    <div className="flex items-center gap-1.5 text-[10px] text-white/30">
-      {syncing ? (
-        <Loader2 size={10} className="animate-spin" />
-      ) : (
-        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/60" />
-      )}
-      BallDontLie GOAT · {lastSynced.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-    </div>
-  );
-
-  return (
-    <>
-      <div className="space-y-5">
-        {/* Live games */}
-        {liveGames.length > 0 && (
-          <section className="rounded-[28px] border border-emerald-400/20 bg-[linear-gradient(160deg,rgba(54,242,143,0.07),rgba(255,255,255,0.025))] p-5 lg:p-6">
-            <SectionHeader
-              title="Live Now"
-              meta={`${liveGames.length} game${liveGames.length !== 1 ? "s" : ""} in progress`}
-              accent
-              badge={dataLabel}
-            />
-            <div className="grid gap-4 xl:grid-cols-2">
-              {liveGames.map((game) => {
-                const bs = liveBoxScores.get(game.id) ?? null;
-                // Prefer real-time game data from box_scores/live over the stale games endpoint
-                const liveGame = bs?.game ?? game;
-                return (
-                  <NBALiveGameCard
-                    key={game.id}
-                    game={liveGame}
-                    boxScore={bs}
-                  />
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* Upcoming games */}
-        {scheduledGames.length > 0 && (
-          <section className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-5 lg:p-6">
-            <SectionHeader
-              title="Upcoming Today"
-              meta={`${scheduledGames.length} game${scheduledGames.length !== 1 ? "s" : ""} scheduled`}
-              badge={liveGames.length === 0 ? dataLabel : undefined}
-            />
-            <div className="grid gap-4 xl:grid-cols-2">
-              {scheduledGames.map((game) => (
-                <NBALiveGameCard
-                  key={game.id}
-                  game={game}
-                  boxScore={null}
-                                  />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Finished games */}
-        {finishedGames.length > 0 && (
-          <section className="rounded-[28px] border border-white/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-5 lg:p-6">
-            <SectionHeader
-              title="Final"
-              meta={`${finishedGames.length} game${finishedGames.length !== 1 ? "s" : ""} completed`}
-            />
-            <div className="grid gap-4 xl:grid-cols-2">
-              {finishedGames.map((game) => (
-                <NBALiveGameCard
-                  key={game.id}
-                  game={game}
-                  boxScore={liveBoxScores.get(game.id) ?? null}
-                                  />
-              ))}
-            </div>
-          </section>
-        )}
-      </div>
-    </>
-  );
-}
-
-// ─── CS2 Section (BallDontLie GOAT data) ──────────────────────────────────
-
-function CS2Section() {
-  const [matches, setMatches] = useState<Cs2Match[]>([]);
-  const [maps, setMaps] = useState<Cs2MatchMap[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [lastSynced, setLastSynced] = useState<Date>(new Date());
-  const [syncing, setSyncing] = useState(false);
-
-  const fetchAll = useCallback(async (quiet = false) => {
-    if (quiet) setSyncing(true);
-    else setLoading(true);
-    try {
-      const matchData = await getCS2Matches();
-      setMatches(matchData);
-      if (matchData.length > 0) {
-        const matchIds = matchData.map((m) => m.id);
-        const mapData = await getCS2Maps(matchIds);
-        setMaps(mapData);
-      }
-      setLastSynced(new Date());
-    } finally {
-      setLoading(false);
-      setSyncing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchAll();
-    const iv = setInterval(() => fetchAll(true), 20_000);
-    return () => clearInterval(iv);
-  }, [fetchAll]);
-
-  const liveMatches = useMemo(() => matches.filter((m) => isCS2Live(m.status)), [matches]);
-  const upcomingMatches = useMemo(() => matches.filter((m) => isCS2Upcoming(m.status)), [matches]);
-  const finishedMatches = useMemo(() => matches.filter((m) => isCS2Finished(m.status)), [matches]);
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <Loader2 size={22} className="animate-spin text-emerald-400" />
-        <div className="mt-3 text-sm text-white/40">Fetching CS2 matches…</div>
-      </div>
-    );
-  }
-
-  if (!matches.length) {
-    return (
-      <div className="flex min-h-[240px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.025] p-8 text-center">
-        <span className="text-4xl">🎮</span>
-        <div className="mt-4 text-lg font-semibold text-white">No CS2 matches today</div>
-        <div className="mt-1 text-sm text-white/40">Check back when tournaments are running.</div>
-      </div>
-    );
-  }
-
-  const dataLabel = (
-    <div className="flex items-center gap-1.5 text-[10px] text-white/30">
-      {syncing ? (
-        <Loader2 size={10} className="animate-spin" />
-      ) : (
-        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/60" />
-      )}
-      BallDontLie GOAT · {lastSynced.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-    </div>
-  );
-
-  return (
-    <div className="space-y-5">
-      {liveMatches.length > 0 && (
-        <section className="rounded-[28px] border border-emerald-400/20 bg-[linear-gradient(160deg,rgba(54,242,143,0.07),rgba(255,255,255,0.025))] p-5 lg:p-6">
-          <SectionHeader
-            title="Live Now"
-            meta={`${liveMatches.length} match${liveMatches.length !== 1 ? "es" : ""} in progress`}
-            accent
-            badge={dataLabel}
-          />
-          <div className="grid gap-4 xl:grid-cols-2">
-            {liveMatches.map((m) => (
-              <CS2MatchCard
-                key={m.id}
-                match={m}
-                maps={maps}
-              />
-            ))}
-            </div>
-          </section>
-        )}
-
-        {upcomingMatches.length > 0 && (
-          <section className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-5 lg:p-6">
-            <SectionHeader
-              title="Upcoming Today"
-              meta={`${upcomingMatches.length} match${upcomingMatches.length !== 1 ? "es" : ""} scheduled`}
-              badge={liveMatches.length === 0 ? dataLabel : undefined}
-            />
-            <div className="grid gap-4 xl:grid-cols-2">
-              {upcomingMatches.map((m) => (
-                <CS2MatchCard key={m.id} match={m} maps={maps} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {finishedMatches.length > 0 && (
-          <section className="rounded-[28px] border border-white/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-5 lg:p-6">
-            <SectionHeader
-              title="Final"
-              meta={`${finishedMatches.length} match${finishedMatches.length !== 1 ? "es" : ""} completed`}
-            />
-            <div className="grid gap-4 xl:grid-cols-2">
-              {finishedMatches.map((m) => (
-                <CS2MatchCard key={m.id} match={m} maps={maps} />
-              ))}
-            </div>
-          </section>
-        )}
-    </div>
-  );
-}
-
-// ─── Generic sport section (non-NBA) ─────────────────────────────────────
-
-function GenericSportSection({
-  activeSport,
-  matches,
-}: {
-  activeSport: string;
-  matches: LiveMatchOut[];
-}) {
-  const filteredLive = useMemo(
-    () => matches.filter((m) => m.is_live && m.sport === activeSport),
-    [matches, activeSport]
-  );
-  const filteredUpcoming = useMemo(
-    () =>
-      matches.filter((m) => !m.is_live && m.sport === activeSport).slice(0, 12),
-    [matches, activeSport]
-  );
-
-  if (filteredLive.length === 0 && filteredUpcoming.length === 0) {
-    return (
-      <div className="flex min-h-[200px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.025] p-8 text-center">
-        <span className="text-4xl">{SPORT_ICONS[activeSport]}</span>
-        <div className="mt-4 text-lg font-semibold text-white">
-          No {SPORT_LABELS[activeSport]} matches right now
-        </div>
-        <div className="mt-1 text-sm text-white/40">Check another sport or come back later.</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-5">
-      {filteredLive.length > 0 && (
-        <section className="rounded-[28px] border border-emerald-400/20 bg-[linear-gradient(160deg,rgba(54,242,143,0.07),rgba(255,255,255,0.025))] p-5 lg:p-6">
-          <SectionHeader
-            title="Live priority"
-            meta={`${filteredLive.length} ${SPORT_LABELS[activeSport] ?? activeSport} matches in play`}
-            accent
-          />
-          <div className="grid gap-4 xl:grid-cols-2">
-            {filteredLive.map((m) => (
-              <MatchTile key={m.id} match={m} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {filteredUpcoming.length > 0 && (
-        <section className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-5 lg:p-6">
-          <SectionHeader
-            title="Upcoming"
-            meta={`Next ${SPORT_LABELS[activeSport] ?? activeSport} fixtures`}
-          />
-          <div className="grid gap-4 xl:grid-cols-2">
-            {filteredUpcoming.map((m) => (
-              <MatchTile key={m.id} match={m} />
-            ))}
-          </div>
-        </section>
-      )}
-    </div>
-  );
-}
-
-// ─── Root LiveView ────────────────────────────────────────────────────────
-
-export function LiveView({ initialMatches }: { initialMatches: LiveMatchOut[] }) {
-  const router = useRouter();
-  const [matches, setMatches] = useState<LiveMatchOut[]>(initialMatches);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  // Default to basketball — richest real-time data source
-  const [activeSport, setActiveSport] = useState<string>("basketball");
-
-  const tick = useLiveRefresh(true, 30_000);
-
-  const refresh = useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      const fresh = await getLiveMatches();
-      setMatches(fresh);
+      const res  = await fetch("/api/sgo/live", { cache: "no-store" });
+      if (!res.ok) return;
+      const json = await res.json();
+      const events: SGOEvent[] = json.events ?? [];
+      const live = events.filter((e) => e.status?.live).map(eventToMatch);
+      setMatches(live);
       setLastUpdated(new Date());
+    } catch {
+      // silently ignore
     } finally {
-      setIsRefreshing(false);
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (tick === 0) return;
-    refresh();
-    router.refresh();
-  }, [tick, refresh, router]);
+    fetchLive();
+    const id = setInterval(fetchLive, POLL_MS);
+    return () => clearInterval(id);
+  }, [fetchLive]);
 
-  const allLive = useMemo(() => matches.filter((m) => m.is_live), [matches]);
-  const allUpcoming = useMemo(() => matches.filter((m) => !m.is_live), [matches]);
+  // Build sport groups
+  const groups: Record<string, LiveMatch[]> = {};
+  for (const m of matches) (groups[m.sport] ??= []).push(m);
 
-  const sportCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    matches.forEach((m) => {
-      counts[m.sport] = (counts[m.sport] ?? 0) + 1;
-    });
-    return counts;
-  }, [matches]);
+  const sports = SPORT_ORDER.filter((s) => groups[s])
+    .concat(Object.keys(groups).filter((s) => !SPORT_ORDER.includes(s)));
 
-  const totalLiveCount = allLive.length;
-  const nbaGameCount = 7; // approximate — NBA section manages its own count
+  const visible = activeSport === "all" ? matches : (groups[activeSport] ?? []);
+
+  // Auto-select first sport with matches
+  useEffect(() => {
+    if (matches.length > 0 && activeSport === "all") {
+      // keep "all" as default — shows everything
+    }
+  }, [matches, activeSport]);
 
   return (
-    <div className="pb-14">
-      {/* Hero banner */}
-      <section className="overflow-hidden rounded-[28px] border border-white/8 bg-[radial-gradient(ellipse_at_top,rgba(54,242,143,0.10),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.018))] p-5 shadow-[0_24px_64px_rgba(0,0,0,0.22)] xl:p-7">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/16 bg-emerald-300/8 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-200">
-              <LiveDot />
-              Live analytics terminal
-            </div>
-            <h2 className="mt-4 text-3xl font-bold tracking-[-0.04em] text-white lg:text-[2.5rem] lg:leading-[1.1]">
-              Real-time scores,<br className="hidden sm:block" /> live box scores, play-by-play.
-            </h2>
-            <p className="mt-3 max-w-xl text-sm leading-7 text-white/50">
-              NBA data powered by BallDontLie GOAT — live box scores, player stats, quarter scores,
-              and play-by-play. Other sports via internal pipeline.
-            </p>
-          </div>
+    <div className="flex flex-col gap-6 p-4 lg:p-6 max-w-5xl mx-auto w-full">
 
-          <div className="grid grid-cols-3 gap-3 xl:grid-cols-3">
-            <div className="rounded-[20px] border border-white/8 bg-white/[0.05] px-4 py-4">
-              <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">
-                Live now
-              </div>
-              <div className="mt-2 text-3xl font-bold tracking-[-0.04em] text-white">
-                {totalLiveCount}
-              </div>
-            </div>
-            <div className="rounded-[20px] border border-white/8 bg-white/[0.05] px-4 py-4">
-              <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">
-                Upcoming
-              </div>
-              <div className="mt-2 text-3xl font-bold tracking-[-0.04em] text-white">
-                {allUpcoming.length}
-              </div>
-            </div>
-            <button
-              onClick={refresh}
-              className="inline-flex items-center justify-center gap-2 rounded-[20px] border border-white/8 bg-white/[0.05] px-4 py-4 text-left transition hover:border-emerald-300/20 hover:bg-white/[0.08]"
-            >
-              <RefreshCw
-                size={14}
-                className={cn("shrink-0 text-emerald-200", isRefreshing && "animate-spin")}
-              />
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">
-                  Synced
-                </div>
-                <div className="mt-1 text-sm font-semibold text-white">
-                  {lastUpdated.toLocaleTimeString("en-GB", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </div>
-              </div>
-            </button>
-          </div>
+      {/* Header bar */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {matches.length > 0 ? (
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+            </span>
+          ) : (
+            <span className="h-3 w-3 rounded-full bg-white/20" />
+          )}
+          <h2 className="text-[15px] font-semibold text-white">
+            {loading ? "Loading…" : matches.length > 0 ? `${matches.length} match${matches.length !== 1 ? "es" : ""} live now` : "No live matches right now"}
+          </h2>
         </div>
-      </section>
 
-      {/* Sport filter bar */}
-      <div className="mt-4 overflow-x-auto no-scrollbar">
-        <div className="flex min-w-max items-center gap-1.5 rounded-[22px] border border-white/8 bg-white/[0.03] p-2">
-          {ALL_SPORTS.map((sport) => {
+        <div className="flex items-center gap-3">
+          {lastUpdated && (
+            <span className="text-[10px] text-white/30 font-mono hidden sm:block">
+              updated {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+            </span>
+          )}
+          <button
+            onClick={fetchLive}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/[0.07] text-[11px] text-white/50 hover:text-white/80 hover:border-white/[0.15] transition-all"
+          >
+            <RefreshCw size={11} />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Sport tabs */}
+      {sports.length > 1 && (
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-1">
+          <button
+            onClick={() => setActiveSport("all")}
+            className={cn(
+              "flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-medium whitespace-nowrap transition-all",
+              activeSport === "all"
+                ? "bg-white/[0.1] text-white border border-white/[0.15]"
+                : "text-white/40 border border-transparent hover:text-white/70 hover:bg-white/[0.04]"
+            )}
+          >
+            All sports
+            <span className="text-[10px] opacity-70">{matches.length}</span>
+          </button>
+          {sports.map((sport) => {
+            const color = SPORT_COLOR[sport] ?? SPORT_COLOR.other;
+            const count = groups[sport]?.length ?? 0;
             const isActive = activeSport === sport;
-            const count = sport === "basketball" ? nbaGameCount : (sportCounts[sport] ?? 0);
-            const liveCount =
-              sport === "basketball" ? 0 : allLive.filter((m) => m.sport === sport).length;
-            const isBdl = sport === "basketball" || sport === "esports" || sport === "cs2bdl";
-
             return (
               <button
                 key={sport}
                 onClick={() => setActiveSport(sport)}
                 className={cn(
-                  "flex items-center gap-2 rounded-full px-4 py-2.5 text-[12px] font-semibold transition-all",
-                  isActive
-                    ? "bg-[#2edb6c] text-[#07110d] shadow-sm"
-                    : "text-white/55 hover:bg-white/[0.06] hover:text-white"
+                  "flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-medium whitespace-nowrap transition-all border",
+                  isActive ? "text-white" : "text-white/40 border-transparent hover:text-white/70 hover:bg-white/[0.04]"
                 )}
+                style={isActive ? { borderColor: `${color}40`, background: `${color}15`, color } : {}}
               >
-                <span>{SPORT_ICONS[sport]}</span>
-                <span>{SPORT_LABELS[sport]}</span>
-                {isBdl && (
-                  <span
-                    className={cn(
-                      "rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider",
-                      isActive ? "bg-[#07110d]/20 text-[#07110d]" : "bg-blue-400/20 text-blue-300"
-                    )}
-                  >
-                    GOAT
-                  </span>
-                )}
-                {liveCount > 0 && (
-                  <span
-                    className={cn(
-                      "rounded-full px-1.5 py-0.5 text-[9px] font-bold",
-                      isActive
-                        ? "bg-[#07110d]/20 text-[#07110d]"
-                        : "bg-emerald-400/20 text-emerald-300"
-                    )}
-                  >
-                    {liveCount} live
-                  </span>
-                )}
-                {count > 0 && liveCount === 0 && !isBdl && (
-                  <span
-                    className={cn(
-                      "rounded-full px-1.5 py-0.5 text-[9px] font-bold",
-                      isActive ? "bg-[#07110d]/20 text-[#07110d]" : "bg-white/10 text-white/45"
-                    )}
-                  >
-                    {count}
-                  </span>
-                )}
+                <span>{SPORT_EMOJI[sport] ?? ""}</span>
+                <span className="capitalize">{sport}</span>
+                <span className="text-[10px] opacity-70">{count}</span>
               </button>
             );
           })}
         </div>
-      </div>
-
-      {/* GOAT banners */}
-      {activeSport === "basketball" && (
-        <div className="mt-3 flex items-center gap-2.5 rounded-2xl border border-blue-400/15 bg-blue-400/[0.05] px-4 py-3">
-          <Zap size={13} className="shrink-0 text-blue-300" />
-          <p className="text-[12px] text-blue-200/80">
-            Live NBA data via{" "}
-            <span className="font-semibold text-blue-200">BallDontLie GOAT</span> — real-time box
-            scores, quarter scores, player stats, play-by-play. Click any game to open the live box
-            score.
-          </p>
-        </div>
-      )}
-      {activeSport === "esports" && (
-        <div className="mt-3 flex items-center gap-2.5 rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.05] px-4 py-3">
-          <Zap size={13} className="shrink-0 text-emerald-300" />
-          <p className="text-[12px] text-emerald-200/80">
-            Live CS2 data via{" "}
-            <span className="font-semibold text-emerald-200">BallDontLie GOAT</span> — real-time
-            map scores, per-map player stats (K/D/A/ADR/KAST/Rating/HS%), round history, and
-            economy data. Click any match to open the live match center.
-          </p>
-        </div>
-      )}
-      {activeSport === "cs2bdl" && (
-        <div className="mt-3 flex items-center gap-2.5 rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.05] px-4 py-3">
-          <Zap size={13} className="shrink-0 text-emerald-300" />
-          <p className="text-[12px] text-emerald-200/80">
-            <span className="font-semibold text-emerald-200">BallDontLie GOAT only</span> — isolated CS2 feed, no other data sources. Use this tab to verify the BallDontLie API is working correctly.
-          </p>
-        </div>
       )}
 
-      {/* Content area */}
-      <div className="mt-4">
-        {activeSport === "basketball" ? (
-          <NBASection />
-        ) : activeSport === "cs2bdl" ? (
-          <CS2Section />
-        ) : activeSport === "esports" ? (
-          <>
-            <GenericSportSection activeSport="esports" matches={matches} />
-            <div className="mt-6">
-              <CS2Section />
-            </div>
-          </>
-        ) : matches.length === 0 ? (
-          <div className="mt-2 flex min-h-[280px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.025] p-8 text-center">
-            <Radio size={26} className="text-white/30" />
-            <div className="mt-4 text-xl font-semibold text-white">No match data available</div>
-            <div className="mt-2 max-w-md text-sm text-white/45">
-              The live feed is empty. Retry once the API has fresh fixtures.
-            </div>
-          </div>
-        ) : (
-          <GenericSportSection activeSport={activeSport} matches={matches} />
-        )}
-      </div>
+      {/* Match grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-[108px] rounded-2xl bg-white/[0.03] animate-pulse" />
+          ))}
+        </div>
+      ) : visible.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+          <span className="text-4xl">📡</span>
+          <p className="text-white/40 text-[13px]">
+            {matches.length > 0 ? "No live matches for this sport right now." : "No live matches detected. Check back soon."}
+          </p>
+          <p className="text-white/20 text-[11px]">Refreshes every 30 seconds</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {visible.map((m) => <MatchCard key={m.eventID} m={m} />)}
+        </div>
+      )}
     </div>
   );
 }

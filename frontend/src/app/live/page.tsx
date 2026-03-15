@@ -1,26 +1,12 @@
 import { AppShell } from "@/components/layout/AppShell";
-import { getLiveMatches } from "@/lib/api";
-import type { LiveMatchOut } from "@/lib/api";
 import { LiveView } from "./LiveView";
 
 export const dynamic = "force-dynamic";
 
-export default async function LivePage() {
-  let matches: LiveMatchOut[] = [];
-  try {
-    matches = await getLiveMatches();
-  } catch {
-    matches = [];
-  }
-
-  const liveCount = matches.filter((m) => m.is_live).length;
-  const subtitle = liveCount > 0
-    ? `${liveCount} match${liveCount !== 1 ? "es" : ""} live now`
-    : "No live matches — showing next fixtures";
-
+export default function LivePage() {
   return (
-    <AppShell title="Live Now" subtitle={subtitle}>
-      <LiveView initialMatches={matches} />
+    <AppShell title="Live Now" subtitle="Live matches from Sports Hub">
+      <LiveView />
     </AppShell>
   );
 }
