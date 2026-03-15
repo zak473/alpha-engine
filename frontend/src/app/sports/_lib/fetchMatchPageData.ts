@@ -100,9 +100,15 @@ export async function fetchMatchPageData(
     const sgoAway = event.teams?.away?.names?.long ?? "";
     const startAt = parseDate(event.status?.startsAt);
 
+    // For tennis, player names can be abbreviated in the backend (e.g. "Daniil Medvedev" → "D. Medvedev").
+    // Search by last name to ensure we match abbreviated forms.
+    const searchTerm = sport === "tennis"
+      ? (sgoHome.split(" ").slice(-1)[0] ?? sgoHome)
+      : sgoHome;
+
     // Search backend by home team name
     const searchRes = await fetch(
-      `${API_BASE}/matches/search?q=${encodeURIComponent(sgoHome)}&limit=20`,
+      `${API_BASE}/matches/search?q=${encodeURIComponent(searchTerm)}&limit=20`,
       { cache: "no-store" }
     );
 
