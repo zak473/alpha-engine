@@ -8,6 +8,11 @@ Features are computed using only data available BEFORE kickoff (no leakage):
   - h2h_home_win_pct, h2h_matches_played  (all prior H2H meetings)
   - surface_hard, surface_clay,
     surface_grass                         (one-hot from TennisMatch.surface)
+  - is_grand_slam, is_masters,
+    is_best_of_5                          (match context from TennisMatch)
+  - home_matches_last_14d,
+    away_matches_last_14d                 (fatigue: matches in last 14 days)
+  - ranking_diff                          (away_ranking - home_ranking; pos = home better ranked)
   - home_ace_avg, away_ace_avg            (rolling 10-match avg aces)
   - home_df_avg, away_df_avg              (rolling 10-match avg double faults)
   - home_first_serve_pct_avg,
@@ -15,13 +20,18 @@ Features are computed using only data available BEFORE kickoff (no leakage):
   - home_first_serve_won_avg,
     away_first_serve_won_avg              (rolling 10-match avg first_serve_won_pct)
   - home_bp_conv_avg, away_bp_conv_avg    (rolling 10-match avg bp_conversion_pct)
+  - home_hold_pct_avg, away_hold_pct_avg  (rolling 10-match avg service_hold_pct)
+  - home_bp_save_pct_avg,
+    away_bp_save_pct_avg                  (rolling 10-match avg bp_saved/bp_faced)
+  - home_return_pts_won_avg,
+    away_return_pts_won_avg               (rolling 10-match avg return_points_won/played)
 
 All functions return float vectors. Missing values → 0.0 (safe for LR).
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -33,18 +43,33 @@ _SPORT = "tennis"
 _DEFAULT_ELO = 1000.0
 
 FEATURE_NAMES: list[str] = [
+    # ELO
     "elo_home",
     "elo_away",
     "elo_diff",
+    # Form
     "home_form_pts",
     "away_form_pts",
+    # Rest
     "home_days_rest",
     "away_days_rest",
+    # H2H
     "h2h_home_win_pct",
     "h2h_matches_played",
+    # Surface one-hot
     "surface_hard",
     "surface_clay",
     "surface_grass",
+    # Match context
+    "is_grand_slam",
+    "is_masters",
+    "is_best_of_5",
+    # Fatigue
+    "home_matches_last_14d",
+    "away_matches_last_14d",
+    # Ranking
+    "ranking_diff",
+    # Serve stats (rolling 10-match avg)
     "home_ace_avg",
     "away_ace_avg",
     "home_df_avg",
@@ -55,6 +80,13 @@ FEATURE_NAMES: list[str] = [
     "away_first_serve_won_avg",
     "home_bp_conv_avg",
     "away_bp_conv_avg",
+    # Return / hold stats (rolling 10-match avg)
+    "home_hold_pct_avg",
+    "away_hold_pct_avg",
+    "home_bp_save_pct_avg",
+    "away_bp_save_pct_avg",
+    "home_return_pts_won_avg",
+    "away_return_pts_won_avg",
 ]
 
 # Outcome labels (binary — no draws in tennis)
@@ -160,6 +192,26 @@ def _days_rest(db: Session, player_id: str, kickoff: datetime) -> float:
     return max(0.0, (k - l).total_seconds() / 86_400)
 
 
+def _matches_last_14d(db: Session, player_id: str, kickoff: datetime) -> float:
+    """Number of matches played in the 14 days before kickoff."""
+    from sqlalchemy import or_
+    cutoff = _ensure_utc(kickoff) - timedelta(days=14)
+    count = (
+        db.query(CoreMatch)
+        .filter(
+            CoreMatch.sport == _SPORT,
+            CoreMatch.kickoff_utc >= cutoff,
+            CoreMatch.kickoff_utc < kickoff,
+            or_(
+                CoreMatch.home_team_id == player_id,
+                CoreMatch.away_team_id == player_id,
+            ),
+        )
+        .count()
+    )
+    return float(count)
+
+
 # ── H2H ───────────────────────────────────────────────────────────────────────
 
 def _h2h(
@@ -206,7 +258,31 @@ def _surface_features(surface: Optional[str]) -> tuple[float, float, float]:
     )
 
 
-# ── Rolling serve stats ───────────────────────────────────────────────────────
+# ── Match context ─────────────────────────────────────────────────────────────
+
+def _tournament_features(tennis_detail: Optional[TennisMatch]) -> tuple[float, float, float]:
+    """Returns (is_grand_slam, is_masters, is_best_of_5)."""
+    if tennis_detail is None:
+        return 0.0, 0.0, 0.0
+    level = (tennis_detail.tournament_level or "").lower()
+    is_grand_slam = 1.0 if level == "grand_slam" else 0.0
+    is_masters = 1.0 if level in ("masters", "masters_1000", "atp1000", "wta1000") else 0.0
+    is_best_of_5 = 1.0 if (tennis_detail.best_of or 3) >= 5 else 0.0
+    return is_grand_slam, is_masters, is_best_of_5
+
+
+# ── Ranking ───────────────────────────────────────────────────────────────────
+
+def _get_ranking(db: Session, player_id: str) -> float:
+    """Current ATP/WTA ranking for a player. Returns 0.0 if unknown."""
+    from db.models.tennis import TennisPlayerProfile
+    prof = db.query(TennisPlayerProfile).filter_by(player_id=player_id).first()
+    if prof and prof.ranking:
+        return float(prof.ranking)
+    return 0.0
+
+
+# ── Rolling serve + return stats ──────────────────────────────────────────────
 
 def _rolling_serve_stats(
     db: Session,
@@ -215,9 +291,7 @@ def _rolling_serve_stats(
     n: int = 10,
 ) -> dict[str, float]:
     """
-    Average serve statistics over the last n TennisMatchStats rows before kickoff.
-    Returns a dict with keys: ace_avg, df_avg, first_serve_pct_avg,
-    first_serve_won_avg, bp_conv_avg.
+    Average serve and return statistics over the last n TennisMatchStats rows before kickoff.
     All values default to 0.0 if no data.
     """
     rows = (
@@ -240,11 +314,31 @@ def _rolling_serve_stats(
             "first_serve_pct_avg":  0.0,
             "first_serve_won_avg":  0.0,
             "bp_conv_avg":          0.0,
+            "hold_pct_avg":         0.0,
+            "bp_save_pct_avg":      0.0,
+            "return_pts_won_avg":   0.0,
         }
 
     def _avg(attr: str) -> float:
         vals = [_safe_float(getattr(r, attr)) for r in rows if getattr(r, attr) is not None]
         return sum(vals) / len(vals) if vals else 0.0
+
+    # Break point save % (computed per match then averaged)
+    bp_save_vals = []
+    for r in rows:
+        if r.break_points_faced and r.break_points_faced > 0 and r.break_points_saved is not None:
+            bp_save_vals.append(r.break_points_saved / r.break_points_faced)
+    bp_save_avg = sum(bp_save_vals) / len(bp_save_vals) if bp_save_vals else 0.0
+
+    # Return points won % (computed per match then averaged)
+    return_pct_vals = []
+    for r in rows:
+        if r.return_points_played and r.return_points_played > 0 and r.return_points_won is not None:
+            return_pct_vals.append(r.return_points_won / r.return_points_played)
+        elif r.first_serve_return_won_pct is not None:
+            # Fallback proxy if raw counts not available
+            return_pct_vals.append(float(r.first_serve_return_won_pct))
+    return_pts_avg = sum(return_pct_vals) / len(return_pct_vals) if return_pct_vals else 0.0
 
     return {
         "ace_avg":              _avg("aces"),
@@ -252,6 +346,9 @@ def _rolling_serve_stats(
         "first_serve_pct_avg":  _avg("first_serve_in_pct"),
         "first_serve_won_avg":  _avg("first_serve_won_pct"),
         "bp_conv_avg":          _avg("bp_conversion_pct"),
+        "hold_pct_avg":         _avg("service_hold_pct"),
+        "bp_save_pct_avg":      bp_save_avg,
+        "return_pts_won_avg":   return_pts_avg,
     }
 
 
@@ -288,7 +385,7 @@ def build_feature_vector(
     # H2H
     h2h_win_pct, h2h_n = _h2h(db, home_id, away_id, kickoff)
 
-    # Surface — look up TennisMatch detail for surface; fall back to None
+    # Tennis match detail
     tennis_detail: Optional[TennisMatch] = (
         db.query(TennisMatch)
         .filter(TennisMatch.match_id == match.id)
@@ -296,8 +393,18 @@ def build_feature_vector(
     )
     surface = tennis_detail.surface if tennis_detail else None
     surface_hard, surface_clay, surface_grass = _surface_features(surface)
+    is_grand_slam, is_masters, is_best_of_5 = _tournament_features(tennis_detail)
 
-    # Rolling serve stats
+    # Fatigue
+    home_matches_14d = _matches_last_14d(db, home_id, kickoff)
+    away_matches_14d = _matches_last_14d(db, away_id, kickoff)
+
+    # Ranking
+    home_ranking = _get_ranking(db, home_id)
+    away_ranking = _get_ranking(db, away_id)
+    ranking_diff = (away_ranking - home_ranking) if (home_ranking > 0 and away_ranking > 0) else 0.0
+
+    # Rolling serve + return stats
     home_serve = _rolling_serve_stats(db, home_id, kickoff)
     away_serve = _rolling_serve_stats(db, away_id, kickoff)
 
@@ -314,6 +421,12 @@ def build_feature_vector(
         "surface_hard":              surface_hard,
         "surface_clay":              surface_clay,
         "surface_grass":             surface_grass,
+        "is_grand_slam":             is_grand_slam,
+        "is_masters":                is_masters,
+        "is_best_of_5":              is_best_of_5,
+        "home_matches_last_14d":     home_matches_14d,
+        "away_matches_last_14d":     away_matches_14d,
+        "ranking_diff":              ranking_diff,
         "home_ace_avg":              home_serve["ace_avg"],
         "away_ace_avg":              away_serve["ace_avg"],
         "home_df_avg":               home_serve["df_avg"],
@@ -324,6 +437,12 @@ def build_feature_vector(
         "away_first_serve_won_avg":  away_serve["first_serve_won_avg"],
         "home_bp_conv_avg":          home_serve["bp_conv_avg"],
         "away_bp_conv_avg":          away_serve["bp_conv_avg"],
+        "home_hold_pct_avg":         home_serve["hold_pct_avg"],
+        "away_hold_pct_avg":         away_serve["hold_pct_avg"],
+        "home_bp_save_pct_avg":      home_serve["bp_save_pct_avg"],
+        "away_bp_save_pct_avg":      away_serve["bp_save_pct_avg"],
+        "home_return_pts_won_avg":   home_serve["return_pts_won_avg"],
+        "away_return_pts_won_avg":   away_serve["return_pts_won_avg"],
     }
     vector = [raw[f] for f in FEATURE_NAMES]
     return vector, raw

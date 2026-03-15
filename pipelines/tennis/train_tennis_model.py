@@ -34,7 +34,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 from db.models.mvp import CoreMatch, ModelRegistry, RatingEloTeam
-from db.models.tennis import TennisMatch, TennisMatchStats
+from db.models.tennis import TennisMatch, TennisMatchStats, TennisPlayerProfile
 from db.session import SessionLocal
 from evaluation.metrics import brier, logloss
 from pipelines.tennis.feature_engineering import (
@@ -127,12 +127,23 @@ class BulkDataStore:
             self.elo_ts[tid] = [x[0] for x in lst]
         log.info("  %d ELO rows loaded for %d teams.", len(elo_rows), len(self.elo_by_team))
 
-        log.info("BulkDataStore: loading TennisMatch surface data …")
+        log.info("BulkDataStore: loading TennisMatch data …")
         tennis_rows: list[TennisMatch] = session.query(TennisMatch).all()
         self.surface_by_match: dict[str, Optional[str]] = {
             r.match_id: r.surface for r in tennis_rows
         }
+        # Store full TennisMatch rows for tournament context features
+        self.tennis_by_match: dict[str, TennisMatch] = {
+            r.match_id: r for r in tennis_rows
+        }
         log.info("  %d TennisMatch rows loaded.", len(tennis_rows))
+
+        log.info("BulkDataStore: loading TennisPlayerProfile rankings …")
+        profile_rows: list[TennisPlayerProfile] = session.query(TennisPlayerProfile).all()
+        self.profile_by_player: dict[str, TennisPlayerProfile] = {
+            r.player_id: r for r in profile_rows if r.player_id
+        }
+        log.info("  %d TennisPlayerProfile rows loaded.", len(self.profile_by_player))
 
         log.info("BulkDataStore: loading TennisMatchStats …")
         stats_rows: list[TennisMatchStats] = session.query(TennisMatchStats).all()
@@ -172,6 +183,15 @@ class BulkDataStore:
         # matches before kickoff
         start = max(0, idx - n)
         return [self.player_matches[player_id][i][1] for i in range(start, idx)]
+
+    def get_matches_last_14d(self, player_id: str, kickoff_ts: float) -> float:
+        ts_list = self.player_ts.get(player_id)
+        if not ts_list:
+            return 0.0
+        cutoff = kickoff_ts - 14 * 86_400
+        start_idx = bisect.bisect_left(ts_list, cutoff)
+        end_idx = bisect.bisect_left(ts_list, kickoff_ts)
+        return float(end_idx - start_idx)
 
     def get_days_rest(self, player_id: str, kickoff_ts: float) -> float:
         ts_list = self.player_ts.get(player_id)
@@ -217,21 +237,40 @@ class BulkDataStore:
     def get_rolling_serve_stats(
         self, player_id: str, kickoff_ts: float, n: int = 10
     ) -> dict[str, float]:
+        _empty = {
+            "ace_avg": 0.0, "df_avg": 0.0, "first_serve_pct_avg": 0.0,
+            "first_serve_won_avg": 0.0, "bp_conv_avg": 0.0,
+            "hold_pct_avg": 0.0, "bp_save_pct_avg": 0.0, "return_pts_won_avg": 0.0,
+        }
         ts_list = self.stats_ts.get(player_id)
         if not ts_list:
-            return {"ace_avg": 0.0, "df_avg": 0.0, "first_serve_pct_avg": 0.0,
-                    "first_serve_won_avg": 0.0, "bp_conv_avg": 0.0}
+            return _empty
         idx = bisect.bisect_left(ts_list, kickoff_ts)
         start = max(0, idx - n)
         rows = [self.stats_by_player[player_id][i][1] for i in range(start, idx)]
         if not rows:
-            return {"ace_avg": 0.0, "df_avg": 0.0, "first_serve_pct_avg": 0.0,
-                    "first_serve_won_avg": 0.0, "bp_conv_avg": 0.0}
+            return _empty
 
         def _avg(attr: str) -> float:
             vals = [float(getattr(r, attr)) for r in rows
                     if getattr(r, attr) is not None]
             return sum(vals) / len(vals) if vals else 0.0
+
+        # Break point save %
+        bp_save_vals = []
+        for r in rows:
+            if r.break_points_faced and r.break_points_faced > 0 and r.break_points_saved is not None:
+                bp_save_vals.append(r.break_points_saved / r.break_points_faced)
+        bp_save_avg = sum(bp_save_vals) / len(bp_save_vals) if bp_save_vals else 0.0
+
+        # Return points won %
+        return_pct_vals = []
+        for r in rows:
+            if r.return_points_played and r.return_points_played > 0 and r.return_points_won is not None:
+                return_pct_vals.append(r.return_points_won / r.return_points_played)
+            elif r.first_serve_return_won_pct is not None:
+                return_pct_vals.append(float(r.first_serve_return_won_pct))
+        return_pts_avg = sum(return_pct_vals) / len(return_pct_vals) if return_pct_vals else 0.0
 
         return {
             "ace_avg":              _avg("aces"),
@@ -239,6 +278,9 @@ class BulkDataStore:
             "first_serve_pct_avg":  _avg("first_serve_in_pct"),
             "first_serve_won_avg":  _avg("first_serve_won_pct"),
             "bp_conv_avg":          _avg("bp_conversion_pct"),
+            "hold_pct_avg":         _avg("service_hold_pct"),
+            "bp_save_pct_avg":      bp_save_avg,
+            "return_pts_won_avg":   return_pts_avg,
         }
 
 
@@ -280,14 +322,34 @@ def _build_feature_vector_bulk(store: BulkDataStore, match: CoreMatch) -> list[f
     # H2H
     h2h_win_pct, h2h_n = store.get_h2h(home_id, away_id, kickoff_ts)
 
-    # Surface
+    # Surface + tournament context
     surface = store.surface_by_match.get(match.id)
     s = (surface or "").lower()
     surface_hard  = 1.0 if s == "hard"  else 0.0
     surface_clay  = 1.0 if s == "clay"  else 0.0
     surface_grass = 1.0 if s == "grass" else 0.0
 
-    # Rolling serve stats
+    tennis_detail = store.tennis_by_match.get(match.id)
+    if tennis_detail is not None:
+        level = (tennis_detail.tournament_level or "").lower()
+        is_grand_slam = 1.0 if level == "grand_slam" else 0.0
+        is_masters = 1.0 if level in ("masters", "masters_1000", "atp1000", "wta1000") else 0.0
+        is_best_of_5 = 1.0 if (tennis_detail.best_of or 3) >= 5 else 0.0
+    else:
+        is_grand_slam = is_masters = is_best_of_5 = 0.0
+
+    # Fatigue
+    home_matches_14d = store.get_matches_last_14d(home_id, kickoff_ts)
+    away_matches_14d = store.get_matches_last_14d(away_id, kickoff_ts)
+
+    # Ranking diff (away - home; positive = home is better ranked)
+    home_prof = store.profile_by_player.get(home_id)
+    away_prof = store.profile_by_player.get(away_id)
+    home_rank = float(home_prof.ranking) if (home_prof and home_prof.ranking) else 0.0
+    away_rank = float(away_prof.ranking) if (away_prof and away_prof.ranking) else 0.0
+    ranking_diff = (away_rank - home_rank) if (home_rank > 0 and away_rank > 0) else 0.0
+
+    # Rolling serve + return stats
     home_serve = store.get_rolling_serve_stats(home_id, kickoff_ts)
     away_serve = store.get_rolling_serve_stats(away_id, kickoff_ts)
 
@@ -304,6 +366,12 @@ def _build_feature_vector_bulk(store: BulkDataStore, match: CoreMatch) -> list[f
         surface_hard,
         surface_clay,
         surface_grass,
+        is_grand_slam,
+        is_masters,
+        is_best_of_5,
+        home_matches_14d,
+        away_matches_14d,
+        ranking_diff,
         home_serve["ace_avg"],
         away_serve["ace_avg"],
         home_serve["df_avg"],
@@ -314,6 +382,12 @@ def _build_feature_vector_bulk(store: BulkDataStore, match: CoreMatch) -> list[f
         away_serve["first_serve_won_avg"],
         home_serve["bp_conv_avg"],
         away_serve["bp_conv_avg"],
+        home_serve["hold_pct_avg"],
+        away_serve["hold_pct_avg"],
+        home_serve["bp_save_pct_avg"],
+        away_serve["bp_save_pct_avg"],
+        home_serve["return_pts_won_avg"],
+        away_serve["return_pts_won_avg"],
     ]
 
 
