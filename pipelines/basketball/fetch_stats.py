@@ -227,7 +227,11 @@ def _extract_hl_match_id(provider_id: str) -> Optional[str]:
     return None
 
 
-def fetch_all(days_back: int = 30, dry_run: bool = False) -> int:
+def fetch_all(days_back: int = 30, dry_run: bool = False, extras_only: bool = False) -> int:
+    """
+    extras_only=True: only parse extras_json already on CoreMatch rows (no API calls).
+    Useful for initial population without burning API quota.
+    """
     from db.models.mvp import CoreMatch
     from db.models.basketball import BasketballTeamMatchStats
 
@@ -275,18 +279,19 @@ def fetch_all(days_back: int = 30, dry_run: bool = False) -> int:
                 except Exception as exc:
                     log.debug("extras_json parse failed for %s: %s", match.id[:8], exc)
 
-            # Fall back to Highlightly API call
-            if not home_stats:
+            # Fall back to Highlightly statistics endpoint only (1 call, not 3)
+            if not home_stats and not extras_only:
                 hl_id = _extract_hl_match_id(match.provider_id or "")
                 if hl_id:
                     try:
                         from pipelines.highlightly import client as hl
-                        extras = hl.get_extras(_SPORT, hl_id)
-                        if extras.get("statistics"):
+                        data = hl.get(f"basketball/statistics/{hl_id}")
+                        payload = hl._payload(data)
+                        if payload:
                             home_stats, away_stats = _parse_statistics_response(
-                                extras["statistics"], match.home_team_id, match.away_team_id
+                                payload, match.home_team_id, match.away_team_id
                             )
-                        time.sleep(0.5)
+                        time.sleep(1.5)  # conservative pacing
                     except Exception as exc:
                         log.warning("Highlightly stats fetch failed for match %s: %s", match.id[:8], exc)
 
@@ -324,9 +329,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Fetch basketball box score stats (Highlightly)")
     parser.add_argument("--days-back", type=int, default=30)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--extras-only", action="store_true",
+                        help="Only parse extras_json already stored — no API calls")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
-    n = fetch_all(days_back=args.days_back, dry_run=args.dry_run)
+    n = fetch_all(days_back=args.days_back, dry_run=args.dry_run, extras_only=args.extras_only)
     print(f"Done. {n} matches processed.")
 
 
