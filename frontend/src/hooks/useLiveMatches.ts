@@ -17,12 +17,17 @@ export function useLiveMatches(sport: SportSlug, initialMatches: SportMatchListI
 
   const poll = useCallback(async () => {
     try {
+      // Basketball uses BallDontLie GOAT directly — no backend prediction pipeline
+      const url = sport === "basketball"
+        ? "/api/balldontlie/nba/sport-matches"
+        : `/api/v1/sports/${sport}/matches?limit=200`;
+
       const token = typeof window !== "undefined" ? localStorage.getItem("alpha_engine_token") : null;
-      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-      const res = await fetch(
-        `/api/v1/sports/${sport}/matches?limit=200`,
-        { cache: "no-store", headers }
-      );
+      const headers: Record<string, string> = token && sport !== "basketball"
+        ? { Authorization: `Bearer ${token}` }
+        : {};
+
+      const res = await fetch(url, { cache: "no-store", headers });
       if (!res.ok) return;
       const data: { items: SportMatchListItem[] } = await res.json();
       if (data.items?.length) setMatches(data.items);
