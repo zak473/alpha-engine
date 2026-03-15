@@ -11,7 +11,7 @@ export async function GET() {
         const json = JSON.parse(text);
         return { status: res.status, ok: res.ok, count: json.data?.length ?? (json.id ? 1 : 0), sample: json.data?.[0] ?? (json.id ? { id: json.id } : null) };
       } catch {
-        return { status: res.status, ok: res.ok, count: 0, raw: text.slice(0, 120) };
+        return { status: res.status, ok: res.ok, count: 0, raw: text.slice(0, 200) };
       }
     } catch (e) {
       return { status: null, ok: false, count: 0, raw: String(e) };
@@ -20,32 +20,40 @@ export async function GET() {
 
   const today = new Date().toISOString().split("T")[0];
 
-  const [cs2Running, cs2Upcoming, nbaGames, nbaGame] = await Promise.all([
+  // Test games with three different URL formats to find which one works
+  const [
+    cs2Running,
+    cs2Upcoming,
+    // Format 1: unencoded brackets (what we currently use)
+    nbaGamesUnencoded,
+    // Format 2: percent-encoded brackets (as the official .gs script does)
+    nbaGamesEncoded,
+    // Format 3: start_date + end_date (alternative from OpenAPI spec)
+    nbaGamesDateRange,
+    // Format 4: seasons only (sanity check)
+    nbaGamesSeason,
+    nbaBoxScoresLive,
+  ] = await Promise.all([
     test("https://api.balldontlie.io/cs/v1/matches?status=running&per_page=5"),
     test("https://api.balldontlie.io/cs/v1/matches?status=upcoming&per_page=5"),
-    test(`https://api.balldontlie.io/nba/v1/games?dates[]=${today}&per_page=3`),
-    // Test single game fetch with a known recent game ID from the list
-    (async () => {
-      try {
-        const listRes = await fetch(`https://api.balldontlie.io/nba/v1/games?dates[]=${today}&per_page=1`, { headers: { Authorization: key }, cache: "no-store" });
-        const listJson = await listRes.json();
-        const firstId = listJson.data?.[0]?.id;
-        if (!firstId) return { status: null, sample: "no games today to test single fetch" };
-        const res = await fetch(`https://api.balldontlie.io/nba/v1/games/${firstId}`, { headers: { Authorization: key }, cache: "no-store" });
-        const json = await res.json();
-        return { status: res.status, gameId: firstId, hasDataWrapper: "data" in json, keys: Object.keys(json).slice(0, 5) };
-      } catch (e) {
-        return { status: null, sample: String(e) };
-      }
-    })(),
+    test(`https://api.balldontlie.io/nba/v1/games?dates[]=${today}&per_page=5`),
+    test(`https://api.balldontlie.io/nba/v1/games?dates%5B%5D=${today}&per_page=5`),
+    test(`https://api.balldontlie.io/nba/v1/games?start_date=${today}&end_date=${today}&per_page=5`),
+    test(`https://api.balldontlie.io/nba/v1/games?seasons[]=2025&per_page=5`),
+    test(`https://api.balldontlie.io/nba/v1/box_scores/live`),
   ]);
 
   return NextResponse.json({
     keyLength: key.length,
     keyStart: key.slice(0, 8),
+    keyEnd: key.slice(-4),
+    today,
     cs2Running,
     cs2Upcoming,
-    nbaGames,
-    nbaGame,
+    nbaGamesUnencoded,
+    nbaGamesEncoded,
+    nbaGamesDateRange,
+    nbaGamesSeason,
+    nbaBoxScoresLive,
   });
 }
