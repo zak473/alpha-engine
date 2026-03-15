@@ -1,7 +1,6 @@
-import { notFound } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
-import { getSportMatchDetail, getSoccerTeamEloHistory } from "@/lib/api";
-import { SoccerMatchDetail } from "./SoccerMatchDetail";
+import { notFound } from "next/navigation";
+import { SGOMatchDetail } from "@/app/sports/[sport]/matches/[id]/SGOMatchDetail";
 
 export const dynamic = "force-dynamic";
 
@@ -9,34 +8,20 @@ interface Props {
   params: { id: string };
 }
 
-export async function generateMetadata({ params }: Props) {
-  try {
-    const match = await getSportMatchDetail("soccer", params.id);
-    return {
-      title: `${match.home.name} vs ${match.away.name} — Never In Doubt`,
-      description: `${match.league} · ${new Date(match.kickoff_utc).toLocaleDateString("en-GB")}`,
-    };
-  } catch {
-    return { title: "Match — Never In Doubt" };
-  }
-}
-
 export default async function SoccerMatchPage({ params }: Props) {
-  let match;
-  try {
-    match = await getSportMatchDetail("soccer", params.id);
-  } catch {
-    notFound();
-  }
-
-  const [eloHome, eloAway] = await Promise.all([
-    getSoccerTeamEloHistory(match.home.id, 30),
-    getSoccerTeamEloHistory(match.away.id, 30),
-  ]);
+  const apiKey = process.env.SGO_API_KEY ?? "";
+  const res = await fetch(
+    `https://api.sportsgameodds.com/v2/events/?apiKey=${apiKey}&eventID=${params.id}`,
+    { cache: "no-store" }
+  );
+  if (!res.ok) notFound();
+  const data = await res.json();
+  const event = data.data?.[0];
+  if (!event) notFound();
 
   return (
-    <AppShell title={`${match.home.name} vs ${match.away.name}`} subtitle={match.league}>
-      <SoccerMatchDetail match={match} eloHome={eloHome} eloAway={eloAway} />
+    <AppShell title={`${event.teams.home.names.long} vs ${event.teams.away.names.long}`} subtitle={event.leagueID}>
+      <SGOMatchDetail event={event} sport="soccer" />
     </AppShell>
   );
 }

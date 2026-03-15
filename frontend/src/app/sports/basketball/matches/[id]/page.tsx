@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/layout/AppShell";
-import { NBAGameDetailPage } from "@/app/sports/nba/[id]/NBAGameDetailPage";
+import { notFound } from "next/navigation";
+import { SGOMatchDetail } from "@/app/sports/[sport]/matches/[id]/SGOMatchDetail";
 
 export const dynamic = "force-dynamic";
 
@@ -7,17 +8,20 @@ interface Props {
   params: { id: string };
 }
 
-export async function generateMetadata({ params }: Props) {
-  return { title: `NBA Game #${params.id} — Never In Doubt` };
-}
+export default async function BasketballMatchPage({ params }: Props) {
+  const apiKey = process.env.SGO_API_KEY ?? "";
+  const res = await fetch(
+    `https://api.sportsgameodds.com/v2/events/?apiKey=${apiKey}&eventID=${params.id}`,
+    { cache: "no-store" }
+  );
+  if (!res.ok) notFound();
+  const data = await res.json();
+  const event = data.data?.[0];
+  if (!event) notFound();
 
-export default function BasketballMatchPage({ params }: Props) {
   return (
-    <AppShell
-      title="NBA Game Center"
-      subtitle="BallDontLie GOAT · Live scores, box score, odds, H2H analysis"
-    >
-      <NBAGameDetailPage gameId={params.id} />
+    <AppShell title={`${event.teams.home.names.long} vs ${event.teams.away.names.long}`} subtitle={event.leagueID}>
+      <SGOMatchDetail event={event} sport="basketball" />
     </AppShell>
   );
 }

@@ -1,9 +1,7 @@
 import { AppShell } from "@/components/layout/AppShell";
-import { getSportMatchDetail } from "@/lib/api";
+import { notFound } from "next/navigation";
 import type { SportSlug } from "@/lib/api";
-import { MatchDetailShell } from "./MatchDetailShell";
-import { notFound, redirect } from "next/navigation";
-import { NBAGameDetailPage } from "@/app/sports/nba/[id]/NBAGameDetailPage";
+import { SGOMatchDetail } from "./SGOMatchDetail";
 
 export const dynamic = "force-dynamic";
 
@@ -17,27 +15,23 @@ export default async function SportMatchDetailPage({ params }: PageProps) {
   const sport = params.sport as SportSlug;
   if (!VALID_SPORTS.includes(sport)) notFound();
 
-  // Basketball uses BallDontLie — no backend route exists
-  if (sport === "basketball") {
-    return (
-      <AppShell title="NBA Game Center" subtitle="BallDontLie GOAT · Live scores, box score, odds, H2H analysis">
-        <NBAGameDetailPage gameId={params.id} />
-      </AppShell>
-    );
-  }
+  const apiKey = process.env.SGO_API_KEY ?? "";
+  const res = await fetch(
+    `https://api.sportsgameodds.com/v2/events/?apiKey=${apiKey}&eventID=${params.id}`,
+    { cache: "no-store" }
+  );
 
-  let match: any = null;
-  try {
-    match = await getSportMatchDetail(sport, params.id);
-  } catch {
-    notFound();
-  }
+  if (!res.ok) notFound();
+  const data = await res.json();
+  const event = data.data?.[0];
+  if (!event) notFound();
 
-  const title = `${match.home.name} vs ${match.away.name}`;
+  const homeName = event.teams.home.names.long;
+  const awayName = event.teams.away.names.long;
 
   return (
-    <AppShell title={title} subtitle={match.league}>
-      <MatchDetailShell match={match} sport={sport} />
+    <AppShell title={`${homeName} vs ${awayName}`} subtitle={event.leagueID}>
+      <SGOMatchDetail event={event} sport={sport} />
     </AppShell>
   );
 }
