@@ -1,27 +1,17 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { notFound } from "next/navigation";
 import { SGOMatchDetail } from "@/app/sports/[sport]/matches/[id]/SGOMatchDetail";
+import { fetchMatchPageData } from "@/app/sports/_lib/fetchMatchPageData";
 
 export const dynamic = "force-dynamic";
 
-interface Props {
-  params: { id: string };
-}
-
-export default async function EsportsMatchPage({ params }: Props) {
-  const apiKey = process.env.SGO_API_KEY ?? "";
-  const res = await fetch(
-    `https://api.sportsgameodds.com/v2/events/?apiKey=${apiKey}&eventID=${params.id}`,
-    { cache: "no-store" }
-  );
-  if (!res.ok) notFound();
-  const data = await res.json();
-  const event = data.data?.[0];
-  if (!event) notFound();
-
+export default async function EsportsMatchPage({ params }: { params: { id: string } }) {
+  const data = await fetchMatchPageData("esports", params.id);
+  if (!data) notFound();
+  const { event, backendMatch, eloHome, eloAway } = data;
   return (
-    <AppShell title={`${event.teams.home.names.long} vs ${event.teams.away.names.long}`} subtitle={event.leagueID}>
-      <SGOMatchDetail event={event} sport="esports" />
+    <AppShell title={`${event.teams.home.names.long} vs ${event.teams.away.names.long}`} subtitle={String(event.leagueID)}>
+      <SGOMatchDetail event={event} sport="esports" backendMatch={backendMatch} eloHome={eloHome} eloAway={eloAway} />
     </AppShell>
   );
 }
