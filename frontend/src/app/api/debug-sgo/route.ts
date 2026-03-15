@@ -21,13 +21,13 @@ export async function GET(req: Request) {
     const event = raw.data?.[0] ?? raw.events?.[0];
     const summary = event ? {
       topLevelKeys: Object.keys(event),
-      statusKeys: event.status ? Object.keys(event.status) : [],
-      teamsKeys: event.teams ? Object.keys(event.teams) : [],
-      hasScores: "scores" in event || "score" in event,
-      hasStats: "stats" in event || "statistics" in event || "boxscore" in event,
-      rawStatus: event.status,
-      rawScores: event.scores ?? event.score ?? "not present",
-      rawStats: event.stats ?? event.statistics ?? event.boxscore ?? "not present",
+      rawResults: event.results,
+      rawPlayers: event.players,
+      rawInfo: event.info,
+      rawLinks: event.links,
+      rawClock: event.status?.clock,
+      rawPeriods: event.status?.periods,
+      rawTeams: event.teams,
     } : { error: "no event found", raw };
 
     return NextResponse.json({ url, status: res.status, summary });
