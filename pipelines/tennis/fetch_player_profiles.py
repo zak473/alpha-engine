@@ -131,8 +131,7 @@ def _compute_career_stats(session: Session, player_id: str) -> dict:
 
 def _fetch_api_tennis_player(player_key: str) -> Optional[dict]:
     """Fetch player info from api-tennis.com get_players endpoint."""
-    from config.settings import settings
-    api_key = getattr(settings, "TENNIS_LIVE_API_KEY", None)
+    api_key = os.environ.get("TENNIS_LIVE_API_KEY")
     if not api_key:
         return None
     try:
