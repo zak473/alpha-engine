@@ -350,7 +350,7 @@ def _job_retrain_models() -> None:
     log.info("[scheduler] Starting retrain_models job ...")
 
     for sport, module_path, fn_name in [
-        ("soccer",     "pipelines.soccer.train_soccer_model",        "main"),
+        ("soccer",     "pipelines.soccer.train_soccer_xgb",           "main"),
         ("baseball",   "pipelines.baseball.train_baseball_model",    "main"),
         ("tennis",     "pipelines.tennis.train_tennis_model",         "main"),
         ("esports",    "pipelines.esports.train_esports_model",       "main"),
