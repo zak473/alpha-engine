@@ -34,6 +34,16 @@ function teamsMatch(sgoName: string, backendName: string): boolean {
   return false;
 }
 
+// Score how precisely a SGO name matches a backend name (higher = better)
+function nameMatchScore(sgoName: string, backendName: string): number {
+  const a = normalizeName(sgoName);
+  const b = normalizeName(backendName);
+  if (a === b) return 3;
+  if (a.length > 3 && b.includes(a)) return 2;
+  if (b.length > 3 && a.includes(b)) return 1;
+  return 0;
+}
+
 function parseDate(val: unknown): Date | null {
   if (!val) return null;
   const n = Number(val);
@@ -107,19 +117,17 @@ export async function fetchMatchPageData(
           teamsMatch(sgoAway, r.title.split(" vs ").slice(-1)[0] ?? "")
       );
 
-      // If we have a start date, prefer the candidate closest in time
-      let best: SearchResult | null = null;
-      if (startAt && candidates.length > 1) {
-        best = candidates.reduce((prev, cur) => {
-          const prevDate = parseDate(prev.subtitle.split("·").slice(-1)[0]?.trim());
-          const curDate  = parseDate(cur.subtitle.split("·").slice(-1)[0]?.trim());
-          const prevDiff = prevDate ? Math.abs(prevDate.getTime() - startAt.getTime()) : Infinity;
-          const curDiff  = curDate  ? Math.abs(curDate.getTime()  - startAt.getTime()) : Infinity;
-          return curDiff < prevDiff ? cur : prev;
-        });
-      } else {
-        best = candidates[0] ?? null;
-      }
+      // Score candidates by name match quality, then break ties by date proximity
+      const scored = candidates.map((r) => {
+        const parts = r.title.split(" vs ");
+        const homeScore = nameMatchScore(sgoHome, parts[0] ?? "");
+        const awayScore = nameMatchScore(sgoAway, parts.slice(-1)[0] ?? "");
+        const dateVal = parseDate(r.subtitle.split("·").slice(-1)[0]?.trim());
+        const dateDiff = (startAt && dateVal) ? Math.abs(dateVal.getTime() - startAt.getTime()) : Infinity;
+        return { r, nameScore: homeScore + awayScore, dateDiff };
+      });
+      scored.sort((a, b) => b.nameScore - a.nameScore || a.dateDiff - b.dateDiff);
+      const best: SearchResult | null = scored[0]?.r ?? null;
 
       if (best) {
         const detailRes = await fetch(
