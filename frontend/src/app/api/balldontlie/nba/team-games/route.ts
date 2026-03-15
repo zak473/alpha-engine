@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const qs = new URLSearchParams();
   qs.append("team_ids[]", teamId);
   qs.append("seasons[]", season);
-  qs.set("per_page", "15");
+  qs.set("per_page", "30");
 
   try {
     const res = await fetch(`${BDL_BASE}/games?${qs}`, {

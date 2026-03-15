@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   qs.append("team_ids[]", team1Id);
   qs.append("team_ids[]", team2Id);
   seasons.forEach((s) => qs.append("seasons[]", s));
-  qs.set("per_page", "50");
+  qs.set("per_page", "100");
 
   try {
     const res = await fetch(`${BDL_BASE}/games?${qs}`, {

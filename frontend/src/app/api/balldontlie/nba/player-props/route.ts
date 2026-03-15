@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const res = await fetch(
-      `${BDL_BASE}/odds/player_props?game_id=${gameId}&per_page=50`,
+      `${BDL_BASE}/odds/player_props?game_id=${gameId}&per_page=100`,
       { headers: bdlHeaders(), next: { revalidate: 60 } } // props — refresh every minute
     );
     if (!res.ok) return NextResponse.json({ data: [] }, { status: res.status });

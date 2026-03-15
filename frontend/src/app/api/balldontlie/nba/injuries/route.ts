@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const ids = teamIdsParam.split(",").filter(Boolean);
   const qs = new URLSearchParams();
   ids.forEach((id) => qs.append("team_ids[]", id));
-  qs.set("per_page", "50");
+  qs.set("per_page", "100");
 
   try {
     const res = await fetch(`${BDL_BASE}/player_injuries?${qs}`, {

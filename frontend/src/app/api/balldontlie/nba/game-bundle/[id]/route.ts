@@ -30,9 +30,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const [gameJson, boxJson, playsJson, standJson, oddsJson] = await Promise.all([
     bdlGet(`${BDL_V1}/games/${id}`, 60),
     bdlGet(`${BDL_V1}/box_scores?game_ids[]=${id}`, 60),
-    bdlGet(`${BDL_V1}/plays?game_id=${id}&per_page=50`, 60),
+    bdlGet(`${BDL_V1}/plays?game_id=${id}&per_page=100`, 60),
     bdlGet(`${BDL_V1}/standings?season=2024&per_page=30`, 600),
-    bdlGet(`${BDL_V2}/odds?game_ids[]=${id}&per_page=20`, 120),
+    bdlGet(`${BDL_V2}/odds?game_ids[]=${id}&per_page=100`, 120),
   ]);
 
   // game can come from box score embed, single-game endpoint (wrapped or flat)

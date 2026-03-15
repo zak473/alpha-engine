@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   if (!gameId) return NextResponse.json({ data: [] });
 
   try {
-    const res = await fetch(`${BDL_BASE}/odds?game_ids[]=${gameId}&per_page=50`, {
+    const res = await fetch(`${BDL_BASE}/odds?game_ids[]=${gameId}&per_page=100`, {
       headers: bdlHeaders(),
       next: { revalidate: 60 }, // odds — refresh every minute
     });
