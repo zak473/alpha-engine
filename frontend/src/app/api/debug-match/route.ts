@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
 
   const out: Record<string, unknown> = {
     API_BASE,
+    RAW_ENV: process.env.NEXT_PUBLIC_API_URL ?? "NOT_SET",
     sport,
     eventID,
   };
