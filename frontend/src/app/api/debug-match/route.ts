@@ -12,15 +12,17 @@ function normalizeName(name: string): string {
     .trim();
 }
 
+const GENERIC_TEAM_WORDS = new Set(["united", "city", "town", "athletic", "sports", "club", "wanderers", "rovers", "county"]);
+
 function teamsMatch(a: string, b: string): boolean {
   const na = normalizeName(a);
   const nb = normalizeName(b);
   if (na === nb) return true;
   if (na.length > 3 && nb.includes(na)) return true;
   if (nb.length > 3 && na.includes(nb)) return true;
-  const wa = na.split(" ").filter((w) => w.length > 2);
-  const wb = new Set(nb.split(" ").filter((w) => w.length > 2));
-  if (wa.some((w) => wb.has(w))) return true;
+  const wa = na.split(" ").filter((w) => w.length > 2 && !GENERIC_TEAM_WORDS.has(w));
+  const wb = new Set(nb.split(" ").filter((w) => w.length > 2 && !GENERIC_TEAM_WORDS.has(w)));
+  if (wa.length > 0 && wa.some((w) => wb.has(w))) return true;
   return false;
 }
 
