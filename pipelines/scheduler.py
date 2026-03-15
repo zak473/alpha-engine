@@ -142,6 +142,14 @@ def _job_predict_only() -> None:
     except Exception as exc:
         log.error("[scheduler] hockey predict failed: %s", exc, exc_info=True)
 
+    # Basketball (ML model or ELO fallback)
+    try:
+        from pipelines.basketball.predict_basketball import run as run_basketball_pred
+        run_basketball_pred()
+        log.info("[scheduler] basketball predict done.")
+    except Exception as exc:
+        log.error("[scheduler] basketball predict failed: %s", exc, exc_info=True)
+
     log.info("[scheduler] predict_only done.")
 
 
@@ -170,11 +178,12 @@ def _job_update_elo() -> None:
     log.info("[scheduler] Starting update_elo job ...")
 
     sports = [
-        ("soccer",     "pipelines.soccer.backfill_elo",     "run_backfill"),
-        ("tennis",     "pipelines.tennis.backfill_elo",     "run_backfill"),
-        ("esports",    "pipelines.esports.backfill_elo",    "run_backfill"),
-        ("baseball",   "pipelines.baseball.backfill_elo",   "run_backfill"),
-        ("hockey",     "pipelines.hockey.backfill_elo",     "run_backfill"),
+        ("soccer",      "pipelines.soccer.backfill_elo",      "run_backfill"),
+        ("tennis",      "pipelines.tennis.backfill_elo",      "run_backfill"),
+        ("esports",     "pipelines.esports.backfill_elo",     "run_backfill"),
+        ("baseball",    "pipelines.baseball.backfill_elo",    "run_backfill"),
+        ("hockey",      "pipelines.hockey.backfill_elo",      "run_backfill"),
+        ("basketball",  "pipelines.basketball.backfill_elo",  "run_backfill"),
     ]
 
     for sport, module_path, fn_name in sports:
@@ -207,6 +216,13 @@ def _job_fetch_stats() -> None:
         log.info("[scheduler] hockey stats: %d rows upserted.", n)
     except Exception as exc:
         log.error("[scheduler] hockey stats failed: %s", exc, exc_info=True)
+
+    try:
+        from pipelines.basketball.fetch_stats import fetch_all as basketball_stats
+        n = basketball_stats(days_back=7)
+        log.info("[scheduler] basketball stats: %d rows upserted.", n)
+    except Exception as exc:
+        log.error("[scheduler] basketball stats failed: %s", exc, exc_info=True)
 
     log.info("[scheduler] fetch_stats done.")
 
@@ -350,11 +366,12 @@ def _job_retrain_models() -> None:
     log.info("[scheduler] Starting retrain_models job ...")
 
     for sport, module_path, fn_name in [
-        ("soccer",     "pipelines.soccer.train_soccer_xgb",           "main"),
-        ("baseball",   "pipelines.baseball.train_baseball_model",    "main"),
-        ("tennis",     "pipelines.tennis.train_tennis_model",         "main"),
-        ("esports",    "pipelines.esports.train_esports_model",       "main"),
-        ("hockey",     "pipelines.hockey.train_hockey_model",         "main"),
+        ("soccer",      "pipelines.soccer.train_soccer_xgb",           "main"),
+        ("baseball",    "pipelines.baseball.train_baseball_model",      "main"),
+        ("tennis",      "pipelines.tennis.train_tennis_model",          "main"),
+        ("esports",     "pipelines.esports.train_esports_model",        "main"),
+        ("hockey",      "pipelines.hockey.train_hockey_model",          "main"),
+        ("basketball",  "pipelines.basketball.train_basketball_model",  "main"),
     ]:
         try:
             import importlib
