@@ -69,8 +69,8 @@ SPORT_MAP: dict[str, str] = {
     "soccer_australia_aleague":           "soccer",
     "soccer_japan_j_league":              "soccer",
     "soccer_usa_mls":                     "soccer",
-    # Basketball
-    "basketball_nba":                     "basketball",
+    # Basketball — NBA odds come from BallDontLie GOAT (nba/v2/odds); skip here
+    # "basketball_nba":                  "basketball",
     "basketball_euroleague":              "basketball",
     "basketball_nbl":                     "basketball",
     "basketball_ncaab":                   "basketball",
@@ -321,10 +321,7 @@ def _ingest_event(db, event: dict, sport_slug: str, dry_run: bool) -> bool:
 
 def fetch_all(dry_run: bool = False) -> int:
     if not settings.ODDS_API_KEY:
-        log.warning(
-            "ODDS_API_KEY not set. Get a free key at https://the-odds-api.com "
-            "and add it to .env as ODDS_API_KEY=your_key"
-        )
+        log.debug("ODDS_API_KEY not set — skipping odds fetch (optional for soccer/tennis/hockey).")
         return 0
 
     db = SessionLocal()
