@@ -35,6 +35,16 @@ def list_hockey_matches(
     return _service.get_match_list(db, status=status, league=league, date_from=date_from, date_to=date_to, limit=limit, offset=offset)
 
 
+@router.get("/matches/preview", response_model=HockeyMatchDetail)
+def get_hockey_match_preview(
+    home: str = Query(..., description="Home team name"),
+    away: str = Query(..., description="Away team name"),
+    db: Session = Depends(get_db),
+):
+    """ELO-based match preview when no DB record exists for upcoming/untracked games."""
+    return _service.preview_match(home, away, db)
+
+
 @router.get("/matches/{match_id}", response_model=HockeyMatchDetail)
 def get_hockey_match(match_id: str, db: Session = Depends(get_db)):
     """Full hockey match detail with ELO, H2H, and predictions."""

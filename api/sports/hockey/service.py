@@ -39,6 +39,23 @@ from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, RatingEloTeam
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
+def _find_team_by_name(db: Session, name: str) -> Optional[CoreTeam]:
+    """Find the best matching CoreTeam by display name."""
+    teams = db.query(CoreTeam).filter(CoreTeam.name.ilike(f"%{name}%")).all()
+    if not teams:
+        words = [w for w in name.split() if len(w) > 3]
+        for word in words:
+            teams = db.query(CoreTeam).filter(CoreTeam.name.ilike(f"%{word}%")).all()
+            if teams:
+                break
+    if not teams:
+        return None
+    for t in teams:
+        if t.provider_id and (t.provider_id.startswith("nhl") or t.provider_id.startswith("hl-hockey")):
+            return t
+    return teams[0]
+
+
 def _name(db: Session, team_id: str) -> str:
     t = db.get(CoreTeam, team_id)
     return t.name if t else team_id
@@ -620,6 +637,62 @@ class HockeyMatchService(BaseMatchListService):
                 "has_elo": elo_h is not None,
                 "has_pred": pred is not None,
                 "has_stats": stats_h is not None,
+                "has_form": form_h is not None,
+            },
+        )
+
+    def preview_match(self, home_name: str, away_name: str, db: Session) -> HockeyMatchDetail:
+        """ELO-based preview for a match not yet in the DB."""
+        home_team = _find_team_by_name(db, home_name)
+        away_team = _find_team_by_name(db, away_name)
+
+        home_id = home_team.id if home_team else f"preview-home-{home_name.lower().replace(' ', '-')}"
+        away_id = away_team.id if away_team else f"preview-away-{away_name.lower().replace(' ', '-')}"
+        hname = home_team.name if home_team else home_name
+        aname = away_team.name if away_team else away_name
+        home_logo = home_team.logo_url if home_team else None
+        away_logo = away_team.logo_url if away_team else None
+
+        elo_h = _elo_snapshot(db, home_id, hname) if home_team else None
+        elo_a = _elo_snapshot(db, away_id, aname) if away_team else None
+
+        probs = None
+        fair_odds = None
+        key_drivers = None
+        if elo_h and elo_a:
+            r_diff = elo_h.rating - elo_a.rating + 30.0
+            p_home = round(1.0 / (1.0 + math.pow(10, -r_diff / 400.0)), 4)
+            p_away = round(1.0 - p_home, 4)
+            probs = ProbabilitiesOut(home_win=p_home, away_win=p_away)
+            if p_home > 0 and p_away > 0:
+                fair_odds = FairOddsOut(home_win=round(1 / p_home, 2), away_win=round(1 / p_away, 2))
+            key_drivers = [KeyDriverOut(feature="ELO Differential", importance=1.0, value=round(elo_h.rating - elo_a.rating, 1))]
+
+        h2h = _h2h(db, home_id, away_id) if home_team and away_team else H2HRecordOut(total_matches=0, home_wins=0, away_wins=0, recent_matches=[])
+        form_h = _form_from_db(db, home_id, hname) if home_team else None
+        form_a = _form_from_db(db, away_id, aname) if away_team else None
+
+        return HockeyMatchDetail(
+            id=f"preview-{home_id}-{away_id}",
+            sport="hockey",
+            league="NHL",
+            season=None,
+            kickoff_utc=None,
+            status="scheduled",
+            home=ParticipantOut(id=home_id, name=hname, logo_url=home_logo),
+            away=ParticipantOut(id=away_id, name=aname, logo_url=away_logo),
+            probabilities=probs,
+            fair_odds=fair_odds,
+            key_drivers=key_drivers,
+            elo_home=elo_h,
+            elo_away=elo_a,
+            form_home=form_h,
+            form_away=form_a,
+            h2h=h2h,
+            data_completeness={
+                "has_elo": elo_h is not None,
+                "has_pred": False,
+                "has_stats": False,
                 "has_form": form_h is not None,
             },
         )

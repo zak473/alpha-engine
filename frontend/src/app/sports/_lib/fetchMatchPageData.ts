@@ -136,7 +136,7 @@ export async function fetchMatchPageData(
       const best: SearchResult | null = scored[0]?.r ?? null;
 
       // Sports that support the preview endpoint (ELO-based prediction from team names)
-      const PREVIEW_SPORTS = new Set(["baseball", "basketball"]);
+      const PREVIEW_SPORTS = new Set(["baseball", "basketball", "hockey"]);
 
       if (best) {
         const detailRes = await fetch(
