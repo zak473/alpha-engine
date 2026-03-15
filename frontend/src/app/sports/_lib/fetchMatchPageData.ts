@@ -18,10 +18,8 @@ function normalizeName(name: string): string {
     .trim();
 }
 
-function surname(name: string): string {
-  const parts = normalizeName(name).split(" ").filter(Boolean);
-  return parts.length > 0 ? (parts[parts.length - 1].length > 2 ? parts[parts.length - 1] : parts[0]) : normalizeName(name);
-}
+// Generic words that appear in many team names and shouldn't count as a match alone
+const GENERIC_TEAM_WORDS = new Set(["united", "city", "town", "athletic", "sports", "club", "wanderers", "rovers", "county"]);
 
 function teamsMatch(sgoName: string, backendName: string): boolean {
   const a = normalizeName(sgoName);
@@ -29,11 +27,10 @@ function teamsMatch(sgoName: string, backendName: string): boolean {
   if (a === b) return true;
   if (a.length > 3 && b.includes(a)) return true;
   if (b.length > 3 && a.includes(b)) return true;
-  if (surname(sgoName) === surname(backendName)) return true;
-  // Word overlap
-  const wa = a.split(" ").filter((w) => w.length > 2);
-  const wb = new Set(b.split(" ").filter((w) => w.length > 2));
-  if (wa.some((w) => wb.has(w))) return true;
+  // Word overlap — exclude generic suffixes to avoid "Leeds United" matching "West Ham United"
+  const wa = a.split(" ").filter((w) => w.length > 2 && !GENERIC_TEAM_WORDS.has(w));
+  const wb = new Set(b.split(" ").filter((w) => w.length > 2 && !GENERIC_TEAM_WORDS.has(w)));
+  if (wa.length > 0 && wa.some((w) => wb.has(w))) return true;
   return false;
 }
 
