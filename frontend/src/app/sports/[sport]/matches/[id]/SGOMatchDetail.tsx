@@ -620,14 +620,19 @@ function LeagueContextSection({ match, homeName, awayName }: { match: SportMatch
   return (
     <Card title="League Standing">
       <div className="grid grid-cols-2 gap-3">
-        {[{ name: homeName, pos: lc.home_position, pts: lc.home_points, played: lc.home_games_played },
-          { name: awayName, pos: lc.away_position, pts: lc.away_points, played: lc.away_games_played }].map(({ name, pos, pts, played }) => (
+        {[
+          { name: homeName, pos: lc.home_position, pts: lc.home_points, played: lc.home_games_played, formRank: lc.home_form_rank, top4gap: lc.top_4_gap_home },
+          { name: awayName, pos: lc.away_position, pts: lc.away_points, played: lc.away_games_played, formRank: lc.away_form_rank, relGap: lc.relegation_gap_away },
+        ].map(({ name, pos, pts, played, formRank, top4gap, relGap }) => (
           <div key={name} className="rounded-xl border p-3" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
             <div className="text-[10px] uppercase tracking-[0.14em] text-text-muted mb-1 truncate">{name}</div>
             {pos != null && <div className="text-2xl font-bold text-text-primary">#{String(pos)}</div>}
-            <div className="flex gap-3 text-[10px] text-text-muted mt-1">
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-text-muted mt-1">
               {pts != null && <span>Pts: <b className="text-text-primary">{String(pts)}</b></span>}
               {played != null && <span>P: <b className="text-text-primary">{String(played)}</b></span>}
+              {formRank != null && <span>Form rank: <b className="text-text-primary">#{String(formRank)}</b></span>}
+              {top4gap != null && <span>Top 4: <b className={cn(Number(top4gap) >= 0 ? "text-emerald-400" : "text-red-400")}>{Number(top4gap) > 0 ? `+${top4gap}` : String(top4gap)}</b></span>}
+              {relGap != null && <span>Rel zone: <b className={cn(Number(relGap) <= 3 ? "text-red-400" : "text-emerald-400")}>+{String(relGap)}</b></span>}
             </div>
           </div>
         ))}
