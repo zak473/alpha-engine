@@ -273,14 +273,19 @@ function NBASection() {
     return () => clearInterval(iv);
   }, [fetchAll]);
 
-  const liveGames = useMemo(() => games.filter((g) => isGameLive(g.status)), [games]);
+  // A game is live if the games API says so, OR if box_scores/live returned data for it
+  // (nba/v1/games status can lag behind real-time, but box_scores/live is always current)
+  const liveGames = useMemo(
+    () => games.filter((g) => isGameLive(g.status) || liveBoxScores.has(g.id)),
+    [games, liveBoxScores]
+  );
   const scheduledGames = useMemo(
-    () => games.filter((g) => isGameScheduled(g.status)),
-    [games]
+    () => games.filter((g) => isGameScheduled(g.status) && !liveBoxScores.has(g.id)),
+    [games, liveBoxScores]
   );
   const finishedGames = useMemo(
-    () => games.filter((g) => isGameFinished(g.status)),
-    [games]
+    () => games.filter((g) => isGameFinished(g.status) && !liveBoxScores.has(g.id)),
+    [games, liveBoxScores]
   );
 
   if (loading) {
@@ -326,13 +331,18 @@ function NBASection() {
               badge={dataLabel}
             />
             <div className="grid gap-4 xl:grid-cols-2">
-              {liveGames.map((game) => (
-                <NBALiveGameCard
-                  key={game.id}
-                  game={game}
-                  boxScore={liveBoxScores.get(game.id) ?? null}
-                                  />
-              ))}
+              {liveGames.map((game) => {
+                const bs = liveBoxScores.get(game.id) ?? null;
+                // Prefer real-time game data from box_scores/live over the stale games endpoint
+                const liveGame = bs?.game ?? game;
+                return (
+                  <NBALiveGameCard
+                    key={game.id}
+                    game={liveGame}
+                    boxScore={bs}
+                  />
+                );
+              })}
             </div>
           </section>
         )}
