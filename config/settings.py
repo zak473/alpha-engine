@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     TENNIS_ELO_K_BASE: float = 32.0
     TENNIS_TIME_DECAY: float = 0.92
 
+    # Live data — PandaScore (CS2, LoL, Dota2, Valorant esports fixtures + results)
+    # Register at https://pandascore.co → API key
+    ESPORTS_API_KEY: str = ""
+
     # ELO — Esports
     ESPORTS_ELO_BASE: float = 1500.0
     ESPORTS_ELO_K_BASE: float = 40.0

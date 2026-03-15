@@ -84,9 +84,9 @@ def _job_fetch_live() -> None:
     except Exception as exc:
         log.error("[scheduler] tennis build_player_form failed: %s", exc, exc_info=True)
 
-    # Esports
+    # Esports (PandaScore: CS2, LoL, Dota2, Valorant)
     try:
-        from pipelines.esports.fetch_hltv import fetch_all as fetch_esports
+        from pipelines.esports.fetch_live import fetch_all as fetch_esports
         n = fetch_esports()
         total += n
         log.info("[scheduler] esports: %d rows ingested.", n)
