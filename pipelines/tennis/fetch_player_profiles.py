@@ -323,7 +323,7 @@ def run(dry_run: bool = False) -> int:
                     # Update or create profile entry
                     prof = session.query(TennisPlayerProfile).filter_by(player_id=team.id).first()
                     if prof is None:
-                        prof = TennisPlayerProfile(player_id=team.id, player_name=team.name)
+                        prof = TennisPlayerProfile(player_id=team.id)
                         session.add(prof)
                     if rank_val is not None:
                         prof.ranking = rank_val
