@@ -65,6 +65,8 @@ class Settings(BaseSettings):
     SOCCER_HOME_ADV: float = 65.0
     SOCCER_TIME_DECAY: float = 0.97
 
+    # ELO — Basketball handled by BallDontLie GOAT (no backend ELO)
+
     # ELO — Tennis
     TENNIS_ELO_BASE: float = 1500.0
     TENNIS_ELO_K_BASE: float = 32.0

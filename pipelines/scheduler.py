@@ -93,7 +93,7 @@ def _job_fetch_live() -> None:
     except Exception as exc:
         log.error("[scheduler] esports fetch failed: %s", exc, exc_info=True)
 
-    # Basketball, Baseball, Hockey — handled by Highlightly (_job_fetch_highlightly runs every 10m)
+    # Baseball, Hockey — handled by Highlightly (_job_fetch_highlightly runs every 10m)
 
     log.info("[scheduler] fetch_live done — %d total rows.", total)
 
@@ -125,14 +125,6 @@ def _job_predict_only() -> None:
         log.info("[scheduler] esports predict done.")
     except Exception as exc:
         log.error("[scheduler] esports predict failed: %s", exc, exc_info=True)
-
-    # Basketball (ELO)
-    try:
-        from pipelines.basketball.predict_basketball import run as run_basketball_pred
-        run_basketball_pred()
-        log.info("[scheduler] basketball predict done.")
-    except Exception as exc:
-        log.error("[scheduler] basketball predict failed: %s", exc, exc_info=True)
 
     # Baseball (ELO)
     try:
@@ -181,7 +173,6 @@ def _job_update_elo() -> None:
         ("soccer",     "pipelines.soccer.backfill_elo",     "run_backfill"),
         ("tennis",     "pipelines.tennis.backfill_elo",     "run_backfill"),
         ("esports",    "pipelines.esports.backfill_elo",    "run_backfill"),
-        ("basketball", "pipelines.basketball.backfill_elo", "run_backfill"),
         ("baseball",   "pipelines.baseball.backfill_elo",   "run_backfill"),
         ("hockey",     "pipelines.hockey.backfill_elo",     "run_backfill"),
     ]
@@ -202,13 +193,6 @@ def _job_update_elo() -> None:
 def _job_fetch_stats() -> None:
     """Fetch real box score stats from NBA and MLB APIs."""
     log.info("[scheduler] Starting fetch_stats job ...")
-
-    try:
-        from pipelines.basketball.fetch_stats import fetch_all as bball_stats
-        n = bball_stats()
-        log.info("[scheduler] basketball stats: %d rows upserted.", n)
-    except Exception as exc:
-        log.error("[scheduler] basketball stats failed: %s", exc, exc_info=True)
 
     try:
         from pipelines.baseball.fetch_stats import fetch_all as baseball_stats
@@ -367,7 +351,6 @@ def _job_retrain_models() -> None:
 
     for sport, module_path, fn_name in [
         ("soccer",     "pipelines.soccer.train_soccer_model",        "main"),
-        ("basketball", "pipelines.basketball.train_basketball_model", "main"),
         ("baseball",   "pipelines.baseball.train_baseball_model",    "main"),
         ("tennis",     "pipelines.tennis.train_tennis_model",         "main"),
         ("esports",    "pipelines.esports.train_esports_model",       "main"),
@@ -397,7 +380,7 @@ def _job_generate_weekly_challenges() -> None:
     week_end = week_start + timedelta(days=7)
 
     SYSTEM_USER = "system"
-    SPORTS = ["soccer", "tennis", "basketball", "baseball", "esports", "hockey"]
+    SPORTS = ["soccer", "tennis", "baseball", "esports", "hockey"]
     TEMPLATES = [
         {
             "sport": "soccer",
@@ -408,11 +391,6 @@ def _job_generate_weekly_challenges() -> None:
             "sport": "tennis",
             "name": "Weekly Tennis Challenge",
             "description": "Submit your tennis match predictions and track your accuracy across the week.",
-        },
-        {
-            "sport": "basketball",
-            "name": "Weekly Basketball Challenge",
-            "description": "Back the best basketball value bets and rise up the weekly rankings.",
         },
         {
             "sport": "baseball",
@@ -687,7 +665,7 @@ def start() -> BackgroundScheduler:
         _job_retrain_models,
         trigger=CronTrigger(day_of_week="sat", hour=2, minute=0, timezone="UTC"),
         id="retrain_models",
-        name="Weekly ML model retraining (soccer, basketball, baseball, tennis, esports)",
+        name="Weekly ML model retraining (soccer, baseball, tennis, esports)",
         replace_existing=True,
     )
 

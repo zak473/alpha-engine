@@ -23,11 +23,10 @@ from sqlalchemy.orm import Session
 from api.deps import get_db, get_current_user
 from api.exceptions import register_exception_handlers
 from api.middleware import RequestLoggingMiddleware
-from api.routers import auth, backtest, basketball as basketball_router, baseball as baseball_router, challenges, esports, matches, notifications, picks, predictions, soccer, standings as standings_router, tennis, tipsters
+from api.routers import auth, backtest, baseball as baseball_router, challenges, esports, matches, notifications, picks, predictions, soccer, standings as standings_router, tennis, tipsters
 from api.sports.soccer import routes as soccer_sport
 from api.sports.tennis import routes as tennis_sport
 from api.sports.esports import routes as esports_sport
-from api.sports.basketball import routes as basketball_sport
 from api.sports.baseball import routes as baseball_sport
 from api.sports.hockey import routes as hockey_sport
 from config.settings import settings
@@ -155,27 +154,6 @@ async def lifespan(app: FastAPI):
                 logger.info("Startup: %d finished soccer matches — skipping backfill.", _soccer_finished)
         except Exception as exc:
             logger.warning("Startup soccer backfill check failed: %s", exc)
-
-    # Basketball — NBA stats API 2015-2025 → ELO
-    try:
-        _bball_finished = _sport_count("basketball")
-        if _bball_finished < 500:
-            logger.info("Startup: %d finished basketball matches — triggering NBA backfill.", _bball_finished)
-            def _run_basketball_backfill():
-                try:
-                    from pipelines.basketball.backfill_history import run as bh_run
-                    n = bh_run()
-                    logger.info("Startup: basketball backfill complete (%d matches).", n)
-                    from pipelines.basketball.backfill_elo import run_backfill as _elo
-                    _elo()
-                    logger.info("Startup: basketball ELO backfill complete.")
-                except Exception as _exc:
-                    logger.error("Startup basketball backfill failed: %s", _exc, exc_info=True)
-            _th.Thread(target=_run_basketball_backfill, daemon=True, name="basketball-history").start()
-        else:
-            logger.info("Startup: %d finished basketball matches — skipping backfill.", _bball_finished)
-    except Exception as exc:
-        logger.warning("Startup basketball backfill check failed: %s", exc)
 
     # Baseball — Retrosheet 2015-2025 → ELO
     try:
@@ -324,14 +302,12 @@ from api.routers import bankroll
 app.include_router(bankroll.router,    prefix=settings.API_PREFIX)
 app.include_router(standings_router.router)
 app.include_router(backtest.router,    prefix=settings.API_PREFIX)
-app.include_router(basketball_router.router, prefix=settings.API_PREFIX)
 app.include_router(baseball_router.router,   prefix=settings.API_PREFIX)
 
 # ── Sport-specific match routes ────────────────────────────────────────────
 app.include_router(soccer_sport.router,      prefix=settings.API_PREFIX)
 app.include_router(tennis_sport.router,      prefix=settings.API_PREFIX)
 app.include_router(esports_sport.router,     prefix=settings.API_PREFIX)
-app.include_router(basketball_sport.router,  prefix=settings.API_PREFIX)
 app.include_router(baseball_sport.router,    prefix=settings.API_PREFIX)
 app.include_router(hockey_sport.router,      prefix=settings.API_PREFIX)
 
@@ -430,11 +406,6 @@ def trigger_sync(background_tasks=None):
             total += fetch_esports()
         except Exception as exc:
             logger.error("[manual sync] Esports failed: %s", exc, exc_info=True)
-        try:
-            from pipelines.basketball.fetch_live import fetch_all as fetch_basketball
-            total += fetch_basketball()
-        except Exception as exc:
-            logger.error("[manual sync] Basketball failed: %s", exc, exc_info=True)
         try:
             from pipelines.baseball.fetch_live import fetch_all as fetch_baseball
             total += fetch_baseball()
@@ -573,23 +544,6 @@ def trigger_rebuild_soccer_features():
     _th.Thread(target=_run, daemon=True, name="soccer-features").start()
     return {"status": "started", "note": "Rebuilding feat_soccer_match. Check logs for progress."}
 
-
-@app.post("/api/v1/admin/rebuild-basketball-data", tags=["Admin"], dependencies=[Depends(get_current_user)])
-def trigger_rebuild_basketball_data():
-    """Full basketball data rebuild: backfill_history (NBA 2015-2025) → backfill_elo."""
-    import threading as _th
-    def _run():
-        try:
-            from pipelines.basketball.backfill_history import run as bh_run
-            n = bh_run()
-            logger.info("[basketball-rebuild] backfill_history: %d matches.", n)
-            from pipelines.basketball.backfill_elo import run_backfill as elo_run
-            elo_run()
-            logger.info("[basketball-rebuild] backfill_elo done.")
-        except Exception as exc:
-            logger.error("[basketball-rebuild] failed: %s", exc, exc_info=True)
-    _th.Thread(target=_run, daemon=True, name="basketball-rebuild").start()
-    return {"status": "started", "note": "Basketball data rebuild running. Check Railway logs."}
 
 
 @app.post("/api/v1/admin/rebuild-baseball-data", tags=["Admin"], dependencies=[Depends(get_current_user)])
