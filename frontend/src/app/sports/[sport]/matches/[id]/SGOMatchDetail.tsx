@@ -990,128 +990,89 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
   const grouped = categorizeMarkets(match.allMarkets);
   const orderedCats = CATEGORY_ORDER.filter((c) => grouped[c]?.length);
 
+  const hasInfoData = !!(backendMatch || event.results?.game || event.info?.venue);
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 lg:px-6">
-      <div className={cn("grid gap-6", (backendMatch || event.results?.game || event.info?.venue) ? "lg:grid-cols-[1fr_400px]" : "")}>
+    <div className="mx-auto max-w-6xl px-4 py-6 lg:px-6 space-y-6">
 
-        {/* Left: hero + odds */}
-        <div className="space-y-4">
-
-          {/* Hero */}
-          <div className="sportsbook-card overflow-hidden">
-            <div className="flex items-center justify-between gap-3 px-5 pt-5">
-              <div className="flex items-center gap-2.5">
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-full text-base" style={{ background: `${cfg.color}16`, color: cfg.color }}>{cfg.icon}</span>
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-text-subtle">{cfg.label}</div>
-                  <div className="text-sm font-medium text-text-primary">{match.league}</div>
-                </div>
-              </div>
-              {isLive ? (
-                <div className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1" style={{ borderColor: `${cfg.color}35`, background: `${cfg.color}12` }}>
-                  <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: cfg.color }} />
-                  <span className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: cfg.color }}>Live {match.liveClock ? `· ${match.liveClock}` : ""}</span>
-                </div>
-              ) : isFinished ? (
-                <span className="rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>Final</span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-                  <Timer size={12} /> {formatKickoff(match.startTime)}
-                </span>
-              )}
-            </div>
-
-            <div className="grid gap-4 px-5 py-6 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.16em] text-text-subtle">Home</p>
-                <p className="mt-1 text-2xl font-bold leading-tight text-text-primary">{match.home.name}</p>
-              </div>
-              {match.homeScore != null && match.awayScore != null ? (
-                <div className="rounded-2xl border px-5 py-3 text-center" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-text-subtle mb-1">score</div>
-                  <div className="flex items-center justify-center gap-3 text-3xl font-mono font-bold text-text-primary">
-                    <span>{match.homeScore}</span><span className="text-text-subtle">–</span><span>{match.awayScore}</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center text-2xl font-thin text-text-subtle">vs</div>
-              )}
-              <div className="text-left lg:text-right">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-text-subtle">Away</p>
-                <p className="mt-1 text-2xl font-bold leading-tight text-text-primary">{match.away.name}</p>
-              </div>
+      {/* Hero — full width */}
+      <div className="sportsbook-card overflow-hidden">
+        <div className="flex items-center justify-between gap-3 px-5 pt-5">
+          <div className="flex items-center gap-2.5">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full text-base" style={{ background: `${cfg.color}16`, color: cfg.color }}>{cfg.icon}</span>
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-text-subtle">{cfg.label}</div>
+              <div className="text-sm font-medium text-text-primary">{match.league}</div>
             </div>
           </div>
-
-          {/* Events timeline on left (only when finished/live) */}
-          {backendMatch && (isLive || isFinished) && <EventsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
-
-          {/* Odds */}
-          {orderedCats.length === 0 && !isFinished && (
-            <div className="rounded-[20px] border px-5 py-8 text-center text-sm text-text-muted" style={{ borderColor: "var(--border0)" }}>
-              No odds available for this match.
+          {isLive ? (
+            <div className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1" style={{ borderColor: `${cfg.color}35`, background: `${cfg.color}12` }}>
+              <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: cfg.color }} />
+              <span className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: cfg.color }}>Live {match.liveClock ? `· ${match.liveClock}` : ""}</span>
             </div>
+          ) : isFinished ? (
+            <span className="rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>Final</span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+              <Timer size={12} /> {formatKickoff(match.startTime)}
+            </span>
           )}
-          {orderedCats.map((cat) => {
-            const markets = grouped[cat];
-            const isExpanded = expandedCats.has(cat);
-            const hasEdge = markets.some((m) => m.selections.some((s) => (s.edge ?? 0) >= 0.05));
-            return (
-              <div key={cat} className="sportsbook-card overflow-hidden">
-                <button onClick={() => toggleCat(cat)} className="flex w-full items-center justify-between px-5 py-4 transition-colors hover:bg-white/[0.02]">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-text-primary">{cat}</span>
-                    <span className="rounded-full border px-2 py-0.5 text-[10px] font-medium text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>{markets.length}</span>
-                    {hasEdge && (
-                      <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em]"
-                        style={{ borderColor: "rgba(251,191,36,0.30)", background: "rgba(251,191,36,0.12)", color: "#f59e0b" }}>
-                        <Flame size={9} /> Value
-                      </span>
-                    )}
-                  </div>
-                  {isExpanded ? <ChevronUp size={16} className="text-text-muted" /> : <ChevronDown size={16} className="text-text-muted" />}
-                </button>
-                {isExpanded && (
-                  <div className="border-t px-5 py-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" style={{ borderColor: "var(--border0)" }}>
-                    {markets.map((mkt) => (
-                      <MarketSection key={mkt.id} market={mkt} matchId={match.id} matchLabel={matchLabel}
-                        sport={sport} league={match.league} startTime={match.startTime} isFinished={isFinished} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          {isFinished && <p className="text-center text-sm text-text-muted py-2">This match has ended — odds are no longer available.</p>}
         </div>
 
-        {/* Right: SGO + backend data */}
-        {(backendMatch || event.results?.game || event.info?.venue) && (
+        <div className="grid gap-4 px-5 py-6 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.16em] text-text-subtle">Home</p>
+            <p className="mt-1 text-2xl font-bold leading-tight text-text-primary">{match.home.name}</p>
+          </div>
+          {match.homeScore != null && match.awayScore != null ? (
+            <div className="rounded-2xl border px-5 py-3 text-center" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-text-subtle mb-1">score</div>
+              <div className="flex items-center justify-center gap-3 text-3xl font-mono font-bold text-text-primary">
+                <span>{match.homeScore}</span><span className="text-text-subtle">–</span><span>{match.awayScore}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-2xl font-thin text-text-subtle">vs</div>
+          )}
+          <div className="text-left lg:text-right">
+            <p className="text-[11px] uppercase tracking-[0.16em] text-text-subtle">Away</p>
+            <p className="mt-1 text-2xl font-bold leading-tight text-text-primary">{match.away.name}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Info grid — two columns on desktop */}
+      {hasInfoData && (
+        <div className="grid gap-6 lg:grid-cols-2">
+
+          {/* Left info column: SGO live data */}
           <div className="space-y-4">
-            {/* SGO live/match data — always shown when available */}
             <SGOVenueSection event={event} />
             <SGOTeamStatsSection event={event} homeName={match.home.name} awayName={match.away.name} />
+            {backendMatch && (isLive || isFinished) && <EventsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
+            <LiveStatsSection match={backendMatch ?? ({} as SportMatchDetail)} homeName={match.home.name} awayName={match.away.name} />
             <SGOPlayerStatsSection event={event} homeName={match.home.name} awayName={match.away.name} />
+            {backendMatch && <LineupSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
+            {backendMatch && <InjuriesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
+          </div>
 
-            {/* Backend model data */}
+          {/* Right info column: model + analytics */}
+          <div className="space-y-4">
             {backendMatch ? (
               <>
                 <ProbabilitiesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
                 <EloSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} eloHome={eloHome} eloAway={eloAway} cfg={cfg} />
-                <ContextSection match={backendMatch} />
-                {sport === "tennis" && <TennisInfoSection match={backendMatch} />}
-                {sport === "esports" && <EsportsInfoSection match={backendMatch} />}
                 <FormSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                {sport === "tennis" && <TennisProfileSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
-                <KeyDriversSection match={backendMatch} />
                 <H2HSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
                 <LeagueContextSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                <LiveStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                <KeyDriversSection match={backendMatch} />
+                <SimulationSection match={backendMatch} />
                 <StatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
                 <AdvancedStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                <SimulationSection match={backendMatch} />
-                <LineupSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                <InjuriesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                <ContextSection match={backendMatch} />
+                {sport === "tennis" && <TennisInfoSection match={backendMatch} />}
+                {sport === "tennis" && <TennisProfileSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
+                {sport === "esports" && <EsportsInfoSection match={backendMatch} />}
                 <RefereeSection match={backendMatch} />
               </>
             ) : (
@@ -1120,8 +1081,50 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Odds — full width at bottom */}
+      <div className="space-y-3">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted px-1">Betting Markets</div>
+        {orderedCats.length === 0 && !isFinished && (
+          <div className="rounded-[20px] border px-5 py-8 text-center text-sm text-text-muted" style={{ borderColor: "var(--border0)" }}>
+            No odds available for this match.
+          </div>
         )}
+        {orderedCats.map((cat) => {
+          const markets = grouped[cat];
+          const isExpanded = expandedCats.has(cat);
+          const hasEdge = markets.some((m) => m.selections.some((s) => (s.edge ?? 0) >= 0.05));
+          return (
+            <div key={cat} className="sportsbook-card overflow-hidden">
+              <button onClick={() => toggleCat(cat)} className="flex w-full items-center justify-between px-5 py-4 transition-colors hover:bg-white/[0.02]">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-text-primary">{cat}</span>
+                  <span className="rounded-full border px-2 py-0.5 text-[10px] font-medium text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>{markets.length}</span>
+                  {hasEdge && (
+                    <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em]"
+                      style={{ borderColor: "rgba(251,191,36,0.30)", background: "rgba(251,191,36,0.12)", color: "#f59e0b" }}>
+                      <Flame size={9} /> Value
+                    </span>
+                  )}
+                </div>
+                {isExpanded ? <ChevronUp size={16} className="text-text-muted" /> : <ChevronDown size={16} className="text-text-muted" />}
+              </button>
+              {isExpanded && (
+                <div className="border-t px-5 py-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" style={{ borderColor: "var(--border0)" }}>
+                  {markets.map((mkt) => (
+                    <MarketSection key={mkt.id} market={mkt} matchId={match.id} matchLabel={matchLabel}
+                      sport={sport} league={match.league} startTime={match.startTime} isFinished={isFinished} />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {isFinished && <p className="text-center text-sm text-text-muted py-2">This match has ended — odds are no longer available.</p>}
       </div>
+
     </div>
   );
 }
