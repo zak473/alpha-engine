@@ -773,6 +773,11 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
         </div>
 
         {/* Right: all backend data */}
+        {!backendMatch && (
+          <div className="sportsbook-card p-5 text-sm text-text-muted">
+            No model data found for this match.
+          </div>
+        )}
         {backendMatch && (
           <div className="space-y-4">
             <ProbabilitiesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
