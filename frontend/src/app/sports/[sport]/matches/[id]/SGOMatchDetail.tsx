@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { ChevronDown, ChevronUp, Timer, Flame, TrendingUp, Shield, MapPin, Cloud, Users, Zap } from "lucide-react";
+import { ChevronDown, ChevronUp, Timer, Flame, TrendingUp, Shield, MapPin, Cloud, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SportSlug, Market, Selection } from "@/lib/betting-types";
 import { SPORT_CONFIG } from "@/lib/betting-types";
@@ -794,15 +794,6 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
             <LineupSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
             <InjuriesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
             <RefereeSection match={backendMatch} />
-            {/* Model info footer */}
-            {backendMatch.model && (
-              <div className="flex items-center gap-2 px-1 pt-1">
-                <Zap size={11} className="text-text-subtle" />
-                <span className="text-[10px] text-text-subtle">
-                  {String((backendMatch.model as unknown as Record<string, unknown>).version ?? "model")} · acc {(backendMatch.model as unknown as Record<string, unknown>).accuracy != null ? `${(Number((backendMatch.model as unknown as Record<string, unknown>).accuracy) * 100).toFixed(1)}%` : "—"}
-                </span>
-              </div>
-            )}
           </div>
         )}
       </div>

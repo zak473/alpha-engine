@@ -88,28 +88,32 @@ export async function GET(req: Request) {
     }
   }
 
-  // Fetch match detail
-  if (bestId) {
+  // Fetch match detail for all candidates (up to 3)
+  const detailResults: unknown[] = [];
+  for (const c of (info.candidates as Array<{ id: string; title: string }> ?? []).slice(0, 3)) {
     try {
       const detailRes = await fetch(
-        `${API_BASE}/sports/${sport}/matches/${bestId}`,
+        `${API_BASE}/sports/${sport}/matches/${c.id}`,
         { cache: "no-store" }
       );
-      info.detailStatus = detailRes.status;
       if (detailRes.ok) {
         const detail = await detailRes.json();
-        // Show which fields have data
-        info.detailFields = Object.entries(detail).reduce((acc, [k, v]) => {
-          (acc as Record<string, unknown>)[k] = v === null ? "null" : Array.isArray(v) ? `array(${(v as unknown[]).length})` : typeof v === "object" ? "object" : v;
-          return acc;
-        }, {} as Record<string, unknown>);
+        detailResults.push({
+          id: c.id, title: c.title,
+          fields: Object.entries(detail).reduce((acc, [k, v]) => {
+            (acc as Record<string, unknown>)[k] = v === null ? "null" : Array.isArray(v) ? `array(${(v as unknown[]).length})` : typeof v === "object" ? "object" : v;
+            return acc;
+          }, {} as Record<string, unknown>),
+        });
       } else {
-        info.detailBody = await detailRes.text();
+        detailResults.push({ id: c.id, title: c.title, status: detailRes.status });
       }
     } catch (e) {
-      info.detailError = String(e);
+      detailResults.push({ id: c.id, title: c.title, error: String(e) });
     }
   }
+  info.detailResults = detailResults;
+  info.bestId = (info.candidates as Array<{ id: string }> ?? [])[0]?.id ?? null;
 
   return NextResponse.json(info, { status: 200 });
 }
