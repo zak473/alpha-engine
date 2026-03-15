@@ -388,7 +388,7 @@ class BaseballMatchDetail(BaseModel):
     sport: str = "baseball"
     league: str
     season: Optional[str] = None
-    kickoff_utc: datetime
+    kickoff_utc: Optional[datetime] = None
     status: str
     home: ParticipantOut
     away: ParticipantOut

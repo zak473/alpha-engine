@@ -46,6 +46,13 @@ FEATURE_NAMES = [
     "home_era_avg", "away_era_avg",
     "home_whip_avg", "away_whip_avg",
     "home_ops_avg", "away_ops_avg",
+    # Pitching quality
+    "home_k_avg", "away_k_avg",           # strikeouts pitched (dominance)
+    "home_bb_avg", "away_bb_avg",          # walks allowed (control)
+    "home_k_bb_avg", "away_k_bb_avg",      # K/BB ratio (best single pitcher metric)
+    # Offensive power
+    "home_hr_avg", "away_hr_avg",          # home runs (power)
+    "home_lob_avg", "away_lob_avg",        # left on base (clutch hitting / missed opportunities)
 ]
 
 OUTCOME_LABELS = {"home_win": 0, "away_win": 1, "H": 0, "A": 1}
@@ -69,7 +76,8 @@ def _rolling_baseball_stats(
     for this team before kickoff.
 
     Returns a dict with keys:
-        runs_avg, runs_allowed_avg, hits_avg, era_avg, whip_avg, ops_avg
+        runs_avg, runs_allowed_avg, hits_avg, era_avg, whip_avg, ops_avg,
+        k_avg, bb_avg, k_bb_avg, hr_avg, lob_avg
 
     runs_allowed_avg is derived from the OPPONENT's BaseballTeamMatchStats.runs
     for those same match_ids.
@@ -86,6 +94,11 @@ def _rolling_baseball_stats(
             "era_avg": 0.0,
             "whip_avg": 0.0,
             "ops_avg": 0.0,
+            "k_avg": 0.0,
+            "bb_avg": 0.0,
+            "k_bb_avg": 0.0,
+            "hr_avg": 0.0,
+            "lob_avg": 0.0,
         }
 
     match_ids = [m.id for m in matches]
@@ -123,11 +136,19 @@ def _rolling_baseball_stats(
     era_vals  = [s.era  for s in team_stats]
     whip_vals = [s.whip for s in team_stats]
     ops_vals  = [s.ops  for s in team_stats]
+    k_vals    = [s.strikeouts_pitching for s in team_stats]
+    bb_vals   = [s.walks_allowed for s in team_stats]
+    hr_vals   = [s.home_runs for s in team_stats]
+    lob_vals  = [s.left_on_base for s in team_stats]
 
     runs_allowed_vals = [
         opp_runs_by_match.get(s.match_id)
         for s in team_stats
     ]
+
+    k_avg  = _avg(k_vals)
+    bb_avg = _avg(bb_vals)
+    k_bb_avg = round(k_avg / bb_avg, 3) if bb_avg > 0 else 0.0
 
     return {
         "runs_avg":         _avg(runs_vals),
@@ -136,6 +157,11 @@ def _rolling_baseball_stats(
         "era_avg":          _avg(era_vals),
         "whip_avg":         _avg(whip_vals),
         "ops_avg":          _avg(ops_vals),
+        "k_avg":            k_avg,
+        "bb_avg":           bb_avg,
+        "k_bb_avg":         k_bb_avg,
+        "hr_avg":           _avg(hr_vals),
+        "lob_avg":          _avg(lob_vals),
     }
 
 
@@ -208,6 +234,18 @@ def build_feature_vector(
         "away_whip_avg":         away_bb["whip_avg"],
         "home_ops_avg":          home_bb["ops_avg"],
         "away_ops_avg":          away_bb["ops_avg"],
+        # Pitching quality
+        "home_k_avg":            home_bb["k_avg"],
+        "away_k_avg":            away_bb["k_avg"],
+        "home_bb_avg":           home_bb["bb_avg"],
+        "away_bb_avg":           away_bb["bb_avg"],
+        "home_k_bb_avg":         home_bb["k_bb_avg"],
+        "away_k_bb_avg":         away_bb["k_bb_avg"],
+        # Offensive power
+        "home_hr_avg":           home_bb["hr_avg"],
+        "away_hr_avg":           away_bb["hr_avg"],
+        "home_lob_avg":          home_bb["lob_avg"],
+        "away_lob_avg":          away_bb["lob_avg"],
     }
 
     vector = [raw[f] for f in FEATURE_NAMES]

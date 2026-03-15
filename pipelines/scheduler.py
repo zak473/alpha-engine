@@ -86,7 +86,7 @@ def _job_fetch_live() -> None:
 
     # Esports
     try:
-        from pipelines.esports.fetch_live import fetch_all as fetch_esports
+        from pipelines.esports.fetch_hltv import fetch_all as fetch_esports
         n = fetch_esports()
         total += n
         log.info("[scheduler] esports: %d rows ingested.", n)

@@ -50,6 +50,25 @@ from sqlalchemy import or_
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
+def _find_team_by_name(db: Session, name: str, sport: str) -> Optional[CoreTeam]:
+    """Find the best matching CoreTeam by display name."""
+    teams = db.query(CoreTeam).filter(CoreTeam.name.ilike(f"%{name}%")).all()
+    if not teams:
+        # Fallback: word-level match on the most distinctive word
+        words = [w for w in name.split() if len(w) > 3]
+        for word in words:
+            teams = db.query(CoreTeam).filter(CoreTeam.name.ilike(f"%{word}%")).all()
+            if teams:
+                break
+    if not teams:
+        return None
+    prefix = "mlb" if sport == "baseball" else "nba" if sport == "basketball" else f"hl-{sport}"
+    for t in teams:
+        if t.provider_id and t.provider_id.startswith(prefix):
+            return t
+    return teams[0]
+
+
 def _name(db: Session, team_id: str) -> str:
     t = db.get(CoreTeam, team_id)
     return t.name if t else team_id
@@ -637,6 +656,78 @@ class BaseballMatchService(BaseMatchListService):
 
         return _build_baseball_detail(match, home_name, away_name, league, db,
                                      home_logo=home_logo, away_logo=away_logo)
+
+    def preview_match(self, home_name: str, away_name: str, db: Session) -> BaseballMatchDetail:
+        """ELO-based preview for a match not yet in the DB."""
+        home_team = _find_team_by_name(db, home_name, "baseball")
+        away_team = _find_team_by_name(db, away_name, "baseball")
+
+        home_id = home_team.id if home_team else f"preview-home-{home_name.lower().replace(' ', '-')}"
+        away_id = away_team.id if away_team else f"preview-away-{away_name.lower().replace(' ', '-')}"
+        hname = home_team.name if home_team else home_name
+        aname = away_team.name if away_team else away_name
+        home_logo = home_team.logo_url if home_team else None
+        away_logo = away_team.logo_url if away_team else None
+
+        elo_home = _elo_snapshot(db, home_id, hname) if home_team else None
+        elo_away = _elo_snapshot(db, away_id, aname) if away_team else None
+        r_home = elo_home.rating if elo_home else 1500.0
+        r_away = elo_away.rating if elo_away else 1500.0
+        p_home = _elo_win_prob(r_home, r_away, 24.0)
+        p_away = 1.0 - p_home
+
+        h2h = _h2h(db, home_id, away_id) if home_team and away_team else H2HRecordOut(total_matches=0, home_wins=0, away_wins=0, recent_matches=[])
+
+        home_form_records = compute_team_form(db, "baseball", home_id, limit=5) if home_team else []
+        home_summary = form_summary(home_form_records)
+        away_form_records = compute_team_form(db, "baseball", away_id, limit=5) if away_team else []
+        away_summary = form_summary(away_form_records)
+        form_home = _build_baseball_form(home_id, hname, home_form_records, home_summary) if home_form_records else None
+        form_away = _build_baseball_form(away_id, aname, away_form_records, away_summary) if away_form_records else None
+
+        return BaseballMatchDetail(
+            id=f"preview-{home_id}-{away_id}",
+            sport="baseball",
+            league="MLB",
+            season=None,
+            kickoff_utc=None,
+            status="scheduled",
+            home=ParticipantOut(id=home_id, name=hname, logo_url=home_logo),
+            away=ParticipantOut(id=away_id, name=aname, logo_url=away_logo),
+            probabilities=ProbabilitiesOut(home_win=round(p_home, 3), away_win=round(p_away, 3)),
+            fair_odds=FairOddsOut(
+                home_win=round(1 / p_home, 2) if p_home > 0 else None,
+                away_win=round(1 / p_away, 2) if p_away > 0 else None,
+            ),
+            key_drivers=[KeyDriverOut(feature="ELO Differential", importance=0.5, value=round(r_home - r_away, 1))],
+            elo_home=elo_home,
+            elo_away=elo_away,
+            match_info=BaseballMatchInfo(
+                ballpark=None, city=None, attendance=None, innings_played=None,
+                inning_scores=None, home_hits=None, home_errors=None,
+                away_hits=None, away_errors=None, umpire_home_plate=None,
+                weather=None, park_factor=None,
+                home_record=_season_record(db, "baseball", home_id, None) if home_team else None,
+                away_record=_season_record(db, "baseball", away_id, None) if away_team else None,
+                home_streak=None, away_streak=None,
+                home_bullpen_era=None, away_bullpen_era=None,
+            ),
+            form_home=form_home,
+            form_away=form_away,
+            h2h=h2h,
+            data_completeness={
+                "box_score": False, "pitching_line": False, "batting_line": False,
+                "inning_events": False,
+                "elo_ratings": elo_home is not None or elo_away is not None,
+                "weather": False, "h2h": True,
+            },
+            betting={
+                "home_ml": round(1 / p_home, 2) if p_home > 0 else None,
+                "away_ml": round(1 / p_away, 2) if p_away > 0 else None,
+                "market_home": None,
+                "market_away": None,
+            },
+        )
 
     def get_elo_history(self, team_id: str, limit: int, db: Session) -> list[EloHistoryPoint]:
         rows = (
