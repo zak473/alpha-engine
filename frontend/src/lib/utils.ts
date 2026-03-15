@@ -25,10 +25,14 @@ export function fmtDelta(n: number, prefix = ""): string {
 
 export function sportColor(sport: string): string {
   switch (sport) {
-    case "soccer":  return colors.accentBlue;
-    case "tennis":  return colors.accentGreen;
-    case "esports": return colors.accentPurple;
-    default:        return colors.textMuted;
+    case "soccer":      return colors.accentBlue;
+    case "tennis":      return colors.accentGreen;
+    case "esports":     return colors.accentPurple;
+    case "basketball":  return colors.accentAmber;
+    case "baseball":    return colors.accentRed;
+    case "hockey":      return "#06b6d4";
+    case "horseracing": return "#e879f9";
+    default:            return colors.textMuted;
   }
 }
 
@@ -94,10 +98,14 @@ export function formatPercent(n: number, decimals = 1): string {
 
 export function sportLabel(sport: string): string {
   switch (sport) {
-    case "soccer":  return "Soccer";
-    case "tennis":  return "Tennis";
-    case "esports": return "Esports";
-    default:        return sport;
+    case "soccer":      return "Soccer";
+    case "tennis":      return "Tennis";
+    case "esports":     return "Esports";
+    case "basketball":  return "Basketball";
+    case "baseball":    return "Baseball";
+    case "hockey":      return "Hockey";
+    case "horseracing": return "Horse Racing";
+    default:            return sport;
   }
 }
 

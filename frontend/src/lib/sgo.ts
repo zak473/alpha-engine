@@ -8,12 +8,13 @@ import type { BettingMatch, BettingTeam, Market, Selection, SportSlug } from "@/
 // ─── League config ────────────────────────────────────────────────────────────
 
 export const SPORT_LEAGUES: Record<SportSlug, string[]> = {
-  soccer:     ["EPL", "LA_LIGA", "BUNDESLIGA", "FR_LIGUE_1", "IT_SERIA_A", "UEFA_CHAMPIONS_LEAGUE", "UEFA_EUROPA_LEAGUE", "MLS"],
-  basketball: ["NBA"],
-  baseball:   ["MLB"],
-  hockey:     ["NHL"],
-  tennis:     ["ATP", "WTA"],
-  esports:    [],
+  soccer:      ["EPL", "LA_LIGA", "BUNDESLIGA", "FR_LIGUE_1", "IT_SERIA_A", "UEFA_CHAMPIONS_LEAGUE", "UEFA_EUROPA_LEAGUE", "MLS"],
+  basketball:  ["NBA"],
+  baseball:    ["MLB"],
+  hockey:      ["NHL"],
+  tennis:      ["ATP", "WTA"],
+  esports:     [],
+  horseracing: [],
 };
 
 export const LEAGUE_LABELS: Record<string, string> = {

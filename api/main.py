@@ -30,6 +30,7 @@ from api.sports.esports import routes as esports_sport
 from api.sports.baseball import routes as baseball_sport
 from api.sports.basketball import routes as basketball_sport
 from api.sports.hockey import routes as hockey_sport
+from api.sports.horseracing import routes as horseracing_sport
 from config.settings import settings
 
 SECRET_KEY_IS_DEFAULT = (
@@ -202,9 +203,9 @@ async def lifespan(app: FastAPI):
     # ── API key health report ──────────────────────────────────────────────
     KEY_MAP = {
         "TENNIS_LIVE_API_KEY":   ("Tennis live scores (api-tennis.com)", settings.TENNIS_LIVE_API_KEY),
-
         "ODDS_API_KEY":          ("Real market odds + auto-pick", settings.ODDS_API_KEY),
         "HIGHLIGHTLY_API_KEY":   ("Highlightly (soccer/basketball/baseball/hockey)", settings.HIGHLIGHTLY_API_KEY),
+        "RACING_API_USERNAME":   ("Horse racing (theracingapi.com)", settings.RACING_API_USERNAME),
     }
     active   = [(k, desc) for k, (desc, val) in KEY_MAP.items() if val]
     inactive = [(k, desc) for k, (desc, val) in KEY_MAP.items() if not val]
@@ -312,6 +313,7 @@ app.include_router(esports_sport.router,     prefix=settings.API_PREFIX)
 app.include_router(baseball_sport.router,    prefix=settings.API_PREFIX)
 app.include_router(basketball_sport.router,  prefix=settings.API_PREFIX)
 app.include_router(hockey_sport.router,      prefix=settings.API_PREFIX)
+app.include_router(horseracing_sport.router, prefix=settings.API_PREFIX)
 
 # ─── Shared endpoints ─────────────────────────────────────────────────────
 

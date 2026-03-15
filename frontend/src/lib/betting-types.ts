@@ -4,7 +4,7 @@
  * map SportMatchListItem → BettingMatch so no backend changes are needed.
  */
 
-export type SportSlug = "soccer" | "tennis" | "esports" | "basketball" | "baseball" | "hockey";
+export type SportSlug = "soccer" | "tennis" | "esports" | "basketball" | "baseball" | "hockey" | "horseracing";
 
 export type MatchStatus = "live" | "upcoming" | "finished" | "cancelled";
 
@@ -84,10 +84,11 @@ export const DEFAULT_BETTING_FILTER: BettingFilter = {
 
 // Sport display config
 export const SPORT_CONFIG: Record<SportSlug, { label: string; color: string; icon: string }> = {
-  soccer:     { label: "Soccer",     color: "#3b82f6", icon: "⚽" },
-  tennis:     { label: "Tennis",     color: "#10d992", icon: "🎾" },
-  esports:    { label: "Esports",    color: "#a855f7", icon: "🎮" },
-  basketball: { label: "Basketball", color: "#f59e0b", icon: "🏀" },
-  baseball:   { label: "Baseball",   color: "#ef4444", icon: "⚾" },
-  hockey:     { label: "Hockey",     color: "#06b6d4", icon: "🏒" },
+  soccer:      { label: "Soccer",       color: "#3b82f6", icon: "⚽" },
+  tennis:      { label: "Tennis",       color: "#10d992", icon: "🎾" },
+  esports:     { label: "Esports",      color: "#a855f7", icon: "🎮" },
+  basketball:  { label: "Basketball",   color: "#f59e0b", icon: "🏀" },
+  baseball:    { label: "Baseball",     color: "#ef4444", icon: "⚾" },
+  hockey:      { label: "Hockey",       color: "#06b6d4", icon: "🏒" },
+  horseracing: { label: "Horse Racing", color: "#e879f9", icon: "🏇" },
 };

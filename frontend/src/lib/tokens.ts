@@ -16,11 +16,12 @@ export const colors = {
   negative: "#ef4444",
   warning:  "#f59e0b",
   info:     "#64748b",
-  soccer:     "#2edb6c",
-  tennis:     "#22c55e",
-  esports:    "#8b5cf6",
-  basketball: "#f59e0b",
-  baseball:   "#ef4444",
+  soccer:      "#2edb6c",
+  tennis:      "#22c55e",
+  esports:     "#8b5cf6",
+  basketball:  "#f59e0b",
+  baseball:    "#ef4444",
+  horseracing: "#e879f9",
 
   surfaceBase:    "#08120e",
   surfaceRaised:  "rgba(255,255,255,0.04)",
@@ -74,11 +75,12 @@ export const chartDefaults = {
 
 export function sportColor(sport: string): string {
   const map: Record<string, string> = {
-    soccer:     colors.soccer,
-    tennis:     colors.tennis,
-    esports:    colors.esports,
-    basketball: colors.basketball,
-    baseball:   colors.baseball,
+    soccer:      colors.soccer,
+    tennis:      colors.tennis,
+    esports:     colors.esports,
+    basketball:  colors.basketball,
+    baseball:    colors.baseball,
+    horseracing: colors.horseracing,
   };
   return map[sport.toLowerCase()] ?? colors.text1;
 }

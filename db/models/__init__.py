@@ -28,6 +28,7 @@ from db.models.challenges import (
 from db.models.baseball import BaseballTeamMatchStats, EventContext
 from db.models.tipsters import TipsterTip, TipsterFollow
 from db.models.notifications import UserNotification
+from db.models.horseracing import HorseRace, HorseRunner
 
 __all__ = [
     "Sport", "Competition", "Season", "Venue",
@@ -48,4 +49,5 @@ __all__ = [
     "BaseballTeamMatchStats", "EventContext",
     "TipsterTip", "TipsterFollow",
     "UserNotification",
+    "HorseRace", "HorseRunner",
 ]

@@ -95,6 +95,15 @@ def _job_fetch_live() -> None:
 
     # Baseball, Hockey — handled by Highlightly (_job_fetch_highlightly runs every 10m)
 
+    # Horse racing
+    try:
+        from pipelines.horseracing.fetch_live import fetch_all as fetch_horseracing
+        n = fetch_horseracing()
+        total += n
+        log.info("[scheduler] horseracing: %d races ingested.", n)
+    except Exception as exc:
+        log.error("[scheduler] horseracing fetch failed: %s", exc, exc_info=True)
+
     log.info("[scheduler] fetch_live done — %d total rows.", total)
 
 

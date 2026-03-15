@@ -17,12 +17,13 @@ const NAV = [
 ];
 
 const SPORTS = [
-  { label: "Soccer", href: "/sports/soccer/matches", color: "#60a5fa" },
-  { label: "Tennis", href: "/sports/tennis/matches", color: "#2edb6c" },
-  { label: "Esports", href: "/sports/esports/matches", color: "#a855f7" },
-  { label: "Basketball", href: "/sports/basketball/matches", color: "#f59e0b" },
-  { label: "Baseball", href: "/sports/baseball/matches", color: "#ef4444" },
-  { label: "Hockey", href: "/sports/hockey/matches", color: "#06b6d4" },
+  { label: "Soccer",       href: "/sports/soccer/matches",      color: "#60a5fa" },
+  { label: "Tennis",       href: "/sports/tennis/matches",      color: "#2edb6c" },
+  { label: "Esports",      href: "/sports/esports/matches",     color: "#a855f7" },
+  { label: "Basketball",   href: "/sports/basketball/matches",  color: "#f59e0b" },
+  { label: "Baseball",     href: "/sports/baseball/matches",    color: "#ef4444" },
+  { label: "Hockey",       href: "/sports/hockey/matches",      color: "#06b6d4" },
+  { label: "Horse Racing", href: "/sports/horseracing",         color: "#e879f9" },
 ];
 
 export function Sidebar() {
