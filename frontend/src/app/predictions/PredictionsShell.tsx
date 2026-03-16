@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BrainCircuit, Zap, ChevronRight } from "lucide-react";
+import { BrainCircuit, Zap, ChevronRight, Eye, EyeOff } from "lucide-react";
 import { SPORT_LEAGUES, fetchSGOEvents, sgoEventToMatch, LEAGUE_LABELS } from "@/lib/sgo";
 import type { BettingMatch } from "@/lib/betting-types";
 import type { SportSlug } from "@/lib/api";
@@ -11,14 +11,18 @@ import { cn } from "@/lib/utils";
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-const SPORTS: { value: string; label: string; icon: string }[] = [
-  { value: "all",        label: "All sports",  icon: "🏆" },
-  { value: "soccer",     label: "Soccer",      icon: "⚽" },
-  { value: "tennis",     label: "Tennis",      icon: "🎾" },
-  { value: "basketball", label: "Basketball",  icon: "🏀" },
-  { value: "baseball",   label: "Baseball",    icon: "⚾" },
-  { value: "hockey",     label: "Hockey",      icon: "🏒" },
+const SPORT_META: { value: string; label: string; icon: string }[] = [
+  { value: "all",        label: "All",        icon: "🏆" },
+  { value: "soccer",     label: "Soccer",     icon: "⚽" },
+  { value: "tennis",     label: "Tennis",     icon: "🎾" },
+  { value: "basketball", label: "Basketball", icon: "🏀" },
+  { value: "baseball",   label: "Baseball",   icon: "⚾" },
+  { value: "hockey",     label: "Hockey",     icon: "🏒" },
 ];
+
+const SPORT_ICONS: Record<string, string> = Object.fromEntries(
+  SPORT_META.map(({ value, icon }) => [value, icon])
+);
 
 const CONF_THRESHOLDS = [
   { value: "0",   label: "All"  },
@@ -61,10 +65,9 @@ function teamsMatch(a: string, b: string): boolean {
 async function fetchBackendForSport(sport: SportSlug): Promise<BackendItem[]> {
   try {
     const now = new Date();
-    const dateFrom = now.toISOString();
     const dateTo = new Date(now.getTime() + 48 * 3600_000).toISOString();
     const res = await fetch(
-      `/api/v1/sports/${sport}/matches?date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}&limit=200`,
+      `/api/v1/sports/${sport}/matches?date_from=${encodeURIComponent(now.toISOString())}&date_to=${encodeURIComponent(dateTo)}&limit=200`,
       { cache: "no-store" }
     );
     if (!res.ok) return [];
@@ -94,131 +97,161 @@ function mergeBackend(match: BettingMatch, items: BackendItem[]): BettingMatch {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function fmtKickoff(iso: string) {
+function fmtTime(iso: string) {
   const d = new Date(iso);
-  return (
-    d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) +
-    " · " +
-    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) +
-    " UTC"
-  );
+  return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) + " UTC";
 }
 
-function ConfBar({ conf }: { conf: number }) {
-  const pct = Math.round(conf * 100);
-  const bg = conf >= 0.7 ? "bg-emerald-400" : conf >= 0.5 ? "bg-amber-400" : "bg-red-400";
-  const textCol = conf >= 0.7 ? "text-emerald-300" : conf >= 0.5 ? "text-amber-400" : "text-red-400";
-  return (
-    <div className="flex items-center gap-2 min-w-[90px]">
-      <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
-        <div className={cn("h-full rounded-full", bg)} style={{ width: `${pct}%` }} />
-      </div>
-      <span className={cn("font-mono text-xs font-bold tabular-nums w-8 text-right", textCol)}>{pct}%</span>
-    </div>
-  );
+function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const tomorrowStr = new Date(now.getTime() + 86400_000).toISOString().slice(0, 10);
+  const matchStr = d.toISOString().slice(0, 10);
+  if (matchStr === todayStr) return "Today";
+  if (matchStr === tomorrowStr) return "Tomorrow";
+  return d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" });
 }
 
-// ── Prediction Card ──────────────────────────────────────────────────────────
+// ── Card ─────────────────────────────────────────────────────────────────────
 
-function MatchCard({ match, sport }: { match: BettingMatch; sport: string }) {
-  const href = `/sports/${sport}/matches/${match.id}`;
-  const hasModel = match.pHome != null;
-  const hPct = hasModel ? Math.round((match.pHome ?? 0) * 100) : null;
-  const aPct = hasModel ? Math.round((match.pAway ?? 0) * 100) : null;
-  const dPct = hasModel && match.pDraw != null ? Math.round(match.pDraw * 100) : null;
+type MatchWithSport = BettingMatch & { sport: SportSlug };
 
-  // Get moneyline odds from featured markets
+function MatchCard({ match }: { match: MatchWithSport }) {
+  const href = `/sports/${match.sport}/matches/${match.id}`;
+
+  const hasProbabilities = match.pHome != null;
+  const hasConfidence = match.modelConfidence != null;
+  const hPct = hasProbabilities ? Math.round((match.pHome ?? 0) * 100) : null;
+  const aPct = hasProbabilities ? Math.round((match.pAway ?? 0) * 100) : null;
+  const dPct = hasProbabilities && match.pDraw != null ? Math.round(match.pDraw * 100) : null;
+  const conf = match.modelConfidence ?? 0;
+
+  // Moneyline from first featured market
   const ml = match.featuredMarkets?.[0];
   const homeOdds = ml?.selections[0]?.odds;
   const awayOdds = ml?.selections[ml.selections.length - 1]?.odds;
 
-  const conf = match.modelConfidence;
+  const isHighConf = hasConfidence && conf >= 0.7;
+  const confColor = conf >= 0.7 ? "text-emerald-300" : conf >= 0.5 ? "text-amber-400" : "text-red-400";
+  const confBarBg = conf >= 0.7 ? "bg-emerald-400" : conf >= 0.5 ? "bg-amber-400" : "bg-red-400";
+
+  const leagueLabel = LEAGUE_LABELS[match.league] ?? match.league;
+  const sportIcon = SPORT_ICONS[match.sport] ?? "🏆";
 
   return (
     <Link
       href={href}
-      className="group rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300/25 hover:shadow-[0_24px_60px_rgba(0,0,0,0.26)] block"
+      className={cn(
+        "group relative block overflow-hidden rounded-[28px] border p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_60px_rgba(0,0,0,0.32)]",
+        isHighConf
+          ? "border-emerald-400/25 bg-[linear-gradient(135deg,rgba(54,242,143,0.08),rgba(54,242,143,0.03))] hover:border-emerald-400/40"
+          : "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] hover:border-emerald-300/20"
+      )}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-white/55">
-          {LEAGUE_LABELS[match.league] ?? match.league}
-        </span>
-        <span className="text-[11px] text-white/35">{fmtKickoff(match.startTime)}</span>
+      {/* High confidence glow */}
+      {isHighConf && (
+        <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-[radial-gradient(circle_at_top_left,rgba(54,242,143,0.08),transparent_60%)]" />
+      )}
+
+      {/* Header row */}
+      <div className="relative flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-sm">{sportIcon}</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
+            {leagueLabel}
+          </span>
+          {isHighConf && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+              <Zap size={9} />
+              High confidence
+            </span>
+          )}
+        </div>
+        <span className="shrink-0 font-mono text-[11px] text-white/30">{fmtTime(match.startTime)}</span>
       </div>
 
-      {/* Teams + probs */}
-      <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+      {/* Teams */}
+      <div className="relative mt-4 grid grid-cols-[1fr_32px_1fr] items-start gap-2">
         {/* Home */}
         <div>
-          <p className="text-sm font-semibold text-white leading-tight">{match.home.name}</p>
-          {hasModel ? (
-            <p className="mt-1 font-mono text-2xl font-bold text-emerald-300 tabular-nums">{hPct}%</p>
-          ) : (
-            <p className="mt-1 text-xs text-white/30">—</p>
+          <p className="text-[13px] font-semibold leading-snug text-white">{match.home.name}</p>
+          {hasProbabilities ? (
+            <p className={cn("mt-1.5 font-mono text-[26px] font-bold tabular-nums leading-none",
+              (hPct ?? 0) > (aPct ?? 0) ? "text-emerald-300" : "text-white/60"
+            )}>{hPct}%</p>
+          ) : homeOdds ? (
+            <p className="mt-1.5 font-mono text-xl font-bold tabular-nums leading-none text-white/50">{homeOdds.toFixed(2)}</p>
+          ) : null}
+          {hasProbabilities && homeOdds && (
+            <p className="mt-0.5 font-mono text-[11px] text-white/30">{homeOdds.toFixed(2)}</p>
           )}
-          {homeOdds && <p className="mt-0.5 font-mono text-xs text-white/35">{homeOdds.toFixed(2)} odds</p>}
         </div>
 
-        {/* Center */}
-        <div className="flex flex-col items-center gap-1">
+        {/* VS divider */}
+        <div className="flex h-full flex-col items-center pt-1">
+          <span className="text-[11px] font-medium text-white/25">vs</span>
           {dPct != null && (
-            <div className="rounded-[24px] border border-white/8 bg-black/20 px-4 py-3 text-center">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">Draw</p>
-              <p className="font-mono text-sm font-bold text-white tabular-nums">{dPct}%</p>
+            <div className="mt-2 rounded-xl border border-white/8 bg-black/20 px-1.5 py-2 text-center">
+              <p className="text-[9px] font-semibold uppercase text-white/35">D</p>
+              <p className="font-mono text-xs font-bold text-white/60 tabular-nums">{dPct}%</p>
             </div>
           )}
-          <span className="text-[11px] font-medium text-white/35">vs</span>
         </div>
 
         {/* Away */}
         <div className="text-right">
-          <p className="text-sm font-semibold text-white leading-tight">{match.away.name}</p>
-          {hasModel ? (
-            <p className="mt-1 font-mono text-2xl font-bold text-amber-400 tabular-nums">{aPct}%</p>
-          ) : (
-            <p className="mt-1 text-xs text-white/30">—</p>
+          <p className="text-[13px] font-semibold leading-snug text-white">{match.away.name}</p>
+          {hasProbabilities ? (
+            <p className={cn("mt-1.5 font-mono text-[26px] font-bold tabular-nums leading-none",
+              (aPct ?? 0) > (hPct ?? 0) ? "text-emerald-300" : "text-white/60"
+            )}>{aPct}%</p>
+          ) : awayOdds ? (
+            <p className="mt-1.5 font-mono text-xl font-bold tabular-nums leading-none text-white/50">{awayOdds.toFixed(2)}</p>
+          ) : null}
+          {hasProbabilities && awayOdds && (
+            <p className="mt-0.5 font-mono text-[11px] text-white/30">{awayOdds.toFixed(2)}</p>
           )}
-          {awayOdds && <p className="mt-0.5 font-mono text-xs text-white/35">{awayOdds.toFixed(2)} odds</p>}
         </div>
       </div>
 
-      {/* Prob bar */}
-      {hasModel && (
-        <div className="mt-4 flex h-2 w-full overflow-hidden rounded-full bg-white/10">
-          <div className="h-full bg-emerald-400 transition-all" style={{ width: `${hPct}%` }} />
+      {/* Probability bar */}
+      {hasProbabilities && (
+        <div className="relative mt-4 flex h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]">
+          <div
+            className={cn("h-full transition-all", (hPct ?? 0) >= (aPct ?? 0) ? "bg-emerald-400" : "bg-white/40")}
+            style={{ width: `${hPct}%` }}
+          />
           {dPct != null && <div className="h-full bg-white/20" style={{ width: `${dPct}%` }} />}
-          <div className="h-full flex-1 bg-amber-400" />
+          <div className={cn("h-full flex-1", (aPct ?? 0) > (hPct ?? 0) ? "bg-emerald-400" : "bg-amber-400/60")} />
         </div>
       )}
 
       {/* Footer */}
-      <div className="mt-4 flex items-center justify-between gap-3">
-        {conf != null ? (
+      <div className="relative mt-4 flex items-center justify-between gap-3">
+        {hasConfidence ? (
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40">Confidence</span>
-            <ConfBar conf={conf} />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/35">Confidence</span>
+            <div className="flex items-center gap-1.5">
+              <div className="h-1.5 w-20 overflow-hidden rounded-full bg-white/10">
+                <div className={cn("h-full rounded-full", confBarBg)} style={{ width: `${Math.round(conf * 100)}%` }} />
+              </div>
+              <span className={cn("font-mono text-xs font-bold tabular-nums", confColor)}>
+                {Math.round(conf * 100)}%
+              </span>
+            </div>
           </div>
+        ) : hasProbabilities ? (
+          <span className="text-[11px] text-white/25">ELO estimate</span>
         ) : (
-          <span className="text-[11px] text-white/25">No model prediction</span>
+          <span className="text-[11px] text-white/20">No model prediction</span>
         )}
-        <div className="flex items-center gap-1 text-[12px] font-semibold text-white/72 opacity-0 transition group-hover:opacity-100">
-          View <ChevronRight size={13} />
-        </div>
+
+        <span className="flex items-center gap-1 text-[11px] font-semibold text-white/40 opacity-0 transition-opacity group-hover:opacity-100">
+          View <ChevronRight size={12} />
+        </span>
       </div>
     </Link>
-  );
-}
-
-// ── Empty state ──────────────────────────────────────────────────────────────
-
-function EmptyState() {
-  return (
-    <div className="flex min-h-[280px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
-      <BrainCircuit size={28} className="text-white/35" />
-      <div className="mt-4 text-xl font-semibold text-white">No upcoming matches</div>
-      <div className="mt-2 max-w-md text-sm text-white/50">No fixtures found in the next 48 hours for this selection.</div>
-    </div>
   );
 }
 
@@ -255,6 +288,23 @@ function PillGroup<T extends string>({
   );
 }
 
+// ── Day section ───────────────────────────────────────────────────────────────
+
+function DaySection({ label, matches }: { label: string; matches: MatchWithSport[] }) {
+  return (
+    <div>
+      <div className="mb-3 flex items-center gap-3">
+        <h3 className="text-[13px] font-bold text-white/60">{label}</h3>
+        <div className="h-px flex-1 bg-white/[0.06]" />
+        <span className="text-[11px] text-white/30">{matches.length} fixture{matches.length !== 1 ? "s" : ""}</span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {matches.map((m) => <MatchCard key={m.id} match={m} />)}
+      </div>
+    </div>
+  );
+}
+
 // ── Main shell ───────────────────────────────────────────────────────────────
 
 const ALL_SPORT_LEAGUES: { sport: SportSlug; leagueID: string }[] = Object.entries(SPORT_LEAGUES)
@@ -265,10 +315,12 @@ const ALL_SPORT_LEAGUES: { sport: SportSlug; leagueID: string }[] = Object.entri
 export function PredictionsShell({ initialSport }: { initialSport: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  type MatchWithSport = BettingMatch & { sport: SportSlug };
-  const [matches, setMatches] = useState<MatchWithSport[]>([]);
+
+  type MatchWithSportLocal = BettingMatch & { sport: SportSlug };
+  const [matches, setMatches] = useState<MatchWithSportLocal[]>([]);
   const [loading, setLoading] = useState(true);
   const [minConf, setMinConf] = useState("0");
+  const [showAll, setShowAll] = useState(false);
 
   const sport = searchParams.get("sport") ?? initialSport;
 
@@ -282,15 +334,14 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
 
   useEffect(() => {
     setLoading(true);
-
     const leagues = sport === "all"
       ? ALL_SPORT_LEAGUES
       : ALL_SPORT_LEAGUES.filter((l) => l.sport === sport);
 
     if (!leagues.length) { setLoading(false); return; }
 
-    // Fetch SGO events + backend predictions in parallel
     const sportSlugs = Array.from(new Set(leagues.map((l) => l.sport)));
+
     Promise.all([
       Promise.all(leagues.map(({ leagueID, sport: s }) =>
         fetchSGOEvents(leagueID).then((events) =>
@@ -304,7 +355,7 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
       const backendMap = Object.fromEntries(backendBySport.map(({ sport: s, items }) => [s, items]));
       const now = Date.now();
       const cutoff = now + 48 * 3600_000;
-      const merged: MatchWithSport[] = sgoMatches
+      const merged: MatchWithSportLocal[] = sgoMatches
         .filter((m) => {
           const t = new Date(m.startTime).getTime();
           return t >= now && t <= cutoff;
@@ -317,93 +368,117 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
   }, [sport]);
 
   const threshold = parseFloat(minConf);
-  const items = threshold > 0
-    ? matches.filter((m) => (m.modelConfidence ?? 0) >= threshold)
-    : matches;
 
+  // Filter: if not showAll, only show matches with predictions or high odds interest
+  const base = showAll ? matches : matches.filter((m) => m.pHome != null);
+  const items = threshold > 0
+    ? base.filter((m) => (m.modelConfidence ?? 0) >= threshold)
+    : base;
+
+  const withConf = matches.filter((m) => m.modelConfidence != null).length;
   const highConf = matches.filter((m) => (m.modelConfidence ?? 0) >= 0.7).length;
-  const withModel = matches.filter((m) => m.modelConfidence != null).length;
+
+  // Group by day
+  const grouped: { label: string; matches: MatchWithSportLocal[] }[] = [];
+  for (const m of items) {
+    const label = dayLabel(m.startTime);
+    const existing = grouped.find((g) => g.label === label);
+    if (existing) existing.matches.push(m);
+    else grouped.push({ label, matches: [m] });
+  }
 
   return (
     <div className="pb-12">
 
       {/* Hero */}
-      <section className="overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.10),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-5 shadow-[0_26px_70px_rgba(0,0,0,0.24)] backdrop-blur xl:p-7">
+      <section className="overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.10),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-5 shadow-[0_26px_70px_rgba(0,0,0,0.24)] xl:p-7">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <div className="inline-flex items-center rounded-full border border-emerald-300/16 bg-emerald-300/8 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200">
-              Model predictions
+              Model predictions · Next 48 hours
             </div>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-white lg:text-[2.7rem]">AI-Powered Match Predictions</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-white/58">
-              Win probabilities, fair odds, and confidence scores generated by our machine learning models across every sport.
+            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-white lg:text-[2.5rem]">
+              AI-Powered Tip Finder
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-white/55">
+              Win probabilities and confidence scores from our ML models, overlaid on live SGO fixtures across every sport.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-[22px] border border-white/8 bg-white/[0.05] px-4 py-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">With predictions</div>
-              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">
-                {loading ? "—" : withModel}
+          <div className="grid grid-cols-3 gap-3 xl:shrink-0">
+            {[
+              { label: "Total fixtures", value: loading ? "—" : String(matches.length), color: "text-white" },
+              { label: "With predictions", value: loading ? "—" : String(withConf), color: "text-blue-300" },
+              { label: "High confidence", value: loading ? "—" : String(highConf), color: "text-emerald-300" },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="rounded-[22px] border border-white/8 bg-white/[0.05] px-4 py-4 text-center">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">{label}</div>
+                <div className={cn("mt-2 text-2xl font-bold tabular-nums", color)}>{value}</div>
               </div>
-            </div>
-            <div className="rounded-[22px] border border-white/8 bg-white/[0.05] px-4 py-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">High confidence</div>
-              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-emerald-300">
-                {loading ? "—" : highConf}
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Filters */}
       <div className="mt-4 overflow-hidden rounded-[28px] border border-white/8 bg-white/[0.03] p-4">
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <PillGroup
             label="Sport"
-            options={SPORTS}
+            options={SPORT_META}
             active={sport}
             onChange={(v) => navigate({ sport: v })}
           />
           <PillGroup
-            label="Min confidence"
+            label="Confidence"
             options={CONF_THRESHOLDS}
             active={minConf}
             onChange={setMinConf}
           />
+          <button
+            onClick={() => setShowAll((v) => !v)}
+            className={cn(
+              "ml-auto flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all",
+              showAll
+                ? "border-white/15 bg-white/[0.06] text-white/70"
+                : "border-white/8 text-white/40 hover:text-white/60"
+            )}
+          >
+            {showAll ? <Eye size={13} /> : <EyeOff size={13} />}
+            {showAll ? "Showing all" : "Predictions only"}
+          </button>
         </div>
       </div>
 
-      {/* Results count */}
-      {!loading && items.length > 0 && (
-        <div className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-white/50">
-            Showing <span className="font-semibold text-white">{items.length}</span> fixture{items.length !== 1 ? "s" : ""} in the next 48 hours
-          </p>
-          {threshold > 0 && (
-            <p className="text-xs text-white/35 flex items-center gap-1">
-              <Zap size={11} /> Filtered to {Math.round(threshold * 100)}%+ confidence
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Cards */}
-      <div className="mt-4">
+      {/* Content */}
+      <div className="mt-6 space-y-8">
         {loading ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="rounded-[28px] border border-white/8 bg-white/[0.02] h-52 animate-pulse" />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div key={i} className="h-52 animate-pulse rounded-[28px] border border-white/6 bg-white/[0.02]" />
             ))}
           </div>
-        ) : items.length === 0 ? (
-          <EmptyState />
+        ) : grouped.length === 0 ? (
+          <div className="flex min-h-[280px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.02] p-8 text-center">
+            <BrainCircuit size={28} className="text-white/30" />
+            <div className="mt-4 text-xl font-semibold text-white">No predictions found</div>
+            <div className="mt-2 text-sm text-white/40">
+              {threshold > 0
+                ? `No matches meet the ${Math.round(threshold * 100)}%+ confidence threshold.`
+                : "No upcoming fixtures with model predictions in the next 48 hours."}
+            </div>
+            {!showAll && (
+              <button
+                onClick={() => setShowAll(true)}
+                className="mt-4 flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[12px] text-white/50 hover:text-white/70 transition-colors"
+              >
+                <Eye size={13} /> Show all fixtures
+              </button>
+            )}
+          </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {items.map((m) => (
-              <MatchCard key={m.id} match={m} sport={m.sport} />
-            ))}
-          </div>
+          grouped.map(({ label, matches: dayMatches }) => (
+            <DaySection key={label} label={label} matches={dayMatches} />
+          ))
         )}
       </div>
     </div>
