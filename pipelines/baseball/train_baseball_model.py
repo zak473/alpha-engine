@@ -135,19 +135,39 @@ def train(version: Optional[str] = None) -> str:
         if len(y_train) < 5:
             raise ValueError("Not enough training samples after split.")
 
-        # Build pipeline: scale → LR → Platt calibration
+        # Scale features to check sparsity of baseball-specific stats
+        # (indices 13+ are baseball-specific rolling stats)
+        BASE_FEATURE_COUNT = 13
+        baseball_block = X_train[:, BASE_FEATURE_COUNT:]
+        nonzero_frac = (baseball_block != 0).mean()
+        if nonzero_frac < 0.1:
+            # Stats are >90% zero — not yet populated; train on base features only
+            log.warning(
+                "Baseball stats block is %.0f%% zero — using base features only.",
+                (1 - nonzero_frac) * 100,
+            )
+            X_train = X_train[:, :BASE_FEATURE_COUNT]
+            X_eval  = X_eval[:,  :BASE_FEATURE_COUNT]
+
+        # Regularisation: C scales inversely with dataset size.
+        # With <200 samples, use aggressive regularisation to avoid overfitting.
+        C_value = 0.05 if len(y_train) < 200 else 0.3 if len(y_train) < 500 else 1.0
+        log.info("Using C=%.3f for %d training samples.", C_value, len(y_train))
+
         base_lr = LogisticRegression(
             solver="lbfgs",
-            max_iter=1000,
-            C=1.0,
+            max_iter=2000,
+            C=C_value,
+            class_weight="balanced",
             random_state=42,
         )
         pipeline = Pipeline([
             ("scaler", StandardScaler()),
             ("lr", base_lr),
         ])
+        cv_folds = min(3, len(y_train) // 5) if len(y_train) < 50 else min(5, len(y_train))
         calibrated = CalibratedClassifierCV(
-            pipeline, method="sigmoid", cv=min(5, len(y_train))
+            pipeline, method="sigmoid", cv=max(2, cv_folds)
         )
         calibrated.fit(X_train, y_train)
         log.info("Model trained and calibrated.")
@@ -218,10 +238,10 @@ def train(version: Optional[str] = None) -> str:
             artifact_path=str(artefact_path),
             feature_names=FEATURE_NAMES,
             hyperparams={
-                "C": 1.0,
+                "C": C_value,
                 "solver": "lbfgs",
                 "calibration": "sigmoid",
-                "cv": 5,
+                "class_weight": "balanced",
             },
             n_train_samples=len(y_train),
             metrics=metrics,

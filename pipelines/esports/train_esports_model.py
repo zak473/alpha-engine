@@ -33,8 +33,10 @@ from sklearn.preprocessing import StandardScaler
 from db.models.mvp import CoreMatch, ModelRegistry
 from db.session import SessionLocal
 from evaluation.metrics import brier, logloss
-from pipelines.common.feature_engineering import (
+from pipelines.esports.feature_engineering import (
     FEATURE_NAMES,
+    OUTCOME_LABELS,
+    LABEL_OUTCOMES,
     build_feature_vector,
 )
 
@@ -45,18 +47,6 @@ ARTEFACT_DIR = Path(__file__).resolve().parents[2] / "artefacts"
 ARTEFACT_DIR.mkdir(exist_ok=True)
 
 _SPORT = "esports"
-
-# Binary outcome map: label strings → int class index
-# "H" and "home_win" → 0 (home wins)
-# "A" and "away_win" → 1 (away wins)
-# anything else (draw, None, unknown) → None (skip)
-OUTCOME_LABELS: dict[str, int] = {
-    "H":        0,
-    "home_win": 0,
-    "A":        1,
-    "away_win": 1,
-}
-LABEL_OUTCOMES: dict[int, str] = {0: "home_win", 1: "away_win"}
 
 
 # ---------------------------------------------------------------------------
@@ -147,10 +137,13 @@ def train(version: Optional[str] = None) -> str:
             raise ValueError("Not enough training samples after split.")
 
         # Build pipeline: scale → LR (binary) → Platt calibration
+        # C=0.5: moderate regularisation — esports signal is noisy
+        # class_weight="balanced": handles any win/loss imbalance
         base_lr = LogisticRegression(
             solver="lbfgs",
             max_iter=1000,
-            C=1.0,
+            C=0.5,
+            class_weight="balanced",
             random_state=42,
         )
         pipeline = Pipeline([
@@ -215,10 +208,10 @@ def train(version: Optional[str] = None) -> str:
             sport=_SPORT,
             model_name=model_name,
             version=version,
-            algorithm="logistic_regression",
+            algorithm="logistic_regression_calibrated",
             artifact_path=str(artefact_path),
             feature_names=FEATURE_NAMES,
-            hyperparams={"C": 1.0, "solver": "lbfgs", "calibration": "sigmoid", "cv": 5},
+            hyperparams={"C": 0.5, "solver": "lbfgs", "calibration": "sigmoid", "cv": 5, "class_weight": "balanced"},
             n_train_samples=len(y_train),
             metrics=metrics,
             is_live=True,
