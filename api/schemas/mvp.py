@@ -76,7 +76,7 @@ class PredictionSchema(BaseModel):
     probabilities: ProbabilitiesSchema
     fair_odds: FairOddsSchema
     market_odds: Optional[FairOddsSchema] = None  # sharpest available bookmaker odds
-    confidence: int = Field(..., ge=0, le=100)
+    confidence: float = Field(..., ge=0, le=1)
     key_drivers: list[KeyDriverSchema]
     model: Optional[ModelMetaSchema]
     simulation: Optional[SimulationSchema]

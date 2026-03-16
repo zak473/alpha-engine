@@ -129,7 +129,7 @@ def _build_prediction_schema(
             away_win=pred.fair_odds_away,
         ),
         market_odds=market_odds,
-        confidence=pred.confidence,
+        confidence=round(pred.confidence / 100, 4),
         key_drivers=drivers,
         model=ModelMetaSchema(
             version=registry.model_name,
@@ -205,7 +205,7 @@ def _build_fixture_schema(session: Session, match: CoreMatch) -> PredictionSchem
         ),
         probabilities=probs,
         fair_odds=fair_odds,
-        confidence=confidence,
+        confidence=round(confidence / 100, 4),
         key_drivers=[],
         model=None,
         simulation=None,
