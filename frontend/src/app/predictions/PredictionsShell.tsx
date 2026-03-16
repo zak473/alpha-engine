@@ -9,11 +9,6 @@ import { cn } from "@/lib/utils";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-const SPORT_SLUGS: Record<string, string> = {
-  soccer: "soccer", tennis: "tennis", esports: "esports",
-  basketball: "basketball", baseball: "baseball",
-};
-
 const SPORT_EMOJI: Record<string, string> = {
   soccer: "⚽", tennis: "🎾", esports: "🎮", basketball: "🏀", baseball: "⚾",
 };
@@ -111,12 +106,6 @@ const STATUSES = [
   { value: "live",      label: "Live"     },
 ];
 
-const RANGES = [
-  { value: "today", label: "Today"   },
-  { value: "7d",    label: "7 days"  },
-  { value: "30d",   label: "30 days" },
-];
-
 const CONF_THRESHOLDS = [
   { value: "0",   label: "All"  },
   { value: "0.5", label: "50%+" },
@@ -159,8 +148,7 @@ function PillGroup<T extends string>({
 // ── Prediction Card ───────────────────────────────────────────────────────
 
 function PredictionCard({ pred }: { pred: MvpPrediction }) {
-  const sportSlug = SPORT_SLUGS[pred.sport] ?? pred.sport;
-  const detailHref = `/sports/${sportSlug}/matches/${pred.event_id}`;
+  const detailHref = `/matches/${pred.event_id}`;
   const emoji = SPORT_EMOJI[pred.sport] ?? "🏆";
   const p = pred.probabilities;
   const fo = pred.fair_odds;
@@ -168,9 +156,6 @@ function PredictionCard({ pred }: { pred: MvpPrediction }) {
   const aPct = Math.round(p.away_win * 100);
   const dPct = p.draw != null ? Math.round(p.draw * 100) : null;
   const isLive = pred.status === "live";
-  const confColor = pred.confidence >= 0.7 ? "text-emerald-300" : pred.confidence >= 0.5 ? "text-amber-400" : "text-red-400";
-  const confBg   = pred.confidence >= 0.7 ? "bg-emerald-400/10 border-emerald-400/20" : pred.confidence >= 0.5 ? "bg-amber-400/10 border-amber-400/20" : "bg-red-400/10 border-red-400/20";
-
   return (
     <Link
       href={detailHref}
@@ -235,9 +220,6 @@ function PredictionCard({ pred }: { pred: MvpPrediction }) {
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40">Confidence</span>
           <ConfBar conf={pred.confidence} />
-          <span className={cn("rounded-full border px-2 py-0.5 font-mono text-[11px] font-bold tabular-nums", confBg, confColor)}>
-            {Math.round(pred.confidence * 100)}%
-          </span>
         </div>
         <div className="flex items-center gap-1 text-[12px] font-semibold text-white/72 opacity-0 transition group-hover:opacity-100">
           View match <ChevronRight size={13} />
@@ -265,10 +247,9 @@ interface Props {
   initialData: MvpPredictionList;
   initialSport: string;
   initialStatus: string;
-  initialRange: string;
 }
 
-export function PredictionsShell({ initialData, initialSport, initialStatus, initialRange }: Props) {
+export function PredictionsShell({ initialData, initialSport, initialStatus }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
@@ -276,7 +257,6 @@ export function PredictionsShell({ initialData, initialSport, initialStatus, ini
 
   const sport  = searchParams.get("sport")  ?? initialSport;
   const status = searchParams.get("status") ?? initialStatus;
-  const range  = searchParams.get("range")  ?? initialRange;
 
   function navigate(updates: Record<string, string>) {
     const p = new URLSearchParams(searchParams.toString());
@@ -343,12 +323,6 @@ export function PredictionsShell({ initialData, initialSport, initialStatus, ini
             options={STATUSES as { value: string; label: string }[]}
             active={status}
             onChange={(v) => navigate({ status: v })}
-          />
-          <PillGroup
-            label="Range"
-            options={RANGES as { value: string; label: string }[]}
-            active={range}
-            onChange={(v) => navigate({ range: v })}
           />
           <PillGroup
             label="Min confidence"
