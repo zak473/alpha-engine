@@ -217,26 +217,43 @@ function MatchCard({ match }: { match: MatchWithSport }) {
 
       {/* Probability bar */}
       {hasProbabilities && (
-        <div className="relative mt-4 flex h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]">
+        <div className="relative mt-4 overflow-hidden rounded-full bg-white/[0.08]" style={{ height: 8 }}>
           <div
-            className={cn("h-full transition-all", (hPct ?? 0) >= (aPct ?? 0) ? "bg-emerald-400" : "bg-white/40")}
+            className={cn("absolute left-0 top-0 h-full transition-all shadow-[0_0_8px_rgba(52,211,153,0.5)]", (hPct ?? 0) >= (aPct ?? 0) ? "bg-emerald-400" : "bg-white/30")}
             style={{ width: `${hPct}%` }}
           />
-          {dPct != null && <div className="h-full bg-white/20" style={{ width: `${dPct}%` }} />}
-          <div className={cn("h-full flex-1", (aPct ?? 0) > (hPct ?? 0) ? "bg-emerald-400" : "bg-amber-400/60")} />
+          {dPct != null && (
+            <div className="absolute top-0 h-full bg-white/15" style={{ left: `${hPct}%`, width: `${dPct}%` }} />
+          )}
+          <div
+            className={cn("absolute right-0 top-0 h-full", (aPct ?? 0) > (hPct ?? 0) ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" : "bg-amber-400/50")}
+            style={{ width: `${aPct}%` }}
+          />
         </div>
       )}
 
       {/* Footer */}
       <div className="relative mt-4 flex items-center justify-between gap-3">
         {hasConfidence ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/35">Confidence</span>
-            <div className="flex items-center gap-1.5">
-              <div className="h-1.5 w-20 overflow-hidden rounded-full bg-white/10">
-                <div className={cn("h-full rounded-full", confBarBg)} style={{ width: `${Math.round(conf * 100)}%` }} />
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-24 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className={cn("h-full rounded-full shadow-sm", confBarBg,
+                    conf >= 0.7 ? "shadow-emerald-400/40" : conf >= 0.5 ? "shadow-amber-400/40" : "shadow-red-400/40"
+                  )}
+                  style={{ width: `${Math.round(conf * 100)}%` }}
+                />
               </div>
-              <span className={cn("font-mono text-xs font-bold tabular-nums", confColor)}>
+              <span className={cn(
+                "rounded-full border px-2 py-0.5 font-mono text-[12px] font-bold tabular-nums",
+                conf >= 0.7
+                  ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+                  : conf >= 0.5
+                  ? "border-amber-400/30 bg-amber-400/10 text-amber-300"
+                  : "border-red-400/30 bg-red-400/10 text-red-400"
+              )}>
                 {Math.round(conf * 100)}%
               </span>
             </div>
@@ -319,7 +336,7 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
   type MatchWithSportLocal = BettingMatch & { sport: SportSlug };
   const [matches, setMatches] = useState<MatchWithSportLocal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [minConf, setMinConf] = useState("0");
+  const [minConf, setMinConf] = useState("0.6");
   const [showAll, setShowAll] = useState(false);
 
   const sport = searchParams.get("sport") ?? initialSport;
