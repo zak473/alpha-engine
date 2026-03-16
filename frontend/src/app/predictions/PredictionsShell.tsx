@@ -1,17 +1,98 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { useTransition, useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { BrainCircuit, TrendingUp, Calendar, Zap, ChevronRight } from "lucide-react";
-import type { MvpPrediction, MvpPredictionList } from "@/lib/types";
+import { useRouter, useSearchParams } from "next/navigation";
+import { BrainCircuit, Zap, ChevronRight } from "lucide-react";
+import { SPORT_LEAGUES, fetchSGOEvents, sgoEventToMatch, LEAGUE_LABELS } from "@/lib/sgo";
+import type { BettingMatch } from "@/lib/betting-types";
+import type { SportSlug } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Constants ───────────────────────────────────────────────────────────────
 
-const SPORT_EMOJI: Record<string, string> = {
-  soccer: "⚽", tennis: "🎾", esports: "🎮", basketball: "🏀", baseball: "⚾",
-};
+const SPORTS: { value: string; label: string; icon: string }[] = [
+  { value: "all",        label: "All sports",  icon: "🏆" },
+  { value: "soccer",     label: "Soccer",      icon: "⚽" },
+  { value: "tennis",     label: "Tennis",      icon: "🎾" },
+  { value: "basketball", label: "Basketball",  icon: "🏀" },
+  { value: "baseball",   label: "Baseball",    icon: "⚾" },
+  { value: "hockey",     label: "Hockey",      icon: "🏒" },
+];
+
+const CONF_THRESHOLDS = [
+  { value: "0",   label: "All"  },
+  { value: "0.5", label: "50%+" },
+  { value: "0.6", label: "60%+" },
+  { value: "0.7", label: "70%+" },
+  { value: "0.8", label: "80%+" },
+];
+
+// ── Backend merge ───────────────────────────────────────────────────────────
+
+interface BackendItem {
+  home_name: string;
+  away_name: string;
+  p_home: number | null;
+  p_away: number | null;
+  p_draw?: number | null;
+  confidence: number | null;
+  kickoff_utc: string;
+}
+
+function normalizeName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\b(fc|cf|ac|as|sc|cd|afc|rsc|fk|sk|bk|hc|hv)\b/g, "")
+    .replace(/[^a-z0-9]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function teamsMatch(a: string, b: string): boolean {
+  const na = normalizeName(a);
+  const nb = normalizeName(b);
+  if (na === nb) return true;
+  if (na.length > 3 && nb.includes(na)) return true;
+  if (nb.length > 3 && na.includes(nb)) return true;
+  return false;
+}
+
+async function fetchBackendForSport(sport: SportSlug): Promise<BackendItem[]> {
+  try {
+    const now = new Date();
+    const dateFrom = now.toISOString();
+    const dateTo = new Date(now.getTime() + 48 * 3600_000).toISOString();
+    const res = await fetch(
+      `/api/v1/sports/${sport}/matches?date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}&limit=200`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.items ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function mergeBackend(match: BettingMatch, items: BackendItem[]): BettingMatch {
+  const found = items.find(
+    (b) =>
+      teamsMatch(match.home.name, b.home_name) &&
+      teamsMatch(match.away.name, b.away_name) &&
+      Math.abs(new Date(match.startTime).getTime() - new Date(b.kickoff_utc).getTime()) < 6 * 3600_000
+  );
+  if (!found) return match;
+  return {
+    ...match,
+    pHome: found.p_home ?? undefined,
+    pAway: found.p_away ?? undefined,
+    pDraw: found.p_draw ?? undefined,
+    modelConfidence: found.confidence != null ? found.confidence / 100 : undefined,
+  };
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmtKickoff(iso: string) {
   const d = new Date(iso);
@@ -37,82 +118,111 @@ function ConfBar({ conf }: { conf: number }) {
   );
 }
 
-function StatusPill({ status }: { status: string }) {
-  if (status === "live") return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-300">
-      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-      Live
-    </span>
-  );
-  if (status === "scheduled") return (
-    <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/50">
-      Upcoming
-    </span>
-  );
+// ── Prediction Card ──────────────────────────────────────────────────────────
+
+function MatchCard({ match, sport }: { match: BettingMatch; sport: string }) {
+  const href = `/sports/${sport}/matches/${match.id}`;
+  const hasModel = match.pHome != null;
+  const hPct = hasModel ? Math.round((match.pHome ?? 0) * 100) : null;
+  const aPct = hasModel ? Math.round((match.pAway ?? 0) * 100) : null;
+  const dPct = hasModel && match.pDraw != null ? Math.round(match.pDraw * 100) : null;
+
+  // Get moneyline odds from featured markets
+  const ml = match.featuredMarkets?.[0];
+  const homeOdds = ml?.selections[0]?.odds;
+  const awayOdds = ml?.selections[ml.selections.length - 1]?.odds;
+
+  const conf = match.modelConfidence;
+
   return (
-    <span className="inline-flex items-center rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/35">
-      Finished
-    </span>
+    <Link
+      href={href}
+      className="group rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300/25 hover:shadow-[0_24px_60px_rgba(0,0,0,0.26)] block"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3">
+        <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-white/55">
+          {LEAGUE_LABELS[match.league] ?? match.league}
+        </span>
+        <span className="text-[11px] text-white/35">{fmtKickoff(match.startTime)}</span>
+      </div>
+
+      {/* Teams + probs */}
+      <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+        {/* Home */}
+        <div>
+          <p className="text-sm font-semibold text-white leading-tight">{match.home.name}</p>
+          {hasModel ? (
+            <p className="mt-1 font-mono text-2xl font-bold text-emerald-300 tabular-nums">{hPct}%</p>
+          ) : (
+            <p className="mt-1 text-xs text-white/30">—</p>
+          )}
+          {homeOdds && <p className="mt-0.5 font-mono text-xs text-white/35">{homeOdds.toFixed(2)} odds</p>}
+        </div>
+
+        {/* Center */}
+        <div className="flex flex-col items-center gap-1">
+          {dPct != null && (
+            <div className="rounded-[24px] border border-white/8 bg-black/20 px-4 py-3 text-center">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">Draw</p>
+              <p className="font-mono text-sm font-bold text-white tabular-nums">{dPct}%</p>
+            </div>
+          )}
+          <span className="text-[11px] font-medium text-white/35">vs</span>
+        </div>
+
+        {/* Away */}
+        <div className="text-right">
+          <p className="text-sm font-semibold text-white leading-tight">{match.away.name}</p>
+          {hasModel ? (
+            <p className="mt-1 font-mono text-2xl font-bold text-amber-400 tabular-nums">{aPct}%</p>
+          ) : (
+            <p className="mt-1 text-xs text-white/30">—</p>
+          )}
+          {awayOdds && <p className="mt-0.5 font-mono text-xs text-white/35">{awayOdds.toFixed(2)} odds</p>}
+        </div>
+      </div>
+
+      {/* Prob bar */}
+      {hasModel && (
+        <div className="mt-4 flex h-2 w-full overflow-hidden rounded-full bg-white/10">
+          <div className="h-full bg-emerald-400 transition-all" style={{ width: `${hPct}%` }} />
+          {dPct != null && <div className="h-full bg-white/20" style={{ width: `${dPct}%` }} />}
+          <div className="h-full flex-1 bg-amber-400" />
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="mt-4 flex items-center justify-between gap-3">
+        {conf != null ? (
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40">Confidence</span>
+            <ConfBar conf={conf} />
+          </div>
+        ) : (
+          <span className="text-[11px] text-white/25">No model prediction</span>
+        )}
+        <div className="flex items-center gap-1 text-[12px] font-semibold text-white/72 opacity-0 transition group-hover:opacity-100">
+          View <ChevronRight size={13} />
+        </div>
+      </div>
+    </Link>
   );
 }
 
-// ── KPI strip ─────────────────────────────────────────────────────────────
+// ── Empty state ──────────────────────────────────────────────────────────────
 
-function KpiStrip({ items }: { items: MvpPrediction[] }) {
-  const today = new Date().toISOString().slice(0, 10);
-  const todayItems = items.filter((p) => p.start_time.slice(0, 10) === today);
-  const avgConf = items.length > 0
-    ? items.reduce((s, p) => s + p.confidence, 0) / items.length : 0;
-  const highConf = items.filter((p) => p.confidence >= 0.7).length;
-
-  const avgAccent = avgConf >= 0.7 ? "text-emerald-300" : avgConf >= 0.5 ? "text-amber-400" : "text-white/50";
-
-  const stats = [
-    { label: "Total predictions", value: String(items.length),          icon: BrainCircuit, accent: "text-emerald-300" },
-    { label: "Today's picks",     value: String(todayItems.length),      icon: Calendar,     accent: "text-blue-300"   },
-    { label: "Avg confidence",    value: items.length > 0 ? `${Math.round(avgConf * 100)}%` : "—", icon: TrendingUp, accent: avgAccent },
-    { label: "High confidence",   value: String(highConf),               icon: Zap,          accent: "text-purple-300" },
-  ];
-
+function EmptyState() {
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      {stats.map(({ label, value, icon: Icon, accent }) => (
-        <div key={label} className="rounded-[22px] border border-white/8 bg-white/[0.05] px-4 py-4">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">{label}</span>
-            <Icon size={13} className={cn(accent, "opacity-70")} />
-          </div>
-          <p className={cn("mt-3 font-mono text-[32px] font-semibold leading-none tabular-nums tracking-[-0.05em] text-white")}>{value}</p>
-        </div>
-      ))}
+    <div className="flex min-h-[280px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
+      <BrainCircuit size={28} className="text-white/35" />
+      <div className="mt-4 text-xl font-semibold text-white">No upcoming matches</div>
+      <div className="mt-2 max-w-md text-sm text-white/50">No fixtures found in the next 48 hours for this selection.</div>
     </div>
   );
 }
 
-// ── Filter bar ────────────────────────────────────────────────────────────
-
-const SPORTS = [
-  { value: "all",        label: "All sports"    },
-  { value: "soccer",     label: "⚽ Soccer"     },
-  { value: "tennis",     label: "🎾 Tennis"     },
-  { value: "esports",    label: "🎮 Esports"    },
-  { value: "basketball", label: "🏀 Basketball" },
-  { value: "baseball",   label: "⚾ Baseball"   },
-];
-
-const STATUSES = [
-  { value: "all",       label: "All"      },
-  { value: "scheduled", label: "Upcoming" },
-  { value: "live",      label: "Live"     },
-];
-
-const CONF_THRESHOLDS = [
-  { value: "0",   label: "All"  },
-  { value: "0.5", label: "50%+" },
-  { value: "0.6", label: "60%+" },
-  { value: "0.7", label: "70%+" },
-  { value: "0.8", label: "80%+" },
-];
+// ── Pill group ───────────────────────────────────────────────────────────────
 
 function PillGroup<T extends string>({
   label, options, active, onChange,
@@ -145,133 +255,74 @@ function PillGroup<T extends string>({
   );
 }
 
-// ── Prediction Card ───────────────────────────────────────────────────────
+// ── Main shell ───────────────────────────────────────────────────────────────
 
-function PredictionCard({ pred }: { pred: MvpPrediction }) {
-  const detailHref = `/matches/${pred.event_id}`;
-  const emoji = SPORT_EMOJI[pred.sport] ?? "🏆";
-  const p = pred.probabilities;
-  const fo = pred.fair_odds;
-  const hPct = Math.round(p.home_win * 100);
-  const aPct = Math.round(p.away_win * 100);
-  const dPct = p.draw != null ? Math.round(p.draw * 100) : null;
-  const isLive = pred.status === "live";
-  return (
-    <Link
-      href={detailHref}
-      className={cn(
-        "group rounded-[28px] border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300/25 hover:shadow-[0_24px_60px_rgba(0,0,0,0.26)]",
-        isLive
-          ? "bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))] border-emerald-400/30"
-          : "bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] border-white/8"
-      )}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/[0.04] px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-white/55">
-            <span>{emoji}</span>
-            {pred.sport}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <StatusPill status={pred.status} />
-          <span className="text-[11px] text-white/35">{fmtKickoff(pred.start_time)}</span>
-        </div>
-      </div>
-
-      {/* Teams + probs */}
-      <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        {/* Home */}
-        <div>
-          <p className="text-sm font-semibold text-white leading-tight">{pred.participants.home.name}</p>
-          <p className="mt-1 font-mono text-2xl font-bold text-emerald-300 tabular-nums">{hPct}%</p>
-          {fo?.home_win && <p className="mt-0.5 font-mono text-xs text-white/35">{fo.home_win.toFixed(2)} odds</p>}
-        </div>
-
-        {/* Center */}
-        <div className="flex flex-col items-center gap-1">
-          {dPct != null && (
-            <div className="rounded-[24px] border border-white/8 bg-black/20 px-4 py-3 text-center">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">Draw</p>
-              <p className="font-mono text-sm font-bold text-white tabular-nums">{dPct}%</p>
-            </div>
-          )}
-          <span className="text-[11px] font-medium text-white/35">vs</span>
-        </div>
-
-        {/* Away */}
-        <div className="text-right">
-          <p className="text-sm font-semibold text-white leading-tight">{pred.participants.away.name}</p>
-          <p className="mt-1 font-mono text-2xl font-bold text-amber-400 tabular-nums">{aPct}%</p>
-          {fo?.away_win && <p className="mt-0.5 font-mono text-xs text-white/35">{fo.away_win.toFixed(2)} odds</p>}
-        </div>
-      </div>
-
-      {/* Prob bar */}
-      <div className="mt-4 flex h-2 w-full overflow-hidden rounded-full bg-white/10">
-        <div className="h-full bg-emerald-400 transition-all" style={{ width: `${hPct}%` }} />
-        {dPct != null && <div className="h-full bg-white/20" style={{ width: `${dPct}%` }} />}
-        <div className="h-full flex-1 bg-amber-400" />
-      </div>
-
-      {/* Footer */}
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/40">Confidence</span>
-          <ConfBar conf={pred.confidence} />
-        </div>
-        <div className="flex items-center gap-1 text-[12px] font-semibold text-white/72 opacity-0 transition group-hover:opacity-100">
-          View match <ChevronRight size={13} />
-        </div>
-      </div>
-    </Link>
+const ALL_SPORT_LEAGUES: { sport: SportSlug; leagueID: string }[] = Object.entries(SPORT_LEAGUES)
+  .flatMap(([sport, leagues]) =>
+    (leagues as string[]).map((leagueID) => ({ sport: sport as SportSlug, leagueID }))
   );
-}
 
-// ── Empty state ───────────────────────────────────────────────────────────
-
-function EmptyState() {
-  return (
-    <div className="flex min-h-[280px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
-      <BrainCircuit size={28} className="text-white/35" />
-      <div className="mt-4 text-xl font-semibold text-white">No predictions found</div>
-      <div className="mt-2 max-w-md text-sm text-white/50">Try a different sport, status, or date range.</div>
-    </div>
-  );
-}
-
-// ── Main shell ────────────────────────────────────────────────────────────
-
-interface Props {
-  initialData: MvpPredictionList;
-  initialSport: string;
-  initialStatus: string;
-}
-
-export function PredictionsShell({ initialData, initialSport, initialStatus }: Props) {
+export function PredictionsShell({ initialSport }: { initialSport: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [, startTransition] = useTransition();
+  type MatchWithSport = BettingMatch & { sport: SportSlug };
+  const [matches, setMatches] = useState<MatchWithSport[]>([]);
+  const [loading, setLoading] = useState(true);
   const [minConf, setMinConf] = useState("0");
 
-  const sport  = searchParams.get("sport")  ?? initialSport;
-  const status = searchParams.get("status") ?? initialStatus;
+  const sport = searchParams.get("sport") ?? initialSport;
 
   function navigate(updates: Record<string, string>) {
     const p = new URLSearchParams(searchParams.toString());
     Object.entries(updates).forEach(([k, v]) => {
-      if (v === "all" && k !== "range") p.delete(k); else p.set(k, v);
+      if (v === "all") p.delete(k); else p.set(k, v);
     });
-    startTransition(() => {
-      router.replace(`/predictions${p.size ? `?${p}` : ""}`, { scroll: false });
-    });
+    router.replace(`/predictions${p.size ? `?${p}` : ""}`, { scroll: false });
   }
+
+  useEffect(() => {
+    setLoading(true);
+
+    const leagues = sport === "all"
+      ? ALL_SPORT_LEAGUES
+      : ALL_SPORT_LEAGUES.filter((l) => l.sport === sport);
+
+    if (!leagues.length) { setLoading(false); return; }
+
+    // Fetch SGO events + backend predictions in parallel
+    const sportSlugs = Array.from(new Set(leagues.map((l) => l.sport)));
+    Promise.all([
+      Promise.all(leagues.map(({ leagueID, sport: s }) =>
+        fetchSGOEvents(leagueID).then((events) =>
+          events
+            .filter((e) => !e.status.started && !e.status.ended && !e.status.cancelled)
+            .map((e) => ({ ...sgoEventToMatch(e, s), sport: s }))
+        )
+      )).then((res) => res.flat()),
+      Promise.all(sportSlugs.map((s) => fetchBackendForSport(s).then((items) => ({ sport: s, items })))),
+    ]).then(([sgoMatches, backendBySport]) => {
+      const backendMap = Object.fromEntries(backendBySport.map(({ sport: s, items }) => [s, items]));
+      const now = Date.now();
+      const cutoff = now + 48 * 3600_000;
+      const merged: MatchWithSport[] = sgoMatches
+        .filter((m) => {
+          const t = new Date(m.startTime).getTime();
+          return t >= now && t <= cutoff;
+        })
+        .map((m) => ({ ...mergeBackend(m, backendMap[m.sport] ?? []), sport: m.sport }))
+        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+      setMatches(merged);
+      setLoading(false);
+    });
+  }, [sport]);
 
   const threshold = parseFloat(minConf);
   const items = threshold > 0
-    ? initialData.items.filter((p) => p.confidence >= threshold)
-    : initialData.items;
+    ? matches.filter((m) => (m.modelConfidence ?? 0) >= threshold)
+    : matches;
+
+  const highConf = matches.filter((m) => (m.modelConfidence ?? 0) >= 0.7).length;
+  const withModel = matches.filter((m) => m.modelConfidence != null).length;
 
   return (
     <div className="pb-12">
@@ -288,45 +339,35 @@ export function PredictionsShell({ initialData, initialSport, initialStatus }: P
               Win probabilities, fair odds, and confidence scores generated by our machine learning models across every sport.
             </p>
           </div>
-
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-[22px] border border-white/8 bg-white/[0.05] px-4 py-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Total predictions</div>
-              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">{items.length}</div>
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">With predictions</div>
+              <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-white">
+                {loading ? "—" : withModel}
+              </div>
             </div>
             <div className="rounded-[22px] border border-white/8 bg-white/[0.05] px-4 py-4">
               <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">High confidence</div>
               <div className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-emerald-300">
-                {items.filter((p) => p.confidence >= 0.7).length}
+                {loading ? "—" : highConf}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* KPI strip */}
-      <div className="mt-4">
-        <KpiStrip items={items} />
-      </div>
-
       {/* Filters */}
       <div className="mt-4 overflow-hidden rounded-[28px] border border-white/8 bg-white/[0.03] p-4">
         <div className="flex flex-wrap gap-4">
           <PillGroup
             label="Sport"
-            options={SPORTS as { value: string; label: string }[]}
+            options={SPORTS}
             active={sport}
             onChange={(v) => navigate({ sport: v })}
           />
           <PillGroup
-            label="Status"
-            options={STATUSES as { value: string; label: string }[]}
-            active={status}
-            onChange={(v) => navigate({ status: v })}
-          />
-          <PillGroup
             label="Min confidence"
-            options={CONF_THRESHOLDS as { value: string; label: string }[]}
+            options={CONF_THRESHOLDS}
             active={minConf}
             onChange={setMinConf}
           />
@@ -334,22 +375,33 @@ export function PredictionsShell({ initialData, initialSport, initialStatus }: P
       </div>
 
       {/* Results count */}
-      {items.length > 0 && (
+      {!loading && items.length > 0 && (
         <div className="mt-4 flex items-center justify-between">
           <p className="text-sm text-white/50">
-            Showing <span className="font-semibold text-white">{items.length}</span> prediction{items.length !== 1 ? "s" : ""}
+            Showing <span className="font-semibold text-white">{items.length}</span> fixture{items.length !== 1 ? "s" : ""} in the next 48 hours
           </p>
+          {threshold > 0 && (
+            <p className="text-xs text-white/35 flex items-center gap-1">
+              <Zap size={11} /> Filtered to {Math.round(threshold * 100)}%+ confidence
+            </p>
+          )}
         </div>
       )}
 
-      {/* Cards grid */}
+      {/* Cards */}
       <div className="mt-4">
-        {items.length === 0 ? (
+        {loading ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-[28px] border border-white/8 bg-white/[0.02] h-52 animate-pulse" />
+            ))}
+          </div>
+        ) : items.length === 0 ? (
           <EmptyState />
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {items.map((pred) => (
-              <PredictionCard key={pred.event_id} pred={pred} />
+            {items.map((m) => (
+              <MatchCard key={m.id} match={m} sport={m.sport} />
             ))}
           </div>
         )}
