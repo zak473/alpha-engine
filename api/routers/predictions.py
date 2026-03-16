@@ -306,7 +306,8 @@ def get_match_prediction(
     )
 
     if result is None:
-        raise HTTPException(status_code=404, detail=f"No prediction found for match {match_id}")
+        # Fall back to ELO-based prediction rather than 404
+        return _build_fixture_schema(session, match)
 
     pred, registry = result
     return _build_prediction_schema(session, match, pred, registry)
