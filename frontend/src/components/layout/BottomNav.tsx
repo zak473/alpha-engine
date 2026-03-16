@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Swords, ClipboardList, TrendingUp, MoreHorizontal,
-  Trophy, ShieldCheck, BrainCircuit, Users, Radio,
+  Trophy, ShieldCheck, BrainCircuit, Users, Radio, MessageSquare,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,7 @@ const MORE_NAV = [
   { label: "Challenges",  href: "/challenges",  icon: Trophy      },
   { label: "Performance", href: "/performance", icon: TrendingUp  },
   { label: "Admin",       href: "/admin",        icon: ShieldCheck },
+  { label: "AI Advisor",  href: "/advisor",      icon: MessageSquare },
 ];
 
 const SPORTS = [

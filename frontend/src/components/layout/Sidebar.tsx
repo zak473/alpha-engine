@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BrainCircuit, Circle, ClipboardList, LayoutDashboard, Radio, ShieldCheck, Swords, TrendingUp, Trophy, Users } from "lucide-react";
+import { Activity, BrainCircuit, Circle, ClipboardList, LayoutDashboard, MessageSquare, Radio, ShieldCheck, Swords, TrendingUp, Trophy, Users } from "lucide-react";
 import { useSidebar } from "./SidebarContext";
 
 const NAV = [
@@ -14,6 +14,7 @@ const NAV = [
   { label: "Challenges", href: "/challenges", icon: Trophy },
   { label: "Record", href: "/record", icon: ClipboardList },
   { label: "Performance", href: "/performance", icon: TrendingUp },
+  { label: "AI Advisor", href: "/advisor", icon: MessageSquare },
 ];
 
 const SPORTS = [
