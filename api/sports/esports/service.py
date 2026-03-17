@@ -484,3 +484,69 @@ class EsportsMatchService(BaseMatchListService):
             lol_objectives_home=lol_obj_home, lol_objectives_away=lol_obj_away,
             betting=betting,
         )
+
+    def preview_match(self, home_name: str, away_name: str, db: Session) -> EsportsMatchDetail:
+        """ELO-based preview for an esports match not yet in the DB."""
+        from datetime import datetime, timezone
+        from db.models.mvp import CoreTeam
+
+        def _find_team(name: str) -> Optional[CoreTeam]:
+            teams = db.query(CoreTeam).filter(CoreTeam.name.ilike(f"%{name}%")).all()
+            if not teams:
+                for word in [w for w in name.split() if len(w) > 3]:
+                    teams = db.query(CoreTeam).filter(CoreTeam.name.ilike(f"%{word}%")).all()
+                    if teams:
+                        break
+            if not teams:
+                return None
+            for t in teams:
+                if t.provider_id and "esports" in t.provider_id:
+                    return t
+            return teams[0]
+
+        home_team = _find_team(home_name)
+        away_team = _find_team(away_name)
+
+        home_id = home_team.id if home_team else f"preview-home-{home_name.lower().replace(' ', '-')}"
+        away_id = away_team.id if away_team else f"preview-away-{away_name.lower().replace(' ', '-')}"
+        hname = home_team.name if home_team else home_name
+        aname = away_team.name if away_team else away_name
+
+        elo_h = _elo_panel(db, home_id, hname) if home_team else None
+        elo_a = _elo_panel(db, away_id, aname) if away_team else None
+
+        probs = None
+        fair_odds = None
+        key_drivers = None
+        if elo_h and elo_a:
+            r_diff = elo_h.overall_rating - elo_a.overall_rating
+            p_home = round(1.0 / (1.0 + math.pow(10, -r_diff / 400.0)), 4)
+            p_away = round(1.0 - p_home, 4)
+            probs = ProbabilitiesOut(home_win=p_home, away_win=p_away)
+            fair_odds = FairOddsOut(
+                home_win=round(1 / p_home, 2) if p_home > 0 else None,
+                away_win=round(1 / p_away, 2) if p_away > 0 else None,
+            )
+            key_drivers = [KeyDriverOut(feature="ELO Differential", importance=1.0, value=round(elo_h.overall_rating - elo_a.overall_rating, 1))]
+
+        h2h = _h2h(db, home_id, away_id, hname, aname) if home_team and away_team else H2HRecordOut(total_matches=0, home_wins=0, away_wins=0, recent_matches=[])
+        form_h = _team_form(db, home_id, hname) if home_team else None
+        form_a = _team_form(db, away_id, aname) if away_team else None
+
+        return EsportsMatchDetail(
+            id=f"preview-{home_id}-{away_id}",
+            sport="esports",
+            league="Unknown",
+            kickoff_utc=datetime.now(timezone.utc),
+            status="scheduled",
+            home=ParticipantOut(id=home_id, name=hname, logo_url=home_team.logo_url if home_team else None),
+            away=ParticipantOut(id=away_id, name=aname, logo_url=away_team.logo_url if away_team else None),
+            probabilities=probs,
+            fair_odds=fair_odds,
+            key_drivers=key_drivers or [],
+            elo_home=elo_h,
+            elo_away=elo_a,
+            h2h=h2h,
+            form_home=form_h,
+            form_away=form_a,
+        )

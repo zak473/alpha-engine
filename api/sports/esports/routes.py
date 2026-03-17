@@ -32,6 +32,16 @@ def list_esports_matches(
     )
 
 
+@router.get("/matches/preview", response_model=EsportsMatchDetail)
+def get_esports_match_preview(
+    home: str = Query(..., description="Home team name"),
+    away: str = Query(..., description="Away team name"),
+    db: Session = Depends(get_db),
+):
+    """ELO-based match preview when no DB record exists for upcoming/untracked games."""
+    return _service.preview_match(home, away, db)
+
+
 @router.get("/matches/{match_id}", response_model=EsportsMatchDetail)
 def get_esports_match(match_id: str, db: Session = Depends(get_db)):
     """Full esports match detail — CS2 or LoL aware."""

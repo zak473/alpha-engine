@@ -9,7 +9,7 @@ Provides:
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 log = logging.getLogger(__name__)
 from typing import Optional
@@ -1190,4 +1190,70 @@ class SoccerMatchService(BaseMatchListService):
                 "market_draw": match.odds_draw,
                 "market_away": match.odds_away,
             },
+        )
+
+    def preview_match(self, home_name: str, away_name: str, db: Session) -> SoccerMatchDetail:
+        """ELO-based preview for a soccer match not yet in the DB."""
+        import math as _math
+
+        def _find_team(name: str) -> Optional[CoreTeam]:
+            teams = db.query(CoreTeam).filter(CoreTeam.name.ilike(f"%{name}%")).all()
+            if not teams:
+                for word in [w for w in name.split() if len(w) > 3]:
+                    teams = db.query(CoreTeam).filter(CoreTeam.name.ilike(f"%{word}%")).all()
+                    if teams:
+                        break
+            if not teams:
+                return None
+            for t in teams:
+                if t.provider_id and "soccer" in t.provider_id:
+                    return t
+            return teams[0]
+
+        home_team = _find_team(home_name)
+        away_team = _find_team(away_name)
+
+        home_id = home_team.id if home_team else f"preview-home-{home_name.lower().replace(' ', '-')}"
+        away_id = away_team.id if away_team else f"preview-away-{away_name.lower().replace(' ', '-')}"
+        hname = home_team.name if home_team else home_name
+        aname = away_team.name if away_team else away_name
+
+        elo_h = _elo_snapshot(db, home_id, hname) if home_team else None
+        elo_a = _elo_snapshot(db, away_id, aname) if away_team else None
+
+        probs = None
+        fair_odds = None
+        key_drivers = None
+        if elo_h and elo_a:
+            r_diff = elo_h.rating - elo_a.rating + 50.0  # home advantage
+            p_2way = 1.0 / (1.0 + _math.pow(10, -r_diff / 400.0))
+            draw = 0.26
+            p_home = round(p_2way * (1.0 - draw), 4)
+            p_away = round((1.0 - p_2way) * (1.0 - draw), 4)
+            p_draw = round(1.0 - p_home - p_away, 4)
+            probs = ProbabilitiesOut(home_win=p_home, away_win=p_away, draw=p_draw)
+            fair_odds = FairOddsOut(
+                home_win=round(1 / p_home, 2) if p_home > 0 else None,
+                draw=round(1 / p_draw, 2) if p_draw > 0 else None,
+                away_win=round(1 / p_away, 2) if p_away > 0 else None,
+            )
+            key_drivers = [KeyDriverOut(feature="ELO Differential", importance=1.0, value=round(elo_h.rating - elo_a.rating, 1))]
+
+        h2h = _h2h(db, home_id, away_id) if home_team and away_team else H2HRecordOut(total_matches=0, home_wins=0, away_wins=0, recent_matches=[])
+
+        now = datetime.now(timezone.utc)
+        return SoccerMatchDetail(
+            id=f"preview-{home_id}-{away_id}",
+            sport="soccer",
+            league="Unknown",
+            kickoff_utc=now,
+            status="scheduled",
+            home=ParticipantOut(id=home_id, name=hname, logo_url=home_team.logo_url if home_team else None),
+            away=ParticipantOut(id=away_id, name=aname, logo_url=away_team.logo_url if away_team else None),
+            probabilities=probs,
+            fair_odds=fair_odds,
+            key_drivers=key_drivers or [],
+            elo_home=elo_h,
+            elo_away=elo_a,
+            h2h=h2h,
         )

@@ -32,6 +32,16 @@ def list_tennis_matches(
     )
 
 
+@router.get("/matches/preview", response_model=TennisMatchDetail)
+def get_tennis_match_preview(
+    home: str = Query(..., description="Home player name"),
+    away: str = Query(..., description="Away player name"),
+    db: Session = Depends(get_db),
+):
+    """ELO-based match preview when no DB record exists for upcoming/untracked games."""
+    return _service.preview_match(home, away, db)
+
+
 @router.get("/matches/{match_id}", response_model=TennisMatchDetail)
 def get_tennis_match(match_id: str, db: Session = Depends(get_db)):
     """Full tennis match detail with ELO, stats, form, and H2H."""
