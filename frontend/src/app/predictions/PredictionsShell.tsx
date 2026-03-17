@@ -3,13 +3,16 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BrainCircuit, Zap, ChevronRight, Eye, EyeOff } from "lucide-react";
+import {
+  BrainCircuit, Zap, ChevronRight, Eye, EyeOff, Users,
+} from "lucide-react";
 import { SPORT_LEAGUES, fetchSGOEvents, sgoEventToMatch, LEAGUE_LABELS } from "@/lib/sgo";
 import type { BettingMatch } from "@/lib/betting-types";
-import type { SportSlug } from "@/lib/api";
+import type { SportSlug, TipsterProfile } from "@/lib/api";
+import { getTipsters } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-// ── Constants ───────────────────────────────────────────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────────
 
 const SPORT_META: { value: string; label: string; icon: string }[] = [
   { value: "all",        label: "All",        icon: "🏆" },
@@ -32,7 +35,7 @@ const CONF_THRESHOLDS = [
   { value: "0.8", label: "80%+" },
 ];
 
-// ── Backend merge ───────────────────────────────────────────────────────────
+// ── Backend merge ────────────────────────────────────────────────────────────
 
 interface BackendItem {
   home_name: string;
@@ -95,7 +98,7 @@ function mergeBackend(match: BettingMatch, items: BackendItem[]): BettingMatch {
   };
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtTime(iso: string) {
   const d = new Date(iso);
@@ -113,9 +116,237 @@ function dayLabel(iso: string): string {
   return d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" });
 }
 
-// ── Card ─────────────────────────────────────────────────────────────────────
+// ── Section label ─────────────────────────────────────────────────────────────
+
+function SectionLabel({
+  label, sub, count, action,
+}: {
+  label: string;
+  sub?: string;
+  count?: number;
+  action?: { label: string; href: string };
+}) {
+  return (
+    <div className="mb-3 flex items-center gap-2.5">
+      <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/65">{label}</span>
+      {count != null && (
+        <span className="rounded-full border border-white/10 bg-white/[0.05] px-1.5 py-px text-[10px] font-semibold tabular-nums text-white/38">
+          {count}
+        </span>
+      )}
+      {sub && <span className="text-[11px] text-white/28">{sub}</span>}
+      <div className="h-px flex-1 bg-white/[0.06]" />
+      {action && (
+        <Link
+          href={action.href}
+          className="flex shrink-0 items-center gap-0.5 text-[11px] font-medium text-[var(--accent)] transition-opacity hover:opacity-75"
+        >
+          {action.label} <ChevronRight size={11} />
+        </Link>
+      )}
+    </div>
+  );
+}
+
+// ── Featured pick card ────────────────────────────────────────────────────────
 
 type MatchWithSport = BettingMatch & { sport: SportSlug };
+
+function FeaturedPickCard({ match }: { match: MatchWithSport }) {
+  const href = `/sports/${match.sport}/matches/${match.id}`;
+  const conf = match.modelConfidence ?? 0;
+  const confPct = Math.round(conf * 100);
+  const hPct = match.pHome != null ? Math.round(match.pHome * 100) : null;
+  const aPct = match.pAway != null ? Math.round(match.pAway * 100) : null;
+  const leagueLabel = LEAGUE_LABELS[match.league] ?? match.league;
+  const isTop = conf >= 0.75;
+  const isMid = conf >= 0.65 && conf < 0.75;
+
+  const confBadge = isTop
+    ? { border: "rgba(52,211,153,0.28)", bg: "rgba(52,211,153,0.09)", color: "#6ee7b7" }
+    : isMid
+    ? { border: "rgba(251,191,36,0.25)", bg: "rgba(251,191,36,0.08)", color: "#fcd34d" }
+    : { border: "rgba(255,255,255,0.10)", bg: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.55)" };
+
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "group relative flex items-center gap-4 overflow-hidden rounded-2xl border p-4 transition-all duration-150 hover:-translate-y-px",
+        isTop
+          ? "border-emerald-400/[0.18] bg-[linear-gradient(135deg,rgba(54,242,143,0.05),rgba(255,255,255,0.02))] hover:border-emerald-400/[0.28]"
+          : "border-white/[0.08] bg-white/[0.03] hover:border-white/[0.12]"
+      )}
+    >
+      {isTop && (
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(54,242,143,0.07),transparent_55%)]" />
+      )}
+
+      <span className="relative shrink-0 text-xl leading-none">{SPORT_ICONS[match.sport] ?? "🏆"}</span>
+
+      <div className="relative min-w-0 flex-1">
+        <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/28">
+          {leagueLabel}
+        </div>
+        <div className="flex items-baseline gap-2">
+          <span className={cn(
+            "max-w-[130px] truncate text-[14px] font-semibold leading-tight",
+            hPct != null && hPct >= (aPct ?? 0) ? "text-white" : "text-white/60"
+          )}>
+            {match.home.name}
+          </span>
+          <span className="shrink-0 text-[10px] text-white/22">vs</span>
+          <span className={cn(
+            "max-w-[130px] truncate text-[14px] font-semibold leading-tight",
+            aPct != null && aPct > (hPct ?? 0) ? "text-white" : "text-white/60"
+          )}>
+            {match.away.name}
+          </span>
+        </div>
+
+        {hPct != null && aPct != null && (
+          <div className="mt-2.5 flex items-center gap-2">
+            <span className={cn(
+              "w-9 shrink-0 text-right font-mono text-[12px] font-bold tabular-nums",
+              hPct > aPct ? "text-emerald-300" : "text-white/38"
+            )}>
+              {hPct}%
+            </span>
+            <div className="relative h-[5px] flex-1 overflow-hidden rounded-full bg-white/[0.08]">
+              <div
+                className={cn("absolute left-0 top-0 h-full rounded-full", hPct > aPct ? "bg-emerald-400" : "bg-white/25")}
+                style={{ width: `${hPct}%` }}
+              />
+            </div>
+            <span className={cn(
+              "w-9 shrink-0 font-mono text-[12px] font-bold tabular-nums",
+              aPct > hPct ? "text-emerald-300" : "text-white/38"
+            )}>
+              {aPct}%
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="relative flex shrink-0 flex-col items-end gap-1.5">
+        <div
+          className="min-w-[58px] rounded-xl border px-3 py-1.5 text-center"
+          style={{ borderColor: confBadge.border, background: confBadge.bg }}
+        >
+          <div className="mb-0.5 text-[8px] uppercase tracking-[0.14em] text-white/28">Conf</div>
+          <div className="font-mono text-[18px] font-bold tabular-nums leading-none" style={{ color: confBadge.color }}>
+            {confPct}%
+          </div>
+        </div>
+        <div className="font-mono text-[10px] text-white/25">{fmtTime(match.startTime)}</div>
+      </div>
+
+      <ChevronRight
+        size={13}
+        className="relative shrink-0 text-white/18 opacity-0 transition-opacity group-hover:opacity-100"
+      />
+    </Link>
+  );
+}
+
+// ── Tipster card ──────────────────────────────────────────────────────────────
+
+function avatarColor(name: string): string {
+  const palette = ["#6ee7b7", "#93c5fd", "#c4b5fd", "#fca5a5", "#fcd34d", "#67e8f9"];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+  return palette[h % palette.length];
+}
+
+function TipsterCard({ tipster }: { tipster: TipsterProfile }) {
+  const winPct = Math.round(tipster.weekly_win_rate * 100);
+  const col = avatarColor(tipster.username);
+  const isHot = winPct >= 65;
+  const winColor = winPct >= 65 ? "text-emerald-300" : winPct >= 55 ? "text-amber-300" : "text-white/50";
+
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3 transition-colors hover:border-white/[0.12]">
+      <div
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[12px] font-bold uppercase"
+        style={{ background: `${col}1a`, color: col, border: `1px solid ${col}35` }}
+      >
+        {tipster.username.slice(0, 2)}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="truncate text-[13px] font-semibold text-white">{tipster.username}</span>
+          {isHot && (
+            <span
+              className="inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-px text-[8px] font-bold uppercase tracking-wider"
+              style={{ borderColor: "rgba(251,191,36,0.28)", background: "rgba(251,191,36,0.08)", color: "#fcd34d" }}
+            >
+              <Zap size={7} /> Hot
+            </span>
+          )}
+        </div>
+        <div className="mt-1 flex items-center gap-1">
+          {tipster.recent_results.slice(0, 5).map((r, i) => (
+            <span
+              key={i}
+              className={cn(
+                "inline-flex h-4 w-4 items-center justify-center rounded text-[8px] font-bold",
+                r === "W" ? "bg-emerald-400/15 text-emerald-400" : "bg-red-400/12 text-red-400"
+              )}
+            >
+              {r}
+            </span>
+          ))}
+          {tipster.active_tips_count > 0 && (
+            <span className="ml-1 text-[10px] text-white/28">{tipster.active_tips_count} active</span>
+          )}
+        </div>
+      </div>
+
+      <div className="shrink-0 text-right">
+        <div className={cn("font-mono text-[20px] font-bold tabular-nums leading-none", winColor)}>
+          {winPct}%
+        </div>
+        <div className="mt-0.5 text-[9px] uppercase tracking-[0.10em] text-white/28">win rate</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Pill group ────────────────────────────────────────────────────────────────
+
+function PillGroup<T extends string>({
+  label, options, active, onChange,
+}: {
+  label: string;
+  options: { value: T; label: string }[];
+  active: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/38 shrink-0">{label}</span>
+      <div className="flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] p-1">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              "rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all",
+              active === o.value
+                ? "bg-[#2edb6c] text-[#07110d] shadow-sm"
+                : "text-white/55 hover:bg-white/[0.06] hover:text-white"
+            )}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Match card (full predictions feed) ───────────────────────────────────────
 
 function MatchCard({ match }: { match: MatchWithSport }) {
   const href = `/sports/${match.sport}/matches/${match.id}`;
@@ -127,7 +358,6 @@ function MatchCard({ match }: { match: MatchWithSport }) {
   const dPct = hasProbabilities && match.pDraw != null ? Math.round(match.pDraw * 100) : null;
   const conf = match.modelConfidence ?? 0;
 
-  // Moneyline from first featured market
   const ml = match.featuredMarkets?.[0];
   const homeOdds = ml?.selections[0]?.odds;
   const awayOdds = ml?.selections[ml.selections.length - 1]?.odds;
@@ -149,12 +379,10 @@ function MatchCard({ match }: { match: MatchWithSport }) {
           : "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] hover:border-emerald-300/20"
       )}
     >
-      {/* High confidence glow */}
       {isHighConf && (
         <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-[radial-gradient(circle_at_top_left,rgba(54,242,143,0.08),transparent_60%)]" />
       )}
 
-      {/* Header row */}
       <div className="relative flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="text-sm">{sportIcon}</span>
@@ -171,9 +399,7 @@ function MatchCard({ match }: { match: MatchWithSport }) {
         <span className="shrink-0 font-mono text-[11px] text-white/30">{fmtTime(match.startTime)}</span>
       </div>
 
-      {/* Teams */}
       <div className="relative mt-4 grid grid-cols-[1fr_32px_1fr] items-start gap-2">
-        {/* Home */}
         <div>
           <p className="text-[13px] font-semibold leading-snug text-white">{match.home.name}</p>
           {hasProbabilities ? (
@@ -188,7 +414,6 @@ function MatchCard({ match }: { match: MatchWithSport }) {
           )}
         </div>
 
-        {/* VS divider */}
         <div className="flex h-full flex-col items-center pt-1">
           <span className="text-[11px] font-medium text-white/25">vs</span>
           {dPct != null && (
@@ -199,7 +424,6 @@ function MatchCard({ match }: { match: MatchWithSport }) {
           )}
         </div>
 
-        {/* Away */}
         <div className="text-right">
           <p className="text-[13px] font-semibold leading-snug text-white">{match.away.name}</p>
           {hasProbabilities ? (
@@ -215,7 +439,6 @@ function MatchCard({ match }: { match: MatchWithSport }) {
         </div>
       </div>
 
-      {/* Probability bar */}
       {hasProbabilities && (
         <div className="relative mt-4 overflow-hidden rounded-full bg-white/[0.08]" style={{ height: 8 }}>
           <div
@@ -232,7 +455,6 @@ function MatchCard({ match }: { match: MatchWithSport }) {
         </div>
       )}
 
-      {/* Footer */}
       <div className="relative mt-4 flex items-center justify-between gap-3">
         {hasConfidence ? (
           <div className="flex items-center gap-2.5">
@@ -272,39 +494,6 @@ function MatchCard({ match }: { match: MatchWithSport }) {
   );
 }
 
-// ── Pill group ───────────────────────────────────────────────────────────────
-
-function PillGroup<T extends string>({
-  label, options, active, onChange,
-}: {
-  label: string;
-  options: { value: T; label: string }[];
-  active: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/38 shrink-0">{label}</span>
-      <div className="flex items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] p-1">
-        {options.map((o) => (
-          <button
-            key={o.value}
-            onClick={() => onChange(o.value)}
-            className={cn(
-              "rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all",
-              active === o.value
-                ? "bg-[#2edb6c] text-[#07110d] shadow-sm"
-                : "text-white/55 hover:bg-white/[0.06] hover:text-white"
-            )}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ── Day section ───────────────────────────────────────────────────────────────
 
 function DaySection({ label, matches }: { label: string; matches: MatchWithSport[] }) {
@@ -322,7 +511,7 @@ function DaySection({ label, matches }: { label: string; matches: MatchWithSport
   );
 }
 
-// ── Main shell ───────────────────────────────────────────────────────────────
+// ── Main shell ────────────────────────────────────────────────────────────────
 
 const ALL_SPORT_LEAGUES: { sport: SportSlug; leagueID: string }[] = Object.entries(SPORT_LEAGUES)
   .flatMap(([sport, leagues]) =>
@@ -338,6 +527,8 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
   const [loading, setLoading] = useState(true);
   const [minConf, setMinConf] = useState("0.6");
   const [showAll, setShowAll] = useState(false);
+  const [tipsters, setTipsters] = useState<TipsterProfile[]>([]);
+  const [tipstersLoading, setTipstersLoading] = useState(true);
 
   const sport = searchParams.get("sport") ?? initialSport;
 
@@ -349,6 +540,7 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
     router.replace(`/predictions${p.size ? `?${p}` : ""}`, { scroll: false });
   }
 
+  // Load matches
   useEffect(() => {
     setLoading(true);
     const leagues = sport === "all"
@@ -384,9 +576,21 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
     });
   }, [sport]);
 
-  const threshold = parseFloat(minConf);
+  // Load tipsters
+  useEffect(() => {
+    getTipsters()
+      .then((data) => {
+        setTipsters(
+          [...data]
+            .sort((a, b) => b.weekly_win_rate - a.weekly_win_rate)
+            .slice(0, 5)
+        );
+      })
+      .catch(() => {})
+      .finally(() => setTipstersLoading(false));
+  }, []);
 
-  // Filter: if not showAll, only show matches with predictions or high odds interest
+  const threshold = parseFloat(minConf);
   const base = showAll ? matches : matches.filter((m) => m.pHome != null);
   const items = threshold > 0
     ? base.filter((m) => (m.modelConfidence ?? 0) >= threshold)
@@ -395,7 +599,13 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
   const withConf = matches.filter((m) => m.modelConfidence != null).length;
   const highConf = matches.filter((m) => (m.modelConfidence ?? 0) >= 0.7).length;
 
-  // Group by day
+  // Featured picks: top 5 by confidence, min 60%, from ALL matches regardless of filters
+  const featuredPicks = matches
+    .filter((m) => (m.modelConfidence ?? 0) >= 0.6)
+    .sort((a, b) => (b.modelConfidence ?? 0) - (a.modelConfidence ?? 0))
+    .slice(0, 5);
+
+  // Group remaining by day
   const grouped: { label: string; matches: MatchWithSportLocal[] }[] = [];
   for (const m of items) {
     const label = dayLabel(m.startTime);
@@ -405,40 +615,39 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
   }
 
   return (
-    <div className="pb-12">
+    <div className="space-y-6 pb-12">
 
-      {/* Hero */}
-      <section className="overflow-hidden rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.10),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-5 shadow-[0_26px_70px_rgba(0,0,0,0.24)] xl:p-7">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+      {/* ── Page header ───────────────────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-[24px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="inline-flex items-center rounded-full border border-emerald-300/16 bg-emerald-300/8 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200">
-              Model predictions · Next 48 hours
-            </div>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-white lg:text-[2.5rem]">
-              AI-Powered Tip Finder
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-white/55">
-              Win probabilities and confidence scores from our ML models, overlaid on live SGO fixtures across every sport.
+            <h1 className="text-[20px] font-bold tracking-[-0.03em] text-white">
+              Today&apos;s Intelligence
+            </h1>
+            <p className="mt-0.5 text-[12px] text-white/35">
+              Best model picks · Top tipsters · Next 48 hours
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-3 xl:shrink-0">
-            {[
-              { label: "Total fixtures", value: loading ? "—" : String(matches.length), color: "text-white" },
-              { label: "With predictions", value: loading ? "—" : String(withConf), color: "text-blue-300" },
-              { label: "High confidence", value: loading ? "—" : String(highConf), color: "text-emerald-300" },
-            ].map(({ label, value, color }) => (
-              <div key={label} className="rounded-[22px] border border-white/8 bg-white/[0.05] px-4 py-4 text-center">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-white/35">{label}</div>
-                <div className={cn("mt-2 text-2xl font-bold tabular-nums", color)}>{value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      {/* Filters */}
-      <div className="mt-4 overflow-hidden rounded-[28px] border border-white/8 bg-white/[0.03] p-4">
-        <div className="flex flex-wrap items-center gap-4">
+          {!loading && (withConf > 0 || highConf > 0) && (
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-center">
+                <div className="font-mono text-[18px] font-bold tabular-nums text-white leading-none">{withConf}</div>
+                <div className="mt-1 text-[9px] uppercase tracking-[0.14em] text-white/30">Predictions</div>
+              </div>
+              {highConf > 0 && (
+                <div className="rounded-xl border px-3 py-1.5 text-center"
+                  style={{ borderColor: "rgba(52,211,153,0.25)", background: "rgba(52,211,153,0.08)" }}>
+                  <div className="font-mono text-[18px] font-bold tabular-nums text-emerald-300 leading-none">{highConf}</div>
+                  <div className="mt-1 text-[9px] uppercase tracking-[0.14em]" style={{ color: "rgba(52,211,153,0.5)" }}>High conf</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Filters */}
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-white/[0.05] pt-4">
           <PillGroup
             label="Sport"
             options={SPORT_META}
@@ -457,7 +666,7 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
               "ml-auto flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all",
               showAll
                 ? "border-white/15 bg-white/[0.06] text-white/70"
-                : "border-white/8 text-white/40 hover:text-white/60"
+                : "border-white/[0.08] text-white/40 hover:text-white/60"
             )}
           >
             {showAll ? <Eye size={13} /> : <EyeOff size={13} />}
@@ -466,12 +675,88 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="mt-6 space-y-8">
+      {/* ── Two-column: Featured picks + Top tipsters ──────────────────────── */}
+      <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
+
+        {/* Featured picks */}
+        <div>
+          <SectionLabel
+            label="Top Picks"
+            sub={loading ? "Loading…" : "Highest confidence today"}
+            count={loading ? undefined : featuredPicks.length}
+          />
+          {loading ? (
+            <div className="space-y-2">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-[88px] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02]" />
+              ))}
+            </div>
+          ) : featuredPicks.length === 0 ? (
+            <div className="flex min-h-[160px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/[0.10] bg-white/[0.02] p-6 text-center">
+              <BrainCircuit size={24} className="text-white/25" />
+              <p className="mt-3 text-[13px] text-white/40">No high-confidence picks yet</p>
+              <p className="mt-1 text-[11px] text-white/22">
+                Lower the confidence filter to see more matches
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {featuredPicks.map((m) => (
+                <FeaturedPickCard key={m.id} match={m} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Top tipsters */}
+        <div>
+          <SectionLabel
+            label="Top Tipsters"
+            sub="Best win rates this week"
+            action={{ label: "View all", href: "/tipsters" }}
+          />
+          {tipstersLoading ? (
+            <div className="space-y-2">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-[60px] animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.02]" />
+              ))}
+            </div>
+          ) : tipsters.length === 0 ? (
+            <div className="flex min-h-[160px] flex-col items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] p-6 text-center">
+              <Users size={22} className="text-white/25" />
+              <p className="mt-3 text-[13px] text-white/40">No tipsters yet</p>
+              <Link href="/tipsters" className="mt-2 text-[11px] text-[var(--accent)] hover:opacity-75 transition-opacity">
+                Go to tipsters →
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {tipsters.map((t) => (
+                <TipsterCard key={t.id} tipster={t} />
+              ))}
+              <Link
+                href="/tipsters"
+                className="mt-1 flex w-full items-center justify-center gap-1 rounded-xl border border-white/[0.08] py-2.5 text-[11px] font-medium text-white/38 transition-colors hover:bg-white/[0.03] hover:text-white/60"
+              >
+                Full leaderboard <ChevronRight size={11} />
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── All fixtures ──────────────────────────────────────────────────── */}
+      <div>
+        <SectionLabel
+          label="All Fixtures"
+          sub={loading ? "Loading…" : `${items.length} upcoming · sorted by kickoff`}
+          count={loading ? undefined : items.length}
+        />
+
         {loading ? (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 9 }).map((_, i) => (
-              <div key={i} className="h-52 animate-pulse rounded-[28px] border border-white/6 bg-white/[0.02]" />
+              <div key={i} className="h-52 animate-pulse rounded-[28px] border border-white/[0.06] bg-white/[0.02]" />
             ))}
           </div>
         ) : grouped.length === 0 ? (
@@ -493,9 +778,11 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
             )}
           </div>
         ) : (
-          grouped.map(({ label, matches: dayMatches }) => (
-            <DaySection key={label} label={label} matches={dayMatches} />
-          ))
+          <div className="space-y-8">
+            {grouped.map(({ label, matches: dayMatches }) => (
+              <DaySection key={label} label={label} matches={dayMatches} />
+            ))}
+          </div>
         )}
       </div>
     </div>

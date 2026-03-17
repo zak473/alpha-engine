@@ -10,7 +10,7 @@ export default async function PredictionsPage({
 }) {
   const params = await searchParams;
   return (
-    <AppShell title="Tip Finder" subtitle="Model edges, confidence, and pre-match pricing">
+    <AppShell title="Intelligence" subtitle="Today's best picks · top tipsters · strongest edges">
       <PredictionsShell initialSport={params.sport ?? "all"} />
     </AppShell>
   );
