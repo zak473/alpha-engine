@@ -59,8 +59,10 @@ export function Sidebar() {
           boxShadow: "24px 0 60px rgba(0,0,0,0.28)",
         }}
       >
-        <div className="px-4 pb-3 pt-5">
-          <Image src="/never-in-doubt-logo.png" alt="Never In Doubt" width={1264} height={848} className="w-full h-auto opacity-90" />
+        <div className="px-4 pb-3 pt-4">
+          <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.24)] backdrop-blur">
+            <Image src="/never-in-doubt-logo.png" alt="Never In Doubt" width={1264} height={848} className="w-full h-auto opacity-90" />
+          </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 pb-4">
