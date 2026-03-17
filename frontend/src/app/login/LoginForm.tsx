@@ -40,10 +40,10 @@ export function LoginForm() {
     <div className="px-4 py-8 lg:px-6 lg:py-10">
       <div className="mx-auto grid w-full max-w-7xl gap-6 lg:grid-cols-[1.12fr_0.88fr]">
         {/* Marketing panel */}
-        <section className="relative overflow-hidden rounded-[36px] border border-white/8 bg-[radial-gradient(circle_at_top_right,rgba(46,219,108,0.12),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-6 text-white shadow-[0_25px_80px_rgba(0,0,0,0.28)] backdrop-blur lg:p-8">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(46,219,108,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(46,219,108,0.08),transparent_28%)]" />
+        <section className="relative overflow-hidden rounded-[36px] border border-white/8 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.12),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-6 text-white shadow-[0_25px_80px_rgba(0,0,0,0.28)] backdrop-blur lg:p-8">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.08),transparent_28%)]" />
           <div className="relative z-10 flex h-full flex-col">
-            <div className="inline-flex w-fit items-center rounded-full border border-[rgba(46,219,108,0.22)] bg-[rgba(46,219,108,0.08)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#2edb6c]">
+            <div className="inline-flex w-fit items-center rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-300">
               Never In Doubt
             </div>
 
@@ -63,7 +63,7 @@ export function LoginForm() {
               <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.04] p-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#2edb6c]">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-400">
                       Platform access
                     </div>
                     <div className="mt-2 text-2xl font-semibold text-white">
@@ -77,7 +77,7 @@ export function LoginForm() {
                     <div className="text-[11px] uppercase tracking-[0.16em] text-white/45">
                       Status
                     </div>
-                    <div className="mt-1 text-sm font-semibold text-[#2edb6c]">
+                    <div className="mt-1 text-sm font-semibold text-blue-300">
                       Online now
                     </div>
                   </div>
@@ -128,7 +128,7 @@ export function LoginForm() {
                   key={item.label}
                   className="rounded-[22px] border border-white/10 bg-white/[0.04] px-4 py-4"
                 >
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#2edb6c]">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-400">
                     {item.label}
                   </div>
                   <div className="mt-2 text-sm text-white/72">{item.value}</div>
@@ -220,7 +220,7 @@ export function LoginForm() {
 
             <button
               type="submit"
-              className="inline-flex h-14 items-center justify-center rounded-2xl bg-[#2edb6c] px-5 text-[15px] font-semibold text-[#0f1a12] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-70"
+              className="inline-flex h-14 items-center justify-center rounded-2xl bg-blue-500 px-5 text-[15px] font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-70"
               disabled={loading}
             >
               {loading ? "Signing in…" : "Enter platform"}

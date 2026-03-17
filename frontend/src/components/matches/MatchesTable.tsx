@@ -51,7 +51,7 @@ function confidenceTone(confidence: number | null | undefined) {
 function sortButton(active: boolean) {
   return cn(
     "rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all",
-    active ? "bg-[#2edb6c] text-[#07110d]" : "text-white/55 hover:bg-white/[0.06] hover:text-white"
+    active ? "bg-blue-500 text-white" : "text-white/55 hover:bg-white/[0.06] hover:text-white"
   );
 }
 

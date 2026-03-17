@@ -2031,7 +2031,7 @@ export function SoccerMatchDetail({ match, eloHome, eloAway }: MatchProps) {
               <button key={t.id} onClick={() => setActiveTab(t.id)}
                 className={cn("shrink-0 rounded-full px-4 py-2.5 text-[12px] font-semibold transition-all",
                   activeTab === t.id
-                    ? "bg-[#2edb6c] text-[#07110d] shadow-sm"
+                    ? "bg-blue-500 text-white shadow-sm"
                     : "text-white/60 hover:bg-white/[0.06] hover:text-white"
                 )}>{t.label}</button>
             ))}

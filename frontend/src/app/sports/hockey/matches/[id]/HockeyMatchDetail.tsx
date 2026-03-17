@@ -26,9 +26,9 @@ import type {
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
-  bg0:         "#08120e",
-  surface:     "rgba(255,255,255,0.04)",
-  border:      "rgba(255,255,255,0.08)",
+  bg0:         "#09090b",
+  surface:     "#18181b",
+  border:      "#27272a",
   textPrimary: "#f4f4f5",
   textMuted:   "#a1a1aa",
   textSubtle:  "#71717a",

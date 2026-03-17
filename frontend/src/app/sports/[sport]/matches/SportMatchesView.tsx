@@ -155,7 +155,7 @@ export function SportMatchesView({ sport }: Props) {
                 className={cn(
                   "flex items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-all",
                   s.slug === sport
-                    ? "bg-[#2edb6c] text-[#07110d] shadow-sm"
+                    ? "bg-blue-500 text-white shadow-sm"
                     : "text-white/60 hover:bg-white/[0.06] hover:text-white"
                 )}
               >
