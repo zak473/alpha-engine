@@ -3,19 +3,22 @@
 import { useState, useCallback, useId } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronUp, Shield, Timer, TrendingUp, Flame } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatMatchKickoff } from "@/lib/utils";
 import type { BettingMatch, Market, Selection, SportSlug } from "@/lib/betting-types";
 import { SPORT_CONFIG } from "@/lib/betting-types";
 import { useBetting } from "./BettingContext";
 
 function OddsButton({ selection, market, match, compact = false }: { selection: Selection; market: Market; match: BettingMatch; compact?: boolean }) {
-  const { addToQueue, isInQueue } = useBetting();
+  const { addToQueue, removeFromQueue, isInQueue } = useBetting();
   const selId = `${match.id}:${market.id}:${selection.id}`;
   const added = isInQueue(selId);
   const [flash, setFlash] = useState(false);
 
   const handleClick = useCallback(() => {
-    if (added) return;
+    if (added) {
+      removeFromQueue(selId);
+      return;
+    }
     addToQueue({
       id: selId,
       matchId: match.id,
@@ -33,7 +36,7 @@ function OddsButton({ selection, market, match, compact = false }: { selection: 
     });
     setFlash(true);
     setTimeout(() => setFlash(false), 1400);
-  }, [added, addToQueue, selId, match, market, selection]);
+  }, [added, addToQueue, removeFromQueue, selId, match, market, selection]);
 
   const edgePct = (selection.edge ?? 0) * 100;
 
@@ -59,10 +62,10 @@ function OddsButton({ selection, market, match, compact = false }: { selection: 
       }}
     >
       <span className={cn("font-mono font-bold tabular-nums leading-tight", compact ? "text-[11px]" : "text-sm")}>
-        {flash || added ? "✓ Added" : selection.odds.toFixed(2)}
+        {flash ? "✓ Added" : added ? "× Remove" : selection.odds.toFixed(2)}
       </span>
       <span className={cn("mt-0.5 max-w-full truncate leading-tight text-text-muted", compact ? "text-[9px]" : "text-[10px]")}>
-        {flash || added ? "Tracked" : selection.label}
+        {flash ? "Tracked" : added ? "Click to deselect" : selection.label}
       </span>
       {!flash && !added && edgePct > 0.5 && (
         <span className="mt-1 rounded-full bg-emerald-500/12 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300">
@@ -274,6 +277,8 @@ export function MatchCard({ match, highlighted, sport, detailHref }: MatchCardPr
   );
 }
 
+const TZ = "Europe/London";
+
 function isWithinHour(iso: string): boolean {
   const ms = new Date(iso).getTime();
   if (isNaN(ms)) return false;
@@ -281,17 +286,7 @@ function isWithinHour(iso: string): boolean {
   return diff > 0 && diff < 3_600_000;
 }
 
-function formatMatchTime(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "—";
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const tomorrowStart = new Date(todayStart.getTime() + 86_400_000);
-
-  if (d >= todayStart && d < tomorrowStart) return "Today " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  if (d >= tomorrowStart && d < new Date(tomorrowStart.getTime() + 86_400_000)) return "Tomorrow " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) + " " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-}
+const formatMatchTime = formatMatchKickoff;
 
 function formatCountdown(iso: string, status: BettingMatch["status"]): string {
   if (status === "live") return "In-play";

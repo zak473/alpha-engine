@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BrainCircuit, Circle, ClipboardList, LayoutDashboard, MessageSquare, Radio, ShieldCheck, Swords, TrendingUp, Trophy, Users } from "lucide-react";
+import { Activity, BrainCircuit, Circle, ClipboardList, LayoutDashboard, MessageSquare, Radio, ShieldCheck, TrendingUp, Trophy, Users } from "lucide-react";
 import { useSidebar } from "./SidebarContext";
 
 const NAV = [
   { label: "Betting Board", href: "/dashboard", icon: LayoutDashboard },
   { label: "Live Now", href: "/live", icon: Radio },
-  { label: "Matches", href: "/matches", icon: Swords },
   { label: "Tipsters", href: "/tipsters", icon: Users },
   { label: "Predictions", href: "/predictions", icon: BrainCircuit },
   { label: "Challenges", href: "/challenges", icon: Trophy },
@@ -19,7 +18,7 @@ const NAV = [
 
 const SPORTS = [
   { label: "Soccer",       href: "/sports/soccer/matches",      color: "#60a5fa" },
-  { label: "Tennis",       href: "/sports/tennis/matches",      color: "#2edb6c" },
+  { label: "Tennis",       href: "/sports/tennis/matches",      color: "#22c55e" },
   { label: "Esports",      href: "/sports/esports/matches",     color: "#a855f7" },
   { label: "Basketball",   href: "/sports/basketball/matches",  color: "#f59e0b" },
   { label: "Baseball",     href: "/sports/baseball/matches",    color: "#ef4444" },
@@ -50,8 +49,8 @@ export function Sidebar() {
           width: "var(--sidebar-width)",
           display: "flex",
           flexDirection: "column",
-          background: "linear-gradient(180deg,#08120e 0%,#0a1510 100%)",
-          borderRight: "1px solid rgba(255,255,255,0.08)",
+          background: "linear-gradient(180deg,#09090b 0%,#111113 100%)",
+          borderRight: "1px solid #27272a",
           zIndex: 40,
           transform: open ? "translateX(0)" : undefined,
           transition: "transform 200ms",
@@ -60,8 +59,8 @@ export function Sidebar() {
       >
         <div className="px-4 pb-3 pt-4">
           <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))] p-4 shadow-[0_18px_40px_rgba(0,0,0,0.24)] backdrop-blur">
-            <div className="rounded-[22px] border border-emerald-300/14 bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.20),transparent_70%),rgba(255,255,255,0.04)] p-4">
-              <div className="text-[11px] uppercase tracking-[0.24em] text-emerald-200/70">Never In Doubt</div>
+            <div className="rounded-[22px] border border-white/10 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.15),transparent_70%),rgba(255,255,255,0.04)] p-4">
+              <div className="text-[11px] uppercase tracking-[0.24em] text-white/50">Never In Doubt</div>
               <div className="mt-2 text-xl font-semibold tracking-[-0.04em] text-white">Premium betting board</div>
               <p className="mt-3 text-[12px] leading-5 text-white/58">
                 A calmer shell, stronger hierarchy, and cleaner live workflow across the whole product.
@@ -93,9 +92,9 @@ export function Sidebar() {
                     href={href}
                     onClick={() => setOpen(false)}
                     className="nav-link"
-                    style={active ? { background: "linear-gradient(135deg,rgba(54,242,143,0.18),rgba(54,242,143,0.08))", color: "#fff", border: "1px solid rgba(54,242,143,0.24)", boxShadow: "0 10px 24px rgba(54,242,143,0.08)" } : { border: "1px solid transparent" }}
+                    style={active ? { background: "rgba(59,130,246,0.12)", color: "#fff", border: "1px solid rgba(59,130,246,0.25)", boxShadow: "0 10px 24px rgba(59,130,246,0.08)" } : { border: "1px solid transparent" }}
                   >
-                    <Icon size={15} style={{ flexShrink: 0, color: active ? "#7af7b7" : "rgba(255,255,255,0.54)" }} />
+                    <Icon size={15} style={{ flexShrink: 0, color: active ? "#93c5fd" : "rgba(255,255,255,0.54)" }} />
                     {label}
                   </Link>
                 );
@@ -140,7 +139,7 @@ export function Sidebar() {
 
         <div className="border-t border-white/8 px-4 py-3 text-[11px] text-white/52">
           <div className="flex items-center gap-2">
-            <Activity size={12} className="text-emerald-300" />
+            <Activity size={12} className="text-blue-400" />
             Synced live board experience
           </div>
         </div>

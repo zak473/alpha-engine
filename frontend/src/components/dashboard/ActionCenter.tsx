@@ -183,7 +183,7 @@ export function ActionCenter({
     actions.push({ id: "train", icon: Brain, label: "Train new model", description: "Retrain with latest data", href: "/models" });
   }
   if (expiringCount > 0) {
-    actions.push({ id: "resolve", icon: Clock, label: `Resolve ${expiringCount} expiring`, description: "Predictions locking soon", href: "/matches?range=2h" });
+    actions.push({ id: "resolve", icon: Clock, label: `Resolve ${expiringCount} expiring`, description: "Predictions locking soon", href: "/predictions" });
   }
   if (challengeEndingName) {
     actions.push({ id: "picks", icon: Trophy, label: "Place challenge picks", description: challengeEndingName, href: "/challenges" });

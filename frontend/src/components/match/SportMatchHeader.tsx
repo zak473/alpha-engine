@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, Calendar, Clock, MapPin } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatUKDate, formatUKTime } from "@/lib/utils";
 import { FormStreak } from "@/components/charts/FormStreak";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -51,12 +51,8 @@ export interface SportMatchHeaderProps {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-}
-function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) + " UTC";
-}
+const fmtDate = formatUKDate;
+const fmtTime = formatUKTime;
 
 function Delta({ v }: { v: number | null | undefined }) {
   if (v == null) return null;

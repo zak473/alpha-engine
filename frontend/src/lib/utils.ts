@@ -79,9 +79,46 @@ export function formatDate(iso: string, mode: "short" | "long" | "relative" = "s
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "Europe/London",
     });
   }
-  return d.toLocaleString("en-GB", { day: "numeric", month: "short" });
+  return d.toLocaleString("en-GB", { day: "numeric", month: "short", timeZone: "Europe/London" });
+}
+
+// ─── UK timezone date helpers ─────────────────────────────────────────────────
+const UK_TZ = "Europe/London";
+
+/** Midnight UTC for the given date in UK time */
+function ukMidnight(d: Date): Date {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: UK_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+  const [day, month, year] = parts.split("/");
+  return new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
+}
+
+/**
+ * Format a match start time in UK timezone.
+ * Returns "Today HH:MM", "Tomorrow HH:MM", or "DD Mon HH:MM"
+ */
+export function formatMatchKickoff(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  const now = new Date();
+  const todayStart = ukMidnight(now);
+  const tomorrowStart = new Date(todayStart.getTime() + 86_400_000);
+  const timeStr = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: UK_TZ });
+  if (d >= todayStart && d < tomorrowStart) return "Today " + timeStr;
+  if (d >= tomorrowStart && d < new Date(tomorrowStart.getTime() + 86_400_000)) return "Tomorrow " + timeStr;
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: UK_TZ }) + " " + timeStr;
+}
+
+/** Format a date as "16 Mar 2026" in UK timezone */
+export function formatUKDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: UK_TZ });
+}
+
+/** Format time only as "HH:MM" in UK timezone */
+export function formatUKTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: UK_TZ });
 }
 
 /** +43.2u or -8.4u (betting units) */

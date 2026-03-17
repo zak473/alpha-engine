@@ -16,7 +16,7 @@ export function TopPicksMiniModule({
   title = "Model's Top Picks Today",
   maxPicks = 3,
 }: TopPicksMiniModuleProps) {
-  const { addToQueue, isInQueue } = useBetting();
+  const { addToQueue, removeFromQueue, isInQueue } = useBetting();
 
   // Top picks: highest edge, upcoming or live only
   const picks = [...matches]
@@ -67,7 +67,7 @@ export function TopPicksMiniModule({
           const cfg = SPORT_CONFIG[m.sport];
 
           const handleAdd = () => {
-            if (added) return;
+            if (added) { removeFromQueue(selId); return; }
             addToQueue({
               id: selId,
               matchId: m.id,
