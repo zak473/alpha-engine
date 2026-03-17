@@ -81,6 +81,29 @@ async function fetchBackendForSport(sport: SportSlug): Promise<BackendItem[]> {
   }
 }
 
+async function fetchPreview(sport: SportSlug, home: string, away: string): Promise<BackendItem | null> {
+  try {
+    const res = await fetch(
+      `/api/v1/sports/${sport}/matches/preview?home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return null;
+    const d = await res.json();
+    if (!d.probabilities) return null;
+    return {
+      home_name: d.home?.name ?? home,
+      away_name: d.away?.name ?? away,
+      p_home: d.probabilities.home_win ?? null,
+      p_away: d.probabilities.away_win ?? null,
+      p_draw: d.probabilities.draw ?? null,
+      confidence: d.confidence ?? null,
+      kickoff_utc: d.kickoff_utc ?? new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function mergeBackend(match: BettingMatch, items: BackendItem[]): BettingMatch {
   const found = items.find(
     (b) =>
@@ -560,19 +583,45 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
         )
       )).then((res) => res.flat()),
       Promise.all(sportSlugs.map((s) => fetchBackendForSport(s).then((items) => ({ sport: s, items })))),
-    ]).then(([sgoMatches, backendBySport]) => {
+    ]).then(async ([sgoMatches, backendBySport]) => {
       const backendMap = Object.fromEntries(backendBySport.map(({ sport: s, items }) => [s, items]));
       const now = Date.now();
       const cutoff = now + 48 * 3600_000;
-      const merged: MatchWithSportLocal[] = sgoMatches
+
+      // First pass: merge with backend DB matches
+      const firstPass: MatchWithSportLocal[] = sgoMatches
         .filter((m) => {
           const t = new Date(m.startTime).getTime();
           return t >= now && t <= cutoff;
         })
         .map((m) => ({ ...mergeBackend(m, backendMap[m.sport] ?? []), sport: m.sport }))
         .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-      setMatches(merged);
+
+      setMatches(firstPass);
       setLoading(false);
+
+      // Second pass: for matches still missing probabilities, call preview endpoint
+      const unmatched = firstPass.filter((m) => m.pHome == null && m.status !== "finished");
+      if (unmatched.length > 0) {
+        const previews = await Promise.all(
+          unmatched.map((m) => fetchPreview(m.sport, m.home.name, m.away.name))
+        );
+        setMatches((prev) =>
+          prev.map((m) => {
+            if (m.pHome != null) return m;
+            const idx = unmatched.findIndex((u) => u.id === m.id);
+            const p = idx >= 0 ? previews[idx] : null;
+            if (!p) return m;
+            return {
+              ...m,
+              pHome: p.p_home ?? undefined,
+              pAway: p.p_away ?? undefined,
+              pDraw: p.p_draw ?? undefined,
+              modelConfidence: p.confidence != null ? p.confidence / 100 : undefined,
+            };
+          })
+        );
+      }
     });
   }, [sport]);
 
