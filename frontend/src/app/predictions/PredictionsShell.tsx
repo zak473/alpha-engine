@@ -525,8 +525,8 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
   type MatchWithSportLocal = BettingMatch & { sport: SportSlug };
   const [matches, setMatches] = useState<MatchWithSportLocal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [minConf, setMinConf] = useState("0.6");
-  const [showAll, setShowAll] = useState(false);
+  const [minConf, setMinConf] = useState("0");
+  const [showAll, setShowAll] = useState(true);
   const [tipsters, setTipsters] = useState<TipsterProfile[]>([]);
   const [tipstersLoading, setTipstersLoading] = useState(true);
 
