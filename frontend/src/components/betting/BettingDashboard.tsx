@@ -63,59 +63,68 @@ export function BettingDashboard({ matches, sport }: { matches: BettingMatch[]; 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
 
-          {/* Compact page header */}
-          <BettingHero
-            matches={sportFiltered}
-            filteredCount={filtered.length}
-            activeSportLabel={activeSportLabel}
-          />
+          {/* ── Command header — title row + sport tab row in one unified block ── */}
+          <div
+            className="border-b"
+            style={{ background: "rgba(255,255,255,0.018)", borderColor: "var(--border0)" }}
+          >
+            {/* Row 1: title + KPI chips */}
+            <BettingHero
+              matches={sportFiltered}
+              filteredCount={filtered.length}
+              activeSportLabel={activeSportLabel}
+            />
 
-          {/* Sport pill selector + quick filters */}
-          <div className="flex flex-wrap items-center gap-1.5 border-b px-4 pb-3 pt-1 lg:px-6" style={{ borderColor: "var(--border0)" }}>
-            {SPORT_ENTRIES.map((entry) => (
-              <button
-                key={entry}
-                onClick={() => handleSportSelect(entry)}
-                className={cn(
-                  "rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-all",
-                  activeSport === entry
-                    ? "bg-[#2edb6c] text-[#07110d]"
-                    : "border border-white/[0.08] bg-white/[0.03] text-white/55 hover:bg-white/[0.06] hover:text-white"
+            {/* Internal row divider */}
+            <div className="mx-4 h-px lg:mx-6" style={{ background: "var(--border0)" }} />
+
+            {/* Row 2: sport tabs + quick actions */}
+            <div className="flex flex-wrap items-center gap-1.5 px-4 py-2 lg:px-6">
+              {SPORT_ENTRIES.map((entry) => (
+                <button
+                  key={entry}
+                  onClick={() => handleSportSelect(entry)}
+                  className={cn(
+                    "rounded px-3 py-1 text-[12px] font-semibold transition-all",
+                    activeSport === entry
+                      ? "bg-[#2edb6c] text-[#07110d]"
+                      : "text-white/50 hover:bg-white/[0.06] hover:text-white"
+                  )}
+                >
+                  {entry === "all" ? "All" : SPORT_CONFIG[entry].label}
+                </button>
+              ))}
+
+              <div className="ml-auto flex items-center gap-1">
+                <button
+                  onClick={handleShowTopPicks}
+                  className="flex items-center gap-1 rounded border border-amber-400/[0.18] bg-amber-400/[0.07] px-2.5 py-1 text-[11px] font-semibold text-amber-300 transition hover:bg-amber-400/[0.12]"
+                >
+                  <Zap size={10} />
+                  Top picks
+                </button>
+                {isFilterDirty ? (
+                  <button
+                    onClick={handleClearFilters}
+                    className="flex items-center gap-1 rounded border border-white/[0.08] bg-transparent px-2.5 py-1 text-[11px] text-white/45 transition hover:text-white"
+                  >
+                    <X size={10} />
+                    Reset
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleShowLive}
+                    className="flex items-center gap-1 rounded border border-white/[0.08] bg-transparent px-2.5 py-1 text-[11px] text-white/45 transition hover:text-white"
+                  >
+                    <Activity size={10} />
+                    Live only
+                  </button>
                 )}
-              >
-                {entry === "all" ? "All" : SPORT_CONFIG[entry].label}
-              </button>
-            ))}
-
-            <div className="ml-auto flex items-center gap-1.5">
-              <button
-                onClick={handleShowTopPicks}
-                className="flex items-center gap-1.5 rounded-full border border-amber-400/[0.2] bg-amber-400/[0.07] px-3 py-1.5 text-[12px] font-semibold text-amber-300 transition hover:bg-amber-400/[0.12]"
-              >
-                <Zap size={11} />
-                Top picks
-              </button>
-              {isFilterDirty ? (
-                <button
-                  onClick={handleClearFilters}
-                  className="flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[12px] text-white/55 transition hover:bg-white/[0.06] hover:text-white"
-                >
-                  <X size={11} />
-                  Reset
-                </button>
-              ) : (
-                <button
-                  onClick={handleShowLive}
-                  className="flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[12px] text-white/55 transition hover:bg-white/[0.06] hover:text-white"
-                >
-                  <Activity size={11} />
-                  Live only
-                </button>
-              )}
+              </div>
             </div>
           </div>
 
-          {/* Filter bar */}
+          {/* ── Filter band (sticky) ── */}
           <div className="px-4 lg:px-6">
             <StickyFilterBar
               filter={filter}
@@ -125,12 +134,12 @@ export function BettingDashboard({ matches, sport }: { matches: BettingMatch[]; 
             />
           </div>
 
-          {/* In-play strip */}
+          {/* ── In-play strip ── */}
           <div className="px-4 pb-2 lg:px-6">
             <InPlayModule />
           </div>
 
-          {/* Match board */}
+          {/* ── Match board ── */}
           <div className="px-4 py-4 lg:px-6 lg:py-5">
             <MatchList
               matches={filtered}

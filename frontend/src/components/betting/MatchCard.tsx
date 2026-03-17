@@ -44,7 +44,7 @@ function OddsButton({ selection, market, match, compact = false }: { selection: 
       className={cn(
         "relative flex flex-col items-start justify-center overflow-hidden rounded-2xl border text-left transition-all duration-150",
         "disabled:opacity-40 disabled:cursor-not-allowed",
-        compact ? "min-w-[62px] px-2.5 py-2" : "min-w-[84px] px-3 py-2.5",
+        compact ? "min-w-[58px] px-2 py-1.5" : "min-w-[76px] px-2.5 py-2",
         added || flash
           ? "text-white"
           : "text-text-primary hover:-translate-y-[1px]"
@@ -75,9 +75,9 @@ function OddsButton({ selection, market, match, compact = false }: { selection: 
 
 function MarketRow({ market, match, compact }: { market: Market; match: BettingMatch; compact?: boolean }) {
   return (
-    <div className="rounded-[20px] border p-2.5" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-      <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-text-muted">{market.name}</div>
-      <div className="flex items-center gap-2 flex-wrap">
+    <div className="rounded-xl border p-2" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-text-muted">{market.name}</div>
+      <div className="flex items-center gap-1.5 flex-wrap">
         {market.selections.map((sel) => (
           <OddsButton key={sel.id} selection={sel} market={market} match={match} compact={compact} />
         ))}
@@ -141,23 +141,23 @@ function ModelBar({ match }: { match: BettingMatch }) {
   const confidence = match.modelConfidence != null ? Math.round(match.modelConfidence * 100) : null;
 
   return (
-    <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+    <div className="grid gap-2 lg:grid-cols-[1fr_auto] lg:items-center">
       <div>
-        <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-text-muted">
+        <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-text-muted">
           <span>Model lean</span>
           <span>{pct}% home</span>
         </div>
-        <div className="h-2 overflow-hidden rounded-full" style={{ background: "var(--bg3)" }}>
+        <div className="h-1.5 overflow-hidden rounded-full" style={{ background: "var(--bg3)" }}>
           <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "var(--accent)" }} />
         </div>
       </div>
       {confidence != null && (
-        <div className="flex flex-wrap items-center gap-2 text-[11px]">
-          <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-            <Shield size={12} /> {confidence}% confidence
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+          <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+            <Shield size={11} /> {confidence}%
           </span>
-          <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-semibold" style={{ borderColor: edge >= 3 ? "rgba(34,197,94,0.2)" : "rgba(245,158,11,0.2)", background: edge >= 3 ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.10)", color: edge >= 3 ? "var(--positive)" : "var(--warning)" }}>
-            <TrendingUp size={12} /> {edge > 0 ? "+" : ""}{edge.toFixed(1)}% edge
+          <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 font-semibold" style={{ borderColor: edge >= 3 ? "rgba(34,197,94,0.2)" : "rgba(245,158,11,0.2)", background: edge >= 3 ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.10)", color: edge >= 3 ? "var(--positive)" : "var(--warning)" }}>
+            <TrendingUp size={11} /> {edge > 0 ? "+" : ""}{edge.toFixed(1)}%
           </span>
         </div>
       )}
@@ -168,14 +168,14 @@ function ModelBar({ match }: { match: BettingMatch }) {
 function MatchCardIdentity({ match, cfg }: { match: BettingMatch; cfg: (typeof SPORT_CONFIG)[keyof typeof SPORT_CONFIG] }) {
   return (
     <>
-      <div className="flex items-center justify-between gap-3 px-5 pt-4">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full text-sm" style={{ background: `${cfg.color}16`, color: cfg.color }}>
+      <div className="flex items-center justify-between gap-3 px-4 pt-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-sm" style={{ background: `${cfg.color}16`, color: cfg.color }}>
             {cfg.icon}
           </span>
           <div className="min-w-0">
             <div className="text-[10px] uppercase tracking-[0.18em] text-text-subtle">{cfg.label}</div>
-            <div className="truncate text-sm font-medium text-text-primary">{match.league}</div>
+            <div className="truncate text-[12px] font-medium text-text-primary">{match.league}</div>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -189,16 +189,16 @@ function MatchCardIdentity({ match, cfg }: { match: BettingMatch; cfg: (typeof S
         </div>
       </div>
 
-      <div className="grid gap-3 px-5 py-4 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-        <p className="truncate text-[18px] font-semibold leading-tight text-text-primary">{match.home.name}</p>
+      <div className="grid gap-2 px-4 py-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+        <p className="truncate text-[17px] font-semibold leading-tight text-text-primary">{match.home.name}</p>
         <ScoreBlock match={match} />
-        <p className="truncate text-[18px] font-semibold leading-tight text-text-primary lg:text-right">{match.away.name}</p>
+        <p className="truncate text-[17px] font-semibold leading-tight text-text-primary lg:text-right">{match.away.name}</p>
       </div>
 
-      <div className="px-5 pb-4">
-        <div className="mb-2.5 flex items-center gap-1.5">
-          <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-            <Timer size={11} /> {formatCountdown(match.startTime, match.status)}
+      <div className="px-4 pb-3">
+        <div className="mb-2 flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+            <Timer size={10} /> {formatCountdown(match.startTime, match.status)}
           </span>
         </div>
         <ModelBar match={match} />
@@ -244,12 +244,12 @@ export function MatchCard({ match, highlighted, sport, detailHref }: MatchCardPr
       )}
 
       {!isFinished && (
-        <div className="border-t px-5 py-4 flex flex-col gap-3" style={{ borderColor: "var(--border0)" }}>
+        <div className="border-t px-4 py-3 flex flex-col gap-2" style={{ borderColor: "var(--border0)" }}>
           {featuredSlice.map((mkt) => <MarketRow key={mkt.id} market={mkt} match={match} />)}
         </div>
       )}
 
-      <div className="flex items-center justify-between border-t px-5 py-3" style={{ borderColor: "var(--border0)" }}>
+      <div className="flex items-center justify-between border-t px-4 py-2" style={{ borderColor: "var(--border0)" }}>
         {hasMoreMarkets && !isFinished ? (
           <button onClick={() => setExpanded((v) => !v)} className="flex items-center gap-1 text-[11px] font-medium text-text-muted transition-colors hover:text-text-primary">
             {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
@@ -260,7 +260,7 @@ export function MatchCard({ match, highlighted, sport, detailHref }: MatchCardPr
       </div>
 
       {expanded && !isFinished && (
-        <div className="border-t px-5 py-4 flex flex-col gap-3" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+        <div className="border-t px-4 py-3 flex flex-col gap-2" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
           {match.allMarkets.slice(2).map((mkt) => <MarketRow key={mkt.id} market={mkt} match={match} />)}
         </div>
       )}

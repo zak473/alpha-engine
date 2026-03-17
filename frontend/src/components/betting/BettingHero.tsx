@@ -8,6 +8,38 @@ interface BettingHeroProps {
   activeSportLabel: string;
 }
 
+type KpiVariant = "live" | "edge" | "neutral";
+
+function KpiChip({
+  value,
+  sub,
+  variant = "neutral",
+}: {
+  value: string;
+  sub?: string;
+  variant?: KpiVariant;
+}) {
+  const style: React.CSSProperties =
+    variant === "live"
+      ? { borderColor: "rgba(52,211,153,0.28)", background: "rgba(52,211,153,0.09)", color: "#6ee7b7" }
+      : variant === "edge"
+      ? { borderColor: "rgba(251,191,36,0.22)", background: "rgba(251,191,36,0.08)", color: "#fcd34d" }
+      : { borderColor: "var(--border0)", background: "var(--bg2)", color: "var(--text2)" };
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] tabular-nums"
+      style={style}
+    >
+      {variant === "live" && (
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+      )}
+      <span className="font-semibold">{value}</span>
+      {sub && <span className="ml-px text-[9px] opacity-55">{sub}</span>}
+    </span>
+  );
+}
+
 export function BettingHero({ matches, filteredCount, activeSportLabel }: BettingHeroProps) {
   const liveCount = matches.filter((m) => m.status === "live").length;
   const topEdge = matches.reduce((max, m) => Math.max(max, m.edgePercent ?? 0), 0);
@@ -20,34 +52,18 @@ export function BettingHero({ matches, filteredCount, activeSportLabel }: Bettin
     : null;
 
   return (
-    <div className="flex items-center justify-between gap-3 px-4 pb-3 pt-4 lg:px-6 lg:pt-5">
-      <div className="flex min-w-0 items-center gap-2.5">
-        <h1 className="text-[15px] font-semibold tracking-[-0.02em] text-white">Betting Board</h1>
-        <span className="hidden text-[11px] font-medium uppercase tracking-[0.14em] text-white/38 sm:inline">
-          {activeSportLabel}
-        </span>
+    <div className="flex items-start justify-between gap-4 px-4 pb-2.5 pt-3 lg:px-6">
+      <div>
+        <h1 className="text-[14px] font-bold tracking-[-0.02em] text-white">Betting Board</h1>
+        <p className="mt-0.5 text-[11px] text-white/32">
+          {activeSportLabel} · AI-ranked predictions · sorted by edge
+        </p>
       </div>
-
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {liveCount > 0 && (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/[0.08] px-2.5 py-1 text-[11px] font-semibold text-emerald-300">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-            {liveCount} live
-          </span>
-        )}
-        {topEdge > 0 && (
-          <span className="rounded-full border border-amber-400/20 bg-amber-400/[0.07] px-2.5 py-1 text-[11px] font-semibold text-amber-300">
-            +{topEdge.toFixed(1)}% top edge
-          </span>
-        )}
-        {avgConfidence != null && (
-          <span className="hidden rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[11px] text-white/45 sm:inline">
-            {avgConfidence}% avg conf
-          </span>
-        )}
-        <span className="text-[11px] tabular-nums text-white/28">
-          {filteredCount} {filteredCount === 1 ? "match" : "matches"}
-        </span>
+      <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-1.5">
+        {liveCount > 0 && <KpiChip value={`${liveCount} live`} variant="live" />}
+        {topEdge > 0 && <KpiChip value={`+${topEdge.toFixed(1)}%`} sub="edge" variant="edge" />}
+        {avgConfidence != null && <KpiChip value={`${avgConfidence}%`} sub="conf" />}
+        <KpiChip value={`${filteredCount}`} sub={filteredCount === 1 ? "match" : "matches"} />
       </div>
     </div>
   );
