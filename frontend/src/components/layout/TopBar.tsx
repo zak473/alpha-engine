@@ -50,8 +50,8 @@ function SearchBox({ onClose }: { onClose?: () => void }) {
   }, []);
 
   return (
-    <div ref={wrapRef} className="relative w-full max-w-xl">
-      <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-2.5 backdrop-blur transition focus-within:border-emerald-300/25 focus-within:bg-white/[0.07]">
+    <div ref={wrapRef} className="relative w-full max-w-[32rem]">
+      <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-3 py-2.5 backdrop-blur transition focus-within:border-emerald-300/25 focus-within:bg-white/[0.07]">
         <Search size={15} className="text-white/45" />
         <input
           value={query}
@@ -189,7 +189,7 @@ export function TopBar({ title, subtitle }: TopBarProps) {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
 
   return (
-    <header className="sticky top-0 z-30 flex h-[74px] items-center gap-3 border-b border-white/8 bg-white/[0.04] px-4 backdrop-blur-xl lg:px-6">
+    <header className="sticky top-0 z-30 flex h-[72px] items-center gap-3 border-b border-white/8 bg-[#0a1510]/78 px-4 backdrop-blur-xl lg:px-6">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <button
           className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/72 lg:hidden"
@@ -210,14 +210,14 @@ export function TopBar({ title, subtitle }: TopBarProps) {
         </div>
       </div>
 
-      <div className="hidden flex-1 justify-center md:flex">
+      <div className="hidden flex-1 justify-center lg:flex">
         <SearchBox />
       </div>
 
       <div className="flex items-center justify-end gap-2">
         <button
           onClick={() => setShowMobileSearch((v) => !v)}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/72 md:hidden"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-white/72 lg:hidden"
           aria-label="Search"
         >
           {showMobileSearch ? <X size={16} /> : <Search size={16} />}
@@ -241,7 +241,7 @@ export function TopBar({ title, subtitle }: TopBarProps) {
       </div>
 
       {showMobileSearch && (
-        <div className="absolute left-0 right-0 top-[74px] z-40 border-b border-white/8 bg-white/[0.06] px-4 py-3 backdrop-blur-xl md:hidden">
+        <div className="absolute left-0 right-0 top-[72px] z-40 border-b border-white/8 bg-[#0a1510]/92 px-4 py-3 backdrop-blur-xl lg:hidden">
           <SearchBox onClose={() => setShowMobileSearch(false)} />
         </div>
       )}
