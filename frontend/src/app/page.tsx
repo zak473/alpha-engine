@@ -27,15 +27,15 @@ const pillars = [
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen overflow-hidden bg-[#09090b] text-white">
+    <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,rgba(61,242,145,0.16),transparent_24%),linear-gradient(180deg,#07110d_0%,#091510_45%,#0b1712_100%)] text-white">
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-8 lg:px-10">
         <header className="flex items-center justify-between gap-4 rounded-full border border-white/10 bg-white/5 px-5 py-3 backdrop-blur">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-500/20 text-blue-300 shadow-[0_12px_30px_rgba(59,130,246,0.28)]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#36f28f_0%,#15a95b_100%)] text-[#041109] shadow-[0_12px_30px_rgba(54,242,143,0.28)]">
               <Sparkles size={18} />
             </div>
             <div>
-              <div className="text-[11px] uppercase tracking-[0.28em] text-white/50">Never In Doubt</div>
+              <div className="text-[11px] uppercase tracking-[0.28em] text-emerald-200/70">Never In Doubt</div>
               <div className="text-sm font-semibold text-white/95">AI sports betting platform</div>
             </div>
           </div>
@@ -44,7 +44,7 @@ export default function HomePage() {
             <Link href="/login" className="hidden rounded-full border border-white/12 px-4 py-2 text-sm font-medium text-white/80 transition hover:bg-white/5 sm:inline-flex">
               Log in
             </Link>
-            <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-full bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(59,130,246,0.22)] transition hover:-translate-y-0.5">
+            <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#36f28f_0%,#1ac96b_100%)] px-5 py-2.5 text-sm font-semibold text-[#041109] shadow-[0_18px_40px_rgba(54,242,143,0.22)] transition hover:-translate-y-0.5">
               Open dashboard
               <ArrowRight size={16} />
             </Link>
@@ -54,8 +54,8 @@ export default function HomePage() {
         <section className="relative flex flex-1 items-center py-12 lg:py-20">
           <div className="grid w-full items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-300">
-                <span className="inline-flex h-2 w-2 rounded-full bg-blue-400 shadow-[0_0_14px_rgba(59,130,246,0.9)]" />
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/18 bg-emerald-300/8 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-200">
+                <span className="inline-flex h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_14px_rgba(110,255,178,0.9)]" />
                 Redesigned premium experience
               </div>
 
@@ -68,7 +68,7 @@ export default function HomePage() {
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-full bg-blue-500 px-6 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5">
+                <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-full bg-emerald-400 px-6 py-3 text-sm font-semibold text-[#07110d] transition hover:-translate-y-0.5">
                   Explore the board
                   <ArrowRight size={16} />
                 </Link>
@@ -88,7 +88,7 @@ export default function HomePage() {
             </div>
 
             <div className="relative">
-              <div className="absolute inset-0 rounded-[32px] bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.18),transparent_48%)] blur-2xl" />
+              <div className="absolute inset-0 rounded-[32px] bg-[radial-gradient(circle_at_top,rgba(54,242,143,0.22),transparent_48%)] blur-2xl" />
               <div className="relative rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.09),rgba(255,255,255,0.04))] p-5 shadow-[0_30px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
                 <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-5">
                   <div className="flex items-center justify-between gap-3">
@@ -96,7 +96,7 @@ export default function HomePage() {
                       <div className="text-[11px] uppercase tracking-[0.24em] text-white/45">Today’s board</div>
                       <div className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">Signal overview</div>
                     </div>
-                    <div className="rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1.5 text-xs font-semibold text-blue-300">
+                    <div className="rounded-full border border-emerald-300/18 bg-emerald-300/10 px-3 py-1.5 text-xs font-semibold text-emerald-200">
                       Live synced
                     </div>
                   </div>
@@ -104,7 +104,7 @@ export default function HomePage() {
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-[22px] border border-white/8 bg-white/5 p-4">
                       <div className="text-[11px] uppercase tracking-[0.18em] text-white/42">Top edge</div>
-                      <div className="mt-3 text-4xl font-semibold tracking-[-0.05em] text-[#22c55e]">+12.4%</div>
+                      <div className="mt-3 text-4xl font-semibold tracking-[-0.05em] text-emerald-300">+12.4%</div>
                       <div className="mt-2 text-sm text-white/52">Highest-ranked market on the board</div>
                     </div>
                     <div className="rounded-[22px] border border-white/8 bg-white/5 p-4">
@@ -125,7 +125,7 @@ export default function HomePage() {
                           <div className="text-sm font-semibold text-white">{match}</div>
                           <div className="mt-1 text-xs text-white/46">{meta}</div>
                         </div>
-                        <div className="rounded-full bg-[#22c55e]/10 px-3 py-1 text-sm font-semibold text-[#22c55e]">{edge}</div>
+                        <div className="rounded-full bg-emerald-300/10 px-3 py-1 text-sm font-semibold text-emerald-200">{edge}</div>
                       </div>
                     ))}
                   </div>
@@ -139,7 +139,7 @@ export default function HomePage() {
           <div className="grid gap-4 lg:grid-cols-3">
             {pillars.map(({ icon: Icon, title, body }) => (
               <div key={title} className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-300">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-300/10 text-emerald-200">
                   <Icon size={20} />
                 </div>
                 <h2 className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-white">{title}</h2>
@@ -150,7 +150,7 @@ export default function HomePage() {
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-[28px] border border-white/10 bg-white/5 px-6 py-5 backdrop-blur">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-blue-300">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-emerald-200">
                 <Trophy size={18} />
               </div>
               <div>
@@ -158,7 +158,7 @@ export default function HomePage() {
                 <div className="text-sm text-white/55">Dashboard, shell, and core visual system have all been refreshed.</div>
               </div>
             </div>
-            <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-full bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white">
+            <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#36f28f_0%,#1ac96b_100%)] px-5 py-2.5 text-sm font-semibold text-[#041109]">
               Launch app
               <ArrowRight size={16} />
             </Link>

@@ -233,7 +233,7 @@ export function TopBar({ title, subtitle }: TopBarProps) {
             {user ? `Logout · ${user.displayName ?? user.email}` : "Logout"}
           </button>
         ) : (
-          <Link href="/login" className="hidden items-center gap-2 rounded-full bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white sm:inline-flex">
+          <Link href="/login" className="hidden items-center gap-2 rounded-full bg-emerald-400 px-4 py-2.5 text-sm font-semibold text-[#08120e] sm:inline-flex">
             <LogIn size={15} />
             Login
           </Link>

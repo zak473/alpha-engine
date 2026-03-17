@@ -14,7 +14,7 @@ interface AppShellProps {
 export function AppShell({ children, title, subtitle, compact }: AppShellProps) {
   return (
     <SidebarProvider>
-      <div className="brand-shell relative min-h-screen bg-[#09090b] text-text-primary">
+      <div className="brand-shell relative min-h-screen bg-[radial-gradient(circle_at_top,rgba(53,242,143,0.10),transparent_18%),linear-gradient(180deg,#08120e_0%,#0a1510_100%)] text-text-primary">
         <Sidebar />
         <div className={compact ? "relative z-[1] flex h-screen flex-col overflow-hidden lg:pl-56" : "relative z-[1] flex min-h-screen flex-col lg:pl-56"}>
           <TopBar title={title} subtitle={subtitle} />
@@ -22,8 +22,8 @@ export function AppShell({ children, title, subtitle, compact }: AppShellProps) 
             {!compact && (
               <div className="mb-6 flex flex-col gap-3 rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))] px-5 py-4 shadow-[0_24px_60px_rgba(0,0,0,0.22)] backdrop-blur xl:flex-row xl:items-center xl:justify-between">
                 <div className="min-w-0">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-300">
-                    <span className="inline-flex h-2 w-2 rounded-full bg-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.8)]" />
+                  <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/14 bg-emerald-300/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-200">
+                    <span className="inline-flex h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,255,178,0.8)]" />
                     Never In Doubt workspace
                   </div>
                   <h1 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white sm:text-[2rem]">{title}</h1>

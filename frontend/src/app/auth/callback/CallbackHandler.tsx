@@ -31,7 +31,7 @@ export function CallbackHandler() {
   }, [params, router]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#09090b]">
+    <div className="flex min-h-screen items-center justify-center bg-[#08120e]">
       <p className="text-sm text-white/50">Signing you in…</p>
     </div>
   );

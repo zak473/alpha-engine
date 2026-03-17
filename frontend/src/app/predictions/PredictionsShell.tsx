@@ -293,7 +293,7 @@ function PillGroup<T extends string>({
             className={cn(
               "rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all",
               active === o.value
-                ? "bg-blue-500 text-white shadow-sm"
+                ? "bg-[#2edb6c] text-[#07110d] shadow-sm"
                 : "text-white/55 hover:bg-white/[0.06] hover:text-white"
             )}
           >

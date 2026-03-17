@@ -1009,7 +1009,7 @@ function EloTab({ match, eloHomeHistory, eloAwayHistory }: {
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                 <XAxis dataKey="date" tick={{ fill: C.textSubtle, fontSize: 10 }} tickLine={false} axisLine={false} />
                 <YAxis tick={{ fill: C.textSubtle, fontSize: 10 }} tickLine={false} axisLine={false} domain={["auto", "auto"]} />
-                <Tooltip contentStyle={{ background: "#18181b", border: `1px solid ${C.border}`, borderRadius: 12, fontSize: 11 }} labelStyle={{ color: C.textMuted }} />
+                <Tooltip contentStyle={{ background: "#0a1510", border: `1px solid ${C.border}`, borderRadius: 12, fontSize: 11 }} labelStyle={{ color: C.textMuted }} />
                 <Legend wrapperStyle={{ fontSize: 11, color: C.textMuted }} />
                 <Line type="monotone" dataKey="home" name={match.home.name} stroke={C.emerald} strokeWidth={2} dot={false} />
                 <Line type="monotone" dataKey="away" name={match.away.name} stroke={C.blue} strokeWidth={2} dot={false} />
