@@ -272,10 +272,7 @@ export function adaptToMatchCard(
   const pAway = rawAway / sum;
   const pDraw = rawDraw / sum;
 
-  // confidence from sport services is 0-100 int; normalise to 0-1
-  const confidence = hasRealPrediction && item.confidence != null
-    ? (item.confidence > 1 ? item.confidence / 100 : item.confidence)
-    : null;
+  const confidence = hasRealPrediction ? (item.confidence ?? null) : null;
   const edgePercent = confidence != null ? Math.round((confidence - 0.5) * 20 * 10) / 10 : null;
 
   let allMarkets: Market[];

@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { ChevronDown, ChevronUp, Timer, Flame, TrendingUp, Shield, MapPin, Cloud, Users } from "lucide-react";
-import { cn, formatMatchKickoff } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { SportSlug, Market, Selection } from "@/lib/betting-types";
 import { SPORT_CONFIG } from "@/lib/betting-types";
 import { useBetting } from "@/components/betting/BettingContext";
@@ -17,30 +17,26 @@ function OddsButton({ selId, selection, matchLabel, sport, league, marketId, mar
   selId: string; selection: Selection; matchLabel: string; sport: SportSlug; league: string;
   marketId: string; marketName: string; startTime: string; disabled?: boolean;
 }) {
-  const { addToQueue, removeFromQueue, isInQueue } = useBetting();
+  const { addToQueue, isInQueue } = useBetting();
   const added = isInQueue(selId);
   const [flash, setFlash] = useState(false);
 
   const handleClick = useCallback(() => {
-    if (disabled) return;
-    if (added) {
-      removeFromQueue(selId);
-      return;
-    }
+    if (added || disabled) return;
     addToQueue({ id: selId, matchId: selId.split(":")[0], matchLabel, sport, league, marketId, marketName,
       selectionId: selection.id, selectionLabel: selection.label, odds: selection.odds, edge: selection.edge,
       startTime, addedAt: new Date().toISOString() });
     setFlash(true);
     setTimeout(() => setFlash(false), 1400);
-  }, [added, disabled, addToQueue, removeFromQueue, selId, matchLabel, sport, league, marketId, marketName, selection, startTime]);
+  }, [added, disabled, addToQueue, selId, matchLabel, sport, league, marketId, marketName, selection, startTime]);
 
   return (
     <button onClick={handleClick} disabled={!!disabled}
       className={cn("relative flex flex-col items-start justify-center overflow-hidden rounded-2xl border text-left transition-all duration-150 min-w-[84px] px-3 py-2.5 disabled:opacity-40 disabled:cursor-not-allowed",
         added || flash ? "text-white" : "text-text-primary hover:-translate-y-[1px]")}
       style={added || flash ? { background: "rgba(46,219,108,0.12)", borderColor: "rgba(46,219,108,0.20)", boxShadow: "0 10px 22px rgba(46,219,108,0.10)" } : { background: "var(--bg2)", borderColor: "var(--border0)" }}>
-      <span className="font-mono font-bold tabular-nums leading-tight text-sm">{flash ? "✓ Added" : added ? "× Remove" : selection.odds.toFixed(2)}</span>
-      <span className="mt-0.5 max-w-full truncate leading-tight text-text-muted text-[10px]">{flash ? "Tracked" : added ? "Click to deselect" : selection.label}</span>
+      <span className="font-mono font-bold tabular-nums leading-tight text-sm">{flash || added ? "✓ Added" : selection.odds.toFixed(2)}</span>
+      <span className="mt-0.5 max-w-full truncate leading-tight text-text-muted text-[10px]">{flash || added ? "Tracked" : selection.label}</span>
     </button>
   );
 }
@@ -336,7 +332,7 @@ function H2HSection({ match, homeName, awayName }: { match: SportMatchDetail; ho
           <div className="text-[10px] uppercase tracking-[0.16em] text-text-muted">Recent meetings</div>
           {recent.slice(0, 5).map((m, i) => (
             <div key={i} className="flex items-center justify-between rounded-xl border px-3 py-2 text-sm" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-              <span className="text-text-muted text-[11px]">{m.date ? new Date(String(m.date)).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit", timeZone: "Europe/London" }) : "—"}</span>
+              <span className="text-text-muted text-[11px]">{m.date ? new Date(String(m.date)).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }) : "—"}</span>
               <span className="font-mono font-semibold text-text-primary">
                 {m.home_score != null ? `${m.home_score} – ${m.away_score}` : (m.player_a_sets != null ? `${m.player_a_sets} – ${m.player_b_sets}` : String(m.winner ?? "—"))}
               </span>
@@ -1194,7 +1190,16 @@ function fmt(v: unknown): string {
   return String(v).replace(/_/g, " ");
 }
 
-const formatKickoff = formatMatchKickoff;
+function formatKickoff(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrowStart = new Date(todayStart.getTime() + 86_400_000);
+  if (d >= todayStart && d < tomorrowStart) return "Today " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  if (d >= tomorrowStart && d < new Date(tomorrowStart.getTime() + 86_400_000)) return "Tomorrow " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) + " " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 

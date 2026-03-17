@@ -201,8 +201,8 @@ export function KpiStrip({ predictions, myChallenges, performance, apiOk, dbOk }
 
       {/* Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, position: "relative" }}>
-        <KpiTile icon={Calendar}  iconColor="var(--info)"     label="Events Today"   value={todayEvents.length} sub={sportSub}                             href="/predictions" />
-        <KpiTile icon={Zap}       iconColor="var(--warning)"  label="Open Signals"   value={openCount}          sub={`${predictions.length} total`}        href="/predictions" />
+        <KpiTile icon={Calendar}  iconColor="var(--info)"     label="Events Today"   value={todayEvents.length} sub={sportSub}                             href="/matches" />
+        <KpiTile icon={Zap}       iconColor="var(--warning)"  label="Open Signals"   value={openCount}          sub={`${predictions.length} total`}        href="/matches?status=scheduled" />
         <KpiTile icon={Cpu}       iconColor={liveModel ? "var(--positive)" : "var(--warning)"} label="Active Model" value={liveModel ? liveModel.model_name.replace("soccer_","").toUpperCase() : "None"} sub={modelSub} status={liveModel ? "ok" : "warn"} href="/performance" />
         <KpiTile icon={Activity}  iconColor={pipelineOk ? "var(--positive)" : "var(--negative)"} label="Pipeline" value={pipelineOk ? "Operational" : "Degraded"} sub={pipelineOk ? "All systems OK" : "Check logs →"} status={pipelineOk ? "ok" : "error"} onClick={() => setSystemOpen((v) => !v)} active={systemOpen} />
         <KpiTile icon={Trophy}    iconColor="var(--info)"     label="Challenges"     value={activeChallenges.length || "—"} sub={activeChallenges[0]?.name.slice(0,22) ?? "Join a challenge →"} href="/challenges" />

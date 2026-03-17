@@ -3,7 +3,6 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { formatMatchKickoff } from "@/lib/utils";
 import type { SportMatchListItem } from "@/lib/types";
 import type { SportSlug } from "@/lib/api";
 import { LiveBadge } from "@/components/ui/LiveBadge";
@@ -98,7 +97,14 @@ function probBar(pHome: number | null, pAway: number | null) {
   );
 }
 
-const formatKickoff = formatMatchKickoff;
+function formatKickoff(iso: string) {
+  const d = new Date(iso);
+  return (
+    d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) +
+    " " +
+    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+  );
+}
 
 export function MatchesTable({ sport, matches, total, initialStatus }: MatchesTableProps) {
   const router = useRouter();

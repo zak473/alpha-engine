@@ -67,13 +67,13 @@ const pct = (v: number | null | undefined) => v == null ? "—" : `${Math.round(
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "Europe/London" });
+  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" });
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) + " UTC";
 }
 function fmtDateShort(iso: string) {
-  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "Europe/London" });
+  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
 }
 function normaliseOutcome(raw: string | null | undefined): "home_win" | "draw" | "away_win" | null {
   if (!raw) return null;

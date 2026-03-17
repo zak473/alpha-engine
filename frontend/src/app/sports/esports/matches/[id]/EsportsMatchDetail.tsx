@@ -63,13 +63,13 @@ const abs = (v: number | null | undefined) => v == null ? "—" : String(Math.ro
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "Europe/London" });
+  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 function fmtDateShort(iso: string) {
-  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "Europe/London" });
+  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
 }
 function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" });
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) + " UTC";
 }
 
 function eloWinProb(rA: number, rB: number) {
@@ -1284,7 +1284,7 @@ function EloTab({ match, eloHomeHistory, eloAwayHistory }: Props) {
   const homeMap = Object.fromEntries(eloHomeHistory.map(p => [p.date, p.rating]));
   const awayMap = Object.fromEntries(eloAwayHistory.map(p => [p.date, p.rating]));
   const chartData = Array.from(allDates).sort().map(date => ({
-    date: new Date(date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "Europe/London" }),
+    date: new Date(date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }),
     [match.home.name]: homeMap[date] ?? null,
     [match.away.name]: awayMap[date] ?? null,
   }));

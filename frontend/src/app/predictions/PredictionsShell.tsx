@@ -7,7 +7,7 @@ import { BrainCircuit, Zap, ChevronRight, Eye, EyeOff } from "lucide-react";
 import { SPORT_LEAGUES, fetchSGOEvents, sgoEventToMatch, LEAGUE_LABELS } from "@/lib/sgo";
 import type { BettingMatch } from "@/lib/betting-types";
 import type { SportSlug } from "@/lib/api";
-import { cn, formatUKTime, formatMatchKickoff } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -97,20 +97,20 @@ function mergeBackend(match: BettingMatch, items: BackendItem[]): BettingMatch {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-const fmtTime = formatUKTime;
-
-const UK_TZ = "Europe/London";
+function fmtTime(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) + " UTC";
+}
 
 function dayLabel(iso: string): string {
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return "Unknown";
-  // Compare calendar dates in UK timezone
-  const ukFmt = (dt: Date) => dt.toLocaleDateString("en-CA", { timeZone: UK_TZ }); // YYYY-MM-DD
-  const matchDay = ukFmt(d);
   const now = new Date();
-  if (matchDay === ukFmt(now)) return "Today";
-  if (matchDay === ukFmt(new Date(now.getTime() + 86_400_000))) return "Tomorrow";
-  return d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short", timeZone: UK_TZ });
+  const todayStr = now.toISOString().slice(0, 10);
+  const tomorrowStr = new Date(now.getTime() + 86400_000).toISOString().slice(0, 10);
+  const matchStr = d.toISOString().slice(0, 10);
+  if (matchStr === todayStr) return "Today";
+  if (matchStr === tomorrowStr) return "Tomorrow";
+  return d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" });
 }
 
 // ── Card ─────────────────────────────────────────────────────────────────────

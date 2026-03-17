@@ -327,7 +327,7 @@ export function DashboardShowcase({
             />
           ))}
           <Link
-            href="/predictions"
+            href="/matches"
             className="flex flex-col items-center justify-center gap-3 rounded-[24px] border p-5 text-center transition-all duration-150 hover:-translate-y-[1px]"
             style={{ background: "#ffffff", borderColor: "rgba(17,33,23,0.08)", borderStyle: "dashed" }}
           >

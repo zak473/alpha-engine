@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, ClipboardList, TrendingUp, MoreHorizontal,
+  LayoutDashboard, Swords, ClipboardList, TrendingUp, MoreHorizontal,
   Trophy, ShieldCheck, BrainCircuit, Users, Radio, MessageSquare,
 } from "lucide-react";
 import { useState } from "react";
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 const PRIMARY_NAV = [
   { label: "Dashboard",   href: "/dashboard",   icon: LayoutDashboard },
   { label: "Live",        href: "/live",         icon: Radio           },
-  { label: "Predictions", href: "/predictions",  icon: BrainCircuit    },
+  { label: "Matches",     href: "/matches",      icon: Swords          },
   { label: "Record",      href: "/record",       icon: ClipboardList   },
 ];
 
