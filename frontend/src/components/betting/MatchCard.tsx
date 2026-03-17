@@ -189,22 +189,16 @@ function MatchCardIdentity({ match, cfg }: { match: BettingMatch; cfg: (typeof S
         </div>
       </div>
 
-      <div className="grid gap-4 px-5 py-4 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-        <div className="min-w-0">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-text-subtle">Home</p>
-          <p className="mt-1 truncate text-[18px] font-semibold leading-tight text-text-primary">{match.home.name}</p>
-        </div>
+      <div className="grid gap-3 px-5 py-4 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+        <p className="truncate text-[18px] font-semibold leading-tight text-text-primary">{match.home.name}</p>
         <ScoreBlock match={match} />
-        <div className="min-w-0 text-left lg:text-right">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-text-subtle">Away</p>
-          <p className="mt-1 truncate text-[18px] font-semibold leading-tight text-text-primary">{match.away.name}</p>
-        </div>
+        <p className="truncate text-[18px] font-semibold leading-tight text-text-primary lg:text-right">{match.away.name}</p>
       </div>
 
       <div className="px-5 pb-4">
-        <div className="flex flex-wrap items-center gap-2 pb-3 text-[11px] text-text-muted">
-          <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-            <Timer size={12} /> {formatCountdown(match.startTime, match.status)}
+        <div className="mb-2.5 flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+            <Timer size={11} /> {formatCountdown(match.startTime, match.status)}
           </span>
         </div>
         <ModelBar match={match} />
