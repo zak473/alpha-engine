@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, X, SlidersHorizontal, Zap } from "lucide-react";
+import { Search, X, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BettingFilter } from "@/lib/betting-types";
 import { DEFAULT_BETTING_FILTER } from "@/lib/betting-types";
@@ -124,10 +124,10 @@ export function StickyFilterBar({
       }}
     >
       {/* Row 1: Search + actions */}
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b" style={{ borderColor: "var(--border0)" }}>
+      <div className="flex items-center gap-3 px-4 py-2 border-b" style={{ borderColor: "var(--border0)" }}>
         {/* Search */}
-        <div className="relative flex-1 max-w-xs">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle pointer-events-none" />
+        <div className="relative flex-1 max-w-[220px]">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle pointer-events-none" />
           <input
             type="text"
             placeholder="Search teams, leagues..."
@@ -162,22 +162,6 @@ export function StickyFilterBar({
 
         <div className="flex-1" />
 
-        {/* Top picks button */}
-        {onShowTopPicks && (
-          <button
-            onClick={onShowTopPicks}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
-            style={{
-              background: "linear-gradient(135deg, rgba(251,191,36,0.15) 0%, rgba(251,191,36,0.08) 100%)",
-              color: "var(--warning)",
-              border: "1px solid rgba(214,162,61,0.24)",
-            }}
-          >
-            <Zap size={12} />
-            Show top picks
-          </button>
-        )}
-
         {/* Queue pill (mobile) */}
         {onShowQueueRail && (
           <button
@@ -196,8 +180,8 @@ export function StickyFilterBar({
       </div>
 
       {/* Row 2: Filter chips */}
-      <div 
-        className="flex items-center gap-4 px-4 py-2 overflow-x-auto" 
+      <div
+        className="flex items-center gap-4 px-4 py-1.5 overflow-x-auto"
         style={{ scrollbarWidth: "none" }}
       >
         <ChipGroup 

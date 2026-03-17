@@ -42,9 +42,9 @@ function OddsButton({ selection, market, match, compact = false }: { selection: 
       onClick={handleClick}
       disabled={match.status === "finished"}
       className={cn(
-        "relative flex flex-col items-start justify-center overflow-hidden rounded-2xl border text-left transition-all duration-150",
+        "relative flex flex-col items-start justify-center overflow-hidden rounded-xl border text-left transition-all duration-150",
         "disabled:opacity-40 disabled:cursor-not-allowed",
-        compact ? "min-w-[58px] px-2 py-1.5" : "min-w-[76px] px-2.5 py-2",
+        compact ? "min-w-[56px] px-2 py-1" : "min-w-[72px] px-2.5 py-1.5",
         added || flash
           ? "text-white"
           : "text-text-primary hover:-translate-y-[1px]"
@@ -52,20 +52,20 @@ function OddsButton({ selection, market, match, compact = false }: { selection: 
       style={added || flash ? {
         background: "rgba(46,219,108,0.12)",
         borderColor: "rgba(46,219,108,0.20)",
-        boxShadow: "0 10px 22px rgba(46,219,108,0.10)",
+        boxShadow: "0 8px 18px rgba(46,219,108,0.10)",
       } : {
         background: "var(--bg2)",
         borderColor: "var(--border0)",
       }}
     >
-      <span className={cn("font-mono font-bold tabular-nums leading-tight", compact ? "text-[11px]" : "text-sm")}>
+      <span className={cn("font-mono font-bold tabular-nums leading-tight", compact ? "text-[11px]" : "text-[13px]")}>
         {flash || added ? "✓ Added" : selection.odds.toFixed(2)}
       </span>
-      <span className={cn("mt-0.5 max-w-full truncate leading-tight text-text-muted", compact ? "text-[9px]" : "text-[10px]")}>
+      <span className={cn("mt-0.5 max-w-full truncate leading-tight text-text-muted", compact ? "text-[9px]" : "text-[9px]")}>
         {flash || added ? "Tracked" : selection.label}
       </span>
       {!flash && !added && edgePct > 0.5 && (
-        <span className="mt-1 rounded-full bg-emerald-500/12 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300">
+        <span className="mt-0.5 rounded bg-emerald-500/12 px-1 py-px text-[8px] font-bold text-emerald-300">
           +{edgePct.toFixed(1)}%
         </span>
       )}
@@ -75,8 +75,8 @@ function OddsButton({ selection, market, match, compact = false }: { selection: 
 
 function MarketRow({ market, match, compact }: { market: Market; match: BettingMatch; compact?: boolean }) {
   return (
-    <div className="rounded-xl border p-2" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-text-muted">{market.name}</div>
+    <div>
+      <div className="mb-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-white/28">{market.name}</div>
       <div className="flex items-center gap-1.5 flex-wrap">
         {market.selections.map((sel) => (
           <OddsButton key={sel.id} selection={sel} market={market} match={match} compact={compact} />
@@ -91,9 +91,9 @@ function LiveBadge({ match }: { match: BettingMatch }) {
 
   if (match.status === "live") {
     return (
-      <div className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1" style={{ borderColor: `${cfg.color}35`, background: `${cfg.color}12` }}>
+      <div className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5" style={{ borderColor: `${cfg.color}35`, background: `${cfg.color}12` }}>
         <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: cfg.color }} />
-        <span className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: cfg.color }}>
+        <span className="text-[9px] font-bold uppercase tracking-[0.14em]" style={{ color: cfg.color }}>
           Live {match.liveClock ? `· ${match.liveClock}` : ""}
         </span>
       </div>
@@ -101,13 +101,13 @@ function LiveBadge({ match }: { match: BettingMatch }) {
   }
 
   if (match.status === "finished") {
-    return <span className="rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>Final</span>;
+    return <span className="rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>Final</span>;
   }
 
   const soon = isWithinHour(match.startTime);
   const timeStr = formatMatchTime(match.startTime);
   return (
-    <span className={cn("rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]", soon ? "text-[var(--warning)]" : "text-text-muted")} style={{ borderColor: soon ? "rgba(251,191,36,0.25)" : "var(--border0)", background: soon ? "rgba(251,191,36,0.10)" : "var(--bg2)" }}>
+    <span className={cn("rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em]", soon ? "text-[var(--warning)]" : "text-text-muted")} style={{ borderColor: soon ? "rgba(251,191,36,0.25)" : "var(--border0)", background: soon ? "rgba(251,191,36,0.10)" : "var(--bg2)" }}>
       {timeStr}
     </span>
   );
@@ -115,12 +115,12 @@ function LiveBadge({ match }: { match: BettingMatch }) {
 
 function ScoreBlock({ match }: { match: BettingMatch }) {
   const hasScore = match.homeScore != null && match.awayScore != null;
-  if (!hasScore) return <div className="px-3 text-sm text-text-subtle">vs</div>;
+  if (!hasScore) return <div className="px-2 text-sm text-text-subtle">vs</div>;
 
   return (
-    <div className="rounded-2xl border px-3 py-2 text-center min-w-[86px]" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-      <div className="text-[10px] uppercase tracking-[0.18em] text-text-subtle">score</div>
-      <div className="mt-1 flex items-center justify-center gap-2 text-2xl font-mono font-bold text-text-primary">
+    <div className="rounded-xl border px-2.5 py-1.5 text-center min-w-[72px]" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+      <div className="text-[9px] uppercase tracking-[0.18em] text-text-subtle">score</div>
+      <div className="mt-0.5 flex items-center justify-center gap-1.5 text-xl font-mono font-bold text-text-primary">
         <span>{match.homeScore}</span>
         <span className="text-text-subtle">–</span>
         <span>{match.awayScore}</span>
@@ -130,34 +130,31 @@ function ScoreBlock({ match }: { match: BettingMatch }) {
 }
 
 function ModelBar({ match }: { match: BettingMatch }) {
-  // Only render when we have a real model prediction
   if (match.pHome == null) {
-    return (
-      <div className="text-[11px] text-text-muted italic">No model prediction yet</div>
-    );
+    return <div className="text-[10px] text-text-muted italic">No model prediction yet</div>;
   }
   const pct = Math.round(match.pHome * 100);
   const edge = match.edgePercent ?? 0;
   const confidence = match.modelConfidence != null ? Math.round(match.modelConfidence * 100) : null;
 
   return (
-    <div className="grid gap-2 lg:grid-cols-[1fr_auto] lg:items-center">
-      <div>
-        <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-text-muted">
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex min-w-[120px] flex-1 flex-col gap-1">
+        <div className="flex items-center justify-between text-[9px] uppercase tracking-[0.14em] text-text-muted">
           <span>Model lean</span>
           <span>{pct}% home</span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full" style={{ background: "var(--bg3)" }}>
+        <div className="h-1 overflow-hidden rounded-full" style={{ background: "var(--bg3)" }}>
           <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "var(--accent)" }} />
         </div>
       </div>
       {confidence != null && (
-        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-          <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-            <Shield size={11} /> {confidence}%
+        <div className="flex items-center gap-1 text-[10px]">
+          <span className="inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+            <Shield size={10} /> {confidence}%
           </span>
-          <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 font-semibold" style={{ borderColor: edge >= 3 ? "rgba(34,197,94,0.2)" : "rgba(245,158,11,0.2)", background: edge >= 3 ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.10)", color: edge >= 3 ? "var(--positive)" : "var(--warning)" }}>
-            <TrendingUp size={11} /> {edge > 0 ? "+" : ""}{edge.toFixed(1)}%
+          <span className="inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 font-semibold" style={{ borderColor: edge >= 3 ? "rgba(34,197,94,0.2)" : "rgba(245,158,11,0.2)", background: edge >= 3 ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.10)", color: edge >= 3 ? "var(--positive)" : "var(--warning)" }}>
+            <TrendingUp size={10} /> {edge > 0 ? "+" : ""}{edge.toFixed(1)}%
           </span>
         </div>
       )}
@@ -168,39 +165,44 @@ function ModelBar({ match }: { match: BettingMatch }) {
 function MatchCardIdentity({ match, cfg }: { match: BettingMatch; cfg: (typeof SPORT_CONFIG)[keyof typeof SPORT_CONFIG] }) {
   return (
     <>
-      <div className="flex items-center justify-between gap-3 px-4 pt-3">
+      {/* Header: sport + league + timer + status badges */}
+      <div className="flex items-center justify-between gap-2 px-4 pt-3">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-sm" style={{ background: `${cfg.color}16`, color: cfg.color }}>
+          <span className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs" style={{ background: `${cfg.color}16`, color: cfg.color }}>
             {cfg.icon}
           </span>
           <div className="min-w-0">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-text-subtle">{cfg.label}</div>
-            <div className="truncate text-[12px] font-medium text-text-primary">{match.league}</div>
+            <div className="truncate text-[11px] font-medium text-text-primary">
+              <span className="text-text-subtle text-[9px] uppercase tracking-[0.14em] mr-1.5">{cfg.label}</span>
+              {match.league}
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-shrink-0 items-center gap-1">
           {(match.edgePercent ?? 0) >= 5 && (
-            <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em]"
+            <span className="inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em]"
               style={{ borderColor: "rgba(251,191,36,0.30)", background: "rgba(251,191,36,0.12)", color: "#f59e0b" }}>
-              <Flame size={9} /> Value
+              <Flame size={8} /> Value
+            </span>
+          )}
+          {match.status !== "live" && (
+            <span className="inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[9px] text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+              <Timer size={9} /> {formatCountdown(match.startTime, match.status)}
             </span>
           )}
           <LiveBadge match={match} />
         </div>
       </div>
 
-      <div className="grid gap-2 px-4 py-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-        <p className="truncate text-[17px] font-semibold leading-tight text-text-primary">{match.home.name}</p>
+      {/* Teams + score */}
+      <div className="grid gap-2 px-4 py-2.5 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+        <p className="truncate text-[16px] font-semibold leading-tight text-text-primary">{match.home.name}</p>
         <ScoreBlock match={match} />
-        <p className="truncate text-[17px] font-semibold leading-tight text-text-primary lg:text-right">{match.away.name}</p>
+        <p className="truncate text-[16px] font-semibold leading-tight text-text-primary lg:text-right">{match.away.name}</p>
       </div>
 
-      <div className="px-4 pb-3">
-        <div className="mb-2 flex items-center gap-1.5">
-          <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-            <Timer size={10} /> {formatCountdown(match.startTime, match.status)}
-          </span>
-        </div>
+      {/* Model bar */}
+      <div className="px-4 pb-2.5">
         <ModelBar match={match} />
       </div>
     </>
@@ -233,7 +235,7 @@ export function MatchCard({ match, highlighted, sport, detailHref }: MatchCardPr
         "sportsbook-card flex flex-col gap-0 overflow-hidden transition-all duration-200",
         highlighted && "ring-2 ring-[var(--accent)]"
       )}
-      style={isLive ? { boxShadow: `0 0 0 1px ${cfg.color}22, 0 14px 28px rgba(17,24,17,0.10)` } : undefined}
+      style={isLive ? { boxShadow: `0 0 0 1px ${cfg.color}22, 0 12px 24px rgba(17,24,17,0.10)` } : undefined}
     >
       {detailHref ? (
         <Link href={detailHref} className="block transition-colors hover:bg-[var(--accent-muted)]">
@@ -244,23 +246,23 @@ export function MatchCard({ match, highlighted, sport, detailHref }: MatchCardPr
       )}
 
       {!isFinished && (
-        <div className="border-t px-4 py-3 flex flex-col gap-2" style={{ borderColor: "var(--border0)" }}>
+        <div className="border-t px-4 py-2.5 flex flex-col gap-2.5" style={{ borderColor: "var(--border0)" }}>
           {featuredSlice.map((mkt) => <MarketRow key={mkt.id} market={mkt} match={match} />)}
         </div>
       )}
 
-      <div className="flex items-center justify-between border-t px-4 py-2" style={{ borderColor: "var(--border0)" }}>
+      <div className="flex items-center justify-between border-t px-4 py-1.5" style={{ borderColor: "var(--border0)" }}>
         {hasMoreMarkets && !isFinished ? (
-          <button onClick={() => setExpanded((v) => !v)} className="flex items-center gap-1 text-[11px] font-medium text-text-muted transition-colors hover:text-text-primary">
-            {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-            {expanded ? "Hide extra markets" : `${match.allMarkets.length - 2} more markets`}
+          <button onClick={() => setExpanded((v) => !v)} className="flex items-center gap-1 text-[10px] font-medium text-text-muted transition-colors hover:text-text-primary">
+            {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+            {expanded ? "Hide" : `${match.allMarkets.length - 2} more markets`}
           </button>
         ) : <div />}
-        {detailHref && <Link href={detailHref} className="text-[11px] font-medium text-[var(--accent)] transition-opacity hover:opacity-80">View full breakdown</Link>}
+        {detailHref && <Link href={detailHref} className="text-[10px] font-medium text-[var(--accent)] transition-opacity hover:opacity-80">View breakdown →</Link>}
       </div>
 
       {expanded && !isFinished && (
-        <div className="border-t px-4 py-3 flex flex-col gap-2" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+        <div className="border-t px-4 py-2.5 flex flex-col gap-2.5" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
           {match.allMarkets.slice(2).map((mkt) => <MarketRow key={mkt.id} market={mkt} match={match} />)}
         </div>
       )}
@@ -294,8 +296,8 @@ function formatCountdown(iso: string, status: BettingMatch["status"]): string {
   if (isNaN(ms)) return "—";
   const diff = ms - Date.now();
   const mins = Math.round(diff / 60000);
-  if (mins < 60) return `${Math.max(0, mins)} min to start`;
+  if (mins < 60) return `${Math.max(0, mins)}m`;
   const hours = Math.floor(mins / 60);
   const rem = mins % 60;
-  return `${hours}h ${rem}m to start`;
+  return `${hours}h${rem > 0 ? ` ${rem}m` : ""}`;
 }

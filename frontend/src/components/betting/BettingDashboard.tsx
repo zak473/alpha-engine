@@ -130,7 +130,6 @@ export function BettingDashboard({ matches, sport }: { matches: BettingMatch[]; 
               filter={filter}
               onChange={setFilter}
               totalShown={filtered.length}
-              onShowTopPicks={handleShowTopPicks}
             />
           </div>
 
