@@ -6,11 +6,11 @@ import { Activity, BrainCircuit, Circle, ClipboardList, LayoutDashboard, Message
 import { useSidebar } from "./SidebarContext";
 
 const NAV = [
+  { label: "Predictions", href: "/predictions", icon: BrainCircuit },
   { label: "Betting Board", href: "/dashboard", icon: LayoutDashboard },
   { label: "Live Now", href: "/live", icon: Radio },
   { label: "Matches", href: "/matches", icon: Swords },
   { label: "Tipsters", href: "/tipsters", icon: Users },
-  { label: "Predictions", href: "/predictions", icon: BrainCircuit },
   { label: "Challenges", href: "/challenges", icon: Trophy },
   { label: "Record", href: "/record", icon: ClipboardList },
   { label: "Performance", href: "/performance", icon: TrendingUp },
