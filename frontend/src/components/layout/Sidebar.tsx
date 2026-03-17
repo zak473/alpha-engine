@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Activity, BrainCircuit, Circle, ClipboardList, LayoutDashboard, MessageSquare, Radio, ShieldCheck, Swords, TrendingUp, Trophy, Users } from "lucide-react";
@@ -67,16 +68,8 @@ export function Sidebar() {
                 A calmer shell, stronger hierarchy, and cleaner live workflow across the whole product.
               </p>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {[
-                ["Markets", "Live ranked"],
-                ["Signals", "Model-led"],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/38">{label}</div>
-                  <div className="mt-1 text-sm font-semibold text-white/92">{value}</div>
-                </div>
-              ))}
+            <div className="mt-4 flex justify-center">
+              <Image src="/never-in-doubt-logo.png" alt="Never In Doubt" width={1264} height={848} className="w-full h-auto opacity-90" />
             </div>
           </div>
         </div>
