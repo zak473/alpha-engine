@@ -57,8 +57,8 @@ function ChipGroup<T extends string>({
   accentLive?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[10px] font-medium text-text-subtle uppercase tracking-wide flex-shrink-0">
+    <div className="flex items-center gap-2 flex-shrink-0">
+      <span className="text-[9px] font-semibold uppercase tracking-[0.12em] flex-shrink-0" style={{ color: "rgba(255,255,255,0.32)" }}>
         {label}
       </span>
       <div className="flex items-center gap-0.5">
@@ -70,16 +70,16 @@ function ChipGroup<T extends string>({
               key={c.value}
               onClick={() => onChange(c.value)}
               className={cn(
-                "px-2 py-1 rounded-md text-[11px] font-medium transition-all duration-120 whitespace-nowrap",
+                "px-2 py-0.5 rounded text-[11px] font-medium transition-all duration-100 whitespace-nowrap",
                 active
                   ? isLive
-                    ? "border border-[rgba(23,148,71,0.22)] bg-[rgba(23,148,71,0.10)] text-[var(--positive)]"
+                    ? "border border-[rgba(46,219,108,0.28)] bg-[rgba(46,219,108,0.12)] text-[var(--positive)]"
                     : "border text-[var(--accent)]"
-                  : "text-text-muted border border-transparent hover:text-text-primary hover:bg-[rgba(23,148,71,0.05)]"
+                  : "text-white/38 border border-transparent hover:text-white/70 hover:bg-white/[0.05]"
               )}
               style={active && !isLive ? {
-                background: "var(--accent-dim)",
-                borderColor: "rgba(48,224,106,0.24)",
+                background: "rgba(46,219,108,0.10)",
+                borderColor: "rgba(46,219,108,0.28)",
               } : {}}
             >
               {isLive && active && (
@@ -117,23 +117,23 @@ export function StickyFilterBar({
     <div
       className="sticky top-0 z-20 border-b flex-shrink-0"
       style={{
-        background: "rgba(8,18,14,0.80)",
-        backdropFilter: "blur(16px)",
-        WebkitBackdropFilter: "blur(16px)",
-        borderColor: "var(--border0)",
+        background: "rgba(7,16,12,0.88)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        borderColor: "rgba(255,255,255,0.07)",
       }}
     >
       {/* Row 1: Search + actions */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b" style={{ borderColor: "var(--border0)" }}>
+      <div className="flex items-center gap-3 px-4 py-1.5 border-b" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
         {/* Search */}
-        <div className="relative flex-1 max-w-[220px]">
-          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle pointer-events-none" />
+        <div className="relative flex-1 max-w-[160px]">
+          <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
           <input
             type="text"
-            placeholder="Search teams, leagues..."
+            placeholder="Search..."
             value={filter.search}
             onChange={(e) => set("search", e.target.value)}
-            className="input-field pl-9 text-sm"
+            className="input-field pl-8 text-[11px]"
           />
           {filter.search && (
             <button
@@ -146,17 +146,17 @@ export function StickyFilterBar({
         </div>
 
         {/* Count */}
-        <span className="text-[11px] text-text-muted flex-shrink-0 tabular-nums">
-          <span className="text-text-primary font-semibold">{totalShown}</span> games
+        <span className="text-[11px] flex-shrink-0 tabular-nums text-white/30">
+          <span className="text-white/65 font-semibold">{totalShown}</span> games
         </span>
 
         {/* Clear filters */}
         {dirty && (
           <button
             onClick={reset}
-            className="text-[11px] text-text-muted hover:text-[var(--accent)] transition-colors flex-shrink-0 flex items-center gap-1"
+            className="text-[11px] text-white/35 hover:text-[var(--accent)] transition-colors flex-shrink-0 flex items-center gap-1"
           >
-            <X size={11} /> Clear filters
+            <X size={10} /> Clear
           </button>
         )}
 
@@ -181,40 +181,40 @@ export function StickyFilterBar({
 
       {/* Row 2: Filter chips */}
       <div
-        className="flex items-center gap-4 px-4 py-1.5 overflow-x-auto"
+        className="flex items-center gap-3 px-4 py-1.5 overflow-x-auto"
         style={{ scrollbarWidth: "none" }}
       >
-        <ChipGroup 
-          chips={STATUS_CHIPS} 
-          value={filter.status} 
+        <ChipGroup
+          chips={STATUS_CHIPS}
+          value={filter.status}
           onChange={(v) => set("status", v)}
           label="Status"
           accentLive
         />
-        
-        <div className="w-px h-5 bg-[var(--border0)] flex-shrink-0" />
-        
-        <ChipGroup 
-          chips={TIME_CHIPS} 
-          value={filter.time} 
+
+        <div className="w-px h-4 flex-shrink-0" style={{ background: "rgba(255,255,255,0.10)" }} />
+
+        <ChipGroup
+          chips={TIME_CHIPS}
+          value={filter.time}
           onChange={(v) => set("time", v)}
           label="Time"
         />
-        
-        <div className="w-px h-5 bg-[var(--border0)] flex-shrink-0" />
-        
-        <ChipGroup 
-          chips={EDGE_CHIPS} 
-          value={filter.edge} 
+
+        <div className="w-px h-4 flex-shrink-0" style={{ background: "rgba(255,255,255,0.10)" }} />
+
+        <ChipGroup
+          chips={EDGE_CHIPS}
+          value={filter.edge}
           onChange={(v) => set("edge", v)}
           label="Edge"
         />
-        
-        <div className="w-px h-5 bg-[var(--border0)] flex-shrink-0" />
-        
-        <ChipGroup 
-          chips={CONF_CHIPS} 
-          value={filter.confidence} 
+
+        <div className="w-px h-4 flex-shrink-0" style={{ background: "rgba(255,255,255,0.10)" }} />
+
+        <ChipGroup
+          chips={CONF_CHIPS}
+          value={filter.confidence}
           onChange={(v) => set("confidence", v)}
           label="Conf"
         />

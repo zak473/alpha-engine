@@ -66,7 +66,7 @@ export function BettingDashboard({ matches, sport }: { matches: BettingMatch[]; 
           {/* ── Command header — title row + sport tab row in one unified block ── */}
           <div
             className="border-b"
-            style={{ background: "rgba(255,255,255,0.018)", borderColor: "var(--border0)" }}
+            style={{ background: "rgba(255,255,255,0.024)", borderColor: "rgba(255,255,255,0.085)" }}
           >
             {/* Row 1: title + KPI chips */}
             <BettingHero
@@ -76,19 +76,19 @@ export function BettingDashboard({ matches, sport }: { matches: BettingMatch[]; 
             />
 
             {/* Internal row divider */}
-            <div className="mx-4 h-px lg:mx-6" style={{ background: "var(--border0)" }} />
+            <div className="h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
 
             {/* Row 2: sport tabs + quick actions */}
-            <div className="flex flex-wrap items-center gap-1.5 px-4 py-2 lg:px-6">
+            <div className="flex flex-wrap items-center gap-1 px-4 py-1.5 lg:px-6">
               {SPORT_ENTRIES.map((entry) => (
                 <button
                   key={entry}
                   onClick={() => handleSportSelect(entry)}
                   className={cn(
-                    "rounded px-3 py-1 text-[12px] font-semibold transition-all",
+                    "rounded px-3 py-0.5 text-[12px] font-semibold transition-all duration-100",
                     activeSport === entry
                       ? "bg-[#2edb6c] text-[#07110d]"
-                      : "text-white/50 hover:bg-white/[0.06] hover:text-white"
+                      : "text-white/40 hover:bg-white/[0.06] hover:text-white/80"
                   )}
                 >
                   {entry === "all" ? "All" : SPORT_CONFIG[entry].label}
@@ -98,7 +98,8 @@ export function BettingDashboard({ matches, sport }: { matches: BettingMatch[]; 
               <div className="ml-auto flex items-center gap-1">
                 <button
                   onClick={handleShowTopPicks}
-                  className="flex items-center gap-1 rounded border border-amber-400/[0.18] bg-amber-400/[0.07] px-2.5 py-1 text-[11px] font-semibold text-amber-300 transition hover:bg-amber-400/[0.12]"
+                  className="flex items-center gap-1 rounded border px-2.5 py-0.5 text-[11px] font-semibold transition-all duration-100 hover:bg-amber-400/[0.14]"
+                  style={{ borderColor: "rgba(251,191,36,0.22)", background: "rgba(251,191,36,0.08)", color: "#fcd34d" }}
                 >
                   <Zap size={10} />
                   Top picks
@@ -106,7 +107,8 @@ export function BettingDashboard({ matches, sport }: { matches: BettingMatch[]; 
                 {isFilterDirty ? (
                   <button
                     onClick={handleClearFilters}
-                    className="flex items-center gap-1 rounded border border-white/[0.08] bg-transparent px-2.5 py-1 text-[11px] text-white/45 transition hover:text-white"
+                    className="flex items-center gap-1 rounded border px-2.5 py-0.5 text-[11px] font-medium transition-all duration-100 hover:text-white/70 hover:bg-white/[0.05]"
+                    style={{ borderColor: "transparent", color: "rgba(255,255,255,0.38)" }}
                   >
                     <X size={10} />
                     Reset
@@ -114,7 +116,8 @@ export function BettingDashboard({ matches, sport }: { matches: BettingMatch[]; 
                 ) : (
                   <button
                     onClick={handleShowLive}
-                    className="flex items-center gap-1 rounded border border-white/[0.08] bg-transparent px-2.5 py-1 text-[11px] text-white/45 transition hover:text-white"
+                    className="flex items-center gap-1 rounded border px-2.5 py-0.5 text-[11px] font-medium transition-all duration-100 hover:text-white/70 hover:bg-white/[0.05]"
+                    style={{ borderColor: "transparent", color: "rgba(255,255,255,0.38)" }}
                   >
                     <Activity size={10} />
                     Live only

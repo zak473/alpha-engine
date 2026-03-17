@@ -76,7 +76,7 @@ function OddsButton({ selection, market, match, compact = false }: { selection: 
 function MarketRow({ market, match, compact }: { market: Market; match: BettingMatch; compact?: boolean }) {
   return (
     <div>
-      <div className="mb-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-white/28">{market.name}</div>
+      <div className="mb-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-white/35">{market.name}</div>
       <div className="flex items-center gap-1.5 flex-wrap">
         {market.selections.map((sel) => (
           <OddsButton key={sel.id} selection={sel} market={market} match={match} compact={compact} />
@@ -115,14 +115,18 @@ function LiveBadge({ match }: { match: BettingMatch }) {
 
 function ScoreBlock({ match }: { match: BettingMatch }) {
   const hasScore = match.homeScore != null && match.awayScore != null;
-  if (!hasScore) return <div className="px-2 text-sm text-text-subtle">vs</div>;
+  if (!hasScore) return (
+    <div className="flex flex-col items-center px-2">
+      <span className="text-[9px] uppercase tracking-[0.18em] text-white/20">vs</span>
+    </div>
+  );
 
   return (
-    <div className="rounded-xl border px-2.5 py-1.5 text-center min-w-[72px]" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-      <div className="text-[9px] uppercase tracking-[0.18em] text-text-subtle">score</div>
-      <div className="mt-0.5 flex items-center justify-center gap-1.5 text-xl font-mono font-bold text-text-primary">
+    <div className="rounded-lg border px-2 py-1 text-center min-w-[60px]" style={{ borderColor: "rgba(255,255,255,0.08)", background: "var(--bg2)" }}>
+      <div className="text-[8px] uppercase tracking-[0.18em] text-white/28">score</div>
+      <div className="mt-0.5 flex items-center justify-center gap-1 text-[17px] font-mono font-bold text-text-primary leading-tight">
         <span>{match.homeScore}</span>
-        <span className="text-text-subtle">–</span>
+        <span className="text-white/30">–</span>
         <span>{match.awayScore}</span>
       </div>
     </div>
@@ -131,7 +135,7 @@ function ScoreBlock({ match }: { match: BettingMatch }) {
 
 function ModelBar({ match }: { match: BettingMatch }) {
   if (match.pHome == null) {
-    return <div className="text-[10px] text-text-muted italic">No model prediction yet</div>;
+    return <div className="text-[10px] text-white/25 italic">No model prediction yet</div>;
   }
   const pct = Math.round(match.pHome * 100);
   const edge = match.edgePercent ?? 0;
@@ -140,21 +144,21 @@ function ModelBar({ match }: { match: BettingMatch }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <div className="flex min-w-[120px] flex-1 flex-col gap-1">
-        <div className="flex items-center justify-between text-[9px] uppercase tracking-[0.14em] text-text-muted">
-          <span>Model lean</span>
-          <span>{pct}% home</span>
+        <div className="flex items-center justify-between text-[9px] uppercase tracking-[0.14em]">
+          <span className="text-white/38">Model lean</span>
+          <span className="font-semibold text-white/60">{pct}% home</span>
         </div>
-        <div className="h-1 overflow-hidden rounded-full" style={{ background: "var(--bg3)" }}>
+        <div className="h-[3px] overflow-hidden rounded-full" style={{ background: "var(--bg3)" }}>
           <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "var(--accent)" }} />
         </div>
       </div>
       {confidence != null && (
-        <div className="flex items-center gap-1 text-[10px]">
-          <span className="inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-text-muted" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-            <Shield size={10} /> {confidence}%
+        <div className="flex items-center gap-1">
+          <span className="inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[10px] text-white/50" style={{ borderColor: "rgba(255,255,255,0.08)", background: "var(--bg2)" }}>
+            <Shield size={9} /> <span className="font-medium">{confidence}%</span>
           </span>
-          <span className="inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 font-semibold" style={{ borderColor: edge >= 3 ? "rgba(34,197,94,0.2)" : "rgba(245,158,11,0.2)", background: edge >= 3 ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.10)", color: edge >= 3 ? "var(--positive)" : "var(--warning)" }}>
-            <TrendingUp size={10} /> {edge > 0 ? "+" : ""}{edge.toFixed(1)}%
+          <span className="inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[10px] font-semibold" style={{ borderColor: edge >= 3 ? "rgba(34,197,94,0.22)" : "rgba(245,158,11,0.22)", background: edge >= 3 ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.10)", color: edge >= 3 ? "var(--positive)" : "var(--warning)" }}>
+            <TrendingUp size={9} /> {edge > 0 ? "+" : ""}{edge.toFixed(1)}%
           </span>
         </div>
       )}
@@ -172,8 +176,8 @@ function MatchCardIdentity({ match, cfg }: { match: BettingMatch; cfg: (typeof S
             {cfg.icon}
           </span>
           <div className="min-w-0">
-            <div className="truncate text-[11px] font-medium text-text-primary">
-              <span className="text-text-subtle text-[9px] uppercase tracking-[0.14em] mr-1.5">{cfg.label}</span>
+            <div className="truncate text-[11px] font-medium text-white/65">
+              <span className="text-white/30 text-[9px] uppercase tracking-[0.14em] mr-1.5">{cfg.label}</span>
               {match.league}
             </div>
           </div>
@@ -195,10 +199,10 @@ function MatchCardIdentity({ match, cfg }: { match: BettingMatch; cfg: (typeof S
       </div>
 
       {/* Teams + score */}
-      <div className="grid gap-2 px-4 py-2.5 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-        <p className="truncate text-[16px] font-semibold leading-tight text-text-primary">{match.home.name}</p>
+      <div className="grid gap-1 px-4 py-2 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+        <p className="truncate text-[15px] font-semibold leading-tight text-text-primary">{match.home.name}</p>
         <ScoreBlock match={match} />
-        <p className="truncate text-[16px] font-semibold leading-tight text-text-primary lg:text-right">{match.away.name}</p>
+        <p className="truncate text-[15px] font-semibold leading-tight text-text-primary lg:text-right">{match.away.name}</p>
       </div>
 
       {/* Model bar */}
@@ -246,7 +250,7 @@ export function MatchCard({ match, highlighted, sport, detailHref }: MatchCardPr
       )}
 
       {!isFinished && (
-        <div className="border-t px-4 py-2.5 flex flex-col gap-2.5" style={{ borderColor: "var(--border0)" }}>
+        <div className="border-t px-4 py-2 flex flex-col gap-2" style={{ borderColor: "var(--border0)" }}>
           {featuredSlice.map((mkt) => <MarketRow key={mkt.id} market={mkt} match={match} />)}
         </div>
       )}
@@ -262,8 +266,8 @@ export function MatchCard({ match, highlighted, sport, detailHref }: MatchCardPr
       </div>
 
       {expanded && !isFinished && (
-        <div className="border-t px-4 py-2.5 flex flex-col gap-2.5" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-          {match.allMarkets.slice(2).map((mkt) => <MarketRow key={mkt.id} market={mkt} match={match} />)}
+        <div className="border-t px-4 py-2 flex flex-col gap-2" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+          {match.allMarkets.slice(2).map((mkt) => <MarketRow key={mkt.id} market={mkt} match={match} compact />)}
         </div>
       )}
     </article>

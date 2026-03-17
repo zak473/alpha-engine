@@ -52,10 +52,10 @@ export function BettingHero({ matches, filteredCount, activeSportLabel }: Bettin
     : null;
 
   return (
-    <div className="flex items-start justify-between gap-4 px-4 pb-2.5 pt-3 lg:px-6">
+    <div className="flex items-center justify-between gap-4 px-4 py-2.5 lg:px-6">
       <div>
-        <h1 className="text-[14px] font-bold tracking-[-0.02em] text-white">Betting Board</h1>
-        <p className="mt-0.5 text-[11px] text-white/32">
+        <h1 className="text-[14px] font-bold tracking-[-0.03em] text-white">Betting Board</h1>
+        <p className="mt-0.5 text-[11px] text-white/28">
           {activeSportLabel} · AI-ranked predictions · sorted by edge
         </p>
       </div>
