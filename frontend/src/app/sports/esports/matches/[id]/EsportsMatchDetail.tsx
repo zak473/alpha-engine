@@ -1431,6 +1431,26 @@ function ModelTab({ match }: { match: EsportsMatch }) {
             </>
           ) : <EmptyState icon={Info} title="No model metadata" />}
         </Panel>
+        {match.simulation?.distribution?.length ? (() => {
+          const sim = match.simulation!;
+          const top = [...sim.distribution].sort((a, b) => b.probability - a.probability).slice(0, 8);
+          const maxProb = top[0]?.probability ?? 1;
+          return (
+            <Panel title="Score Simulation" subtitle={`${sim.n_simulations.toLocaleString()} simulations`}>
+              <div className="space-y-1.5">
+                {top.map((d) => (
+                  <div key={d.score} className="flex items-center gap-3">
+                    <span className="font-mono text-sm font-semibold w-10 text-center" style={{ color: "var(--t1)" }}>{d.score}</span>
+                    <div className="flex-1 h-4 rounded-lg overflow-hidden" style={{ background: "rgba(255,255,255,0.05)" }}>
+                      <div className="h-full rounded-lg bg-accent-blue/50" style={{ width: `${(d.probability / maxProb) * 100}%` }} />
+                    </div>
+                    <span className="text-[11px] font-mono w-10 text-right" style={{ color: "var(--t3)" }}>{(d.probability * 100).toFixed(1)}%</span>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          );
+        })() : null}
         {fo && (
           <Panel title="Fair Odds">
             <MetricRow label={match.home.name} value={fo.home_win?.toFixed(2) ?? "—"} accent />

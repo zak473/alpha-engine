@@ -588,6 +588,26 @@ export function HockeyMatchDetail({ match: initialMatch, eloHomeHistory, eloAway
               ) : null}
             </PanelCard>
           )}
+          {match.simulation?.distribution?.length ? (() => {
+            const sim = match.simulation!;
+            const top = [...sim.distribution].sort((a, b) => b.probability - a.probability).slice(0, 8);
+            const maxProb = top[0]?.probability ?? 1;
+            return (
+              <PanelCard title={`Score Simulation · ${sim.n_simulations.toLocaleString()} runs`}>
+                <div className="space-y-1.5">
+                  {top.map((d) => (
+                    <div key={d.score} className="flex items-center gap-3">
+                      <span className="font-mono text-sm font-semibold text-text-primary w-10 text-center">{d.score}</span>
+                      <div className="flex-1 h-4 rounded-full overflow-hidden bg-white/[0.05]">
+                        <div className="h-full rounded-full bg-emerald-400/50" style={{ width: `${(d.probability / maxProb) * 100}%` }} />
+                      </div>
+                      <span className="text-[11px] font-mono text-text-subtle w-10 text-right">{(d.probability * 100).toFixed(1)}%</span>
+                    </div>
+                  ))}
+                </div>
+              </PanelCard>
+            );
+          })() : null}
 
           {/* Team stats */}
           <PanelCard title="Team Stats">

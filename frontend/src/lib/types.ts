@@ -646,6 +646,7 @@ export interface TennisMatchDetail {
   profile_away?: TennisPlayerProfileOut | null;
   tiebreaks?: TennisTiebreakOut | null;
   betting?: Record<string, unknown> | null;
+  simulation?: { n_simulations: number; distribution: Array<{ score: string; probability: number }>; mean_home_goals?: number | null } | null;
 }
 
 // ─── Esports match detail types ────────────────────────────────────────────
@@ -931,6 +932,7 @@ export interface EsportsMatchDetail {
   lol_objectives_away?: LolObjectiveControlOut | null;
   // Betting
   betting?: Record<string, unknown> | null;
+  simulation?: { n_simulations: number; distribution: Array<{ score: string; probability: number }>; mean_home_goals?: number | null } | null;
 }
 
 // ─── Basketball types ───────────────────────────────────────────────────────
@@ -1212,6 +1214,7 @@ export interface BasketballMatchDetail {
   scoring_runs?: BasketballScoringRunOut[] | null;
   referee?: BasketballRefereeOut | null;
   betting?: BasketballBettingOut | null;
+  simulation?: { n_simulations: number; distribution: Array<{ score: string; probability: number }>; mean_home_goals?: number | null } | null;
 }
 
 // ─── Baseball types ─────────────────────────────────────────────────────────
@@ -1525,6 +1528,7 @@ export interface BaseballMatchDetail {
   situational_away?: SituationalBattingOut | null;
   umpire?: UmpireOut | null;
   betting?: Record<string, unknown> | null;
+  simulation?: { n_simulations: number; distribution: Array<{ score: string; probability: number }>; mean_home_goals?: number | null } | null;
 }
 
 // ─── Hockey ────────────────────────────────────────────────────────────────
@@ -1634,6 +1638,7 @@ export interface HockeyMatchDetail {
   odds_draw?: number | null;
   context?: Record<string, any> | null;
   data_completeness?: Record<string, boolean> | null;
+  simulation?: { n_simulations: number; distribution: Array<{ score: string; probability: number }>; mean_home_goals?: number | null } | null;
 }
 
 // ─── Chart data shapes ─────────────────────────────────────────────────────
