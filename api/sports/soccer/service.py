@@ -1239,7 +1239,7 @@ class SoccerMatchService(BaseMatchListService):
             )
             key_drivers = [KeyDriverOut(feature="ELO Differential", importance=1.0, value=round(elo_h.rating - elo_a.rating, 1))]
 
-        h2h = _h2h(db, home_id, away_id) if home_team and away_team else H2HRecordOut(total_matches=0, home_wins=0, away_wins=0, recent_matches=[])
+        h2h = _h2h(db, home_id, away_id) if home_team and away_team else H2HRecordOut(total_matches=0, home_wins=0, draws=0, away_wins=0, recent_matches=[])
 
         now = datetime.now(timezone.utc)
         return SoccerMatchDetail(

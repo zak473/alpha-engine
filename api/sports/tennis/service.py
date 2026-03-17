@@ -1017,7 +1017,7 @@ class TennisMatchService(BaseMatchListService):
             )
             key_drivers = [KeyDriverOut(feature="ELO Differential", importance=1.0, value=round(elo_h.overall_rating - elo_a.overall_rating, 1))]
 
-        h2h = _h2h(db, home_id, away_id, hname, aname) if home_player and away_player else H2HRecordOut(total_matches=0, home_wins=0, away_wins=0, recent_matches=[])
+        h2h = _h2h(db, home_id, away_id, hname, aname) if home_player and away_player else H2HRecordOut(total_matches=0, player_a_wins=0, player_b_wins=0, recent_matches=[])
         form_h = _player_form(db, home_id, hname, None) if home_player else None
         form_a = _player_form(db, away_id, aname, None) if away_player else None
 

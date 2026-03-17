@@ -45,6 +45,8 @@ interface BackendItem {
   p_draw?: number | null;
   confidence: number | null;
   kickoff_utc: string;
+  elo_home?: number | null;
+  elo_away?: number | null;
 }
 
 function normalizeName(name: string): string {
@@ -104,6 +106,11 @@ async function fetchPreview(sport: SportSlug, home: string, away: string): Promi
   }
 }
 
+function eloProb(eloHome: number, eloAway: number): { pHome: number; pAway: number } {
+  const p = 1 / (1 + Math.pow(10, -(eloHome - eloAway) / 400));
+  return { pHome: Math.round(p * 10000) / 10000, pAway: Math.round((1 - p) * 10000) / 10000 };
+}
+
 function mergeBackend(match: BettingMatch, items: BackendItem[]): BettingMatch {
   const found = items.find(
     (b) =>
@@ -112,13 +119,25 @@ function mergeBackend(match: BettingMatch, items: BackendItem[]): BettingMatch {
       Math.abs(new Date(match.startTime).getTime() - new Date(b.kickoff_utc).getTime()) < 6 * 3600_000
   );
   if (!found) return match;
-  return {
-    ...match,
-    pHome: found.p_home ?? undefined,
-    pAway: found.p_away ?? undefined,
-    pDraw: found.p_draw ?? undefined,
-    modelConfidence: found.confidence != null ? found.confidence / 100 : undefined,
-  };
+
+  // ML prediction exists — use it directly
+  if (found.p_home != null) {
+    return {
+      ...match,
+      pHome: found.p_home,
+      pAway: found.p_away ?? undefined,
+      pDraw: found.p_draw ?? undefined,
+      modelConfidence: found.confidence != null ? found.confidence / 100 : undefined,
+    };
+  }
+
+  // No ML prediction but ELO data available — compute ELO probability
+  if (found.elo_home != null && found.elo_away != null) {
+    const { pHome, pAway } = eloProb(found.elo_home, found.elo_away);
+    return { ...match, pHome, pAway };
+  }
+
+  return match;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
