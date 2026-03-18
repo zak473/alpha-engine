@@ -125,19 +125,23 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
     if len(body.password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
 
-    user = User(
-        id=str(uuid.uuid4()),
-        email=body.email.lower().strip(),
-        password_hash=_hash_password(body.password),
-        display_name=body.display_name,
-    )
-    db.add(user)
     try:
+        user = User(
+            id=str(uuid.uuid4()),
+            email=body.email.lower().strip(),
+            password_hash=_hash_password(body.password),
+            display_name=body.display_name,
+        )
+        db.add(user)
         db.commit()
         db.refresh(user)
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=409, detail="Email already registered.")
+    except Exception as exc:
+        db.rollback()
+        import traceback
+        raise HTTPException(status_code=500, detail=f"Registration error: {type(exc).__name__}: {exc}\n{traceback.format_exc()}")
 
     return UserOut(user_id=user.id, email=user.email, display_name=user.display_name)
 
