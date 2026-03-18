@@ -950,6 +950,24 @@ class SoccerMatchService(BaseMatchListService):
             pred = pred_map.get(m.id)
             feat = feat_map.get(m.id)
 
+            # Compute probabilities: ML prediction first, ELO 3-way fallback otherwise
+            if pred:
+                list_p_home = round(pred.p_home, 4)
+                list_p_draw = round(pred.p_draw, 4)
+                list_p_away = round(pred.p_away, 4)
+                list_conf = pred.confidence
+            else:
+                r_h = (feat.elo_home if feat and feat.elo_home else None) or 1500.0
+                r_a = (feat.elo_away if feat and feat.elo_away else None) or 1500.0
+                HOME_ADV = 65.0
+                r_diff = r_h - r_a + HOME_ADV
+                p_2way = 1.0 / (1.0 + math.pow(10, -r_diff / 400.0))
+                list_p_draw = 0.28 * math.exp(-abs(r_h - r_a) / 220.0)
+                list_p_draw = round(max(0.05, min(list_p_draw, 0.35)), 4)
+                list_p_home = round(p_2way * (1.0 - list_p_draw), 4)
+                list_p_away = round((1.0 - p_2way) * (1.0 - list_p_draw), 4)
+                list_conf = None
+
             items.append(SoccerMatchListItem(
                 id=m.id,
                 league=league_name,
@@ -971,10 +989,10 @@ class SoccerMatchService(BaseMatchListService):
                 elo_home=round(feat.elo_home, 1) if feat and feat.elo_home else None,
                 elo_away=round(feat.elo_away, 1) if feat and feat.elo_away else None,
                 elo_diff=round(feat.elo_diff, 1) if feat and feat.elo_diff else None,
-                confidence=pred.confidence if pred else None,
-                p_home=round(pred.p_home, 4) if pred else None,
-                p_draw=round(pred.p_draw, 4) if pred else None,
-                p_away=round(pred.p_away, 4) if pred else None,
+                confidence=list_conf,
+                p_home=list_p_home,
+                p_draw=list_p_draw,
+                p_away=list_p_away,
                 odds_home=m.odds_home,
                 odds_away=m.odds_away,
                 odds_draw=m.odds_draw,

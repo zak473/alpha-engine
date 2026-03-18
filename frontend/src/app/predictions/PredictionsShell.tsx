@@ -696,24 +696,31 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
       setMatches(firstPass);
       setLoading(false);
 
-      // Second pass: for matches still missing probabilities, call preview endpoint
-      const unmatched = firstPass.filter((m) => m.pHome == null && m.status !== "finished");
+      // Second pass: call preview for matches missing probabilities OR missing draw on draw-capable sports
+      const needsPreview = (m: MatchWithSportLocal) => {
+        if (m.status === "finished") return false;
+        if (m.pHome == null) return true;
+        // Also re-fetch for draw sports (soccer, mls, etc.) that have a draw market but no pDraw yet
+        const hasDrawMarket = m.featuredMarkets?.[0]?.selections.some((s) => s.id === "draw");
+        return hasDrawMarket && m.pDraw == null;
+      };
+      const unmatched = firstPass.filter(needsPreview);
       if (unmatched.length > 0) {
         const previews = await Promise.all(
           unmatched.map((m) => fetchPreview(m.sport, m.home.name, m.away.name))
         );
         setMatches((prev) =>
           prev.map((m) => {
-            if (m.pHome != null) return m;
+            if (!needsPreview(m)) return m;
             const idx = unmatched.findIndex((u) => u.id === m.id);
             const p = idx >= 0 ? previews[idx] : null;
             if (!p) return m;
             return {
               ...m,
-              pHome: p.p_home ?? undefined,
-              pAway: p.p_away ?? undefined,
+              pHome: p.p_home ?? m.pHome ?? undefined,
+              pAway: p.p_away ?? m.pAway ?? undefined,
               pDraw: p.p_draw ?? undefined,
-              modelConfidence: p.confidence != null ? p.confidence / 100 : undefined,
+              modelConfidence: p.confidence != null ? p.confidence / 100 : (m.modelConfidence ?? undefined),
             };
           })
         );
