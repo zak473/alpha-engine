@@ -399,6 +399,23 @@ class CoreStanding(Base):
     )
 
 
+class MatchReasoning(Base):
+    """
+    AI-generated reasoning paragraph for a match prediction.
+    Cached per match; regenerated if older than 24h.
+    """
+    __tablename__ = "match_reasoning"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    match_id: Mapped[str] = mapped_column(String(36), nullable=False, unique=True)
+    reasoning: Mapped[str] = mapped_column(Text, nullable=False)
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_match_reasoning_match_id", "match_id"),
+    )
+
+
 class TeamInjury(Base):
     """
     Current player injuries and suspensions per team.

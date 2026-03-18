@@ -55,3 +55,4 @@ Thumbs.db
 *.pem
 *.key
 secrets/
+check_venv/

@@ -763,3 +763,14 @@ export async function getStandingsForMatch(matchId: string): Promise<StandingsRe
     return null;
   }
 }
+
+// ─── Match reasoning ────────────────────────────────────────────────────────
+
+export async function getMatchReasoning(matchId: string): Promise<string | null> {
+  try {
+    const res = await request<{ match_id: string; reasoning: string }>(`/reasoning/${matchId}`);
+    return res.reasoning;
+  } catch {
+    return null;
+  }
+}

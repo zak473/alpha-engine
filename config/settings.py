@@ -97,6 +97,9 @@ class Settings(BaseSettings):
     MC_DEFAULT_N_SIMULATIONS: int = 10_000
     MC_RANDOM_SEED: int = 42
 
+    # AI reasoning (Claude Haiku via Anthropic API)
+    ANTHROPIC_API_KEY: str = ""
+
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""

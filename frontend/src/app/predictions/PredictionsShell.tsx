@@ -4,12 +4,12 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  BrainCircuit, Zap, ChevronRight, Eye, EyeOff, Users,
+  BrainCircuit, Zap, ChevronRight, Eye, EyeOff, Users, Sparkles, Loader2,
 } from "lucide-react";
 import { SPORT_LEAGUES, fetchSGOEvents, sgoEventToMatch, LEAGUE_LABELS } from "@/lib/sgo";
 import type { BettingMatch } from "@/lib/betting-types";
 import type { SportSlug, TipsterProfile } from "@/lib/api";
-import { getTipsters } from "@/lib/api";
+import { getTipsters, getMatchReasoning } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -38,6 +38,7 @@ const CONF_THRESHOLDS = [
 // ── Backend merge ────────────────────────────────────────────────────────────
 
 interface BackendItem {
+  id: string;
   home_name: string;
   away_name: string;
   p_home: number | null;
@@ -126,10 +127,13 @@ function mergeBackend(match: BettingMatch, items: BackendItem[]): BettingMatch {
   );
   if (!found) return match;
 
+  const backendId = found.id;
+
   // ML prediction exists — use it directly
   if (found.p_home != null) {
     return {
       ...match,
+      backendId,
       pHome: found.p_home,
       pAway: found.p_away ?? undefined,
       pDraw: found.p_draw ?? undefined,
@@ -140,10 +144,10 @@ function mergeBackend(match: BettingMatch, items: BackendItem[]): BettingMatch {
   // No ML prediction but ELO data available — compute ELO probability
   if (found.elo_home != null && found.elo_away != null) {
     const { pHome, pAway } = eloProb(found.elo_home, found.elo_away);
-    return { ...match, pHome, pAway };
+    return { ...match, backendId, pHome, pAway };
   }
 
-  return match;
+  return { ...match, backendId };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -198,7 +202,7 @@ function SectionLabel({
 
 // ── Featured pick card ────────────────────────────────────────────────────────
 
-type MatchWithSport = BettingMatch & { sport: SportSlug };
+type MatchWithSport = BettingMatch & { sport: SportSlug; backendId?: string };
 
 function FeaturedPickCard({ match }: { match: MatchWithSport }) {
   const href = `/sports/${match.sport}/matches/${match.id}`;
@@ -425,6 +429,20 @@ function PillGroup<T extends string>({
 
 function MatchCard({ match }: { match: MatchWithSport }) {
   const href = `/sports/${match.sport}/matches/${match.id}`;
+  const [reasoningOpen, setReasoningOpen] = useState(false);
+  const [reasoning, setReasoning] = useState<string | null>(null);
+  const [loadingReasoning, setLoadingReasoning] = useState(false);
+
+  async function handleAnalysis(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (reasoning) { setReasoningOpen((v) => !v); return; }
+    setReasoningOpen(true);
+    setLoadingReasoning(true);
+    const r = await getMatchReasoning(match.backendId ?? match.id);
+    setReasoning(r);
+    setLoadingReasoning(false);
+  }
 
   const hasModelProbs = match.pHome != null;
   const hasConfidence = match.modelConfidence != null;
@@ -459,157 +477,185 @@ function MatchCard({ match }: { match: MatchWithSport }) {
   const sportIcon = SPORT_ICONS[match.sport] ?? "🏆";
 
   return (
-    <Link
-      href={href}
-      className={cn(
-        "group relative block overflow-hidden rounded-[28px] border p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_60px_rgba(0,0,0,0.32)]",
-        isHighConf
-          ? "border-emerald-400/25 bg-[linear-gradient(135deg,rgba(54,242,143,0.08),rgba(54,242,143,0.03))] hover:border-emerald-400/40"
-          : "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] hover:border-emerald-300/20"
-      )}
-    >
+    <div className={cn(
+      "group relative overflow-hidden rounded-[28px] border transition-all duration-200",
+      isHighConf
+        ? "border-emerald-400/25 bg-[linear-gradient(135deg,rgba(54,242,143,0.08),rgba(54,242,143,0.03))]"
+        : "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))]"
+    )}>
       {isHighConf && (
         <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-[radial-gradient(circle_at_top_left,rgba(54,242,143,0.08),transparent_60%)]" />
       )}
 
-      <div className="relative flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-sm">{sportIcon}</span>
-          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
-            {leagueLabel}
-          </span>
-          {isHighConf && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
-              <Zap size={9} />
-              High confidence
+      {/* Main clickable area */}
+      <Link href={href} className="relative block p-5 hover:-translate-y-0.5 hover:shadow-[0_24px_60px_rgba(0,0,0,0.32)] transition-all duration-200">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">{sportIcon}</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
+              {leagueLabel}
             </span>
-          )}
-        </div>
-        <span className="shrink-0 font-mono text-[11px] text-white/30">{fmtTime(match.startTime)}</span>
-      </div>
-
-      <div className="relative mt-4 grid grid-cols-[1fr_32px_1fr] items-start gap-2">
-        <div>
-          <p className="text-[13px] font-semibold leading-snug text-white">{match.home.name}</p>
-          {hasProbabilities && (
-            <p className={cn(
-              "mt-1.5 font-mono text-[26px] font-bold tabular-nums leading-none",
-              isMarketImplied
-                ? ((hPct ?? 0) >= (aPct ?? 0) ? "text-sky-300" : "text-sky-300/50")
-                : ((hPct ?? 0) >= (aPct ?? 0) ? "text-emerald-300" : "text-white/50")
-            )}>{hPct}%</p>
-          )}
-          {homeOdds && (
-            <p className="mt-0.5 font-mono text-[11px] text-white/30">{homeOdds.toFixed(2)}</p>
-          )}
-        </div>
-
-        <div className="flex h-full flex-col items-center pt-1">
-          <span className="text-[11px] font-medium text-white/25">vs</span>
-          {dPct != null && (
-            <div className="mt-2 rounded-xl border border-white/8 bg-black/20 px-1.5 py-2 text-center">
-              <p className="text-[9px] font-semibold uppercase text-white/35">D</p>
-              <p className="font-mono text-xs font-bold text-amber-300/70 tabular-nums">{dPct}%</p>
-            </div>
-          )}
-        </div>
-
-        <div className="text-right">
-          <p className="text-[13px] font-semibold leading-snug text-white">{match.away.name}</p>
-          {hasProbabilities && (
-            <p className={cn(
-              "mt-1.5 font-mono text-[26px] font-bold tabular-nums leading-none",
-              isMarketImplied
-                ? ((aPct ?? 0) > (hPct ?? 0) ? "text-sky-300" : "text-sky-300/50")
-                : ((aPct ?? 0) > (hPct ?? 0) ? "text-orange-300" : "text-white/50")
-            )}>{aPct}%</p>
-          )}
-          {awayOdds && (
-            <p className="mt-0.5 font-mono text-[11px] text-white/30">{awayOdds.toFixed(2)}</p>
-          )}
-        </div>
-      </div>
-
-      {hasProbabilities && (
-        <div className="relative mt-4 overflow-hidden rounded-full" style={{ height: 12, background: "rgba(255,255,255,0.05)" }}>
-          {/* Home side */}
-          <div
-            className="absolute left-0 top-0 h-full transition-all"
-            style={{
-              width: `${(hPct ?? 0) - (dPct != null ? dPct / 2 : 0)}%`,
-              background: isMarketImplied
-                ? "linear-gradient(90deg, rgba(56,189,248,0.9), rgba(56,189,248,0.6))"
-                : "linear-gradient(90deg, #34d399, #10b981)",
-              boxShadow: isMarketImplied
-                ? "0 0 16px rgba(56,189,248,0.55)"
-                : "0 0 16px rgba(52,211,153,0.55)",
-            }}
-          />
-          {/* Draw middle */}
-          {dPct != null && (
-            <div
-              className="absolute top-0 h-full"
-              style={{
-                left: `${(hPct ?? 0) - dPct / 2}%`,
-                width: `${dPct}%`,
-                background: "rgba(251,191,36,0.55)",
-              }}
-            />
-          )}
-          {/* Away side */}
-          <div
-            className="absolute right-0 top-0 h-full transition-all"
-            style={{
-              width: `${(aPct ?? 0) - (dPct != null ? dPct / 2 : 0)}%`,
-              background: isMarketImplied
-                ? "linear-gradient(270deg, rgba(56,189,248,0.9), rgba(56,189,248,0.6))"
-                : "linear-gradient(270deg, #f97316, #fb923c)",
-              boxShadow: isMarketImplied
-                ? "0 0 16px rgba(56,189,248,0.55)"
-                : "0 0 16px rgba(249,115,22,0.45)",
-            }}
-          />
-        </div>
-      )}
-
-      <div className="relative mt-4 flex items-center justify-between gap-3">
-        {hasConfidence ? (
-          <div className="flex items-center gap-2.5">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/35">Confidence</span>
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-24 overflow-hidden rounded-full bg-white/10">
-                <div
-                  className={cn("h-full rounded-full shadow-sm", confBarBg,
-                    conf >= 0.7 ? "shadow-emerald-400/40" : conf >= 0.5 ? "shadow-amber-400/40" : "shadow-red-400/40"
-                  )}
-                  style={{ width: `${Math.round(conf * 100)}%` }}
-                />
-              </div>
-              <span className={cn(
-                "rounded-full border px-2 py-0.5 font-mono text-[12px] font-bold tabular-nums",
-                conf >= 0.7
-                  ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
-                  : conf >= 0.5
-                  ? "border-amber-400/30 bg-amber-400/10 text-amber-300"
-                  : "border-red-400/30 bg-red-400/10 text-red-400"
-              )}>
-                {Math.round(conf * 100)}%
+            {isHighConf && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+                <Zap size={9} />
+                High confidence
               </span>
+            )}
+          </div>
+          <span className="shrink-0 font-mono text-[11px] text-white/30">{fmtTime(match.startTime)}</span>
+        </div>
+
+        <div className="mt-4 grid grid-cols-[1fr_32px_1fr] items-start gap-2">
+          <div>
+            <p className="text-[13px] font-semibold leading-snug text-white">{match.home.name}</p>
+            {hasProbabilities && (
+              <p className={cn(
+                "mt-1.5 font-mono text-[26px] font-bold tabular-nums leading-none",
+                isMarketImplied
+                  ? ((hPct ?? 0) >= (aPct ?? 0) ? "text-sky-300" : "text-sky-300/50")
+                  : ((hPct ?? 0) >= (aPct ?? 0) ? "text-emerald-300" : "text-white/50")
+              )}>{hPct}%</p>
+            )}
+            {homeOdds && (
+              <p className="mt-0.5 font-mono text-[11px] text-white/30">{homeOdds.toFixed(2)}</p>
+            )}
+          </div>
+
+          <div className="flex h-full flex-col items-center pt-1">
+            <span className="text-[11px] font-medium text-white/25">vs</span>
+            {dPct != null && (
+              <div className="mt-2 rounded-xl border border-white/8 bg-black/20 px-1.5 py-2 text-center">
+                <p className="text-[9px] font-semibold uppercase text-white/35">D</p>
+                <p className="font-mono text-xs font-bold text-amber-300/70 tabular-nums">{dPct}%</p>
+              </div>
+            )}
+          </div>
+
+          <div className="text-right">
+            <p className="text-[13px] font-semibold leading-snug text-white">{match.away.name}</p>
+            {hasProbabilities && (
+              <p className={cn(
+                "mt-1.5 font-mono text-[26px] font-bold tabular-nums leading-none",
+                isMarketImplied
+                  ? ((aPct ?? 0) > (hPct ?? 0) ? "text-sky-300" : "text-sky-300/50")
+                  : ((aPct ?? 0) > (hPct ?? 0) ? "text-orange-300" : "text-white/50")
+              )}>{aPct}%</p>
+            )}
+            {awayOdds && (
+              <p className="mt-0.5 font-mono text-[11px] text-white/30">{awayOdds.toFixed(2)}</p>
+            )}
+          </div>
+        </div>
+
+        {hasProbabilities && (
+          <div className="mt-4 overflow-hidden rounded-full" style={{ height: 12, background: "rgba(255,255,255,0.05)" }}>
+            <div className="relative h-full">
+              <div
+                className="absolute left-0 top-0 h-full transition-all"
+                style={{
+                  width: `${(hPct ?? 0) - (dPct != null ? dPct / 2 : 0)}%`,
+                  background: isMarketImplied
+                    ? "linear-gradient(90deg, rgba(56,189,248,0.9), rgba(56,189,248,0.6))"
+                    : "linear-gradient(90deg, #34d399, #10b981)",
+                  boxShadow: isMarketImplied ? "0 0 16px rgba(56,189,248,0.55)" : "0 0 16px rgba(52,211,153,0.55)",
+                }}
+              />
+              {dPct != null && (
+                <div className="absolute top-0 h-full" style={{
+                  left: `${(hPct ?? 0) - dPct / 2}%`,
+                  width: `${dPct}%`,
+                  background: "rgba(251,191,36,0.55)",
+                }} />
+              )}
+              <div
+                className="absolute right-0 top-0 h-full transition-all"
+                style={{
+                  width: `${(aPct ?? 0) - (dPct != null ? dPct / 2 : 0)}%`,
+                  background: isMarketImplied
+                    ? "linear-gradient(270deg, rgba(56,189,248,0.9), rgba(56,189,248,0.6))"
+                    : "linear-gradient(270deg, #f97316, #fb923c)",
+                  boxShadow: isMarketImplied ? "0 0 16px rgba(56,189,248,0.55)" : "0 0 16px rgba(249,115,22,0.45)",
+                }}
+              />
             </div>
           </div>
-        ) : isMarketImplied ? (
-          <span className="text-[11px] text-white/25">Market implied</span>
-        ) : hasProbabilities ? (
-          <span className="text-[11px] text-white/25">ELO estimate</span>
-        ) : (
-          <span className="text-[11px] text-white/20">No prediction</span>
         )}
 
-        <span className="flex items-center gap-1 text-[11px] font-semibold text-white/40 opacity-0 transition-opacity group-hover:opacity-100">
-          View <ChevronRight size={12} />
-        </span>
+        <div className="mt-4 flex items-center justify-between gap-3">
+          {hasConfidence ? (
+            <div className="flex items-center gap-2.5">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/35">Confidence</span>
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-24 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className={cn("h-full rounded-full shadow-sm", confBarBg,
+                      conf >= 0.7 ? "shadow-emerald-400/40" : conf >= 0.5 ? "shadow-amber-400/40" : "shadow-red-400/40"
+                    )}
+                    style={{ width: `${Math.round(conf * 100)}%` }}
+                  />
+                </div>
+                <span className={cn(
+                  "rounded-full border px-2 py-0.5 font-mono text-[12px] font-bold tabular-nums",
+                  conf >= 0.7
+                    ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+                    : conf >= 0.5
+                    ? "border-amber-400/30 bg-amber-400/10 text-amber-300"
+                    : "border-red-400/30 bg-red-400/10 text-red-400"
+                )}>
+                  {Math.round(conf * 100)}%
+                </span>
+              </div>
+            </div>
+          ) : isMarketImplied ? (
+            <span className="text-[11px] text-white/25">Market implied</span>
+          ) : hasProbabilities ? (
+            <span className="text-[11px] text-white/25">ELO estimate</span>
+          ) : (
+            <span className="text-[11px] text-white/20">No prediction</span>
+          )}
+
+          <span className="flex items-center gap-1 text-[11px] font-semibold text-white/40 opacity-0 transition-opacity group-hover:opacity-100">
+            View <ChevronRight size={12} />
+          </span>
+        </div>
+      </Link>
+
+      {/* AI Analysis toggle */}
+      <div className="relative border-t border-white/[0.05]">
+        <button
+          onClick={handleAnalysis}
+          className={cn(
+            "flex w-full items-center gap-2 px-5 py-2.5 text-left text-[11px] font-semibold transition-colors",
+            reasoningOpen
+              ? "text-purple-300"
+              : "text-white/30 hover:text-white/55"
+          )}
+        >
+          {loadingReasoning
+            ? <Loader2 size={11} className="animate-spin text-purple-400" />
+            : <Sparkles size={11} className={reasoningOpen ? "text-purple-400" : "text-white/25"} />
+          }
+          {loadingReasoning ? "Generating analysis…" : reasoningOpen ? "Hide analysis" : "AI analysis"}
+        </button>
+
+        {reasoningOpen && (
+          <div className="px-5 pb-4">
+            {loadingReasoning ? (
+              <div className="flex items-center gap-2 py-2">
+                <Loader2 size={12} className="animate-spin text-purple-400/60" />
+                <span className="text-[12px] text-white/30">Analysing match data…</span>
+              </div>
+            ) : reasoning ? (
+              <p className="text-[12px] leading-relaxed text-white/55 border-l-2 border-purple-400/30 pl-3">
+                {reasoning}
+              </p>
+            ) : (
+              <p className="text-[12px] text-white/25">Analysis unavailable for this match.</p>
+            )}
+          </div>
+        )}
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -641,7 +687,7 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  type MatchWithSportLocal = BettingMatch & { sport: SportSlug };
+  type MatchWithSportLocal = BettingMatch & { sport: SportSlug; backendId?: string };
   const [matches, setMatches] = useState<MatchWithSportLocal[]>([]);
   const [loading, setLoading] = useState(true);
   const [minConf, setMinConf] = useState("0");
