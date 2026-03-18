@@ -11,8 +11,9 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-if postgres_dsn := os.environ.get("POSTGRES_DSN"):
-    config.set_main_option("sqlalchemy.url", postgres_dsn)
+_db_url = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_DSN")
+if _db_url:
+    config.set_main_option("sqlalchemy.url", _db_url)
 
 target_metadata = Base.metadata
 

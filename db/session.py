@@ -3,7 +3,7 @@ from sqlalchemy.orm import sessionmaker, Session
 from config.settings import settings
 
 engine = create_engine(
-    settings.POSTGRES_DSN,
+    settings.DATABASE_URL or settings.POSTGRES_DSN,
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,

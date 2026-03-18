@@ -13,7 +13,8 @@ class Settings(BaseSettings):
     APP_NAME: str = "alpha-engine"
     ENV: str = "development"
 
-    # Database
+    # Database — Railway injects DATABASE_URL; POSTGRES_DSN is the local fallback
+    DATABASE_URL: str = ""
     POSTGRES_DSN: str = "postgresql://alpha:alpha@localhost:5432/alpha_engine"
     REDIS_URL: str = "redis://localhost:6379/0"
 
