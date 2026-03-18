@@ -111,9 +111,39 @@ export function SportMatchesView({ sport }: Props) {
         results.flat().map((e) => sgoEventToMatch(e, sport))
       ),
       fetchBackendPredictions(sport),
-    ]).then(([sgoMatches, backendItems]) => {
-      setMatches(mergeBackendData(sgoMatches, backendItems));
+    ]).then(async ([sgoMatches, backendItems]) => {
+      const merged = mergeBackendData(sgoMatches, backendItems);
+      setMatches(merged);
       setLoading(false);
+
+      // Second pass: call preview endpoint for matches still missing probabilities
+      const token = typeof window !== "undefined" ? localStorage.getItem("alpha_engine_token") : null;
+      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+      const unmatched = merged.filter((m) => m.pHome == null && m.status !== "finished");
+      if (!unmatched.length) return;
+      const previews = await Promise.all(
+        unmatched.map(async (m) => {
+          try {
+            const res = await fetch(
+              `/api/v1/sports/${sport}/matches/preview?home=${encodeURIComponent(m.home.name)}&away=${encodeURIComponent(m.away.name)}`,
+              { cache: "no-store", headers: authHeaders }
+            );
+            if (!res.ok) return null;
+            const d = await res.json();
+            if (!d.probabilities) return null;
+            return { id: m.id, pHome: d.probabilities.home_win ?? null, pAway: d.probabilities.away_win ?? null, pDraw: d.probabilities.draw ?? null };
+          } catch { return null; }
+        })
+      );
+      setMatches((prev) =>
+        prev.map((m) => {
+          if (m.pHome != null) return m;
+          const idx = unmatched.findIndex((u) => u.id === m.id);
+          const p = idx >= 0 ? previews[idx] : null;
+          if (!p) return m;
+          return { ...m, pHome: p.pHome ?? undefined, pAway: p.pAway ?? undefined, pDraw: p.pDraw ?? undefined };
+        })
+      );
     });
   }, [sport]);
 

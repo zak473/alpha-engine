@@ -138,48 +138,79 @@ function ModelBar({ match }: { match: BettingMatch }) {
   const confidence = match.modelConfidence != null ? Math.round(match.modelConfidence * 100) : null;
 
   // Use model probability, or fall back to market-implied probability from odds
-  let pct: number | null = match.pHome != null ? Math.round(match.pHome * 100) : null;
+  let hPct: number | null = match.pHome != null ? Math.round(match.pHome * 100) : null;
+  let aPct: number | null = match.pAway != null ? Math.round(match.pAway * 100) : null;
   let isMarketImplied = false;
-  if (pct == null) {
+  if (hPct == null) {
     const ml = match.featuredMarkets?.[0];
     const homeOdds = ml?.selections[0]?.odds;
     const awayOdds = ml?.selections[ml.selections.length - 1]?.odds;
     if (homeOdds && awayOdds && homeOdds > 1 && awayOdds > 1) {
       const impHome = 1 / homeOdds;
       const impAway = 1 / awayOdds;
-      pct = Math.round((impHome / (impHome + impAway)) * 100);
+      hPct = Math.round((impHome / (impHome + impAway)) * 100);
+      aPct = 100 - hPct;
       isMarketImplied = true;
     }
   }
+  if (aPct == null && hPct != null) aPct = 100 - hPct;
 
-  if (pct == null) {
+  if (hPct == null) {
     return <div className="text-[10px] text-white/25 italic">No prediction</div>;
   }
 
-  const label = confidence != null ? "Model lean" : isMarketImplied ? "Market implied" : "ELO estimate";
+  const label = confidence != null ? "Model" : isMarketImplied ? "Market implied" : "ELO estimate";
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="flex min-w-[120px] flex-1 flex-col gap-1">
-        <div className="flex items-center justify-between text-[9px] uppercase tracking-[0.14em]">
-          <span className="text-white/38">{label}</span>
-          <span className="font-semibold text-white/60">{pct}% home</span>
-        </div>
-        <div className="h-[3px] overflow-hidden rounded-full" style={{ background: "var(--bg3)" }}>
-          <div
-            className="h-full rounded-full"
-            style={{ width: `${pct}%`, background: isMarketImplied ? "rgb(56,189,248)" : "var(--accent)" }}
-          />
-        </div>
+    <div className="flex flex-col gap-1.5">
+      {/* Labels row */}
+      <div className="flex items-center justify-between">
+        <span className={cn(
+          "font-mono text-[13px] font-bold tabular-nums",
+          isMarketImplied ? "text-sky-300" : (hPct >= (aPct ?? 0) ? "text-emerald-300" : "text-white/50")
+        )}>{hPct}%</span>
+        <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/30">{label}</span>
+        <span className={cn(
+          "font-mono text-[13px] font-bold tabular-nums",
+          isMarketImplied ? "text-sky-300/60" : ((aPct ?? 0) > hPct ? "text-orange-300" : "text-white/40")
+        )}>{aPct}%</span>
       </div>
+
+      {/* Bold gradient bar */}
+      <div className="relative overflow-hidden rounded-full" style={{ height: 10, background: "rgba(255,255,255,0.05)" }}>
+        <div
+          className="absolute left-0 top-0 h-full"
+          style={{
+            width: `${hPct}%`,
+            background: isMarketImplied
+              ? "linear-gradient(90deg, rgba(56,189,248,0.85), rgba(56,189,248,0.5))"
+              : "linear-gradient(90deg, #34d399, #10b981)",
+            boxShadow: isMarketImplied ? "0 0 12px rgba(56,189,248,0.5)" : "0 0 12px rgba(52,211,153,0.5)",
+          }}
+        />
+        <div
+          className="absolute right-0 top-0 h-full"
+          style={{
+            width: `${aPct}%`,
+            background: isMarketImplied
+              ? "linear-gradient(270deg, rgba(56,189,248,0.85), rgba(56,189,248,0.5))"
+              : "linear-gradient(270deg, #f97316, #fb923c)",
+            boxShadow: isMarketImplied ? "0 0 12px rgba(56,189,248,0.5)" : "0 0 12px rgba(249,115,22,0.4)",
+          }}
+        />
+      </div>
+
+      {/* Confidence + edge badges */}
       {confidence != null && (
         <div className="flex items-center gap-1">
           <span className="inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[10px] text-white/50" style={{ borderColor: "rgba(255,255,255,0.08)", background: "var(--bg2)" }}>
             <Shield size={9} /> <span className="font-medium">{confidence}%</span>
           </span>
-          <span className="inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[10px] font-semibold" style={{ borderColor: edge >= 3 ? "rgba(34,197,94,0.22)" : "rgba(245,158,11,0.22)", background: edge >= 3 ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.10)", color: edge >= 3 ? "var(--positive)" : "var(--warning)" }}>
-            <TrendingUp size={9} /> {edge > 0 ? "+" : ""}{edge.toFixed(1)}%
-          </span>
+          {edge > 0 && (
+            <span className="inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[10px] font-semibold" style={{ borderColor: edge >= 3 ? "rgba(34,197,94,0.22)" : "rgba(245,158,11,0.22)", background: edge >= 3 ? "rgba(34,197,94,0.10)" : "rgba(245,158,11,0.10)", color: edge >= 3 ? "var(--positive)" : "var(--warning)" }}>
+              <TrendingUp size={9} /> +{edge.toFixed(1)}%
+            </span>
+          )}
         </div>
       )}
     </div>
