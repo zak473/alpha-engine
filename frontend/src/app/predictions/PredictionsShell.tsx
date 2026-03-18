@@ -260,15 +260,27 @@ function FeaturedPickCard({ match }: { match: MatchWithSport }) {
             )}>
               {hPct}%
             </span>
-            <div className="relative h-[5px] flex-1 overflow-hidden rounded-full bg-white/[0.08]">
+            <div className="relative flex-1 overflow-hidden rounded-full" style={{ height: 8, background: "rgba(255,255,255,0.05)" }}>
               <div
-                className={cn("absolute left-0 top-0 h-full rounded-full", hPct > aPct ? "bg-emerald-400" : "bg-white/25")}
-                style={{ width: `${hPct}%` }}
+                className="absolute left-0 top-0 h-full"
+                style={{
+                  width: `${hPct}%`,
+                  background: hPct > aPct ? "linear-gradient(90deg, #34d399, #10b981)" : "linear-gradient(90deg, #f97316, #fb923c)",
+                  boxShadow: hPct > aPct ? "0 0 10px rgba(52,211,153,0.5)" : "0 0 10px rgba(249,115,22,0.4)",
+                }}
+              />
+              <div
+                className="absolute right-0 top-0 h-full"
+                style={{
+                  width: `${aPct}%`,
+                  background: aPct > hPct ? "linear-gradient(270deg, #34d399, #10b981)" : "linear-gradient(270deg, #f97316, #fb923c)",
+                  boxShadow: aPct > hPct ? "0 0 10px rgba(52,211,153,0.5)" : "0 0 10px rgba(249,115,22,0.4)",
+                }}
               />
             </div>
             <span className={cn(
               "w-9 shrink-0 font-mono text-[12px] font-bold tabular-nums",
-              aPct > hPct ? "text-emerald-300" : "text-white/38"
+              aPct > hPct ? "text-emerald-300" : "text-orange-300/70"
             )}>
               {aPct}%
             </span>
@@ -477,8 +489,11 @@ function MatchCard({ match }: { match: MatchWithSport }) {
         <div>
           <p className="text-[13px] font-semibold leading-snug text-white">{match.home.name}</p>
           {hasProbabilities && (
-            <p className={cn("mt-1.5 font-mono text-[26px] font-bold tabular-nums leading-none",
-              (hPct ?? 0) > (aPct ?? 0) ? "text-emerald-300" : "text-white/60"
+            <p className={cn(
+              "mt-1.5 font-mono text-[26px] font-bold tabular-nums leading-none",
+              isMarketImplied
+                ? ((hPct ?? 0) >= (aPct ?? 0) ? "text-sky-300" : "text-sky-300/50")
+                : ((hPct ?? 0) >= (aPct ?? 0) ? "text-emerald-300" : "text-white/50")
             )}>{hPct}%</p>
           )}
           {homeOdds && (
@@ -491,7 +506,7 @@ function MatchCard({ match }: { match: MatchWithSport }) {
           {dPct != null && (
             <div className="mt-2 rounded-xl border border-white/8 bg-black/20 px-1.5 py-2 text-center">
               <p className="text-[9px] font-semibold uppercase text-white/35">D</p>
-              <p className="font-mono text-xs font-bold text-white/60 tabular-nums">{dPct}%</p>
+              <p className="font-mono text-xs font-bold text-amber-300/70 tabular-nums">{dPct}%</p>
             </div>
           )}
         </div>
@@ -499,8 +514,11 @@ function MatchCard({ match }: { match: MatchWithSport }) {
         <div className="text-right">
           <p className="text-[13px] font-semibold leading-snug text-white">{match.away.name}</p>
           {hasProbabilities && (
-            <p className={cn("mt-1.5 font-mono text-[26px] font-bold tabular-nums leading-none",
-              (aPct ?? 0) > (hPct ?? 0) ? "text-emerald-300" : "text-white/60"
+            <p className={cn(
+              "mt-1.5 font-mono text-[26px] font-bold tabular-nums leading-none",
+              isMarketImplied
+                ? ((aPct ?? 0) > (hPct ?? 0) ? "text-sky-300" : "text-sky-300/50")
+                : ((aPct ?? 0) > (hPct ?? 0) ? "text-orange-300" : "text-white/50")
             )}>{aPct}%</p>
           )}
           {awayOdds && (
@@ -510,27 +528,43 @@ function MatchCard({ match }: { match: MatchWithSport }) {
       </div>
 
       {hasProbabilities && (
-        <div className="relative mt-4 overflow-hidden rounded-full bg-white/[0.08]" style={{ height: 8 }}>
+        <div className="relative mt-4 overflow-hidden rounded-full" style={{ height: 12, background: "rgba(255,255,255,0.05)" }}>
+          {/* Home side */}
           <div
-            className={cn(
-              "absolute left-0 top-0 h-full transition-all",
-              isMarketImplied
-                ? ((hPct ?? 0) >= (aPct ?? 0) ? "bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.5)]" : "bg-sky-400/40")
-                : ((hPct ?? 0) >= (aPct ?? 0) ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" : "bg-white/30")
-            )}
-            style={{ width: `${hPct}%` }}
+            className="absolute left-0 top-0 h-full transition-all"
+            style={{
+              width: `${(hPct ?? 0) - (dPct != null ? dPct / 2 : 0)}%`,
+              background: isMarketImplied
+                ? "linear-gradient(90deg, rgba(56,189,248,0.9), rgba(56,189,248,0.6))"
+                : "linear-gradient(90deg, #34d399, #10b981)",
+              boxShadow: isMarketImplied
+                ? "0 0 16px rgba(56,189,248,0.55)"
+                : "0 0 16px rgba(52,211,153,0.55)",
+            }}
           />
+          {/* Draw middle */}
           {dPct != null && (
-            <div className="absolute top-0 h-full bg-white/15" style={{ left: `${hPct}%`, width: `${dPct}%` }} />
+            <div
+              className="absolute top-0 h-full"
+              style={{
+                left: `${(hPct ?? 0) - dPct / 2}%`,
+                width: `${dPct}%`,
+                background: "rgba(251,191,36,0.55)",
+              }}
+            />
           )}
+          {/* Away side */}
           <div
-            className={cn(
-              "absolute right-0 top-0 h-full",
-              isMarketImplied
-                ? ((aPct ?? 0) > (hPct ?? 0) ? "bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.5)]" : "bg-sky-400/40")
-                : ((aPct ?? 0) > (hPct ?? 0) ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" : "bg-amber-400/50")
-            )}
-            style={{ width: `${aPct}%` }}
+            className="absolute right-0 top-0 h-full transition-all"
+            style={{
+              width: `${(aPct ?? 0) - (dPct != null ? dPct / 2 : 0)}%`,
+              background: isMarketImplied
+                ? "linear-gradient(270deg, rgba(56,189,248,0.9), rgba(56,189,248,0.6))"
+                : "linear-gradient(270deg, #f97316, #fb923c)",
+              boxShadow: isMarketImplied
+                ? "0 0 16px rgba(56,189,248,0.55)"
+                : "0 0 16px rgba(249,115,22,0.45)",
+            }}
           />
         </div>
       )}
