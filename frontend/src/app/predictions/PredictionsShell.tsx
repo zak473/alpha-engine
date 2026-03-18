@@ -364,31 +364,46 @@ function TipsterCard({ tipster }: { tipster: TipsterProfile }) {
 // ── Pill group ────────────────────────────────────────────────────────────────
 
 function PillGroup<T extends string>({
-  label, options, active, onChange,
+  label, options, active, onChange, badges,
 }: {
   label: string;
   options: { value: T; label: string }[];
   active: T;
   onChange: (v: T) => void;
+  badges?: Partial<Record<string, number>>;
 }) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/38 shrink-0">{label}</span>
       <div className="flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] p-1">
-        {options.map((o) => (
-          <button
-            key={o.value}
-            onClick={() => onChange(o.value)}
-            className={cn(
-              "rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all",
-              active === o.value
-                ? "bg-[#2edb6c] text-[#07110d] shadow-sm"
-                : "text-white/55 hover:bg-white/[0.06] hover:text-white"
-            )}
-          >
-            {o.label}
-          </button>
-        ))}
+        {options.map((o) => {
+          const badge = badges?.[o.value];
+          const isActive = active === o.value;
+          return (
+            <button
+              key={o.value}
+              onClick={() => onChange(o.value)}
+              className={cn(
+                "relative flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all",
+                isActive
+                  ? "bg-[#2edb6c] text-[#07110d] shadow-sm"
+                  : "text-white/55 hover:bg-white/[0.06] hover:text-white"
+              )}
+            >
+              {o.label}
+              {badge != null && badge > 0 && (
+                <span className={cn(
+                  "inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold tabular-nums leading-none",
+                  isActive
+                    ? "bg-[#07110d]/30 text-[#07110d]"
+                    : "bg-emerald-400/20 text-emerald-300"
+                )}>
+                  {badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -497,14 +512,24 @@ function MatchCard({ match }: { match: MatchWithSport }) {
       {hasProbabilities && (
         <div className="relative mt-4 overflow-hidden rounded-full bg-white/[0.08]" style={{ height: 8 }}>
           <div
-            className={cn("absolute left-0 top-0 h-full transition-all shadow-[0_0_8px_rgba(52,211,153,0.5)]", (hPct ?? 0) >= (aPct ?? 0) ? "bg-emerald-400" : "bg-white/30")}
+            className={cn(
+              "absolute left-0 top-0 h-full transition-all",
+              isMarketImplied
+                ? ((hPct ?? 0) >= (aPct ?? 0) ? "bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.5)]" : "bg-sky-400/40")
+                : ((hPct ?? 0) >= (aPct ?? 0) ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" : "bg-white/30")
+            )}
             style={{ width: `${hPct}%` }}
           />
           {dPct != null && (
             <div className="absolute top-0 h-full bg-white/15" style={{ left: `${hPct}%`, width: `${dPct}%` }} />
           )}
           <div
-            className={cn("absolute right-0 top-0 h-full", (aPct ?? 0) > (hPct ?? 0) ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" : "bg-amber-400/50")}
+            className={cn(
+              "absolute right-0 top-0 h-full",
+              isMarketImplied
+                ? ((aPct ?? 0) > (hPct ?? 0) ? "bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.5)]" : "bg-sky-400/40")
+                : ((aPct ?? 0) > (hPct ?? 0) ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" : "bg-amber-400/50")
+            )}
             style={{ width: `${aPct}%` }}
           />
         </div>
@@ -682,6 +707,17 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
   const withConf = matches.filter((m) => m.modelConfidence != null).length;
   const highConf = matches.filter((m) => (m.modelConfidence ?? 0) >= 0.7).length;
 
+  // Per-sport signal count (confidence >= 60%) for sport pill badges
+  const sportSignals: Partial<Record<string, number>> = {};
+  let totalSignals = 0;
+  for (const m of matches) {
+    if ((m.modelConfidence ?? 0) >= 0.6) {
+      sportSignals[m.sport] = (sportSignals[m.sport] ?? 0) + 1;
+      totalSignals++;
+    }
+  }
+  if (totalSignals > 0) sportSignals["all"] = totalSignals;
+
   // Featured picks: top 5 by confidence, min 60%, from ALL matches regardless of filters
   const featuredPicks = matches
     .filter((m) => (m.modelConfidence ?? 0) >= 0.6)
@@ -736,6 +772,7 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
             options={SPORT_META}
             active={sport}
             onChange={(v) => navigate({ sport: v })}
+            badges={sportSignals}
           />
           <PillGroup
             label="Confidence"

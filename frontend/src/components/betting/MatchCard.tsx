@@ -166,7 +166,10 @@ function ModelBar({ match }: { match: BettingMatch }) {
           <span className="font-semibold text-white/60">{pct}% home</span>
         </div>
         <div className="h-[3px] overflow-hidden rounded-full" style={{ background: "var(--bg3)" }}>
-          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "var(--accent)" }} />
+          <div
+            className="h-full rounded-full"
+            style={{ width: `${pct}%`, background: isMarketImplied ? "rgb(56,189,248)" : "var(--accent)" }}
+          />
         </div>
       </div>
       {confidence != null && (
