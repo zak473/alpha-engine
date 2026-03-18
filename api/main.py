@@ -633,6 +633,20 @@ def trigger_rebuild_hockey_data():
     return {"status": "started", "note": "Hockey data rebuild running. Check Railway logs."}
 
 
+@app.get("/api/v1/admin/debug-tables", tags=["Admin"])
+def debug_tables(db: Session = Depends(get_db)):
+    """List all tables in the DB and check if users table exists."""
+    from sqlalchemy import inspect as sa_inspect
+    inspector = sa_inspect(db.bind)
+    tables = inspector.get_table_names()
+    try:
+        result = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
+        users_count = result
+    except Exception as exc:
+        users_count = f"ERROR: {exc}"
+    return {"tables": tables, "users_row_count": users_count}
+
+
 @app.get("/ready", tags=["Health"])
 def readiness_check(db: Session = Depends(get_db)):
     """
