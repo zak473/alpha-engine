@@ -137,23 +137,30 @@ function ModelBar({ match }: { match: BettingMatch }) {
   const edge = match.edgePercent ?? 0;
   const confidence = match.modelConfidence != null ? Math.round(match.modelConfidence * 100) : null;
 
-  // Use model probability, or fall back to market-implied probability from odds
+  const ml = match.featuredMarkets?.[0];
+
+  // Use model probability, or fall back to market-implied from odds
   let hPct: number | null = match.pHome != null ? Math.round(match.pHome * 100) : null;
   let aPct: number | null = match.pAway != null ? Math.round(match.pAway * 100) : null;
+  let dPct: number | null = match.pDraw != null ? Math.round(match.pDraw * 100) : null;
   let isMarketImplied = false;
+
   if (hPct == null) {
-    const ml = match.featuredMarkets?.[0];
     const homeOdds = ml?.selections[0]?.odds;
+    const drawSel = ml?.selections.find((s) => s.id === "draw");
     const awayOdds = ml?.selections[ml.selections.length - 1]?.odds;
     if (homeOdds && awayOdds && homeOdds > 1 && awayOdds > 1) {
       const impHome = 1 / homeOdds;
+      const impDraw = drawSel ? 1 / drawSel.odds : 0;
       const impAway = 1 / awayOdds;
-      hPct = Math.round((impHome / (impHome + impAway)) * 100);
-      aPct = 100 - hPct;
+      const total = impHome + impDraw + impAway;
+      hPct = Math.round((impHome / total) * 100);
+      aPct = Math.round((impAway / total) * 100);
+      dPct = impDraw > 0 ? 100 - hPct - aPct : null;
       isMarketImplied = true;
     }
   }
-  if (aPct == null && hPct != null) aPct = 100 - hPct;
+  if (aPct == null && hPct != null) aPct = 100 - hPct - (dPct ?? 0);
 
   if (hPct == null) {
     return <div className="text-[10px] text-white/25 italic">No prediction</div>;
@@ -163,12 +170,17 @@ function ModelBar({ match }: { match: BettingMatch }) {
 
   return (
     <div className="flex flex-col gap-1.5">
-      {/* Labels row */}
-      <div className="flex items-center justify-between">
+      {/* Labels row — home | [draw] | label | away */}
+      <div className="flex items-center justify-between gap-1">
         <span className={cn(
           "font-mono text-[13px] font-bold tabular-nums",
           isMarketImplied ? "text-sky-300" : (hPct >= (aPct ?? 0) ? "text-emerald-300" : "text-white/50")
         )}>{hPct}%</span>
+        {dPct != null && (
+          <span className="font-mono text-[11px] font-semibold tabular-nums text-amber-300/80">
+            {dPct}% D
+          </span>
+        )}
         <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/30">{label}</span>
         <span className={cn(
           "font-mono text-[13px] font-bold tabular-nums",
@@ -176,8 +188,9 @@ function ModelBar({ match }: { match: BettingMatch }) {
         )}>{aPct}%</span>
       </div>
 
-      {/* Bold gradient bar */}
+      {/* Bold three-segment bar */}
       <div className="relative overflow-hidden rounded-full" style={{ height: 10, background: "rgba(255,255,255,0.05)" }}>
+        {/* Home segment */}
         <div
           className="absolute left-0 top-0 h-full"
           style={{
@@ -188,6 +201,18 @@ function ModelBar({ match }: { match: BettingMatch }) {
             boxShadow: isMarketImplied ? "0 0 12px rgba(56,189,248,0.5)" : "0 0 12px rgba(52,211,153,0.5)",
           }}
         />
+        {/* Draw segment */}
+        {dPct != null && dPct > 0 && (
+          <div
+            className="absolute top-0 h-full"
+            style={{
+              left: `${hPct}%`,
+              width: `${dPct}%`,
+              background: "rgba(251,191,36,0.6)",
+            }}
+          />
+        )}
+        {/* Away segment */}
         <div
           className="absolute right-0 top-0 h-full"
           style={{

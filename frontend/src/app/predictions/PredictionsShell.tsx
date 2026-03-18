@@ -432,22 +432,25 @@ function MatchCard({ match }: { match: MatchWithSport }) {
 
   const ml = match.featuredMarkets?.[0];
   const homeOdds = ml?.selections[0]?.odds;
+  const drawSel = ml?.selections.find((s) => s.id === "draw");
   const awayOdds = ml?.selections[ml.selections.length - 1]?.odds;
 
   // Compute implied probability from market odds if no model prediction
   let hPct: number | null = hasModelProbs ? Math.round((match.pHome ?? 0) * 100) : null;
   let aPct: number | null = hasModelProbs ? Math.round((match.pAway ?? 0) * 100) : null;
+  let dPct: number | null = hasModelProbs && match.pDraw != null ? Math.round(match.pDraw * 100) : null;
   let isMarketImplied = false;
   if (!hasModelProbs && homeOdds && awayOdds && homeOdds > 1 && awayOdds > 1) {
     const impHome = 1 / homeOdds;
+    const impDraw = drawSel ? 1 / drawSel.odds : 0;
     const impAway = 1 / awayOdds;
-    const total = impHome + impAway;
+    const total = impHome + impDraw + impAway;
     hPct = Math.round((impHome / total) * 100);
-    aPct = 100 - hPct;
+    aPct = Math.round((impAway / total) * 100);
+    dPct = impDraw > 0 ? 100 - hPct - aPct : null;
     isMarketImplied = true;
   }
   const hasProbabilities = hPct != null && aPct != null;
-  const dPct = hasModelProbs && match.pDraw != null ? Math.round(match.pDraw * 100) : null;
 
   const isHighConf = hasConfidence && conf >= 0.7;
   const confBarBg = conf >= 0.7 ? "bg-emerald-400" : conf >= 0.5 ? "bg-amber-400" : "bg-red-400";
