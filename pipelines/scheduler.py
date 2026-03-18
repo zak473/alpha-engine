@@ -560,6 +560,145 @@ def _job_sync_standings() -> None:
         log.error("[scheduler] sync_standings failed: %s", exc, exc_info=True)
 
 
+def _job_generate_reasoning() -> None:
+    """
+    Pre-generate AI reasoning for all upcoming scheduled matches.
+    Skips matches that already have fresh reasoning (generated < 24h ago).
+    Runs daily at 4:00 AM UTC so analysis is ready before users wake up.
+    """
+    from datetime import datetime, timedelta, timezone
+    from config.settings import settings
+    from db.session import SessionLocal
+    from db.models.mvp import CoreMatch, MatchReasoning
+    from api.routers.reasoning import (
+        _team_name, _league_name, _elo_rating, _standing,
+        _build_prompt, _call_claude, CACHE_TTL_HOURS,
+    )
+    try:
+        from db.models.mvp import FeatSoccerMatch
+    except ImportError:
+        FeatSoccerMatch = None  # type: ignore
+
+    if not settings.ANTHROPIC_API_KEY:
+        log.info("[scheduler] generate_reasoning: ANTHROPIC_API_KEY not set — skipping.")
+        return
+
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        cutoff_kickoff = now + timedelta(hours=48)
+        cutoff_cache = now.replace(tzinfo=None) - timedelta(hours=CACHE_TTL_HOURS)
+
+        # All upcoming matches in the next 48 hours
+        upcoming = (
+            db.query(CoreMatch)
+            .filter(
+                CoreMatch.status == "scheduled",
+                CoreMatch.kickoff_utc >= now,
+                CoreMatch.kickoff_utc <= cutoff_kickoff,
+            )
+            .all()
+        )
+
+        # Find which ones need (re-)generation
+        existing = {
+            r.match_id: r
+            for r in db.query(MatchReasoning)
+            .filter(MatchReasoning.match_id.in_([m.id for m in upcoming]))
+            .all()
+        }
+
+        todo = [
+            m for m in upcoming
+            if m.id not in existing or existing[m.id].generated_at < cutoff_cache
+        ]
+
+        log.info("[scheduler] generate_reasoning: %d upcoming, %d need generation.", len(upcoming), len(todo))
+
+        from db.models.mvp import PredMatch, ModelRegistry
+        import math
+
+        generated = 0
+        for match in todo:
+            try:
+                home = _team_name(db, match.home_team_id)
+                away = _team_name(db, match.away_team_id)
+                league = _league_name(db, match.league_id)
+                sport = match.sport or "soccer"
+
+                pred_row = (
+                    db.query(PredMatch, ModelRegistry)
+                    .join(ModelRegistry, ModelRegistry.model_name == PredMatch.model_version)
+                    .filter(PredMatch.match_id == match.id, ModelRegistry.is_live == True)
+                    .order_by(ModelRegistry.trained_at.desc())
+                    .first()
+                )
+
+                if pred_row:
+                    pred, _ = pred_row
+                    p_home, p_draw, p_away = pred.p_home, pred.p_draw, pred.p_away
+                    confidence = pred.confidence / 100
+                    fair_home, fair_draw, fair_away = pred.fair_odds_home, pred.fair_odds_draw, pred.fair_odds_away
+                    key_drivers = pred.key_drivers or []
+                else:
+                    elo_h = _elo_rating(db, match.home_team_id, match.kickoff_utc) or 1500.0
+                    elo_a = _elo_rating(db, match.away_team_id, match.kickoff_utc) or 1500.0
+                    r_diff = elo_h - elo_a + 65.0
+                    p_home = 1.0 / (1.0 + math.pow(10, -r_diff / 400.0))
+                    p_away = 1.0 - p_home
+                    p_draw = 0.0
+                    confidence = abs(p_home - 0.5) * 2
+                    fair_home = round(1 / p_home, 2) if p_home > 0 else 99.0
+                    fair_away = round(1 / p_away, 2) if p_away > 0 else 99.0
+                    fair_draw = 99.0
+                    key_drivers = []
+
+                elo_home = _elo_rating(db, match.home_team_id, match.kickoff_utc)
+                elo_away = _elo_rating(db, match.away_team_id, match.kickoff_utc)
+
+                feat = None
+                if FeatSoccerMatch and sport == "soccer":
+                    feat = db.query(FeatSoccerMatch).filter_by(match_id=match.id).first()
+
+                standing_home = _standing(db, match.home_team_id, sport)
+                standing_away = _standing(db, match.away_team_id, sport)
+
+                prompt = _build_prompt(
+                    sport=sport, league=league, home=home, away=away,
+                    p_home=p_home, p_draw=p_draw, p_away=p_away,
+                    confidence=confidence,
+                    fair_home=fair_home, fair_draw=fair_draw, fair_away=fair_away,
+                    market_home=match.odds_home, market_draw=match.odds_draw, market_away=match.odds_away,
+                    elo_home=elo_home, elo_away=elo_away,
+                    key_drivers=key_drivers, feat=feat,
+                    standing_home=standing_home, standing_away=standing_away,
+                )
+
+                text = _call_claude(prompt)
+
+                cached = existing.get(match.id)
+                if cached:
+                    cached.reasoning = text
+                    cached.generated_at = datetime.utcnow()
+                else:
+                    db.add(MatchReasoning(match_id=match.id, reasoning=text))
+
+                db.commit()
+                generated += 1
+                log.info("[scheduler] generate_reasoning: generated for %s vs %s", home, away)
+
+            except Exception as exc:
+                db.rollback()
+                log.warning("[scheduler] generate_reasoning: failed for match %s: %s", match.id, exc)
+
+        log.info("[scheduler] generate_reasoning: done. Generated %d / %d.", generated, len(todo))
+
+    except Exception as exc:
+        log.error("[scheduler] generate_reasoning failed: %s", exc, exc_info=True)
+    finally:
+        db.close()
+
+
 # ---------------------------------------------------------------------------
 # Scheduler lifecycle
 # ---------------------------------------------------------------------------
@@ -755,6 +894,15 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
+    # Pre-match AI reasoning — generate for all upcoming matches daily at 4:00 AM UTC
+    _scheduler.add_job(
+        _job_generate_reasoning,
+        trigger=CronTrigger(hour=4, minute=0, timezone="UTC"),
+        id="generate_reasoning",
+        name="AI pre-match reasoning generation (4 AM UTC)",
+        replace_existing=True,
+    )
+
     _scheduler.start()
     log.info(
         "[scheduler] Started. Jobs: expire_stale (5m), fetch_live (30m), fetch_odds (30m), "
@@ -763,7 +911,8 @@ def start() -> BackgroundScheduler:
         "settle_picks (15m), predict_only (1h), fetch_stats (6h), "
         "update_elo (nightly 03:00 UTC), build_soccer_features (nightly 03:30 UTC), "
         "fetch_player_profiles (weekly Sun), fetch_xg (nightly 03:00 UTC), "
-        "retrain_models (weekly Sat), generate_weekly_challenges (weekly Mon 00:05). "
+        "retrain_models (weekly Sat), generate_weekly_challenges (weekly Mon 00:05), "
+        "generate_reasoning (daily 04:00 UTC). "
         "Executor: ThreadPoolExecutor(20 workers)."
     )
     return _scheduler

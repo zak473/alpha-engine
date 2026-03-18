@@ -635,7 +635,7 @@ function MatchCard({ match }: { match: MatchWithSport }) {
             ? <Loader2 size={11} className="animate-spin text-purple-400" />
             : <Sparkles size={11} className={reasoningOpen ? "text-purple-400" : "text-white/25"} />
           }
-          {loadingReasoning ? "Generating analysis…" : reasoningOpen ? "Hide analysis" : "AI analysis"}
+          {loadingReasoning ? "Generating analysis…" : reasoningOpen ? "Hide pre-match analysis" : "Pre-match analysis"}
         </button>
 
         {reasoningOpen && (
