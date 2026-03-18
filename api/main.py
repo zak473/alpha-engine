@@ -64,6 +64,16 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Startup: DB migration failed (continuing): %s", exc)
 
+    # Safety net: create any missing tables that aren't covered by migrations
+    try:
+        from db.base import Base
+        from db.session import engine
+        import db.models  # noqa: ensure all models are imported
+        Base.metadata.create_all(bind=engine)
+        logger.info("Startup: create_all safety net complete.")
+    except Exception as exc:
+        logger.warning("Startup: create_all failed: %s", exc)
+
     # Run stale-match cleanup + full fetch immediately on startup
     try:
         from pipelines.scheduler import _job_expire_stale
