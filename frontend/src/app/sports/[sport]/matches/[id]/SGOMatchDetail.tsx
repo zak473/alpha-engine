@@ -1238,7 +1238,7 @@ function PreMatchAnalysisSection({ matchId, isFinished }: { matchId: string; isF
             {reasoning}
           </p>
         ) : (
-          <p className="text-[12px] text-white/25">Analysis not yet available for this match.</p>
+          <p className="text-[12px] text-white/40">Analysis not yet available — check back shortly.</p>
         )}
       </div>
     </div>
@@ -1355,7 +1355,9 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
           <div className="space-y-3">
             {backendMatch ? (
               <>
-                <PreMatchAnalysisSection matchId={backendMatch.id} isFinished={isFinished} />
+                {!backendMatch.id.startsWith("preview-") && (
+                  <PreMatchAnalysisSection matchId={backendMatch.id} isFinished={isFinished} />
+                )}
                 <ProbabilitiesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
                 <EloSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} eloHome={eloHome} eloAway={eloAway} cfg={cfg} />
                 {sport === "tennis" ? (

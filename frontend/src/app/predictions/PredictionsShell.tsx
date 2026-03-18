@@ -620,8 +620,8 @@ function MatchCard({ match }: { match: MatchWithSport }) {
         </div>
       </Link>
 
-      {/* AI Analysis toggle */}
-      <div className="relative border-t border-white/[0.05]">
+      {/* AI Analysis toggle — only for matches tracked in backend DB */}
+      {match.backendId && <div className="relative border-t border-white/[0.05]">
         <button
           onClick={handleAnalysis}
           className={cn(
@@ -650,11 +650,11 @@ function MatchCard({ match }: { match: MatchWithSport }) {
                 {reasoning}
               </p>
             ) : (
-              <p className="text-[12px] text-white/25">Analysis unavailable for this match.</p>
+              <p className="text-[12px] text-white/40">Analysis not yet available — check back shortly.</p>
             )}
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
