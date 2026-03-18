@@ -453,9 +453,16 @@ class HockeyMatchService(BaseMatchListService):
             pred = pred_map.get(m.id)
             elo_h = elo_map.get(m.home_team_id)
             elo_a = elo_map.get(m.away_team_id)
-            p_home = pred.p_home if pred else None
-            p_away = pred.p_away if pred else None
-            confidence = int(round(max(p_home or 0, p_away or 0) * 100)) if (p_home or p_away) else None
+            if pred:
+                p_home = pred.p_home
+                p_away = pred.p_away
+                confidence = pred.confidence
+            else:
+                r_h = elo_h or 1500.0
+                r_a = elo_a or 1500.0
+                p_home = round(1.0 / (1.0 + math.pow(10, -(r_h - r_a + 30.0) / 400.0)), 3)
+                p_away = round(1.0 - p_home, 3)
+                confidence = None
 
             lg_obj = league_objs.get(m.league_id)
             ht_obj = team_objs.get(m.home_team_id)
@@ -530,9 +537,11 @@ class HockeyMatchService(BaseMatchListService):
                 KeyDriverOut(feature=d.get("feature", ""), value=d.get("value"), importance=d.get("importance", 0.0))
                 for d in (pred.key_drivers or [])
             ]
-        elif elo_h and elo_a:
-            # ELO-derived fallback probabilities
-            r_diff = elo_h.rating - elo_a.rating + 30.0  # 30-pt home advantage
+        else:
+            # ELO-derived fallback probabilities — 1500 default when not yet computed
+            r_h_val = elo_h.rating if elo_h else 1500.0
+            r_a_val = elo_a.rating if elo_a else 1500.0
+            r_diff = r_h_val - r_a_val + 30.0  # 30-pt home advantage
             p_home = round(1.0 / (1.0 + math.pow(10, -r_diff / 400.0)), 4)
             p_away = round(1.0 - p_home, 4)
             probs = ProbabilitiesOut(home_win=p_home, away_win=p_away)
@@ -543,7 +552,7 @@ class HockeyMatchService(BaseMatchListService):
                     away_win=round(1 / p_away, 2),
                 )
             key_drivers = [
-                KeyDriverOut(feature="ELO Differential", importance=1.0, value=round(elo_h.rating - elo_a.rating, 1)),
+                KeyDriverOut(feature="ELO Differential", importance=1.0, value=round(r_h_val - r_a_val, 1)),
             ]
 
         # extras_json contains HL enrichment: stats, form, h2h, period scores
@@ -656,17 +665,14 @@ class HockeyMatchService(BaseMatchListService):
         elo_h = _elo_snapshot(db, home_id, hname) if home_team else None
         elo_a = _elo_snapshot(db, away_id, aname) if away_team else None
 
-        probs = None
-        fair_odds = None
-        key_drivers = None
-        if elo_h and elo_a:
-            r_diff = elo_h.rating - elo_a.rating + 30.0
-            p_home = round(1.0 / (1.0 + math.pow(10, -r_diff / 400.0)), 4)
-            p_away = round(1.0 - p_home, 4)
-            probs = ProbabilitiesOut(home_win=p_home, away_win=p_away)
-            if p_home > 0 and p_away > 0:
-                fair_odds = FairOddsOut(home_win=round(1 / p_home, 2), away_win=round(1 / p_away, 2))
-            key_drivers = [KeyDriverOut(feature="ELO Differential", importance=1.0, value=round(elo_h.rating - elo_a.rating, 1))]
+        r_h_val = elo_h.rating if elo_h else 1500.0
+        r_a_val = elo_a.rating if elo_a else 1500.0
+        r_diff = r_h_val - r_a_val + 30.0
+        p_home = round(1.0 / (1.0 + math.pow(10, -r_diff / 400.0)), 4)
+        p_away = round(1.0 - p_home, 4)
+        probs = ProbabilitiesOut(home_win=p_home, away_win=p_away)
+        fair_odds = FairOddsOut(home_win=round(1 / p_home, 2), away_win=round(1 / p_away, 2))
+        key_drivers = [KeyDriverOut(feature="ELO Differential", importance=1.0, value=round(r_h_val - r_a_val, 1))]
 
         h2h = _h2h(db, home_id, away_id) if home_team and away_team else H2HRecordOut(total_matches=0, home_wins=0, away_wins=0, recent_matches=[])
         form_h = _form_from_db(db, home_id, hname) if home_team else None

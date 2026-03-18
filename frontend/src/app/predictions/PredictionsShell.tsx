@@ -67,13 +67,19 @@ function teamsMatch(a: string, b: string): boolean {
   return false;
 }
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("alpha_engine_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function fetchBackendForSport(sport: SportSlug): Promise<BackendItem[]> {
   try {
     const now = new Date();
     const dateTo = new Date(now.getTime() + 48 * 3600_000).toISOString();
     const res = await fetch(
       `/api/v1/sports/${sport}/matches?date_from=${encodeURIComponent(now.toISOString())}&date_to=${encodeURIComponent(dateTo)}&limit=200`,
-      { cache: "no-store" }
+      { cache: "no-store", headers: getAuthHeaders() }
     );
     if (!res.ok) return [];
     const data = await res.json();
@@ -87,7 +93,7 @@ async function fetchPreview(sport: SportSlug, home: string, away: string): Promi
   try {
     const res = await fetch(
       `/api/v1/sports/${sport}/matches/preview?home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`,
-      { cache: "no-store" }
+      { cache: "no-store", headers: getAuthHeaders() }
     );
     if (!res.ok) return null;
     const d = await res.json();
@@ -393,19 +399,30 @@ function PillGroup<T extends string>({
 function MatchCard({ match }: { match: MatchWithSport }) {
   const href = `/sports/${match.sport}/matches/${match.id}`;
 
-  const hasProbabilities = match.pHome != null;
+  const hasModelProbs = match.pHome != null;
   const hasConfidence = match.modelConfidence != null;
-  const hPct = hasProbabilities ? Math.round((match.pHome ?? 0) * 100) : null;
-  const aPct = hasProbabilities ? Math.round((match.pAway ?? 0) * 100) : null;
-  const dPct = hasProbabilities && match.pDraw != null ? Math.round(match.pDraw * 100) : null;
   const conf = match.modelConfidence ?? 0;
 
   const ml = match.featuredMarkets?.[0];
   const homeOdds = ml?.selections[0]?.odds;
   const awayOdds = ml?.selections[ml.selections.length - 1]?.odds;
 
+  // Compute implied probability from market odds if no model prediction
+  let hPct: number | null = hasModelProbs ? Math.round((match.pHome ?? 0) * 100) : null;
+  let aPct: number | null = hasModelProbs ? Math.round((match.pAway ?? 0) * 100) : null;
+  let isMarketImplied = false;
+  if (!hasModelProbs && homeOdds && awayOdds && homeOdds > 1 && awayOdds > 1) {
+    const impHome = 1 / homeOdds;
+    const impAway = 1 / awayOdds;
+    const total = impHome + impAway;
+    hPct = Math.round((impHome / total) * 100);
+    aPct = 100 - hPct;
+    isMarketImplied = true;
+  }
+  const hasProbabilities = hPct != null && aPct != null;
+  const dPct = hasModelProbs && match.pDraw != null ? Math.round(match.pDraw * 100) : null;
+
   const isHighConf = hasConfidence && conf >= 0.7;
-  const confColor = conf >= 0.7 ? "text-emerald-300" : conf >= 0.5 ? "text-amber-400" : "text-red-400";
   const confBarBg = conf >= 0.7 ? "bg-emerald-400" : conf >= 0.5 ? "bg-amber-400" : "bg-red-400";
 
   const leagueLabel = LEAGUE_LABELS[match.league] ?? match.league;
@@ -444,14 +461,12 @@ function MatchCard({ match }: { match: MatchWithSport }) {
       <div className="relative mt-4 grid grid-cols-[1fr_32px_1fr] items-start gap-2">
         <div>
           <p className="text-[13px] font-semibold leading-snug text-white">{match.home.name}</p>
-          {hasProbabilities ? (
+          {hasProbabilities && (
             <p className={cn("mt-1.5 font-mono text-[26px] font-bold tabular-nums leading-none",
               (hPct ?? 0) > (aPct ?? 0) ? "text-emerald-300" : "text-white/60"
             )}>{hPct}%</p>
-          ) : homeOdds ? (
-            <p className="mt-1.5 font-mono text-xl font-bold tabular-nums leading-none text-white/50">{homeOdds.toFixed(2)}</p>
-          ) : null}
-          {hasProbabilities && homeOdds && (
+          )}
+          {homeOdds && (
             <p className="mt-0.5 font-mono text-[11px] text-white/30">{homeOdds.toFixed(2)}</p>
           )}
         </div>
@@ -468,14 +483,12 @@ function MatchCard({ match }: { match: MatchWithSport }) {
 
         <div className="text-right">
           <p className="text-[13px] font-semibold leading-snug text-white">{match.away.name}</p>
-          {hasProbabilities ? (
+          {hasProbabilities && (
             <p className={cn("mt-1.5 font-mono text-[26px] font-bold tabular-nums leading-none",
               (aPct ?? 0) > (hPct ?? 0) ? "text-emerald-300" : "text-white/60"
             )}>{aPct}%</p>
-          ) : awayOdds ? (
-            <p className="mt-1.5 font-mono text-xl font-bold tabular-nums leading-none text-white/50">{awayOdds.toFixed(2)}</p>
-          ) : null}
-          {hasProbabilities && awayOdds && (
+          )}
+          {awayOdds && (
             <p className="mt-0.5 font-mono text-[11px] text-white/30">{awayOdds.toFixed(2)}</p>
           )}
         </div>
@@ -522,10 +535,12 @@ function MatchCard({ match }: { match: MatchWithSport }) {
               </span>
             </div>
           </div>
+        ) : isMarketImplied ? (
+          <span className="text-[11px] text-white/25">Market implied</span>
         ) : hasProbabilities ? (
           <span className="text-[11px] text-white/25">ELO estimate</span>
         ) : (
-          <span className="text-[11px] text-white/20">No model prediction</span>
+          <span className="text-[11px] text-white/20">No prediction</span>
         )}
 
         <span className="flex items-center gap-1 text-[11px] font-semibold text-white/40 opacity-0 transition-opacity group-hover:opacity-100">

@@ -306,6 +306,14 @@ class EsportsMatchService(BaseMatchListService):
             p_h, p_a = round(raw_h/tot, 4), round(raw_a/tot, 4)
             probabilities = ProbabilitiesOut(home_win=p_h, away_win=p_a)
             fair_odds = FairOddsOut(home_win=round(1/p_h,2) if p_h>0 else None, away_win=round(1/p_a,2) if p_a>0 else None)
+        else:
+            # ELO fallback with 1500 default — ensures probabilities always render
+            r_h = elo_home.overall_rating if elo_home else 1500.0
+            r_a = elo_away.overall_rating if elo_away else 1500.0
+            p_h = round(1.0 / (1.0 + math.pow(10, -(r_h - r_a) / 400.0)), 4)
+            p_a = round(1.0 - p_h, 4)
+            probabilities = ProbabilitiesOut(home_win=p_h, away_win=p_a)
+            fair_odds = FairOddsOut(home_win=round(1/p_h, 2) if p_h > 0 else None, away_win=round(1/p_a, 2) if p_a > 0 else None)
 
         if live_registry:
             metrics = live_registry.metrics or {}
@@ -515,19 +523,16 @@ class EsportsMatchService(BaseMatchListService):
         elo_h = _elo_panel(db, home_id, hname) if home_team else None
         elo_a = _elo_panel(db, away_id, aname) if away_team else None
 
-        probs = None
-        fair_odds = None
-        key_drivers = None
-        if elo_h and elo_a:
-            r_diff = elo_h.overall_rating - elo_a.overall_rating
-            p_home = round(1.0 / (1.0 + math.pow(10, -r_diff / 400.0)), 4)
-            p_away = round(1.0 - p_home, 4)
-            probs = ProbabilitiesOut(home_win=p_home, away_win=p_away)
-            fair_odds = FairOddsOut(
-                home_win=round(1 / p_home, 2) if p_home > 0 else None,
-                away_win=round(1 / p_away, 2) if p_away > 0 else None,
-            )
-            key_drivers = [KeyDriverOut(feature="ELO Differential", importance=1.0, value=round(elo_h.overall_rating - elo_a.overall_rating, 1))]
+        r_h = elo_h.overall_rating if elo_h else 1500.0
+        r_a = elo_a.overall_rating if elo_a else 1500.0
+        p_home = round(1.0 / (1.0 + math.pow(10, -(r_h - r_a) / 400.0)), 4)
+        p_away = round(1.0 - p_home, 4)
+        probs = ProbabilitiesOut(home_win=p_home, away_win=p_away)
+        fair_odds = FairOddsOut(
+            home_win=round(1 / p_home, 2) if p_home > 0 else None,
+            away_win=round(1 / p_away, 2) if p_away > 0 else None,
+        )
+        key_drivers = [KeyDriverOut(feature="ELO Differential", importance=1.0, value=round(r_h - r_a, 1))]
 
         h2h = _h2h(db, home_id, away_id, hname, aname) if home_team and away_team else H2HRecordOut(total_matches=0, team_a_wins=0, team_b_wins=0, recent_matches=[])
         form_h = _team_form(db, home_id, hname) if home_team else None

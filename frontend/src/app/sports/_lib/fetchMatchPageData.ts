@@ -9,6 +9,18 @@ import type { SGOEvent } from "@/lib/sgo";
 
 const API_BASE = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/v1`;
 
+function getServerAuthHeaders(): Record<string, string> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { cookies } = require("next/headers") as { cookies: () => { get(k: string): { value: string } | undefined } };
+    const token = cookies().get("ae_token")?.value;
+    if (token) return { Authorization: `Bearer ${token}` };
+  } catch {
+    // Not in request context (build time, edge)
+  }
+  return {};
+}
+
 function normalizeName(name: string): string {
   return name
     .toLowerCase()
@@ -106,10 +118,12 @@ export async function fetchMatchPageData(
       ? (sgoHome.split(" ").slice(-1)[0] ?? sgoHome)
       : sgoHome;
 
+    const authHeaders = getServerAuthHeaders();
+
     // Search backend by home team name
     const searchRes = await fetch(
       `${API_BASE}/matches/search?q=${encodeURIComponent(searchTerm)}&limit=20`,
-      { cache: "no-store" }
+      { cache: "no-store", headers: authHeaders }
     );
 
     if (searchRes.ok) {
@@ -141,7 +155,7 @@ export async function fetchMatchPageData(
       if (best) {
         const detailRes = await fetch(
           `${API_BASE}/sports/${sport}/matches/${best.id}`,
-          { cache: "no-store" }
+          { cache: "no-store", headers: authHeaders }
         );
 
         if (detailRes.ok) {
@@ -151,7 +165,7 @@ export async function fetchMatchPageData(
         // Fallback: build ELO preview from team names when no DB match found
         const previewRes = await fetch(
           `${API_BASE}/sports/${sport}/matches/preview?home=${encodeURIComponent(sgoHome)}&away=${encodeURIComponent(sgoAway)}`,
-          { cache: "no-store" }
+          { cache: "no-store", headers: authHeaders }
         );
         if (previewRes.ok) {
           backendMatch = await previewRes.json();
@@ -167,8 +181,8 @@ export async function fetchMatchPageData(
         const isPreview = backendMatch.home.id.startsWith("preview-");
         if (!isPreview) {
           const [eloHomeRes, eloAwayRes] = await Promise.all([
-            fetch(eloHistoryUrl(sport, backendMatch.home.id), { cache: "no-store" }),
-            fetch(eloHistoryUrl(sport, backendMatch.away.id), { cache: "no-store" }),
+            fetch(eloHistoryUrl(sport, backendMatch.home.id), { cache: "no-store", headers: authHeaders }),
+            fetch(eloHistoryUrl(sport, backendMatch.away.id), { cache: "no-store", headers: authHeaders }),
           ]);
           if (eloHomeRes.ok) { const d = await eloHomeRes.json(); eloHome = Array.isArray(d) ? d : (d.history ?? []); }
           if (eloAwayRes.ok) { const d = await eloAwayRes.json(); eloAway = Array.isArray(d) ? d : (d.history ?? []); }

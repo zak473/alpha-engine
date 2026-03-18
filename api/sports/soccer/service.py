@@ -1062,10 +1062,10 @@ class SoccerMatchService(BaseMatchListService):
         feat = db.query(FeatSoccerMatch).filter(FeatSoccerMatch.match_id == match_id).first()
 
         # Fall back to ELO-derived probabilities when no model prediction exists
-        if probabilities is None and elo_home and elo_away:
+        if probabilities is None:
             HOME_ADV = 65.0  # soccer home advantage in ELO points
-            r_h = elo_home.rating + HOME_ADV
-            r_a = elo_away.rating
+            r_h = (elo_home.rating if elo_home else 1500.0) + HOME_ADV
+            r_a = elo_away.rating if elo_away else 1500.0
             two_way_home = 1.0 / (1.0 + 10.0 ** ((r_a - r_h) / 400.0))
             p_draw = 0.28 * math.exp(-abs(r_h - r_a) / 220.0)
             p_draw = max(0.05, min(p_draw, 0.35))
@@ -1221,23 +1221,21 @@ class SoccerMatchService(BaseMatchListService):
         elo_h = _elo_snapshot(db, home_id, hname) if home_team else None
         elo_a = _elo_snapshot(db, away_id, aname) if away_team else None
 
-        probs = None
-        fair_odds = None
-        key_drivers = None
-        if elo_h and elo_a:
-            r_diff = elo_h.rating - elo_a.rating + 50.0  # home advantage
-            p_2way = 1.0 / (1.0 + _math.pow(10, -r_diff / 400.0))
-            draw = 0.26
-            p_home = round(p_2way * (1.0 - draw), 4)
-            p_away = round((1.0 - p_2way) * (1.0 - draw), 4)
-            p_draw = round(1.0 - p_home - p_away, 4)
-            probs = ProbabilitiesOut(home_win=p_home, away_win=p_away, draw=p_draw)
-            fair_odds = FairOddsOut(
-                home_win=round(1 / p_home, 2) if p_home > 0 else None,
-                draw=round(1 / p_draw, 2) if p_draw > 0 else None,
-                away_win=round(1 / p_away, 2) if p_away > 0 else None,
-            )
-            key_drivers = [KeyDriverOut(feature="ELO Differential", importance=1.0, value=round(elo_h.rating - elo_a.rating, 1))]
+        r_h_val = elo_h.rating if elo_h else 1500.0
+        r_a_val = elo_a.rating if elo_a else 1500.0
+        r_diff = r_h_val - r_a_val + 50.0  # home advantage
+        p_2way = 1.0 / (1.0 + _math.pow(10, -r_diff / 400.0))
+        draw = 0.26
+        p_home = round(p_2way * (1.0 - draw), 4)
+        p_away = round((1.0 - p_2way) * (1.0 - draw), 4)
+        p_draw = round(1.0 - p_home - p_away, 4)
+        probs = ProbabilitiesOut(home_win=p_home, away_win=p_away, draw=p_draw)
+        fair_odds = FairOddsOut(
+            home_win=round(1 / p_home, 2) if p_home > 0 else None,
+            draw=round(1 / p_draw, 2) if p_draw > 0 else None,
+            away_win=round(1 / p_away, 2) if p_away > 0 else None,
+        )
+        key_drivers = [KeyDriverOut(feature="ELO Differential", importance=1.0, value=round(r_h_val - r_a_val, 1))]
 
         h2h = _h2h(db, home_id, away_id) if home_team and away_team else H2HRecordOut(total_matches=0, home_wins=0, draws=0, away_wins=0, recent_matches=[])
 

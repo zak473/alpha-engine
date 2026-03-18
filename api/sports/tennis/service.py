@@ -836,13 +836,11 @@ class TennisMatchService(BaseMatchListService):
                 home_win=round(1 / p_home, 2) if p_home > 0 else None,
                 away_win=round(1 / p_away, 2) if p_away > 0 else None,
             )
-        elif elo_home and elo_away:
-            # ELO-derived probabilities (no home advantage in tennis)
-            r_diff = elo_home.overall_rating - elo_away.overall_rating
-            # Use surface rating if available
-            if elo_home.surface_rating and elo_away.surface_rating:
-                r_diff = elo_home.surface_rating - elo_away.surface_rating
-            p_home = round(1.0 / (1.0 + math.pow(10, -r_diff / 400.0)), 4)
+        else:
+            # ELO-derived probabilities — fall back to 1500 when not yet computed
+            r_h = (elo_home.surface_rating or elo_home.overall_rating) if elo_home else 1500.0
+            r_a = (elo_away.surface_rating or elo_away.overall_rating) if elo_away else 1500.0
+            p_home = round(1.0 / (1.0 + math.pow(10, -(r_h - r_a) / 400.0)), 4)
             p_away = round(1.0 - p_home, 4)
             probabilities = ProbabilitiesOut(home_win=p_home, away_win=p_away)
             fair_odds = FairOddsOut(
@@ -1003,19 +1001,16 @@ class TennisMatchService(BaseMatchListService):
         elo_h = _surface_elo(db, home_id, hname, None) if home_player else None
         elo_a = _surface_elo(db, away_id, aname, None) if away_player else None
 
-        probs = None
-        fair_odds = None
-        key_drivers = None
-        if elo_h and elo_a:
-            r_diff = elo_h.overall_rating - elo_a.overall_rating
-            p_home = round(1.0 / (1.0 + math.pow(10, -r_diff / 400.0)), 4)
-            p_away = round(1.0 - p_home, 4)
-            probs = ProbabilitiesOut(home_win=p_home, away_win=p_away)
-            fair_odds = FairOddsOut(
-                home_win=round(1 / p_home, 2) if p_home > 0 else None,
-                away_win=round(1 / p_away, 2) if p_away > 0 else None,
-            )
-            key_drivers = [KeyDriverOut(feature="ELO Differential", importance=1.0, value=round(elo_h.overall_rating - elo_a.overall_rating, 1))]
+        r_h = (elo_h.surface_rating or elo_h.overall_rating) if elo_h else 1500.0
+        r_a = (elo_a.surface_rating or elo_a.overall_rating) if elo_a else 1500.0
+        p_home = round(1.0 / (1.0 + math.pow(10, -(r_h - r_a) / 400.0)), 4)
+        p_away = round(1.0 - p_home, 4)
+        probs = ProbabilitiesOut(home_win=p_home, away_win=p_away)
+        fair_odds = FairOddsOut(
+            home_win=round(1 / p_home, 2) if p_home > 0 else None,
+            away_win=round(1 / p_away, 2) if p_away > 0 else None,
+        )
+        key_drivers = [KeyDriverOut(feature="ELO Differential", importance=1.0, value=round(r_h - r_a, 1))]
 
         h2h = _h2h(db, home_id, away_id, hname, aname) if home_player and away_player else H2HRecordOut(total_matches=0, player_a_wins=0, player_b_wins=0, recent_matches=[])
         form_h = _player_form(db, home_id, hname, None) if home_player else None

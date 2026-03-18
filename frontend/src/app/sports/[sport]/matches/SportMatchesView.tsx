@@ -56,9 +56,10 @@ async function fetchBackendPredictions(sport: SportSlug): Promise<BackendListIte
     const now = new Date();
     const dateFrom = new Date(now.getTime() - 3 * 3600_000).toISOString();
     const dateTo = new Date(now.getTime() + 7 * 24 * 3600_000).toISOString();
+    const token = typeof window !== "undefined" ? localStorage.getItem("alpha_engine_token") : null;
     const res = await fetch(
       `/api/v1/sports/${sport}/matches?date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}&limit=200`,
-      { cache: "no-store" }
+      { cache: "no-store", headers: token ? { Authorization: `Bearer ${token}` } : {} }
     );
     if (!res.ok) return [];
     const data = await res.json();

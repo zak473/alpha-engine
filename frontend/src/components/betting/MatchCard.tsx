@@ -134,18 +134,35 @@ function ScoreBlock({ match }: { match: BettingMatch }) {
 }
 
 function ModelBar({ match }: { match: BettingMatch }) {
-  if (match.pHome == null) {
-    return <div className="text-[10px] text-white/25 italic">No model prediction yet</div>;
-  }
-  const pct = Math.round(match.pHome * 100);
   const edge = match.edgePercent ?? 0;
   const confidence = match.modelConfidence != null ? Math.round(match.modelConfidence * 100) : null;
+
+  // Use model probability, or fall back to market-implied probability from odds
+  let pct: number | null = match.pHome != null ? Math.round(match.pHome * 100) : null;
+  let isMarketImplied = false;
+  if (pct == null) {
+    const ml = match.featuredMarkets?.[0];
+    const homeOdds = ml?.selections[0]?.odds;
+    const awayOdds = ml?.selections[ml.selections.length - 1]?.odds;
+    if (homeOdds && awayOdds && homeOdds > 1 && awayOdds > 1) {
+      const impHome = 1 / homeOdds;
+      const impAway = 1 / awayOdds;
+      pct = Math.round((impHome / (impHome + impAway)) * 100);
+      isMarketImplied = true;
+    }
+  }
+
+  if (pct == null) {
+    return <div className="text-[10px] text-white/25 italic">No prediction</div>;
+  }
+
+  const label = confidence != null ? "Model lean" : isMarketImplied ? "Market implied" : "ELO estimate";
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       <div className="flex min-w-[120px] flex-1 flex-col gap-1">
         <div className="flex items-center justify-between text-[9px] uppercase tracking-[0.14em]">
-          <span className="text-white/38">Model lean</span>
+          <span className="text-white/38">{label}</span>
           <span className="font-semibold text-white/60">{pct}% home</span>
         </div>
         <div className="h-[3px] overflow-hidden rounded-full" style={{ background: "var(--bg3)" }}>
