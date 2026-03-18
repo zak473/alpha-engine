@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { ChevronDown, ChevronUp, Timer, Flame, TrendingUp, Shield, MapPin, Cloud, Users } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { ChevronDown, ChevronUp, Timer, Flame, TrendingUp, Shield, MapPin, Cloud, Users, Sparkles, Loader2 } from "lucide-react";
+import { getMatchReasoning } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { SportSlug, Market, Selection } from "@/lib/betting-types";
 import { SPORT_CONFIG } from "@/lib/betting-types";
@@ -1203,6 +1204,47 @@ function formatKickoff(iso: string): string {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+function PreMatchAnalysisSection({ matchId, isFinished }: { matchId: string; isFinished: boolean }) {
+  const [reasoning, setReasoning] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getMatchReasoning(matchId).then((r) => {
+      setReasoning(r);
+      setLoading(false);
+    });
+  }, [matchId]);
+
+  if (isFinished) return null;
+
+  return (
+    <div className="sportsbook-card overflow-hidden">
+      <div className="flex items-center gap-2 px-4 pt-4 pb-2">
+        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-500/15">
+          <Sparkles size={12} className="text-purple-400" />
+        </div>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">Pre-match analysis</span>
+        <span className="ml-auto rounded-full border border-purple-400/20 bg-purple-400/8 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-purple-400/70">AI</span>
+      </div>
+
+      <div className="px-4 pb-4">
+        {loading ? (
+          <div className="flex items-center gap-2 py-3">
+            <Loader2 size={13} className="animate-spin text-purple-400/50" />
+            <span className="text-[12px] text-white/30">Generating analysis…</span>
+          </div>
+        ) : reasoning ? (
+          <p className="border-l-2 border-purple-400/30 pl-3 text-[13px] leading-relaxed text-white/60">
+            {reasoning}
+          </p>
+        ) : (
+          <p className="text-[12px] text-white/25">Analysis not yet available for this match.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   event: SGOEvent;
   sport: SportSlug;
@@ -1313,6 +1355,7 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
           <div className="space-y-3">
             {backendMatch ? (
               <>
+                <PreMatchAnalysisSection matchId={backendMatch.id} isFinished={isFinished} />
                 <ProbabilitiesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
                 <EloSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} eloHome={eloHome} eloAway={eloAway} cfg={cfg} />
                 {sport === "tennis" ? (
