@@ -8,6 +8,7 @@ import type { PicksStatsOut, PickOut, BankrollStatsOut, PredictionAccuracy } fro
 import type { MvpModelMetrics } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { depositBankroll, withdrawBankroll } from "@/lib/api";
+import { TrendingUp, TrendingDown, Zap, Target, BarChart3, Clock, Wallet, ChevronRight } from "lucide-react";
 
 type Range = "7d" | "30d" | "90d" | "all";
 
@@ -28,6 +29,12 @@ const SPORT_COLOURS: Record<string, string> = {
   esports:    "#a855f7",
   basketball: "#f59e0b",
   baseball:   "#ef4444",
+  hockey:     "#06b6d4",
+};
+
+const SPORT_ICONS: Record<string, string> = {
+  soccer: "⚽", tennis: "🎾", esports: "🎮",
+  basketball: "🏀", baseball: "⚾", hockey: "🏒",
 };
 
 interface PerformanceClientProps {
@@ -40,36 +47,38 @@ interface PerformanceClientProps {
   accuracy: PredictionAccuracy;
 }
 
-function fmt(n: number, decimals = 1) {
-  return n.toFixed(decimals);
-}
+function fmt(n: number, decimals = 1) { return n.toFixed(decimals); }
+function pct(n: number) { return `${fmt(n * 100)}%`; }
 
-function pct(n: number) {
-  return `${fmt(n * 100)}%`;
+function SectionLabel({ children, sub }: { children: React.ReactNode; sub?: string }) {
+  return (
+    <div className="mb-4">
+      <h2 className="text-[13px] font-bold uppercase tracking-[0.14em] text-white/50">{children}</h2>
+      {sub && <p className="text-[11px] text-white/28 mt-0.5">{sub}</p>}
+    </div>
+  );
 }
 
 function OutcomePill({ outcome }: { outcome: PickOut["outcome"] }) {
-  if (!outcome) return <span className="text-[11px] text-text-muted">Pending</span>;
-  const map = {
-    won:  "text-accent-green",
-    lost: "text-accent-red",
-    void: "text-text-muted",
+  if (!outcome) return (
+    <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold text-white/40">
+      Pending
+    </span>
+  );
+  const styles = {
+    won:  "border-emerald-400/30 bg-emerald-400/10 text-emerald-300",
+    lost: "border-red-400/30 bg-red-400/10 text-red-400",
+    void: "border-white/10 bg-white/[0.04] text-white/40",
   } as const;
   return (
-    <span className={cn("text-[11px] font-semibold uppercase tracking-wide", map[outcome])}>
+    <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider", styles[outcome])}>
       {outcome}
     </span>
   );
 }
 
 export function PerformanceClient({
-  overall,
-  roiSeries,
-  sportStats,
-  models,
-  recentPicks,
-  bankroll,
-  accuracy,
+  overall, roiSeries, sportStats, models, recentPicks, bankroll, accuracy,
 }: PerformanceClientProps) {
   const router = useRouter();
   const [range, setRange] = useState<Range>("all");
@@ -85,204 +94,278 @@ export function PerformanceClient({
     return roiSeries.filter((p) => p.date >= cutoff);
   }, [roiSeries, range]);
 
-  const roiColour = overall.roi >= 0 ? "text-accent-green" : "text-accent-red";
+  const roiPos = overall.roi >= 0;
+  const winPos = overall.win_rate >= 0.5;
 
-  const kpis = [
-    { label: "Total picks",    value: overall.total.toString() },
-    { label: "Win rate",       value: pct(overall.win_rate),        colour: overall.win_rate >= 0.5 ? "text-accent-green" : "text-accent-red" },
-    { label: "Flat ROI",       value: `${overall.roi >= 0 ? "+" : ""}${fmt(overall.roi * 100)}%`, colour: roiColour },
-    ...(overall.kelly_roi != null ? [{
-      label: "Kelly ROI",
-      value: `${overall.kelly_roi >= 0 ? "+" : ""}${fmt(overall.kelly_roi * 100)}%`,
-      colour: overall.kelly_roi >= 0 ? "text-accent-green" : "text-accent-red",
-    }] : []),
-    { label: "Avg odds",       value: fmt(overall.avg_odds, 2) },
-    { label: "Avg edge",       value: `${fmt(overall.avg_edge * 100)}%` },
-    ...(overall.avg_clv != null ? [{
-      label: "Avg CLV",
-      value: `${overall.avg_clv >= 0 ? "+" : ""}${fmt(overall.avg_clv * 100, 2)}%`,
-      colour: overall.avg_clv >= 0 ? "text-accent-green" : "text-accent-red",
-    }] : []),
-    { label: "W / L / Void",   value: `${overall.won} / ${overall.lost} / ${overall.void}` },
-    { label: "Settled",        value: overall.settled.toString() },
-    { label: "Pending",        value: overall.pending.toString() },
-  ];
+  if (recentPicks.length === 0 && overall.total === 0) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-24 text-center px-6">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.03]">
+          <BarChart3 size={28} className="text-white/25" />
+        </div>
+        <div>
+          <p className="text-[17px] font-semibold text-white">No picks tracked yet</p>
+          <p className="mt-1 text-[13px] text-white/38 max-w-xs">
+            Head to any sport&apos;s matches page, add picks to your queue, then hit &quot;Track these picks&quot;.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-4 p-4 lg:p-6">
+    <div className="space-y-8 p-4 lg:p-6 pb-12">
 
-      {/* KPI strip */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))" }}>
-        {kpis.map((k) => (
-          <div
-            key={k.label}
-            className="rounded-xl border p-3"
-            style={{ background: "var(--glass-bg)", borderColor: "var(--glass-border)" }}
-          >
-            <p className="text-[11px] text-text-muted mb-1">{k.label}</p>
-            <p className={cn("num text-lg font-bold text-text-primary leading-none", k.colour)}>
-              {k.value}
+      {/* ── Hero KPI strip ─────────────────────────────────────────────────── */}
+      <div>
+        <div className="mb-2">
+          <h1 className="text-[22px] font-bold tracking-[-0.03em] text-white">Performance</h1>
+          <p className="text-[12px] text-white/35 mt-0.5">{overall.settled} settled picks · {overall.pending} pending</p>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {/* Win rate */}
+          <div className={cn(
+            "relative overflow-hidden rounded-[20px] border p-4",
+            winPos
+              ? "border-emerald-400/20 bg-[linear-gradient(135deg,rgba(52,211,153,0.10),rgba(52,211,153,0.03))]"
+              : "border-white/[0.08] bg-white/[0.03]"
+          )}>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/38">Win Rate</p>
+            <p className={cn("mt-2 font-mono text-[32px] font-bold tabular-nums leading-none", winPos ? "text-emerald-300" : "text-white/60")}>
+              {overall.total === 0 ? "—" : pct(overall.win_rate)}
             </p>
+            <p className="mt-1 text-[10px] text-white/28">{overall.won}W · {overall.lost}L · {overall.void}V</p>
+            {winPos && <div className="pointer-events-none absolute right-3 top-3 text-emerald-300/20"><TrendingUp size={32} /></div>}
           </div>
-        ))}
-      </div>
 
-      {/* PnL chart */}
-      <div
-        className="rounded-xl border overflow-hidden"
-        style={{ background: "var(--glass-bg)", borderColor: "var(--glass-border)" }}
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "var(--glass-border)" }}>
-          <div>
-            <p className="text-sm font-semibold text-text-primary">Cumulative PnL</p>
-            <p className="text-[11px] text-text-muted mt-0.5">Units — 1 unit staked per pick</p>
-          </div>
-          <div className="flex items-center gap-1">
-            {RANGE_ITEMS.map((item) => (
-              <button
-                key={item.value}
-                onClick={() => setRange(item.value)}
-                className={cn(
-                  "px-2.5 py-1 rounded-full text-[11px] font-medium transition-all",
-                  range === item.value
-                    ? "text-[var(--accent)] border"
-                    : "text-text-muted border border-transparent hover:bg-white/5"
-                )}
-                style={range === item.value ? {
-                  background: "var(--accent-dim)",
-                  borderColor: "rgba(34,211,238,0.3)",
-                } : {}}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="px-4 pb-4 pt-2">
-          <ROIChart data={filteredRoi} />
-        </div>
-      </div>
-
-      {/* Per-sport stats */}
-      <div
-        className="rounded-xl border overflow-hidden"
-        style={{ background: "var(--glass-bg)", borderColor: "var(--glass-border)" }}
-      >
-        <div className="px-4 py-3 border-b" style={{ borderColor: "var(--glass-border)" }}>
-          <p className="text-sm font-semibold text-text-primary">Performance by Sport</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b" style={{ borderColor: "var(--glass-border)" }}>
-                {["Sport", "Picks", "Won", "Lost", "Win Rate", "ROI", "Avg Odds"].map((h, i) => (
-                  <th
-                    key={h}
-                    className={cn(
-                      "px-4 py-2 text-[11px] font-medium text-text-muted",
-                      i === 0 ? "text-left" : "text-right"
-                    )}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sportStats.map((row) => (
-                <tr
-                  key={row.sport}
-                  className="border-b hover:bg-white/[0.02] transition-colors"
-                  style={{ borderColor: "var(--glass-border)" }}
-                >
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-2 h-2 rounded-full flex-shrink-0"
-                        style={{ background: SPORT_COLOURS[row.sport] ?? "#71717a" }}
-                      />
-                      <span className="text-text-primary font-medium capitalize">{row.sport}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-2.5 text-right num text-text-muted">{row.total}</td>
-                  <td className="px-4 py-2.5 text-right num text-accent-green">{row.won}</td>
-                  <td className="px-4 py-2.5 text-right num text-accent-red">{row.lost}</td>
-                  <td className="px-4 py-2.5 text-right num">
-                    <span className={row.win_rate >= 0.5 ? "text-accent-green" : "text-text-muted"}>
-                      {row.total === 0 ? "—" : pct(row.win_rate)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-right num font-semibold">
-                    <span className={row.roi >= 0 ? "text-accent-green" : "text-accent-red"}>
-                      {row.total === 0 ? "—" : `${row.roi >= 0 ? "+" : ""}${fmt(row.roi * 100)}%`}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-right num text-text-muted">
-                    {row.total === 0 ? "—" : fmt(row.avg_odds, 2)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {sportStats.every((r) => r.total === 0) && (
-            <p className="text-center text-text-muted text-sm py-8">
-              No picks tracked yet. Queue picks from the matches page.
+          {/* Flat ROI */}
+          <div className={cn(
+            "relative overflow-hidden rounded-[20px] border p-4",
+            roiPos
+              ? "border-emerald-400/20 bg-[linear-gradient(135deg,rgba(52,211,153,0.10),rgba(52,211,153,0.03))]"
+              : "border-red-400/20 bg-[linear-gradient(135deg,rgba(248,113,113,0.08),rgba(248,113,113,0.02))]"
+          )}>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/38">Flat ROI</p>
+            <p className={cn("mt-2 font-mono text-[32px] font-bold tabular-nums leading-none", roiPos ? "text-emerald-300" : "text-red-400")}>
+              {overall.total === 0 ? "—" : `${roiPos ? "+" : ""}${fmt(overall.roi * 100)}%`}
             </p>
+            <p className="mt-1 text-[10px] text-white/28">Avg odds {fmt(overall.avg_odds, 2)}</p>
+            <div className={cn("pointer-events-none absolute right-3 top-3", roiPos ? "text-emerald-300/20" : "text-red-400/20")}>
+              {roiPos ? <TrendingUp size={32} /> : <TrendingDown size={32} />}
+            </div>
+          </div>
+
+          {/* Avg edge */}
+          <div className="rounded-[20px] border border-white/[0.08] bg-white/[0.03] p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/38">Avg Edge</p>
+            <p className="mt-2 font-mono text-[32px] font-bold tabular-nums leading-none text-white">
+              {fmt(overall.avg_edge * 100)}%
+            </p>
+            <p className="mt-1 text-[10px] text-white/28">{overall.total} total picks</p>
+          </div>
+
+          {/* Kelly ROI or CLV */}
+          {overall.kelly_roi != null ? (
+            <div className={cn(
+              "relative overflow-hidden rounded-[20px] border p-4",
+              overall.kelly_roi >= 0
+                ? "border-emerald-400/20 bg-[linear-gradient(135deg,rgba(52,211,153,0.08),rgba(52,211,153,0.02))]"
+                : "border-white/[0.08] bg-white/[0.03]"
+            )}>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/38">Kelly ROI</p>
+              <p className={cn("mt-2 font-mono text-[32px] font-bold tabular-nums leading-none", overall.kelly_roi >= 0 ? "text-emerald-300" : "text-red-400")}>
+                {overall.kelly_roi >= 0 ? "+" : ""}{fmt(overall.kelly_roi * 100)}%
+              </p>
+              {overall.avg_clv != null && (
+                <p className="mt-1 text-[10px] text-white/28">CLV {overall.avg_clv >= 0 ? "+" : ""}{fmt(overall.avg_clv * 100, 2)}%</p>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-[20px] border border-white/[0.08] bg-white/[0.03] p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/38">Settled</p>
+              <p className="mt-2 font-mono text-[32px] font-bold tabular-nums leading-none text-white">{overall.settled}</p>
+              <p className="mt-1 text-[10px] text-white/28">{overall.pending} pending</p>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Model registry */}
-      {models.length > 0 && (
-        <div
-          className="rounded-xl border overflow-hidden"
-          style={{ background: "var(--glass-bg)", borderColor: "var(--glass-border)" }}
-        >
-          <div className="px-4 py-3 border-b" style={{ borderColor: "var(--glass-border)" }}>
-            <p className="text-sm font-semibold text-text-primary">Model Registry</p>
-            <p className="text-[11px] text-text-muted mt-0.5">Live prediction models</p>
+      {/* ── PnL chart ──────────────────────────────────────────────────────── */}
+      <div>
+        <SectionLabel sub="Units — 1 unit staked per pick">Cumulative PnL</SectionLabel>
+        <div className="overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.03]">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+            <div className={cn("font-mono text-[22px] font-bold tabular-nums", roiPos ? "text-emerald-300" : "text-red-400")}>
+              {roiPos ? "+" : ""}{fmt(overall.roi * 100)}% ROI
+            </div>
+            <div className="flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] p-1">
+              {RANGE_ITEMS.map((item) => (
+                <button
+                  key={item.value}
+                  onClick={() => setRange(item.value)}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-[11px] font-semibold transition-all",
+                    range === item.value
+                      ? "bg-[#2edb6c] text-[#07110d]"
+                      : "text-white/40 hover:text-white/70"
+                  )}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="grid gap-px" style={{ background: "var(--glass-border)" }}>
+          <div className="px-4 pb-4 pt-2">
+            <ROIChart data={filteredRoi} />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Per-sport ──────────────────────────────────────────────────────── */}
+      {sportStats.some((r) => r.total > 0) && (
+        <div>
+          <SectionLabel>Performance by Sport</SectionLabel>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {sportStats.filter((r) => r.total > 0).map((row) => {
+              const col = SPORT_COLOURS[row.sport] ?? "#71717a";
+              const rPos = row.roi >= 0;
+              return (
+                <div
+                  key={row.sport}
+                  className="rounded-[20px] border border-white/[0.08] bg-white/[0.02] p-4"
+                  style={{ borderLeftColor: col, borderLeftWidth: 3 }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{SPORT_ICONS[row.sport] ?? "🏆"}</span>
+                      <span className="text-[13px] font-semibold capitalize text-white">{row.sport}</span>
+                    </div>
+                    <span className={cn("font-mono text-[18px] font-bold tabular-nums", rPos ? "text-emerald-300" : "text-red-400")}>
+                      {rPos ? "+" : ""}{fmt(row.roi * 100)}%
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-[10px] text-white/40 mb-1">
+                      <span>Win rate</span>
+                      <span className={row.win_rate >= 0.5 ? "text-emerald-300" : "text-white/50"}>{pct(row.win_rate)}</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${row.win_rate * 100}%`,
+                          background: row.win_rate >= 0.5
+                            ? "linear-gradient(90deg, #34d399, #10b981)"
+                            : "linear-gradient(90deg, #f97316, #fb923c)",
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-4 text-[10px] text-white/40">
+                    <span><span className="text-white/70 font-semibold">{row.total}</span> picks</span>
+                    <span><span className="text-emerald-300 font-semibold">{row.won}</span>W</span>
+                    <span><span className="text-red-400 font-semibold">{row.lost}</span>L</span>
+                    <span className="ml-auto">Avg {fmt(row.avg_odds, 2)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Model accuracy ─────────────────────────────────────────────────── */}
+      {accuracy.overall.n > 0 && (
+        <div>
+          <SectionLabel sub={`${accuracy.overall.n} finished matches checked`}>Model Accuracy</SectionLabel>
+          <div className="overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.03]">
+            {/* Overall row */}
+            <div className="flex items-center gap-6 px-5 py-4 border-b border-white/[0.06]">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.14em] text-white/38">Overall accuracy</p>
+                <p className={cn("mt-1 font-mono text-[28px] font-bold tabular-nums leading-none",
+                  (accuracy.overall.accuracy ?? 0) >= 0.55 ? "text-emerald-300" : "text-white/70"
+                )}>
+                  {accuracy.overall.accuracy != null ? pct(accuracy.overall.accuracy) : "—"}
+                </p>
+              </div>
+              {accuracy.overall.avg_brier != null && (
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-white/38">Brier score</p>
+                  <p className="mt-1 font-mono text-[28px] font-bold tabular-nums leading-none text-white/70">
+                    {fmt(accuracy.overall.avg_brier, 3)}
+                  </p>
+                </div>
+              )}
+            </div>
+            {/* Per-sport rows */}
+            <div className="divide-y divide-white/[0.05]">
+              {Object.entries(accuracy.by_sport).map(([sport, stat]) => {
+                const acc = stat.accuracy ?? 0;
+                return (
+                  <div key={sport} className="flex items-center gap-4 px-5 py-3">
+                    <span className="text-base w-6 text-center">{SPORT_ICONS[sport] ?? "🏆"}</span>
+                    <span className="min-w-[90px] text-[12px] font-medium capitalize text-white/70">{sport}</span>
+                    <div className="flex-1">
+                      <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${acc * 100}%`,
+                            background: acc >= 0.55
+                              ? "linear-gradient(90deg, #34d399, #10b981)"
+                              : "linear-gradient(90deg, #f97316, #fb923c)",
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <span className={cn("w-12 text-right font-mono text-[12px] font-bold tabular-nums", acc >= 0.55 ? "text-emerald-300" : "text-white/50")}>
+                      {stat.accuracy != null ? pct(acc) : "—"}
+                    </span>
+                    <span className="w-10 text-right text-[11px] text-white/30">{stat.n}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Model registry ─────────────────────────────────────────────────── */}
+      {models.length > 0 && (
+        <div>
+          <SectionLabel sub="Live prediction models">Model Registry</SectionLabel>
+          <div className="space-y-2">
             {models.map((m) => (
               <div
                 key={`${m.model_name}-${m.version}`}
-                className="flex flex-wrap items-center gap-x-6 gap-y-1 px-4 py-3"
-                style={{ background: "var(--glass-bg)" }}
+                className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-[20px] border border-white/[0.08] bg-white/[0.02] px-5 py-3.5"
               >
-                {/* Name + live pill */}
-                <div className="flex items-center gap-2 min-w-[140px]">
-                  <span className="font-mono text-xs text-text-primary">{m.model_name}</span>
+                <div className="flex items-center gap-2.5 min-w-[160px]">
+                  <span className="font-mono text-[12px] font-semibold text-white">{m.model_name}</span>
                   {m.is_live && (
-                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/25">
-                      LIVE
+                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-300">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Live
                     </span>
                   )}
                 </div>
-                {/* Meta chips */}
-                <span className="text-[11px] text-text-muted capitalize">{m.sport}</span>
-                <span className="text-[11px] text-text-muted">{m.algorithm}</span>
+                <span className="text-[11px] capitalize text-white/40">{m.sport}</span>
+                <span className="text-[11px] text-white/40">{m.algorithm}</span>
                 {m.n_train_samples != null && (
-                  <span className="text-[11px] text-text-muted">{m.n_train_samples.toLocaleString()} samples</span>
+                  <span className="text-[11px] text-white/30">{m.n_train_samples.toLocaleString()} samples</span>
                 )}
-                {/* Metrics */}
                 {m.accuracy != null && (
-                  <span className="text-[11px]">
-                    <span className="text-text-muted mr-1">Acc</span>
-                    <span className={cn("font-semibold num", m.accuracy >= 0.55 ? "text-accent-green" : "text-text-primary")}>
-                      {pct(m.accuracy)}
-                    </span>
+                  <span className={cn("font-mono text-[13px] font-bold tabular-nums", m.accuracy >= 0.55 ? "text-emerald-300" : "text-white/60")}>
+                    {pct(m.accuracy)}
                   </span>
                 )}
                 {m.brier_score != null && (
-                  <span className="text-[11px]">
-                    <span className="text-text-muted mr-1">Brier</span>
-                    <span className="font-semibold num text-text-primary">{fmt(m.brier_score, 3)}</span>
-                  </span>
+                  <span className="text-[11px] text-white/40">Brier <span className="text-white/70 font-semibold">{fmt(m.brier_score, 3)}</span></span>
                 )}
                 {m.trained_at && (
-                  <span className="text-[11px] text-text-muted ml-auto">
-                    {m.trained_at.slice(0, 10)}
-                  </span>
+                  <span className="ml-auto text-[10px] text-white/28">{m.trained_at.slice(0, 10)}</span>
                 )}
               </div>
             ))}
@@ -290,267 +373,177 @@ export function PerformanceClient({
         </div>
       )}
 
-      {/* Prediction accuracy */}
-      {accuracy.overall.n > 0 && (
-        <div
-          className="rounded-xl border overflow-hidden"
-          style={{ background: "var(--glass-bg)", borderColor: "var(--glass-border)" }}
-        >
-          <div className="px-4 py-3 border-b" style={{ borderColor: "var(--glass-border)" }}>
-            <p className="text-sm font-semibold text-text-primary">Prediction Accuracy</p>
-            <p className="text-[11px] text-text-muted mt-0.5">
-              Retroactive check — {accuracy.overall.n} finished matches · Overall{" "}
-              <span className={cn("font-semibold", (accuracy.overall.accuracy ?? 0) >= 0.55 ? "text-accent-green" : "text-text-primary")}>
-                {accuracy.overall.accuracy != null ? pct(accuracy.overall.accuracy) : "—"}
-              </span>
-              {" "}· Brier{" "}
-              <span className="font-semibold text-text-primary">
-                {accuracy.overall.avg_brier != null ? fmt(accuracy.overall.avg_brier, 3) : "—"}
-              </span>
-            </p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b" style={{ borderColor: "var(--glass-border)" }}>
-                  {["Sport", "Checked", "Correct", "Accuracy", "Avg Brier"].map((h, i) => (
-                    <th key={h} className={cn("px-4 py-2 text-[11px] font-medium text-text-muted", i === 0 ? "text-left" : "text-right")}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(accuracy.by_sport).map(([sport, stat]) => (
-                  <tr key={sport} className="border-b hover:bg-white/[0.02]" style={{ borderColor: "var(--glass-border)" }}>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: SPORT_COLOURS[sport] ?? "#71717a" }} />
-                        <span className="text-text-primary font-medium capitalize">{sport}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-right num text-text-muted">{stat.n}</td>
-                    <td className="px-4 py-2.5 text-right num text-text-muted">{stat.accuracy != null ? Math.round(stat.accuracy * stat.n) : "—"}</td>
-                    <td className="px-4 py-2.5 text-right num font-semibold">
-                      <span className={stat.accuracy != null && stat.accuracy >= 0.55 ? "text-accent-green" : "text-text-muted"}>
-                        {stat.accuracy != null ? pct(stat.accuracy) : "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-right num text-text-muted">{stat.avg_brier != null ? fmt(stat.avg_brier, 3) : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Bankroll tracker */}
-      <div
-        className="rounded-xl border overflow-hidden"
-        style={{ background: "var(--glass-bg)", borderColor: "var(--glass-border)" }}
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "var(--glass-border)" }}>
-          <div>
-            <p className="text-sm font-semibold text-text-primary">Bankroll</p>
-            <p className="text-[11px] text-text-muted mt-0.5">Track your betting balance</p>
-          </div>
-          {bankroll.current_balance > 0 && (
-            <p className="num text-2xl font-bold text-text-primary">
-              {bankroll.current_balance.toFixed(2)}
-              <span className="text-[11px] text-text-muted font-normal ml-1">units</span>
-            </p>
-          )}
-        </div>
-
-        {bankroll.total_deposited === 0 ? (
-          /* Setup state */
-          <div className="flex flex-col items-center gap-3 py-10 px-4 text-center">
-            <p className="text-text-primary font-semibold">Set your starting bankroll</p>
-            <p className="text-text-muted text-sm max-w-xs">
-              Enter a unit amount (e.g. 100 = £100 or 100 units). Kelly stakes are expressed as a fraction of this.
-            </p>
-            <div className="flex gap-2 mt-1">
-              <input
-                type="number"
-                min="1"
-                placeholder="e.g. 100"
-                value={depositAmt}
-                onChange={(e) => setDepositAmt(e.target.value)}
-                className="input-field w-28 text-sm text-center"
-              />
-              <button
-                disabled={!depositAmt || txBusy}
-                onClick={async () => {
-                  if (!depositAmt) return;
-                  setTxBusy(true); setTxError(null);
-                  try { await depositBankroll(parseFloat(depositAmt), "Starting bankroll"); setDepositAmt(""); router.refresh(); }
-                  catch { setTxError("Failed to set bankroll. Please try again."); }
-                  finally { setTxBusy(false); }
-                }}
-                className="btn btn-md btn-primary"
-              >
-                {txBusy ? "Saving…" : "Set bankroll"}
-              </button>
-            </div>
-            {txError && (
-              <p className="text-xs text-accent-red mt-1">{txError}</p>
-            )}
-          </div>
-        ) : (
-          /* Stats grid + deposit/withdraw */
-          <div className="p-4 space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { label: "Peak",       value: bankroll.peak_balance.toFixed(2) + "u" },
-                { label: "Max DD",     value: "-" + fmt(bankroll.max_drawdown * 100, 1) + "%", colour: "text-accent-red" },
-                { label: "Total P&L",  value: (bankroll.total_pnl >= 0 ? "+" : "") + bankroll.total_pnl.toFixed(2) + "u", colour: bankroll.total_pnl >= 0 ? "text-accent-green" : "text-accent-red" },
-                { label: "Sharpe",     value: bankroll.sharpe != null ? fmt(bankroll.sharpe, 2) : "—" },
-              ].map((k) => (
-                <div key={k.label} className="rounded-lg border p-3" style={{ background: "var(--glass-bg)", borderColor: "var(--glass-border)" }}>
-                  <p className="text-[11px] text-text-muted mb-1">{k.label}</p>
-                  <p className={cn("num text-base font-bold", k.colour ?? "text-text-primary")}>{k.value}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Deposit / Withdraw */}
-            <div className="flex flex-wrap gap-2">
-              <div className="flex gap-1.5 items-center">
+      {/* ── Bankroll ───────────────────────────────────────────────────────── */}
+      <div>
+        <SectionLabel>Bankroll</SectionLabel>
+        <div className="overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.03]">
+          {bankroll.total_deposited === 0 ? (
+            <div className="flex flex-col items-center gap-4 py-12 px-6 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04]">
+                <Wallet size={22} className="text-white/40" />
+              </div>
+              <div>
+                <p className="text-[15px] font-semibold text-white">Set your starting bankroll</p>
+                <p className="mt-1 text-[12px] text-white/38 max-w-xs">
+                  Enter a unit amount (e.g. 100). Kelly stakes are expressed as a fraction of this.
+                </p>
+              </div>
+              <div className="flex gap-2 mt-1">
                 <input
-                  type="number" min="0.01" placeholder="Amount"
-                  value={depositAmt}
-                  onChange={(e) => setDepositAmt(e.target.value)}
-                  className="input-field w-24 text-sm text-center"
+                  type="number" min="1" placeholder="e.g. 100"
+                  value={depositAmt} onChange={(e) => setDepositAmt(e.target.value)}
+                  className="w-28 rounded-xl border border-white/[0.10] bg-white/[0.05] px-3 py-2 text-center text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-emerald-400/40"
                 />
                 <button
                   disabled={!depositAmt || txBusy}
                   onClick={async () => {
                     if (!depositAmt) return;
                     setTxBusy(true); setTxError(null);
-                    try { await depositBankroll(parseFloat(depositAmt)); setDepositAmt(""); router.refresh(); }
-                    catch { setTxError("Deposit failed. Please try again."); }
+                    try { await depositBankroll(parseFloat(depositAmt), "Starting bankroll"); setDepositAmt(""); router.refresh(); }
+                    catch { setTxError("Failed to set bankroll."); }
                     finally { setTxBusy(false); }
                   }}
-                  className="btn btn-sm btn-primary"
+                  className="rounded-xl bg-[#2edb6c] px-4 py-2 text-[13px] font-semibold text-[#07110d] disabled:opacity-40 transition-opacity hover:opacity-90"
                 >
-                  + Deposit
+                  {txBusy ? "Saving…" : "Set bankroll"}
                 </button>
               </div>
-              <div className="flex gap-1.5 items-center">
-                <input
-                  type="number" min="0.01" placeholder="Amount"
-                  value={withdrawAmt}
-                  onChange={(e) => setWithdrawAmt(e.target.value)}
-                  className="input-field w-24 text-sm text-center"
-                />
-                <button
-                  disabled={!withdrawAmt || txBusy}
-                  onClick={async () => {
-                    if (!withdrawAmt) return;
-                    setTxBusy(true); setTxError(null);
-                    try { await withdrawBankroll(parseFloat(withdrawAmt)); setWithdrawAmt(""); router.refresh(); }
-                    catch { setTxError("Withdrawal failed. Please try again."); }
-                    finally { setTxBusy(false); }
-                  }}
-                  className="btn btn-sm btn-secondary"
-                >
-                  − Withdraw
-                </button>
-              </div>
+              {txError && <p className="text-[11px] text-red-400">{txError}</p>}
             </div>
-            {txError && (
-              <p className="text-xs text-accent-red">{txError}</p>
-            )}
-          </div>
-        )}
+          ) : (
+            <>
+              {/* Balance header */}
+              <div className="flex items-center justify-between px-5 py-5 border-b border-white/[0.06]">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-white/38">Current Balance</p>
+                  <p className="mt-1 font-mono text-[34px] font-bold tabular-nums leading-none text-white">
+                    {bankroll.current_balance.toFixed(2)}
+                    <span className="text-[14px] font-normal text-white/35 ml-1.5">units</span>
+                  </p>
+                </div>
+                <div className={cn(
+                  "text-right",
+                  bankroll.total_pnl >= 0 ? "text-emerald-300" : "text-red-400"
+                )}>
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-white/38">Total P&amp;L</p>
+                  <p className="mt-1 font-mono text-[22px] font-bold tabular-nums">
+                    {bankroll.total_pnl >= 0 ? "+" : ""}{bankroll.total_pnl.toFixed(2)}u
+                  </p>
+                </div>
+              </div>
+
+              {/* Stats grid */}
+              <div className="grid grid-cols-3 divide-x divide-white/[0.06] border-b border-white/[0.06]">
+                {[
+                  { label: "Peak",   value: bankroll.peak_balance.toFixed(2) + "u" },
+                  { label: "Max DD", value: "-" + fmt(bankroll.max_drawdown * 100, 1) + "%", danger: true },
+                  { label: "Sharpe", value: bankroll.sharpe != null ? fmt(bankroll.sharpe, 2) : "—" },
+                ].map((k) => (
+                  <div key={k.label} className="px-5 py-3 text-center">
+                    <p className="text-[10px] uppercase tracking-[0.12em] text-white/30">{k.label}</p>
+                    <p className={cn("mt-1 font-mono text-[16px] font-bold tabular-nums", k.danger ? "text-red-400" : "text-white/80")}>{k.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Deposit / Withdraw */}
+              <div className="flex flex-wrap gap-3 px-5 py-4">
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="number" min="0.01" placeholder="Amount"
+                    value={depositAmt} onChange={(e) => setDepositAmt(e.target.value)}
+                    className="w-24 rounded-xl border border-white/[0.10] bg-white/[0.05] px-3 py-2 text-center text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-emerald-400/40"
+                  />
+                  <button
+                    disabled={!depositAmt || txBusy}
+                    onClick={async () => {
+                      if (!depositAmt) return;
+                      setTxBusy(true); setTxError(null);
+                      try { await depositBankroll(parseFloat(depositAmt)); setDepositAmt(""); router.refresh(); }
+                      catch { setTxError("Deposit failed."); }
+                      finally { setTxBusy(false); }
+                    }}
+                    className="rounded-xl bg-emerald-400/15 border border-emerald-400/25 px-4 py-2 text-[12px] font-semibold text-emerald-300 disabled:opacity-40 hover:bg-emerald-400/20 transition-colors"
+                  >
+                    + Deposit
+                  </button>
+                </div>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="number" min="0.01" placeholder="Amount"
+                    value={withdrawAmt} onChange={(e) => setWithdrawAmt(e.target.value)}
+                    className="w-24 rounded-xl border border-white/[0.10] bg-white/[0.05] px-3 py-2 text-center text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-red-400/40"
+                  />
+                  <button
+                    disabled={!withdrawAmt || txBusy}
+                    onClick={async () => {
+                      if (!withdrawAmt) return;
+                      setTxBusy(true); setTxError(null);
+                      try { await withdrawBankroll(parseFloat(withdrawAmt)); setWithdrawAmt(""); router.refresh(); }
+                      catch { setTxError("Withdrawal failed."); }
+                      finally { setTxBusy(false); }
+                    }}
+                    className="rounded-xl bg-red-400/10 border border-red-400/20 px-4 py-2 text-[12px] font-semibold text-red-400 disabled:opacity-40 hover:bg-red-400/15 transition-colors"
+                  >
+                    − Withdraw
+                  </button>
+                </div>
+                {txError && <p className="w-full text-[11px] text-red-400">{txError}</p>}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Recent picks */}
+      {/* ── Recent picks ───────────────────────────────────────────────────── */}
       {recentPicks.length > 0 && (
-        <div
-          className="rounded-xl border overflow-hidden"
-          style={{ background: "var(--glass-bg)", borderColor: "var(--glass-border)" }}
-        >
-          <div className="px-4 py-3 border-b" style={{ borderColor: "var(--glass-border)" }}>
-            <p className="text-sm font-semibold text-text-primary">Recent Picks</p>
-            <p className="text-[11px] text-text-muted mt-0.5">Last 20 tracked</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b" style={{ borderColor: "var(--glass-border)" }}>
-                  {["Match", "Sport", "Selection", "Odds", "Edge", "Kelly", "CLV", "Date", "Result"].map((h, i) => (
-                    <th
-                      key={h}
-                      className={cn(
-                        "px-4 py-2 text-[11px] font-medium text-text-muted",
-                        i <= 2 ? "text-left" : "text-right"
-                      )}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {recentPicks.map((p) => (
-                  <tr
-                    key={p.id}
-                    className="border-b hover:bg-white/[0.02] transition-colors"
-                    style={{ borderColor: "var(--glass-border)" }}
-                  >
-                    <td className="px-4 py-2.5 max-w-[180px]">
-                      <div className="flex items-center gap-1.5">
-                        {p.auto_generated && (
-                          <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-accent-purple/20 text-accent-purple border border-accent-purple/30 flex-shrink-0">BOT</span>
-                        )}
-                        <span className="text-text-primary font-medium truncate">{p.match_label}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span className="text-[11px] font-medium capitalize" style={{ color: SPORT_COLOURS[p.sport] ?? "#71717a" }}>
-                        {p.sport}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-text-muted text-xs truncate max-w-[120px]">
-                      {p.selection_label}
-                    </td>
-                    <td className="px-4 py-2.5 text-right num text-text-primary">{fmt(p.odds, 2)}</td>
-                    <td className="px-4 py-2.5 text-right num">
-                      {p.edge != null
-                        ? <span className={p.edge >= 0 ? "text-accent-green" : "text-accent-red"}>{p.edge >= 0 ? "+" : ""}{fmt(p.edge * 100, 1)}%</span>
-                        : <span className="text-text-muted">—</span>}
-                    </td>
-                    <td className="px-4 py-2.5 text-right num text-text-muted">
-                      {p.stake_fraction != null ? `${fmt(p.stake_fraction * 100, 1)}%` : "—"}
-                    </td>
-                    <td className="px-4 py-2.5 text-right num">
-                      {p.clv != null
-                        ? <span className={p.clv >= 0 ? "text-accent-green" : "text-accent-red"}>{p.clv >= 0 ? "+" : ""}{fmt(p.clv * 100, 1)}%</span>
-                        : <span className="text-text-muted">—</span>}
-                    </td>
-                    <td className="px-4 py-2.5 text-right text-[11px] text-text-muted">
-                      {p.created_at.slice(0, 10)}
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <OutcomePill outcome={p.outcome} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+        <div>
+          <SectionLabel sub="Last 20 tracked">Recent Picks</SectionLabel>
+          <div className="overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.03]">
+            <div className="divide-y divide-white/[0.05]">
+              {recentPicks.map((p) => (
+                <div key={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3.5 hover:bg-white/[0.02] transition-colors">
+                  {/* Match label */}
+                  <div className="flex items-center gap-1.5 min-w-[160px] flex-1">
+                    {p.auto_generated && (
+                      <span className="text-[9px] font-bold px-1 py-0.5 rounded border border-purple-400/30 bg-purple-400/10 text-purple-300 flex-shrink-0">BOT</span>
+                    )}
+                    <span className="text-[13px] font-medium text-white truncate">{p.match_label}</span>
+                  </div>
 
-      {recentPicks.length === 0 && overall.total === 0 && (
-        <div
-          className="rounded-xl border flex flex-col items-center gap-3 py-16 text-center"
-          style={{ background: "var(--glass-bg)", borderColor: "var(--glass-border)" }}
-        >
-          <p className="text-text-primary font-semibold">No picks tracked yet</p>
-          <p className="text-text-muted text-sm max-w-xs">
-            Head to any sport's matches page, add picks to your queue, then hit "Track these picks".
-          </p>
+                  {/* Sport */}
+                  <span
+                    className="text-[10px] font-semibold uppercase tracking-wider"
+                    style={{ color: SPORT_COLOURS[p.sport] ?? "#71717a" }}
+                  >
+                    {p.sport}
+                  </span>
+
+                  {/* Selection */}
+                  <span className="text-[11px] text-white/40 truncate max-w-[110px]">{p.selection_label}</span>
+
+                  {/* Odds */}
+                  <span className="font-mono text-[13px] font-bold text-white tabular-nums">{fmt(p.odds, 2)}</span>
+
+                  {/* Edge */}
+                  {p.edge != null && (
+                    <span className={cn("font-mono text-[11px] font-semibold tabular-nums", p.edge >= 0 ? "text-emerald-300" : "text-red-400")}>
+                      {p.edge >= 0 ? "+" : ""}{fmt(p.edge * 100, 1)}%
+                    </span>
+                  )}
+
+                  {/* Date */}
+                  <span className="text-[10px] text-white/28 ml-auto flex items-center gap-1">
+                    <Clock size={10} />
+                    {p.created_at.slice(0, 10)}
+                  </span>
+
+                  {/* Outcome */}
+                  <OutcomePill outcome={p.outcome} />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
