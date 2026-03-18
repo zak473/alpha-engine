@@ -36,23 +36,21 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
 
-# ── Password hashing (prefer passlib, fall back to sha256) ────────────────
+# ── Password hashing (bcrypt directly, sha256 fallback) ───────────────────
 
 def _hash_password(plain: str) -> str:
     try:
-        from passlib.context import CryptContext
-        ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        return ctx.hash(plain)
-    except ImportError:
+        import bcrypt
+        return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    except Exception:
         return hashlib.sha256(plain.encode()).hexdigest()
 
 
 def _verify_password(plain: str, hashed: str) -> bool:
     try:
-        from passlib.context import CryptContext
-        ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        return ctx.verify(plain, hashed)
-    except ImportError:
+        import bcrypt
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except Exception:
         return hashlib.sha256(plain.encode()).hexdigest() == hashed
 
 
@@ -140,8 +138,7 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Email already registered.")
     except Exception as exc:
         db.rollback()
-        import traceback
-        raise HTTPException(status_code=500, detail=f"Registration error: {type(exc).__name__}: {exc}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Registration error: {type(exc).__name__}: {exc}")
 
     return UserOut(user_id=user.id, email=user.email, display_name=user.display_name)
 
