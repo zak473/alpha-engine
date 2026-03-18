@@ -13,6 +13,8 @@ if config.config_file_name is not None:
 
 _db_url = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_DSN")
 if _db_url:
+    if _db_url.startswith("postgres://"):
+        _db_url = "postgresql://" + _db_url[len("postgres://"):]
     config.set_main_option("sqlalchemy.url", _db_url)
 
 target_metadata = Base.metadata

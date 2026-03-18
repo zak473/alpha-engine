@@ -29,6 +29,7 @@ from db.models.baseball import BaseballTeamMatchStats, EventContext
 from db.models.tipsters import TipsterTip, TipsterFollow
 from db.models.notifications import UserNotification
 from db.models.horseracing import HorseRace, HorseRunner
+from db.models.user import User
 
 __all__ = [
     "Sport", "Competition", "Season", "Venue",
@@ -50,4 +51,5 @@ __all__ = [
     "TipsterTip", "TipsterFollow",
     "UserNotification",
     "HorseRace", "HorseRunner",
+    "User",
 ]
