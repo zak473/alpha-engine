@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export default async function RecordPage() {
 
   return (
-    <AppShell title="Bet Record" subtitle="Settled picks, outcomes, and slip history">
+    <AppShell title="Record">
       <RecordView />
     </AppShell>
   );
