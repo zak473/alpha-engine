@@ -30,7 +30,7 @@ router = APIRouter(prefix="/picks", tags=["Picks"])
 # ─── Schemas ──────────────────────────────────────────────────────────────────
 
 class PickCreate(BaseModel):
-    match_id: str
+    match_id: Optional[str] = None   # omit for manually entered matches
     match_label: str
     sport: str
     league: Optional[str] = None
@@ -39,6 +39,10 @@ class PickCreate(BaseModel):
     selection_label: str
     odds: float
     edge: Optional[float] = None
+
+
+class PickSettle(BaseModel):
+    outcome: str  # "won" | "lost" | "void"
 
 
 class PickOut(BaseModel):
@@ -57,6 +61,7 @@ class PickOut(BaseModel):
     closing_odds: Optional[float]
     clv: Optional[float]
     auto_generated: bool = False
+    is_manual: bool = False
     outcome: Optional[str]   # "won" | "lost" | "void" | null
     settled_at: Optional[str]
     created_at: str
@@ -102,6 +107,7 @@ def _pick_out(p: TrackedPick) -> PickOut:
         closing_odds=p.closing_odds,
         clv=p.clv,
         auto_generated=bool(p.auto_generated),
+        is_manual=p.match_id.startswith("manual-"),
         outcome=p.outcome,
         settled_at=p.settled_at.isoformat() if p.settled_at else None,
         created_at=p.created_at.isoformat(),
@@ -198,10 +204,11 @@ def track_picks(
             raise HTTPException(status_code=400, detail="market_name cannot be empty")
     created = []
     for p in body.picks:
+        match_id = p.match_id if p.match_id else f"manual-{uuid.uuid4()}"
         pick = TrackedPick(
             id=str(uuid.uuid4()),
             user_id=user_id,
-            match_id=p.match_id,
+            match_id=match_id,
             match_label=p.match_label,
             sport=p.sport,
             league=p.league,
@@ -378,6 +385,31 @@ def roi_series(
         })
 
     return {"series": series, "window": window, "n": len(series)}
+
+
+@router.patch("/{pick_id}/settle", response_model=PickOut)
+def settle_pick(
+    pick_id: str,
+    body: PickSettle,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user),
+):
+    """Manually settle a pick — useful for manually entered matches or unsupported markets."""
+    if body.outcome not in ("won", "lost", "void"):
+        raise HTTPException(status_code=400, detail="outcome must be won, lost, or void")
+    pick = db.query(TrackedPick).filter(
+        TrackedPick.id == pick_id,
+        TrackedPick.user_id == user_id,
+    ).first()
+    if pick is None:
+        raise HTTPException(status_code=404, detail="Pick not found")
+    pick.outcome = body.outcome
+    pick.settled_at = datetime.now(tz=timezone.utc)
+    if body.outcome != "void":
+        _create_bankroll_snapshot(pick, db)
+    db.commit()
+    db.refresh(pick)
+    return _pick_out(pick)
 
 
 @router.delete("/{pick_id}", status_code=204)

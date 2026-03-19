@@ -447,7 +447,7 @@ export async function getLiveMatches(): Promise<LiveMatchOut[]> {
 // ─── Picks / Record ───────────────────────────────────────────────────────
 
 export interface PickCreate {
-  match_id: string;
+  match_id?: string;   // omit for manually entered matches
   match_label: string;
   sport: string;
   league?: string;
@@ -474,6 +474,7 @@ export interface PickOut {
   closing_odds: number | null;
   clv: number | null;
   auto_generated: boolean;
+  is_manual: boolean;
   outcome: "won" | "lost" | "void" | null;
   settled_at: string | null;
   created_at: string;
@@ -524,6 +525,10 @@ export async function getPicksStats(sport?: string): Promise<PicksStatsOut> {
 
 export async function deletePick(id: string): Promise<void> {
   return mutate<void>(`/picks/${id}`, "DELETE");
+}
+
+export async function settlePick(id: string, outcome: "won" | "lost" | "void"): Promise<PickOut> {
+  return mutate<PickOut>(`/picks/${id}/settle`, "PATCH", { outcome });
 }
 
 export async function getRecentWins(limit = 5): Promise<PickOut[]> {
