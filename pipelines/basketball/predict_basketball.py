@@ -68,7 +68,13 @@ def _load_elo_engine(session: Session) -> BasketballEloEngine:
 
 def _predict_ml(match: CoreMatch, payload: dict, session: Session) -> dict:
     model = payload["model"]
-    vector, raw = build_feature_vector(session, match)
+    bundle_features = payload.get("feature_names")
+    _, raw = build_feature_vector(session, match)
+    # Use the model bundle's feature list so old models still work after feature updates
+    if bundle_features:
+        vector = [raw.get(f, 0.0) for f in bundle_features]
+    else:
+        vector = list(raw.values())
     X = np.nan_to_num(np.array(vector, dtype=float).reshape(1, -1), nan=0.0)
     proba = model.predict_proba(X)[0]
     p_home, p_away = float(proba[0]), float(proba[1])

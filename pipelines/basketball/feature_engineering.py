@@ -125,9 +125,13 @@ def _rolling_basketball_stats(db: Session, team_id: str, kickoff, n: int = 10) -
     def _avg(lst):
         return float(sum(lst) / len(lst)) if lst else 0.0
 
+    pts = _avg(pts_list)
+    pts_allowed = _avg(pts_allowed_list)
+    net_rating = pts - pts_allowed  # simple net-rating proxy
+
     return {
-        "pts_avg":         _avg(pts_list),
-        "pts_allowed_avg": _avg(pts_allowed_list),
+        "pts_avg":         pts,
+        "pts_allowed_avg": pts_allowed,
         "fg_pct_avg":      _avg(fg_pct_list),
         "fg3_pct_avg":     _avg(fg3_pct_list),
         "ft_pct_avg":      _avg(ft_pct_list),
@@ -136,6 +140,7 @@ def _rolling_basketball_stats(db: Session, team_id: str, kickoff, n: int = 10) -
         "tov_avg":         _avg(tov_list),
         "stl_avg":         _avg(stl_list),
         "blk_avg":         _avg(blk_list),
+        "net_rating_avg":  net_rating,   # included so old models with this feature still work
     }
 
 

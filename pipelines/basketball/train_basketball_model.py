@@ -83,6 +83,7 @@ def _load_training_data(session) -> tuple[np.ndarray, np.ndarray]:
             vector, _ = build_feature_vector(session, match)
         except Exception as exc:
             log.warning("Feature error for match %s: %s — skipping", match.id[:8], exc)
+            session.rollback()  # clear any broken transaction before continuing
             skipped += 1
             continue
         X_raw.append(vector)
