@@ -39,6 +39,7 @@ export default async function AdminPage() {
     runBacktest({ sport: "esports",    staking: "kelly" }),
     runBacktest({ sport: "basketball", staking: "kelly" }),
     runBacktest({ sport: "baseball",   staking: "kelly" }),
+    runBacktest({ sport: "hockey",     staking: "kelly" }),
   ]);
 
   if (health.status === "fulfilled") {

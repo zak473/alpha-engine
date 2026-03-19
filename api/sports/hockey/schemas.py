@@ -207,6 +207,10 @@ class HockeyMatchDetail(BaseModel):
     odds_home: Optional[float] = None
     odds_away: Optional[float] = None
     odds_draw: Optional[float] = None
+    # Injuries
+    injuries_home: Optional[list] = None
+    injuries_away: Optional[list] = None
     # Context
     context: Optional[dict] = None
+    league_context: Optional[dict] = None
     data_completeness: Optional[dict] = None

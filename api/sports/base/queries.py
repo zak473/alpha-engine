@@ -1,7 +1,7 @@
 """Shared query utilities used across sport services."""
 
 from __future__ import annotations
-from typing import Any
+from typing import Any, Optional
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -149,6 +149,110 @@ def form_from_hl(hl_matches: list[dict[str, Any]], team_name: str) -> dict | Non
         "gf_avg": round(sum(gf_list) / len(gf_list), 2) if gf_list else None,
         "ga_avg": round(sum(ga_list) / len(ga_list), 2) if ga_list else None,
         "form_seq": form_seq,
+    }
+
+
+def compute_league_context(
+    session: Session,
+    sport: str,
+    league_id: Optional[str],
+    season: Optional[str],
+    home_id: str,
+    away_id: str,
+) -> Optional[dict]:
+    """
+    Build league context dict for a match, compatible with LeagueContextSection in frontend.
+    Tries CoreStanding table first (Highlightly data), falls back to computing from CoreMatch history.
+    Returns dict with home_position, away_position, home_points, etc. or None if no data.
+    """
+    from db.models.mvp import CoreStanding
+
+    if not league_id:
+        return None
+
+    # --- Try CoreStanding table first (populated by Highlightly standings pipeline) ---
+    q = session.query(CoreStanding).filter(CoreStanding.league_id == league_id)
+    if season:
+        q = q.filter(CoreStanding.season == season)
+    rows = q.order_by(CoreStanding.position).all()
+
+    if rows:
+        home_row = next((r for r in rows if r.team_id == home_id), None)
+        away_row = next((r for r in rows if r.team_id == away_id), None)
+
+        if home_row or away_row:
+            n = len(rows)
+            top4_pts = rows[3].points if n >= 4 else None
+            rel_pts = rows[max(0, n - 3)].points if n >= 3 else None
+
+            home_pts = home_row.points if home_row else None
+            away_pts = away_row.points if away_row else None
+
+            return {
+                "home_position": home_row.position if home_row else None,
+                "away_position": away_row.position if away_row else None,
+                "home_points": home_pts,
+                "away_points": away_pts,
+                "home_games_played": home_row.played if home_row else None,
+                "away_games_played": away_row.played if away_row else None,
+                "points_gap": (home_pts - away_pts) if home_pts is not None and away_pts is not None else None,
+                "top_4_gap_home": (home_pts - top4_pts) if home_pts is not None and top4_pts is not None else None,
+                "relegation_gap_away": (away_pts - rel_pts) if away_pts is not None and rel_pts is not None else None,
+            }
+
+    # --- Fallback: compute from CoreMatch history ---
+    q2 = session.query(CoreMatch).filter(
+        CoreMatch.sport == sport,
+        CoreMatch.league_id == league_id,
+        CoreMatch.status == "finished",
+    )
+    if season:
+        q2 = q2.filter(CoreMatch.season == season)
+    matches = q2.all()
+
+    if not matches:
+        return None
+
+    standings: dict[str, dict] = {}
+    for m in matches:
+        for tid in [m.home_team_id, m.away_team_id]:
+            if tid not in standings:
+                standings[tid] = {"pts": 0, "gp": 0}
+        standings[m.home_team_id]["gp"] += 1
+        standings[m.away_team_id]["gp"] += 1
+        # Use 2pts/0pts for binary win/loss sports; draw = 1pt each
+        if m.outcome == "home_win":
+            standings[m.home_team_id]["pts"] += 2
+        elif m.outcome == "away_win":
+            standings[m.away_team_id]["pts"] += 2
+        else:
+            standings[m.home_team_id]["pts"] += 1
+            standings[m.away_team_id]["pts"] += 1
+
+    sorted_teams = sorted(standings.keys(), key=lambda t: -standings[t]["pts"])
+    position_map = {tid: i + 1 for i, tid in enumerate(sorted_teams)}
+    n = len(sorted_teams)
+
+    home_pos = position_map.get(home_id)
+    away_pos = position_map.get(away_id)
+    if home_pos is None and away_pos is None:
+        return None
+
+    home_s = standings.get(home_id, {"pts": 0, "gp": 0})
+    away_s = standings.get(away_id, {"pts": 0, "gp": 0})
+    top4_pts = standings[sorted_teams[3]]["pts"] if n >= 4 else None
+    rel_pts = standings[sorted_teams[max(0, n - 3)]]["pts"] if n >= 3 else None
+
+    return {
+        "home_position": home_pos,
+        "away_position": away_pos,
+        "home_points": home_s["pts"],
+        "away_points": away_s["pts"],
+        "home_games_played": home_s["gp"],
+        "away_games_played": away_s["gp"],
+        "points_gap": home_s["pts"] - away_s["pts"],
+        "top_4_gap_home": (home_s["pts"] - top4_pts) if top4_pts is not None else None,
+        "relegation_gap_away": (away_s["pts"] - rel_pts) if rel_pts is not None else None,
     }
 
 

@@ -12,6 +12,7 @@ import { MatchList } from "@/components/betting/MatchList";
 import { QueueRail } from "@/components/betting/QueueRail";
 import { MobileQueueDrawer } from "@/components/betting/MobileQueueDrawer";
 import { cn } from "@/lib/utils";
+import { SkeletonCard } from "@/components/ui/Skeleton";
 import { SPORT_LEAGUES, fetchSGOEvents, sgoEventToMatch } from "@/lib/sgo";
 
 const SPORT_BAR: { slug: SportSlug; label: string; icon: string }[] = [
@@ -42,13 +43,20 @@ function teamsMatch(a: string, b: string): boolean {
 }
 
 interface BackendListItem {
+  id?: string;
+  home_id?: string;
+  away_id?: string;
   home_name: string;
   away_name: string;
+  league?: string;
+  status?: string;
   p_home: number | null;
   p_away: number | null;
   p_draw?: number | null;
   confidence: number | null;
   kickoff_utc: string;
+  home_score?: number | null;
+  away_score?: number | null;
 }
 
 async function fetchBackendPredictions(sport: SportSlug): Promise<BackendListItem[]> {
@@ -67,6 +75,30 @@ async function fetchBackendPredictions(sport: SportSlug): Promise<BackendListIte
   } catch {
     return [];
   }
+}
+
+function backendItemToMatch(item: BackendListItem, sport: SportSlug): BettingMatch {
+  const id = item.id ?? `backend-${item.home_name}-${item.away_name}`;
+  const status: BettingMatch["status"] =
+    item.status === "live" ? "live" :
+    item.status === "finished" ? "finished" : "upcoming";
+  return {
+    id,
+    sport,
+    league: item.league ?? sport.toUpperCase(),
+    startTime: item.kickoff_utc,
+    status,
+    homeScore: item.home_score ?? undefined,
+    awayScore: item.away_score ?? undefined,
+    home: { id: item.home_id ?? id + "-home", name: item.home_name, shortName: item.home_name.slice(0, 10) },
+    away: { id: item.away_id ?? id + "-away", name: item.away_name, shortName: item.away_name.slice(0, 10) },
+    featuredMarkets: [],
+    allMarkets: [],
+    pHome: item.p_home ?? undefined,
+    pAway: item.p_away ?? undefined,
+    pDraw: item.p_draw ?? undefined,
+    modelConfidence: item.confidence != null ? item.confidence / 100 : undefined,
+  };
 }
 
 function mergeBackendData(matches: BettingMatch[], backendItems: BackendListItem[]): BettingMatch[] {
@@ -104,7 +136,15 @@ export function SportMatchesView({ sport }: Props) {
     setLoading(true);
     setMatches([]);
     const leagues = SPORT_LEAGUES[sport] ?? [];
-    if (!leagues.length) { setLoading(false); return; }
+
+    // Sports with no SGO leagues (e.g. esports) — show backend matches directly
+    if (!leagues.length) {
+      fetchBackendPredictions(sport).then((backendItems) => {
+        setMatches(backendItems.map((item) => backendItemToMatch(item, sport)));
+        setLoading(false);
+      });
+      return;
+    }
 
     Promise.all([
       Promise.all(leagues.map((l) => fetchSGOEvents(l))).then((results) =>
@@ -118,7 +158,7 @@ export function SportMatchesView({ sport }: Props) {
 
       // Second pass: call preview endpoint for matches still missing probabilities
       const token = typeof window !== "undefined" ? localStorage.getItem("alpha_engine_token") : null;
-      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+      const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
       const unmatched = merged.filter((m) => m.pHome == null && m.status !== "finished");
       if (!unmatched.length) return;
       const previews = await Promise.all(
@@ -210,7 +250,9 @@ export function SportMatchesView({ sport }: Props) {
           />
           <div className="p-4 lg:p-6">
             {loading ? (
-              <div className="flex items-center justify-center py-20 text-white/40">Loading matches…</div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+              </div>
             ) : (
               <MatchList
                 matches={filtered}

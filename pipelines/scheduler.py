@@ -67,6 +67,9 @@ def _job_fetch_live() -> None:
     except Exception as exc:
         log.error("[scheduler] soccer fetch failed: %s", exc, exc_info=True)
 
+    # Rebuild soccer features immediately so same-day predictions use fresh data
+    _job_build_soccer_features()
+
     # Tennis (api-tennis.com: fixtures + live scores + set scores + serve stats)
     try:
         from pipelines.tennis.fetch_api_tennis import fetch_all as fetch_tennis_deep
@@ -406,7 +409,6 @@ def _job_generate_weekly_challenges() -> None:
     week_end = week_start + timedelta(days=7)
 
     SYSTEM_USER = "system"
-    SPORTS = ["soccer", "tennis", "baseball", "esports", "hockey"]
     TEMPLATES = [
         {
             "sport": "soccer",
@@ -422,6 +424,16 @@ def _job_generate_weekly_challenges() -> None:
             "sport": "baseball",
             "name": "Weekly Baseball Challenge",
             "description": "MLB picks of the week — submit your top moneyline and run-line selections.",
+        },
+        {
+            "sport": "basketball",
+            "name": "Weekly Basketball Challenge",
+            "description": "NBA picks of the week — predict game winners and track your accuracy.",
+        },
+        {
+            "sport": "hockey",
+            "name": "Weekly Hockey Challenge",
+            "description": "NHL picks of the week — submit your moneyline selections and climb the leaderboard.",
         },
         {
             "sport": "esports",
@@ -558,6 +570,17 @@ def _job_sync_standings() -> None:
         log.info("[scheduler] sync_standings: %d rows synced.", n)
     except Exception as exc:
         log.error("[scheduler] sync_standings failed: %s", exc, exc_info=True)
+
+
+def _job_fetch_probable_pitchers() -> None:
+    """Fetch MLB probable starting pitchers for upcoming games (next 3 days)."""
+    log.info("[scheduler] Starting fetch_probable_pitchers job ...")
+    try:
+        from pipelines.baseball.fetch_probable_pitchers import run as fetch_pitchers
+        n = fetch_pitchers(days_ahead=3)
+        log.info("[scheduler] probable_pitchers: %d matches updated.", n)
+    except Exception as exc:
+        log.error("[scheduler] fetch_probable_pitchers failed: %s", exc, exc_info=True)
 
 
 def _job_generate_reasoning() -> None:
@@ -903,6 +926,16 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
+    # Fetch MLB probable pitchers daily at 8 AM UTC (rosters finalised by then)
+    _scheduler.add_job(
+        _job_fetch_probable_pitchers,
+        trigger=CronTrigger(hour=8, minute=0, timezone="UTC"),
+        id="fetch_probable_pitchers",
+        name="MLB probable starting pitchers (8 AM UTC)",
+        replace_existing=True,
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=10),
+    )
+
     _scheduler.start()
     log.info(
         "[scheduler] Started. Jobs: expire_stale (5m), fetch_live (30m), fetch_odds (30m), "
@@ -912,7 +945,7 @@ def start() -> BackgroundScheduler:
         "update_elo (nightly 03:00 UTC), build_soccer_features (nightly 03:30 UTC), "
         "fetch_player_profiles (weekly Sun), fetch_xg (nightly 03:00 UTC), "
         "retrain_models (weekly Sat), generate_weekly_challenges (weekly Mon 00:05), "
-        "generate_reasoning (daily 04:00 UTC). "
+        "generate_reasoning (daily 04:00 UTC), fetch_probable_pitchers (daily 08:00 UTC). "
         "Executor: ThreadPoolExecutor(20 workers)."
     )
     return _scheduler

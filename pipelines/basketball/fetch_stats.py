@@ -197,6 +197,147 @@ def _parse_statistics_response(data: Any, home_team_id: str, away_team_id: str) 
     return home_stats, away_stats
 
 
+def _parse_players_from_lineup(lineup_side: dict) -> list[dict]:
+    """
+    Extract per-player stats from one team's Highlightly lineup dict.
+    Lineup shape: {"formation": "...", "players": [{"name": ..., "statistics": {...}}, ...]}
+    Returns list of player stat dicts.
+    """
+    raw_players = lineup_side.get("players") or lineup_side.get("lineups") or []
+    result = []
+    for p in raw_players:
+        if not isinstance(p, dict):
+            continue
+        name = p.get("name") or p.get("playerName") or p.get("shortName") or ""
+        if not name:
+            continue
+        stats = p.get("statistics") or p.get("stats") or {}
+        if isinstance(stats, list):
+            flat: dict = {}
+            for item in stats:
+                if isinstance(item, dict):
+                    t = str(item.get("type") or item.get("name") or "").lower()
+                    flat[t] = item.get("value")
+            stats = flat
+
+        def _i(v):
+            try:
+                return int(v) if v is not None else None
+            except (ValueError, TypeError):
+                return None
+
+        def _f(v):
+            try:
+                if v is None:
+                    return None
+                f = float(str(v).replace("%", ""))
+                return round(f / 100.0, 4) if f > 1.0 else round(f, 4)
+            except (ValueError, TypeError):
+                return None
+
+        # Minutes played — often "25:30" or numeric
+        raw_min = stats.get("minutesPlayed") or stats.get("minutes") or stats.get("min") or p.get("minutesPlayed")
+        if isinstance(raw_min, str) and ":" in raw_min:
+            parts = raw_min.split(":")
+            try:
+                raw_min = int(parts[0]) + int(parts[1]) / 60
+            except (ValueError, IndexError):
+                raw_min = None
+        else:
+            raw_min = _f(raw_min)
+
+        reb_off = _i(stats.get("offensiveRebounds") or stats.get("reboundsOffensive") or stats.get("oreb"))
+        reb_def = _i(stats.get("defensiveRebounds") or stats.get("reboundsDefensive") or stats.get("dreb"))
+        reb_total = _i(stats.get("totalRebounds") or stats.get("rebounds") or stats.get("reb"))
+        if reb_total is None and reb_off is not None and reb_def is not None:
+            reb_total = reb_off + reb_def
+
+        fg_m = _i(stats.get("fieldGoalsMade") or stats.get("fgm") or stats.get("fg_made"))
+        fg_a = _i(stats.get("fieldGoalsAttempted") or stats.get("fga") or stats.get("fg_attempted"))
+        fg3_m = _i(stats.get("threePointersMade") or stats.get("tpm") or stats.get("fg3_made"))
+        fg3_a = _i(stats.get("threePointersAttempted") or stats.get("tpa") or stats.get("fg3_attempted"))
+        ft_m = _i(stats.get("freeThrowsMade") or stats.get("ftm") or stats.get("ft_made"))
+        ft_a = _i(stats.get("freeThrowsAttempted") or stats.get("fta") or stats.get("ft_attempted"))
+
+        def safe_pct(m, a):
+            return round(m / a, 3) if m is not None and a and a > 0 else None
+
+        is_starter = bool(p.get("isStarting") or p.get("isStarter") or p.get("lineup") or False)
+        result.append({
+            "player_id": str(p.get("id") or p.get("playerId") or ""),
+            "player_name": name,
+            "position": (p.get("position") or p.get("pos") or p.get("fieldPosition") or "").upper() or None,
+            "jersey": str(p.get("jerseyNumber") or p.get("jersey") or p.get("shirtNumber") or "")[:5] or None,
+            "is_starter": is_starter,
+            "minutes": raw_min,
+            "points": _i(stats.get("points") or stats.get("totalPoints") or stats.get("pts")),
+            "rebounds_total": reb_total,
+            "rebounds_offensive": reb_off,
+            "rebounds_defensive": reb_def,
+            "assists": _i(stats.get("assists") or stats.get("ast")),
+            "steals": _i(stats.get("steals") or stats.get("stl")),
+            "blocks": _i(stats.get("blocks") or stats.get("blk")),
+            "turnovers": _i(stats.get("turnovers") or stats.get("tov") or stats.get("to")),
+            "fouls": _i(stats.get("fouls") or stats.get("personalFouls") or stats.get("pf")),
+            "plus_minus": _i(stats.get("plusMinus") or stats.get("plus_minus") or stats.get("+/-")),
+            "fg_made": fg_m,
+            "fg_attempted": fg_a,
+            "fg_pct": _f(stats.get("fieldGoalPercentage") or stats.get("fg_pct")) or safe_pct(fg_m, fg_a),
+            "fg3_made": fg3_m,
+            "fg3_attempted": fg3_a,
+            "fg3_pct": _f(stats.get("threePointPercentage") or stats.get("fg3_pct")) or safe_pct(fg3_m, fg3_a),
+            "ft_made": ft_m,
+            "ft_attempted": ft_a,
+            "ft_pct": _f(stats.get("freeThrowPercentage") or stats.get("ft_pct")) or safe_pct(ft_m, ft_a),
+        })
+    return result
+
+
+def _upsert_player_stats(
+    session: Session, match_id: str, team_id: str, is_home: bool, players: list[dict]
+) -> None:
+    from db.models.basketball import BasketballPlayerMatchStats
+
+    if not players:
+        return
+    # Clear existing rows for this team/match before reinserting
+    session.query(BasketballPlayerMatchStats).filter_by(
+        match_id=match_id, team_id=team_id
+    ).delete()
+    for p in players:
+        row = BasketballPlayerMatchStats(
+            match_id=match_id,
+            team_id=team_id,
+            is_home=is_home,
+            player_id=p["player_id"] or None,
+            player_name=p["player_name"],
+            position=p["position"],
+            jersey=p["jersey"],
+            is_starter=p["is_starter"],
+            minutes=p["minutes"],
+            points=p["points"],
+            rebounds_total=p["rebounds_total"],
+            rebounds_offensive=p["rebounds_offensive"],
+            rebounds_defensive=p["rebounds_defensive"],
+            assists=p["assists"],
+            steals=p["steals"],
+            blocks=p["blocks"],
+            turnovers=p["turnovers"],
+            fouls=p["fouls"],
+            plus_minus=p["plus_minus"],
+            fg_made=p["fg_made"],
+            fg_attempted=p["fg_attempted"],
+            fg_pct=p["fg_pct"],
+            fg3_made=p["fg3_made"],
+            fg3_attempted=p["fg3_attempted"],
+            fg3_pct=p["fg3_pct"],
+            ft_made=p["ft_made"],
+            ft_attempted=p["ft_attempted"],
+            ft_pct=p["ft_pct"],
+        )
+        session.add(row)
+
+
 def _upsert_stats(session: Session, match_id: str, team_id: str, is_home: bool, stats: dict) -> None:
     from db.models.basketball import BasketballTeamMatchStats
 
@@ -268,6 +409,9 @@ def fetch_all(days_back: int = 30, dry_run: bool = False, extras_only: bool = Fa
             home_stats: dict = {}
             away_stats: dict = {}
 
+            home_players: list[dict] = []
+            away_players: list[dict] = []
+
             # Try extras_json first (already fetched by Highlightly pipeline)
             if match.extras_json:
                 try:
@@ -276,6 +420,22 @@ def fetch_all(days_back: int = 30, dry_run: bool = False, extras_only: bool = Fa
                         home_stats, away_stats = _parse_statistics_response(
                             extras["statistics"], match.home_team_id, match.away_team_id
                         )
+                    # Extract player stats from lineups
+                    lineups_raw = extras.get("lineups") if isinstance(extras, dict) else None
+                    if isinstance(lineups_raw, dict):
+                        home_lu = lineups_raw.get("home") or lineups_raw.get("homeTeam") or {}
+                        away_lu = lineups_raw.get("away") or lineups_raw.get("awayTeam") or {}
+                        home_players = _parse_players_from_lineup(home_lu)
+                        away_players = _parse_players_from_lineup(away_lu)
+                    elif isinstance(lineups_raw, list):
+                        for side in lineups_raw:
+                            if not isinstance(side, dict):
+                                continue
+                            side_players = _parse_players_from_lineup(side)
+                            if not home_players:
+                                home_players = side_players
+                            elif not away_players:
+                                away_players = side_players
                 except Exception as exc:
                     log.debug("extras_json parse failed for %s: %s", match.id[:8], exc)
 
@@ -309,10 +469,15 @@ def fetch_all(days_back: int = 30, dry_run: bool = False, extras_only: bool = Fa
                 _upsert_stats(session, match.id, match.home_team_id, True, home_stats)
                 if away_stats:
                     _upsert_stats(session, match.id, match.away_team_id, False, away_stats)
+                if home_players:
+                    _upsert_player_stats(session, match.id, match.home_team_id, True, home_players)
+                if away_players:
+                    _upsert_player_stats(session, match.id, match.away_team_id, False, away_players)
                 session.commit()
 
             total += 1
-            log.info("Upserted stats: %s (%s)", match.provider_id, match.kickoff_utc.date())
+            log.info("Upserted stats (+%d/%d players): %s (%s)",
+                     len(home_players), len(away_players), match.provider_id, match.kickoff_utc.date())
 
     except Exception:
         session.rollback()

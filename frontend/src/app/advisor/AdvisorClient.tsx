@@ -87,8 +87,9 @@ export function AdvisorClient() {
       });
 
       if (!res.ok) throw new Error(`API error ${res.status}`);
+      if (!res.body) throw new Error("Response body is empty");
 
-      const reader = res.body!.getReader();
+      const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let assistant = "";
 

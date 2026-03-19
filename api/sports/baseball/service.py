@@ -42,9 +42,9 @@ from api.sports.baseball.schemas import (
     StarterPitcherOut,
     UmpireOut,
 )
-from api.sports.base.queries import compute_team_form, form_from_hl, form_summary, h2h_from_hl
+from api.sports.base.queries import compute_league_context, compute_team_form, form_from_hl, form_summary, h2h_from_hl
 from db.models.baseball import BaseballTeamMatchStats, BaseballPlayerMatchStats, EventContext
-from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, RatingEloTeam
+from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, RatingEloTeam, TeamInjury
 from sqlalchemy import or_
 
 
@@ -108,6 +108,22 @@ _PARK_FACTORS: dict[str, float] = {
     "citi field": 0.98,
     "nationals park": 1.00,
 }
+
+
+def _injuries_for_team(db: Session, team_id: str) -> list[dict]:
+    from datetime import timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=72)
+    rows = (
+        db.query(TeamInjury)
+        .filter(TeamInjury.team_id == team_id, TeamInjury.fetched_at >= cutoff)
+        .order_by(TeamInjury.status, TeamInjury.player_name)
+        .all()
+    )
+    return [
+        {"player_name": r.player_name, "position": r.position, "status": r.status,
+         "reason": r.reason, "expected_return": r.expected_return}
+        for r in rows
+    ]
 
 
 def _get_park_factor(venue: str | None) -> float | None:
@@ -406,15 +422,29 @@ def _build_baseball_detail(
         match_id=match.id, team_id=match.away_team_id
     ).first() if is_finished else None
 
-    starter_home = _starter_from_stats(stats_home_row) if stats_home_row else None
-    starter_away = _starter_from_stats(stats_away_row) if stats_away_row else None
+    # extras_json needed early (probable pitchers for upcoming games)
+    extras = match.extras_json or {}
+
+    def _starter_from_probable(side: str) -> Optional[StarterPitcherOut]:
+        data = extras.get(f"probable_pitcher_{side}")
+        if not data or not isinstance(data, dict):
+            return None
+        name = data.get("name")
+        if not name:
+            return None
+        return StarterPitcherOut(
+            player_id=data.get("player_id") or None,
+            name=name,
+            era=data.get("era_last_5"),
+            whip=data.get("whip_last_5"),
+        )
+
+    starter_home = _starter_from_stats(stats_home_row) if stats_home_row else _starter_from_probable("home")
+    starter_away = _starter_from_stats(stats_away_row) if stats_away_row else _starter_from_probable("away")
     bullpen_home = None
     bullpen_away = None
     batting_home = _batting_from_stats(stats_home_row, home_name, db) if stats_home_row else None
     batting_away = _batting_from_stats(stats_away_row, away_name, db) if stats_away_row else None
-
-    # H2H, form, events from extras_json (Highlightly)
-    extras = match.extras_json or {}
 
     # Form: prefer HL lastfivegames, fall back to DB
     hl_form_home = _hl_form_baseball(extras.get("lastfivegames_home") or [], match.home_team_id, home_name)
@@ -537,7 +567,10 @@ def _build_baseball_detail(
         form_away=hl_form_away,
         inning_events=hl_events or events,
         h2h=h2h_result,
+        injuries_home=_injuries_for_team(db, match.home_team_id) or None,
+        injuries_away=_injuries_for_team(db, match.away_team_id) or None,
         context={"venue_name": match.venue} if match.venue else None,
+        league_context=compute_league_context(db, "baseball", match.league_id, match.season, match.home_team_id, match.away_team_id),
         data_completeness={
             "box_score": is_finished and (stats_home_row is not None or stats_away_row is not None),
             "pitching_line": is_finished and (stats_home_row is not None or stats_away_row is not None),

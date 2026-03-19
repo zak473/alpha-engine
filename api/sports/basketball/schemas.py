@@ -113,6 +113,57 @@ class BasketballTeamFormOut(BaseModel):
     points_conceded_avg: Optional[float] = None
 
 
+class BasketballPlayerBoxOut(BaseModel):
+    player_id: Optional[str] = None
+    name: str
+    position: Optional[str] = None
+    jersey: Optional[str] = None
+    is_starter: bool = True
+    minutes: Optional[float] = None
+    points: Optional[int] = None
+    rebounds: Optional[int] = None
+    reb_off: Optional[int] = None
+    reb_def: Optional[int] = None
+    assists: Optional[int] = None
+    steals: Optional[int] = None
+    blocks: Optional[int] = None
+    turnovers: Optional[int] = None
+    fouls: Optional[int] = None
+    plus_minus: Optional[int] = None
+    fg_made: Optional[int] = None
+    fg_att: Optional[int] = None
+    fg_pct: Optional[float] = None
+    fg3_made: Optional[int] = None
+    fg3_att: Optional[int] = None
+    fg3_pct: Optional[float] = None
+    ft_made: Optional[int] = None
+    ft_att: Optional[int] = None
+    ft_pct: Optional[float] = None
+
+
+class BasketballTeamBoxScore(BaseModel):
+    team_id: str
+    team_name: str
+    is_home: bool
+    players: list[BasketballPlayerBoxOut] = []
+    total_points: Optional[int] = None
+    total_rebounds: Optional[int] = None
+    total_assists: Optional[int] = None
+    total_steals: Optional[int] = None
+    total_blocks: Optional[int] = None
+    total_turnovers: Optional[int] = None
+    total_fouls: Optional[int] = None
+    fg_pct: Optional[float] = None
+    fg3_pct: Optional[float] = None
+    ft_pct: Optional[float] = None
+    fg_made: Optional[int] = None
+    fg_att: Optional[int] = None
+    fg3_made: Optional[int] = None
+    fg3_att: Optional[int] = None
+    ft_made: Optional[int] = None
+    ft_att: Optional[int] = None
+
+
 # ─── List / response schemas ────────────────────────────────────────────────
 
 class BasketballMatchListItem(BaseModel):
@@ -187,6 +238,13 @@ class BasketballMatchDetail(BaseModel):
     # Odds
     odds_home: Optional[float] = None
     odds_away: Optional[float] = None
+    # Player box scores
+    box_home: Optional[BasketballTeamBoxScore] = None
+    box_away: Optional[BasketballTeamBoxScore] = None
+    # Injuries
+    injuries_home: Optional[list] = None
+    injuries_away: Optional[list] = None
     # Context
     context: Optional[dict] = None
+    league_context: Optional[dict] = None
     data_completeness: Optional[dict] = None

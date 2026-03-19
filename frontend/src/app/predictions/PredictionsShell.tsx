@@ -38,7 +38,7 @@ const CONF_THRESHOLDS = [
 // ── Backend merge ────────────────────────────────────────────────────────────
 
 interface BackendItem {
-  id: string;
+  id?: string;
   home_name: string;
   away_name: string;
   p_home: number | null;

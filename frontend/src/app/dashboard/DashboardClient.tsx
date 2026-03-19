@@ -14,7 +14,7 @@ export function DashboardClient() {
   useEffect(() => {
     Promise.allSettled(
       SPORTS.map((sport) =>
-        getSportMatches(sport, { limit: 100 }).then((res) =>
+        getSportMatches(sport, { limit: 50 }).then((res) =>
           res.items.flatMap((item) => {
             try { return [adaptToMatchCard(item, sport)]; }
             catch { return []; }

@@ -971,6 +971,8 @@ class TennisMatchService(BaseMatchListService):
             profile_home=profile_home,
             profile_away=profile_away,
             tiebreaks=tiebreaks,
+            odds_home=match.odds_home,
+            odds_away=match.odds_away,
             betting=betting,
         )
 

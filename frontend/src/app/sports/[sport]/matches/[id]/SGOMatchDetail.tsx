@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { ChevronDown, ChevronUp, Timer, Flame, TrendingUp, Shield, MapPin, Cloud, Users, Sparkles, Loader2 } from "lucide-react";
-import { getMatchReasoning } from "@/lib/api";
+import { getMatchReasoning, getMatchReasoningPreview } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { SportSlug, Market, Selection } from "@/lib/betting-types";
 import { SPORT_CONFIG } from "@/lib/betting-types";
@@ -255,8 +255,8 @@ function FormSection({ match, homeName, awayName }: { match: SportMatchDetail; h
           if (!form) return null;
           const results: string[] = (form.form_last_5 as string[] | undefined) ?? (form.recent_results as string[] | undefined) ?? [];
           const pts = form.form_pts ?? form.wins;
-          const gf = form.goals_scored_avg ?? form.avg_runs_for ?? form.maps_won;
-          const ga = form.goals_against_avg ?? form.avg_runs_against;
+          const gf = form.goals_scored_avg ?? form.points_scored_avg ?? form.avg_runs_for ?? form.maps_won;
+          const ga = form.goals_against_avg ?? form.goals_conceded_avg ?? form.points_conceded_avg ?? form.avg_runs_against;
           const xg = form.xg_avg;
           const winPct = form.win_pct ?? form.series_win_pct;
 
@@ -273,8 +273,8 @@ function FormSection({ match, homeName, awayName }: { match: SportMatchDetail; h
               )}
               <div className="flex flex-wrap gap-2 text-[10px] text-text-muted">
                 {pts != null && <span>Pts: <b className="text-text-primary">{fmt(pts)}</b></span>}
-                {gf != null && <span>GF avg: <b className="text-text-primary">{fmt(gf)}</b></span>}
-                {ga != null && <span>GA avg: <b className="text-text-primary">{fmt(ga)}</b></span>}
+                {gf != null && <span>Scored avg: <b className="text-text-primary">{fmt(gf)}</b></span>}
+                {ga != null && <span>Conceded avg: <b className="text-text-primary">{fmt(ga)}</b></span>}
                 {xg != null && <span>xG avg: <b className="text-text-primary">{fmt(xg)}</b></span>}
               </div>
             </div>
@@ -422,6 +422,56 @@ function SimulationSection({ match }: { match: SportMatchDetail }) {
 }
 
 // ─── Tennis-specific sections ─────────────────────────────────────────────────
+
+function TennisOddsSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
+  const bm = match as unknown as { odds_home?: number | null; odds_away?: number | null; fair_odds?: { home_win?: number | null; away_win?: number | null } | null };
+  const mktH = bm.odds_home;
+  const mktA = bm.odds_away;
+  const fairH = bm.fair_odds?.home_win;
+  const fairA = bm.fair_odds?.away_win;
+  if (!mktH && !mktA) return null;
+
+  const edgePct = (mkt?: number | null, fair?: number | null): number | null => {
+    if (!mkt || !fair || fair <= 0) return null;
+    return ((mkt / fair) - 1) * 100;
+  };
+  const edgeH = edgePct(mktH, fairH);
+  const edgeA = edgePct(mktA, fairA);
+
+  return (
+    <Card title="Odds">
+      <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-xs">
+        <div className="text-right text-text-muted truncate">{homeName}</div>
+        <div className="text-center" />
+        <div className="text-text-muted truncate">{awayName}</div>
+
+        <div className="text-right font-mono font-semibold">{mktH != null ? mktH.toFixed(2) : "—"}</div>
+        <div className="text-center text-[9px] uppercase tracking-widest text-text-muted">Market</div>
+        <div className="font-mono font-semibold">{mktA != null ? mktA.toFixed(2) : "—"}</div>
+
+        {(fairH != null || fairA != null) && (
+          <>
+            <div className="text-right font-mono text-text-muted">{fairH != null ? fairH.toFixed(2) : "—"}</div>
+            <div className="text-center text-[9px] uppercase tracking-widest text-text-muted">Fair</div>
+            <div className="font-mono text-text-muted">{fairA != null ? fairA.toFixed(2) : "—"}</div>
+          </>
+        )}
+
+        {(edgeH != null || edgeA != null) && (
+          <>
+            <div className={cn("text-right font-mono text-[10px]", edgeH != null && edgeH > 0 ? "text-green-400" : "text-text-muted")}>
+              {edgeH != null ? `${edgeH > 0 ? "+" : ""}${edgeH.toFixed(1)}%` : "—"}
+            </div>
+            <div className="text-center text-[9px] uppercase tracking-widest text-text-muted">Edge</div>
+            <div className={cn("font-mono text-[10px]", edgeA != null && edgeA > 0 ? "text-green-400" : "text-text-muted")}>
+              {edgeA != null ? `${edgeA > 0 ? "+" : ""}${edgeA.toFixed(1)}%` : "—"}
+            </div>
+          </>
+        )}
+      </div>
+    </Card>
+  );
+}
 
 function TennisInfoSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
   const info = (match as unknown as Record<string, unknown>).tennis_info as Record<string, unknown> | null | undefined;
@@ -831,6 +881,94 @@ function InjuriesSection({ match, homeName, awayName }: { match: SportMatchDetai
   );
 }
 
+// ─── Basketball box score section ─────────────────────────────────────────────
+
+function BasketballBoxScoreSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
+  const bh = match.box_home as { team_name: string; players: any[]; total_points?: number | null; fg_pct?: number | null; fg3_pct?: number | null; ft_pct?: number | null } | null | undefined;
+  const ba = match.box_away as { team_name: string; players: any[]; total_points?: number | null; fg_pct?: number | null; fg3_pct?: number | null; ft_pct?: number | null } | null | undefined;
+  if (!bh?.players?.length && !ba?.players?.length) return null;
+
+  const cols = [
+    { key: "minutes",   label: "MIN" },
+    { key: "points",    label: "PTS" },
+    { key: "rebounds",  label: "REB" },
+    { key: "assists",   label: "AST" },
+    { key: "steals",    label: "STL" },
+    { key: "blocks",    label: "BLK" },
+    { key: "turnovers", label: "TO" },
+    { key: "plus_minus",label: "+/-" },
+    { key: "fg_pct",    label: "FG%",  isPct: true },
+    { key: "fg3_pct",   label: "3P%",  isPct: true },
+    { key: "ft_pct",    label: "FT%",  isPct: true },
+  ];
+
+  const fmt = (v: unknown, isPct?: boolean) => {
+    if (v == null) return "–";
+    const n = Number(v);
+    if (isNaN(n)) return "–";
+    if (isPct) return (n * 100).toFixed(1) + "%";
+    return n % 1 === 0 ? String(n) : n.toFixed(1);
+  };
+
+  const renderTeam = (box: typeof bh, name: string) => {
+    if (!box?.players?.length) return null;
+    return (
+      <div className="mb-4 last:mb-0">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted mb-1.5">{name}</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11px]">
+            <thead>
+              <tr className="text-text-muted border-b" style={{ borderColor: "var(--border0)" }}>
+                <th className="text-left font-medium pb-1 pr-2">Player</th>
+                <th className="text-center font-medium pb-1 px-1">Pos</th>
+                {cols.map(c => <th key={c.key} className="text-center font-medium pb-1 px-1 min-w-[28px]">{c.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {(box.players as any[]).map((p, i) => (
+                <tr key={i} className="border-t" style={{ borderColor: "var(--border0)", opacity: p.is_starter ? 1 : 0.65 }}>
+                  <td className="py-1.5 pr-2 text-text-primary font-medium whitespace-nowrap truncate max-w-[120px]">{p.name}</td>
+                  <td className="py-1.5 px-1 text-center text-text-muted text-[10px]">{p.position ?? ""}</td>
+                  {cols.map(c => {
+                    const val = p[c.key];
+                    const isPlus = c.key === "plus_minus" && Number(val) > 0;
+                    const isMinus = c.key === "plus_minus" && Number(val) < 0;
+                    const isPts = c.key === "points" && Number(val) >= 20;
+                    return (
+                      <td key={c.key} className="py-1.5 px-1 text-center tabular-nums" style={{
+                        color: isPts ? "#f59e0b" : isPlus ? "#22c55e" : isMinus ? "#ef4444" : "var(--text-primary)",
+                        fontWeight: isPts ? 700 : undefined,
+                      }}>
+                        {fmt(val, (c as any).isPct)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+              <tr className="border-t font-bold" style={{ borderColor: "var(--border0)", color: "var(--text-muted)" }}>
+                <td className="py-1.5 pr-2" colSpan={2}>Team</td>
+                <td className="py-1.5 px-1 text-center">–</td>
+                <td className="py-1.5 px-1 text-center">{box.total_points ?? "–"}</td>
+                <td className="py-1.5 px-1 text-center" colSpan={5}>–</td>
+                <td className="py-1.5 px-1 text-center">{fmt(box.fg_pct, true)}</td>
+                <td className="py-1.5 px-1 text-center">{fmt(box.fg3_pct, true)}</td>
+                <td className="py-1.5 px-1 text-center">{fmt(box.ft_pct, true)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <Card title="Player Box Scores">
+      {renderTeam(bh, homeName)}
+      {renderTeam(ba, awayName)}
+    </Card>
+  );
+}
+
 // ─── Referee section ─────────────────────────────────────────────────────────
 
 function RefereeSection({ match }: { match: SportMatchDetail }) {
@@ -1204,16 +1342,32 @@ function formatKickoff(iso: string): string {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-function PreMatchAnalysisSection({ matchId, isFinished }: { matchId: string; isFinished: boolean }) {
+function PreMatchAnalysisSection({
+  matchId,
+  isFinished,
+  previewParams,
+}: {
+  matchId: string;
+  isFinished: boolean;
+  previewParams?: {
+    home: string; away: string; sport: string; league?: string;
+    p_home?: number; p_draw?: number; p_away?: number;
+    confidence?: number; fair_home?: number; fair_draw?: number; fair_away?: number;
+    elo_home?: number | null; elo_away?: number | null;
+  };
+}) {
   const [reasoning, setReasoning] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getMatchReasoning(matchId).then((r) => {
+    const fetch = previewParams
+      ? getMatchReasoningPreview(previewParams)
+      : getMatchReasoning(matchId);
+    fetch.then((r) => {
       setReasoning(r);
       setLoading(false);
     });
-  }, [matchId]);
+  }, [matchId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (isFinished) return null;
 
@@ -1331,6 +1485,7 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
               /* Tennis: match info, serve stats, tiebreaks, profiles */
               backendMatch && (
                 <>
+                  <TennisOddsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
                   <TennisInfoSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
                   <TennisServeStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
                   <TennisTiebreakSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
@@ -1346,6 +1501,7 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
                 <LiveStatsSection match={backendMatch ?? ({} as SportMatchDetail)} homeName={match.home.name} awayName={match.away.name} />
                 <SGOPlayerStatsSection event={event} homeName={match.home.name} awayName={match.away.name} />
                 {backendMatch && <LineupSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
+                {backendMatch && sport === "basketball" && <BasketballBoxScoreSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
                 {backendMatch && <InjuriesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
               </>
             )}
@@ -1355,9 +1511,25 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
           <div className="space-y-3">
             {backendMatch ? (
               <>
-                {!backendMatch.id.startsWith("preview-") && (
-                  <PreMatchAnalysisSection matchId={backendMatch.id} isFinished={isFinished} />
-                )}
+                <PreMatchAnalysisSection
+                  matchId={backendMatch.id}
+                  isFinished={isFinished}
+                  previewParams={backendMatch.id.startsWith("preview-") ? {
+                    home: backendMatch.home.name,
+                    away: backendMatch.away.name,
+                    sport: backendMatch.sport ?? sport,
+                    league: backendMatch.league ?? undefined,
+                    p_home: backendMatch.probabilities?.home_win ?? undefined,
+                    p_draw: backendMatch.probabilities?.draw ?? undefined,
+                    p_away: backendMatch.probabilities?.away_win ?? undefined,
+                    confidence: backendMatch.confidence ?? undefined,
+                    fair_home: backendMatch.fair_odds?.home_win ?? undefined,
+                    fair_draw: backendMatch.fair_odds?.draw ?? undefined,
+                    fair_away: backendMatch.fair_odds?.away_win ?? undefined,
+                    elo_home: typeof backendMatch.elo_home === "object" && backendMatch.elo_home ? (backendMatch.elo_home as { rating?: number }).rating : null,
+                    elo_away: typeof backendMatch.elo_away === "object" && backendMatch.elo_away ? (backendMatch.elo_away as { rating?: number }).rating : null,
+                  } : undefined}
+                />
                 <ProbabilitiesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
                 <EloSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} eloHome={eloHome} eloAway={eloAway} cfg={cfg} />
                 {sport === "tennis" ? (

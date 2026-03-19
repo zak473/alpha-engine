@@ -47,6 +47,7 @@ export interface BettingMatch {
   pHome?: number;
   pAway?: number;
   pDraw?: number;
+  backendId?: string;
 }
 
 export interface QueueSelection {

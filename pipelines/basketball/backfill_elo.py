@@ -118,8 +118,20 @@ def run_backfill(incremental: bool = False) -> int:
                 session.add(row)
                 rows_written += 1
 
-        session.commit()
-        log.info("Basketball ELO backfill complete. %d rating rows written.", rows_written)
+            # Commit every 200 matches to avoid conflicts with the live scheduler
+            if rows_written % 400 == 0:
+                try:
+                    session.commit()
+                except Exception:
+                    session.rollback()
+                    log.warning("Batch commit conflict — skipping batch (scheduler race). Continuing.")
+
+        try:
+            session.commit()
+        except Exception:
+            session.rollback()
+            log.warning("Final commit conflict — some rows skipped due to scheduler race.")
+        log.info("Basketball ELO backfill complete. ~%d rating rows written.", rows_written)
 
     except Exception:
         session.rollback()

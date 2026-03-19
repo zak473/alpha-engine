@@ -1,5 +1,5 @@
 """
-Hockey prediction pipeline — ELO-based win probability.
+Hockey prediction pipeline — ML model with ELO fallback.
 
 Usage:
     python -m pipelines.hockey.predict_hockey
@@ -15,18 +15,40 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+import numpy as np
 from sqlalchemy.orm import Session
 
 from core.types import MatchContext, Sport
-from db.models.mvp import CoreMatch, PredMatch, RatingEloTeam
+from db.models.mvp import CoreMatch, ModelRegistry, PredMatch, RatingEloTeam
 from db.session import SessionLocal
 from ratings.hockey_elo import HockeyEloEngine
+from pipelines.hockey.feature_engineering import build_feature_vector
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 log = logging.getLogger(__name__)
 
 _SPORT = "hockey"
-_MODEL_VERSION = "hockey-elo-v1"
+
+
+def _try_load_model(session: Session) -> Optional[dict]:
+    try:
+        import joblib
+        reg = (
+            session.query(ModelRegistry)
+            .filter_by(sport=_SPORT, is_live=True)
+            .order_by(ModelRegistry.trained_at.desc())
+            .first()
+        )
+        if reg is None:
+            return None
+        payload = joblib.load(reg.artifact_path)
+        payload["registry"] = reg
+        payload["model_name"] = reg.model_name
+        log.info("Loaded ML model %s", reg.model_name)
+        return payload
+    except Exception as exc:
+        log.warning("ML model unavailable, using ELO: %s", exc)
+        return None
 
 
 def _load_elo_engine(session: Session) -> HockeyEloEngine:
@@ -40,8 +62,29 @@ def _load_elo_engine(session: Session) -> HockeyEloEngine:
     )
     for r in rows:
         engine.set_rating(r.team_id, r.rating_after)
-    log.info("Loaded ELO ratings for %d team entries.", len(rows))
+    log.info("Loaded ELO ratings for %d hockey team entries.", len(rows))
     return engine
+
+
+def _predict_ml(match: CoreMatch, payload: dict, session: Session) -> dict:
+    model = payload["model"]
+    vector, raw = build_feature_vector(session, match)
+    X = np.nan_to_num(np.array(vector, dtype=float).reshape(1, -1), nan=0.0)
+    proba = model.predict_proba(X)[0]
+    p_home, p_away = float(proba[0]), float(proba[1])
+    total = p_home + p_away
+    p_home, p_away = p_home / total, p_away / total
+    confidence = int(round(max(0, min(100, abs(p_home - 0.5) * 200))))
+    return dict(
+        p_home=round(p_home, 4), p_draw=0.0, p_away=round(p_away, 4),
+        fair_odds_home=round(1.0 / p_home, 3) if p_home > 0 else 999.0,
+        fair_odds_draw=999.0,
+        fair_odds_away=round(1.0 / p_away, 3) if p_away > 0 else 999.0,
+        confidence=confidence,
+        key_drivers=[{"feature": f, "importance": 0.0, "value": v} for f, v in list(raw.items())[:5]],
+        simulation={"n_simulations": 0, "distribution": []},
+        features_snapshot=raw,
+    )
 
 
 def _predict_elo(match: CoreMatch, engine: HockeyEloEngine) -> dict:
@@ -77,7 +120,9 @@ def _predict_elo(match: CoreMatch, engine: HockeyEloEngine) -> dict:
 def run(match_id: Optional[str] = None, all_matches: bool = False) -> int:
     session: Session = SessionLocal()
     try:
-        engine = _load_elo_engine(session)
+        payload = _try_load_model(session)
+        engine = _load_elo_engine(session) if not payload else None
+        model_version = payload["model_name"] if payload else "hockey-elo-v1"
 
         if match_id:
             matches = session.query(CoreMatch).filter(
@@ -93,23 +138,22 @@ def run(match_id: Optional[str] = None, all_matches: bool = False) -> int:
                 .all()
             )
 
-        log.info("Running hockey predictions for %d matches (model=%s)...", len(matches), _MODEL_VERSION)
+        log.info("Running hockey predictions for %d matches (model=%s)...",
+                 len(matches), model_version)
         count = 0
         for match in matches:
             try:
-                data = _predict_elo(match, engine)
+                data = _predict_ml(match, payload, session) if payload else _predict_elo(match, engine)
                 existing = session.query(PredMatch).filter_by(
-                    match_id=match.id, model_version=_MODEL_VERSION
+                    match_id=match.id, model_version=model_version
                 ).first()
                 if existing is None:
                     session.add(PredMatch(
                         id=str(uuid.uuid4()),
                         match_id=match.id,
-                        model_version=_MODEL_VERSION,
+                        model_version=model_version,
                         **data,
                     ))
-                    log.info("  [+] %s  p_home=%.3f  p_away=%.3f  conf=%d%%",
-                             match.provider_id, data["p_home"], data["p_away"], data["confidence"])
                 else:
                     for k, v in data.items():
                         setattr(existing, k, v)

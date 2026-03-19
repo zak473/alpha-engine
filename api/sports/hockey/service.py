@@ -33,8 +33,8 @@ from api.sports.hockey.schemas import (
     PeriodScore,
     ProbabilitiesOut,
 )
-from api.sports.base.queries import compute_team_form, form_from_hl, form_summary, h2h_from_hl
-from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, RatingEloTeam
+from api.sports.base.queries import compute_league_context, compute_team_form, form_from_hl, form_summary, h2h_from_hl
+from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, RatingEloTeam, TeamInjury
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -129,6 +129,22 @@ def _h2h(db: Session, home_id: str, away_id: str) -> H2HRecordOut:
 
 
 # ─── Hockey-specific helpers ──────────────────────────────────────────────────
+
+def _injuries_for_team(db: Session, team_id: str) -> list[dict]:
+    from datetime import timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=72)
+    rows = (
+        db.query(TeamInjury)
+        .filter(TeamInjury.team_id == team_id, TeamInjury.fetched_at >= cutoff)
+        .order_by(TeamInjury.status, TeamInjury.player_name)
+        .all()
+    )
+    return [
+        {"player_name": r.player_name, "position": r.position, "status": r.status,
+         "reason": r.reason, "expected_return": r.expected_return}
+        for r in rows
+    ]
+
 
 def _form_hockey(hl_matches: list[dict], team_name: str) -> HockeyTeamFormOut | None:
     raw = form_from_hl(hl_matches, team_name)
@@ -640,7 +656,10 @@ class HockeyMatchService(BaseMatchListService):
             odds_home=m.odds_home,
             odds_away=m.odds_away,
             odds_draw=m.odds_draw,
+            injuries_home=_injuries_for_team(db, m.home_team_id) or None,
+            injuries_away=_injuries_for_team(db, m.away_team_id) or None,
             context={"venue_name": m.venue} if m.venue else None,
+            league_context=compute_league_context(db, "hockey", m.league_id, m.season, m.home_team_id, m.away_team_id),
             data_completeness={
                 "source": "highlightly",
                 "has_elo": elo_h is not None,

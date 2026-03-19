@@ -678,6 +678,26 @@ export function HockeyMatchDetail({ match: initialMatch, eloHomeHistory, eloAway
             </PanelCard>
           )}
 
+          {/* Injuries */}
+          {(match.injuries_home?.length || match.injuries_away?.length) ? (
+            <PanelCard title="Injured / Out">
+              {[
+                { injuries: match.injuries_home, teamName: match.home.name, color: C.blue },
+                { injuries: match.injuries_away, teamName: match.away.name, color: C.cyan },
+              ].map(({ injuries, teamName, color }) => injuries?.length ? (
+                <div key={teamName} className="mb-3 pb-3 last:mb-0 last:pb-0" style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color }}>{teamName}</div>
+                  {(injuries as any[]).map((inj, i) => (
+                    <div key={i} className="flex items-center justify-between py-1 text-xs" style={{ borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                      <span style={{ color: C.textMuted }}>{inj.player_name}</span>
+                      <span className="font-semibold" style={{ color: inj.status === "Suspended" ? C.amber : C.red }}>{inj.status}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null)}
+            </PanelCard>
+          ) : null}
+
         </SideCol>
       </SideGrid>
     </div>

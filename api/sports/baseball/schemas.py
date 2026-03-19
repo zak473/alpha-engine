@@ -425,8 +425,13 @@ class BaseballMatchDetail(BaseModel):
     inning_events: Optional[list[InningEvent]] = None
     # H2H
     h2h: Optional[H2HRecordOut] = None
+    # Injuries / IL
+    injuries_home: Optional[list] = None
+    injuries_away: Optional[list] = None
     # Context / venue
     context: Optional[dict] = None
+    # League standings context
+    league_context: Optional[dict] = None
     # Data completeness
     data_completeness: Optional[dict] = None
     # Batted ball data

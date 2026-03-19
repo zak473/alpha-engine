@@ -199,8 +199,79 @@ def _call_claude(prompt: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Endpoint
+# Endpoints
 # ---------------------------------------------------------------------------
+
+
+@router.get("/preview")
+def get_reasoning_preview(
+    home: str,
+    away: str,
+    sport: str = "soccer",
+    league: str = "Unknown League",
+    p_home: float = 0.5,
+    p_draw: float = 0.0,
+    p_away: float = 0.5,
+    confidence: float = 0.5,
+    fair_home: float = 2.0,
+    fair_draw: float = 10.0,
+    fair_away: float = 2.0,
+    elo_home: Optional[float] = None,
+    elo_away: Optional[float] = None,
+    session: Session = Depends(get_db),
+):
+    """
+    Generate AI reasoning for a preview match (not yet in CoreMatch DB).
+    Cache key is derived from sport+home+away.
+    """
+    if not settings.ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="AI reasoning not configured (ANTHROPIC_API_KEY missing)")
+
+    import re
+    def _slug(s: str) -> str:
+        return re.sub(r"[^a-z0-9]", "_", s.strip().lower())
+
+    cache_key = f"preview:{_slug(sport)}:{_slug(home)}:{_slug(away)}"
+
+    cached = session.query(MatchReasoning).filter_by(match_id=cache_key).first()
+    cutoff = datetime.utcnow() - timedelta(hours=CACHE_TTL_HOURS)
+    if cached and cached.generated_at.replace(tzinfo=None) > cutoff:
+        return {"match_id": cache_key, "reasoning": cached.reasoning}
+
+    prompt = _build_prompt(
+        sport=sport,
+        league=league,
+        home=home,
+        away=away,
+        p_home=p_home,
+        p_draw=p_draw,
+        p_away=p_away,
+        confidence=confidence,
+        fair_home=fair_home,
+        fair_draw=fair_draw,
+        fair_away=fair_away,
+        market_home=None,
+        market_draw=None,
+        market_away=None,
+        elo_home=elo_home,
+        elo_away=elo_away,
+        key_drivers=[],
+        feat=None,
+        standing_home=None,
+        standing_away=None,
+    )
+
+    reasoning = _call_claude(prompt)
+
+    if cached:
+        cached.reasoning = reasoning
+        cached.generated_at = datetime.utcnow()
+    else:
+        session.add(MatchReasoning(match_id=cache_key, reasoning=reasoning))
+    session.commit()
+
+    return {"match_id": cache_key, "reasoning": reasoning}
+
 
 @router.get("/{match_id}")
 def get_reasoning(match_id: str, session: Session = Depends(get_db)):

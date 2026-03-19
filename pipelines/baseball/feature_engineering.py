@@ -53,6 +53,8 @@ FEATURE_NAMES = [
     # Offensive power
     "home_hr_avg", "away_hr_avg",          # home runs (power)
     "home_lob_avg", "away_lob_avg",        # left on base (clutch hitting / missed opportunities)
+    # Probable starter ERA (last 5 starts) — 0.0 when unknown
+    "home_starter_era", "away_starter_era",
 ]
 
 OUTCOME_LABELS = {"home_win": 0, "away_win": 1, "H": 0, "A": 1}
@@ -166,6 +168,24 @@ def _rolling_baseball_stats(
 
 
 # ---------------------------------------------------------------------------
+# Probable starter ERA helper
+# ---------------------------------------------------------------------------
+
+def _starter_era(db: Session, match: CoreMatch, side: str) -> float:
+    """
+    Return ERA from extras_json.probable_pitcher_{side}.era_last_5 if available.
+
+    Falls back to 0.0 (neutral) when no pitcher data is stored.
+    """
+    extras = match.extras_json or {}
+    data = extras.get(f"probable_pitcher_{side}")
+    if not data or not isinstance(data, dict):
+        return 0.0
+    era = data.get("era_last_5")
+    return float(era) if era is not None else 0.0
+
+
+# ---------------------------------------------------------------------------
 # Main feature builder
 # ---------------------------------------------------------------------------
 
@@ -207,6 +227,10 @@ def build_feature_vector(
     home_bb = _rolling_baseball_stats(db, home_id, kickoff)
     away_bb = _rolling_baseball_stats(db, away_id, kickoff)
 
+    # --- Probable starter ERA (0.0 when not available) ---
+    home_starter_era = _starter_era(db, match, "home")
+    away_starter_era = _starter_era(db, match, "away")
+
     raw = {
         "elo_home":              elo_home,
         "elo_away":              elo_away,
@@ -246,6 +270,9 @@ def build_feature_vector(
         "away_hr_avg":           away_bb["hr_avg"],
         "home_lob_avg":          home_bb["lob_avg"],
         "away_lob_avg":          away_bb["lob_avg"],
+        # Probable starter ERA
+        "home_starter_era":      home_starter_era,
+        "away_starter_era":      away_starter_era,
     }
 
     vector = [raw[f] for f in FEATURE_NAMES]

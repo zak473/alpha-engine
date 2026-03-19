@@ -287,5 +287,8 @@ class TennisMatchDetail(BaseModel):
     profile_away: Optional[TennisPlayerProfileOut] = None
     # Tiebreaks
     tiebreaks: Optional[TennisTiebreakOut] = None
-    # Betting market
+    # Bookmaker market odds (decimal)
+    odds_home: Optional[float] = None
+    odds_away: Optional[float] = None
+    # Betting market (model-derived moneylines)
     betting: Optional[dict] = None

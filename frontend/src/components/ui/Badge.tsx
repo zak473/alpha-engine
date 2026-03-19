@@ -27,6 +27,8 @@ export function Badge({ children, sport, variant, className }: BadgeProps) {
       esports:    colors.esports,
       basketball: colors.basketball,
       baseball:   colors.baseball,
+      hockey:     colors.hockey,
+      horseracing: colors.horseracing,
     };
     const color = colorMap[sport.toLowerCase()] ?? colors.text1;
     return (

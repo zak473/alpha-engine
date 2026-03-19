@@ -68,7 +68,7 @@ def get_player_elo_history(
         EloHistoryPoint(
             date=r.rated_at.isoformat(),
             rating=round(r.rating_after, 1),
-            match_id=r.match_id if hasattr(r, "match_id") else None,
+            match_id=r.match_id,
         )
         for r in reversed(rows)
     ]

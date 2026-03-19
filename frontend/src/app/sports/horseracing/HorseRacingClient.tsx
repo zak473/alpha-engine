@@ -72,13 +72,13 @@ export function HorseRacingClient({ initialRaces }: Props) {
       map.get(key)!.push(race);
     }
     // Sort races within each course by scheduled time
-    for (const races of map.values()) {
-      races.sort((a, b) => {
+    Array.from(map.values()).forEach((races) => {
+      races.sort((a: RaceListItem, b: RaceListItem) => {
         const ta = a.scheduled_at ? new Date(a.scheduled_at).getTime() : 0;
         const tb = b.scheduled_at ? new Date(b.scheduled_at).getTime() : 0;
         return ta - tb;
       });
-    }
+    });
     return map;
   }, [filtered]);
 

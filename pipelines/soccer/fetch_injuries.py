@@ -1,10 +1,13 @@
 """
-Fetch player injury and suspension data from API-Football and API-Basketball (via RapidAPI).
+Fetch player injury and suspension data.
 
-Calls GET /injuries?league={id}&season={year} for each tracked league.
-Matches team names to CoreTeam rows, upserts into team_injuries table.
+Sources:
+  - API-Football (RapidAPI): soccer leagues
+  - API-Basketball (RapidAPI): NBA, EuroLeague
+  - MLB Stats API (free, no key): MLB injured list
+  - NHL API (free, no key): NHL injured reserve
 
-Budget: ~20 API calls per run (10 soccer + 10 basketball). Free tier allows 100/day.
+Budget: ~20 RapidAPI calls per run (soccer + basketball). MLB/NHL are free.
 Schedule: daily at 06:00 UTC (see pipelines/scheduler.py).
 """
 
@@ -111,6 +114,151 @@ def _match_team(name: str, name_map: dict[str, str]) -> str | None:
     return None
 
 
+def _fetch_mlb_il() -> list[dict]:
+    """
+    Fetch MLB injured list players via free statsapi.mlb.com.
+    Returns list of dicts: {team_name, player_name, status, reason}.
+    """
+    try:
+        # Get all active MLB teams
+        teams_resp = requests.get(
+            "https://statsapi.mlb.com/api/v1/teams",
+            params={"sportId": 1, "season": 2025},
+            timeout=15,
+        )
+        teams_resp.raise_for_status()
+        teams = teams_resp.json().get("teams", [])
+    except Exception as exc:
+        log.warning("MLB teams fetch failed: %s", exc)
+        return []
+
+    results = []
+    for team in teams:
+        team_id = team.get("id")
+        team_name = team.get("name", "")
+        if not team_id:
+            continue
+        try:
+            resp = requests.get(
+                f"https://statsapi.mlb.com/api/v1/teams/{team_id}/roster",
+                params={"rosterType": "injuredList", "season": 2025},
+                timeout=15,
+            )
+            if not resp.ok:
+                continue
+            roster = resp.json().get("roster", [])
+            for player in roster:
+                name = (player.get("person") or {}).get("fullName", "")
+                position = (player.get("position") or {}).get("abbreviation")
+                status = player.get("status", {}).get("description", "IL")
+                reason = None  # MLB IL doesn't expose injury reason
+                results.append({
+                    "team_name": team_name,
+                    "player_name": name,
+                    "position": position,
+                    "status": status,
+                    "reason": reason,
+                })
+        except Exception as exc:
+            log.debug("MLB IL fetch failed for team %s: %s", team_name, exc)
+
+    log.info("MLB IL: %d injured players fetched", len(results))
+    return results
+
+
+# NHL team abbreviations for all 32 franchises
+_NHL_TEAMS = [
+    "ANA", "BOS", "BUF", "CAR", "CBJ", "CGY", "CHI", "COL", "DAL", "DET",
+    "EDM", "FLA", "LAK", "MIN", "MTL", "NJD", "NSH", "NYI", "NYR", "OTT",
+    "PHI", "PIT", "SEA", "SJS", "STL", "TBL", "TOR", "UTA", "VAN", "VGK",
+    "WPG", "WSH",
+]
+
+
+def _fetch_nhl_injuries() -> list[dict]:
+    """
+    Fetch NHL injured reserve players via free api-web.nhle.com.
+    Uses the roster endpoint; marks players with injuryStatus as injured.
+    Returns list of dicts: {team_name, player_name, position, status, reason}.
+    """
+    results = []
+    for abbrev in _NHL_TEAMS:
+        try:
+            resp = requests.get(
+                f"https://api-web.nhle.com/v1/roster/{abbrev}/current",
+                timeout=15,
+            )
+            if not resp.ok:
+                continue
+            data = resp.json()
+            team_name = data.get("teamName", {}).get("default", abbrev)
+            # Combine all position groups
+            all_players = (
+                data.get("forwards", []) +
+                data.get("defensemen", []) +
+                data.get("goalies", [])
+            )
+            for p in all_players:
+                injury_status = p.get("injuryStatus")
+                if not injury_status:
+                    continue
+                first = (p.get("firstName") or {}).get("default", "")
+                last = (p.get("lastName") or {}).get("default", "")
+                name = f"{first} {last}".strip()
+                position = p.get("positionCode")
+                results.append({
+                    "team_name": team_name,
+                    "player_name": name,
+                    "position": position,
+                    "status": "Out",
+                    "reason": str(injury_status),
+                })
+        except Exception as exc:
+            log.debug("NHL roster fetch failed for %s: %s", abbrev, exc)
+
+    log.info("NHL injuries: %d injured players fetched", len(results))
+    return results
+
+
+def _upsert_injuries(db, name_map: dict, entries: list[dict], now: datetime) -> int:
+    """Generic upsert helper for injury entries from any source."""
+    upserted = 0
+    for entry in entries:
+        player_name = (entry.get("player_name") or "").strip()
+        team_name = (entry.get("team_name") or "").strip()
+        if not player_name or not team_name:
+            continue
+        team_id = _match_team(team_name, name_map)
+        if not team_id:
+            log.debug("No CoreTeam match for '%s'", team_name)
+            continue
+        existing = (
+            db.query(TeamInjury)
+            .filter(TeamInjury.team_id == team_id, TeamInjury.player_name == player_name)
+            .first()
+        )
+        if existing:
+            existing.team_name = team_name
+            existing.status = entry.get("status", "Out")
+            existing.reason = entry.get("reason")
+            existing.position = entry.get("position")
+            existing.expected_return = entry.get("expected_return")
+            existing.fetched_at = now
+        else:
+            db.add(TeamInjury(
+                team_id=team_id,
+                team_name=team_name,
+                player_name=player_name,
+                position=entry.get("position"),
+                status=entry.get("status", "Out"),
+                reason=entry.get("reason"),
+                expected_return=entry.get("expected_return"),
+                fetched_at=now,
+            ))
+        upserted += 1
+    return upserted
+
+
 def fetch_all() -> int:
     """Fetch injuries for all configured leagues and upsert into team_injuries. Returns row count."""
     if not settings.API_FOOTBALL_KEY:
@@ -190,10 +338,11 @@ def fetch_all() -> int:
                     ))
                 upserted += 1
 
-        # Basketball injuries (same upsert logic, different API endpoint)
+        # Basketball injuries (API-Basketball via RapidAPI)
         for league_id, season in _BASKETBALL_LEAGUES.items():
             entries = _fetch_basketball_injuries(league_id, season)
             log.info("Basketball league %d: %d injury entries", league_id, len(entries))
+            normalized = []
             for entry in entries:
                 player = entry.get("player", {})
                 team = entry.get("team", {})
@@ -201,34 +350,30 @@ def fetch_all() -> int:
                 team_name = team.get("name", "").strip()
                 if not player_name or not team_name:
                     continue
-                team_id = _match_team(team_name, name_map)
-                if not team_id:
-                    continue
                 injury_type = player.get("type", "injury").lower()
-                status = "Suspended" if injury_type == "suspension" else "Out"
-                reason = player.get("reason") or None
-                existing = (
-                    db.query(TeamInjury)
-                    .filter(TeamInjury.team_id == team_id, TeamInjury.player_name == player_name)
-                    .first()
-                )
-                if existing:
-                    existing.team_name = team_name
-                    existing.status = status
-                    existing.reason = reason
-                    existing.fetched_at = now
-                else:
-                    db.add(TeamInjury(
-                        team_id=team_id,
-                        team_name=team_name,
-                        player_name=player_name,
-                        position=None,
-                        status=status,
-                        reason=reason,
-                        expected_return=None,
-                        fetched_at=now,
-                    ))
-                upserted += 1
+                normalized.append({
+                    "player_name": player_name,
+                    "team_name": team_name,
+                    "position": None,
+                    "status": "Suspended" if injury_type == "suspension" else "Out",
+                    "reason": player.get("reason") or None,
+                    "expected_return": None,
+                })
+            upserted += _upsert_injuries(db, name_map, normalized, now)
+
+        # MLB injured list (free MLB Stats API — no key required)
+        try:
+            mlb_entries = _fetch_mlb_il()
+            upserted += _upsert_injuries(db, name_map, mlb_entries, now)
+        except Exception as exc:
+            log.warning("MLB IL fetch failed: %s", exc)
+
+        # NHL injured reserve (free NHL API — no key required)
+        try:
+            nhl_entries = _fetch_nhl_injuries()
+            upserted += _upsert_injuries(db, name_map, nhl_entries, now)
+        except Exception as exc:
+            log.warning("NHL injury fetch failed: %s", exc)
 
         db.commit()
         log.info("fetch_injuries: %d rows upserted.", upserted)

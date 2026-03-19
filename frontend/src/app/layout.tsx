@@ -7,6 +7,7 @@ import { OddsFormatProvider } from "@/lib/odds-format";
 import { ThemeProvider } from "@/lib/theme";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://neverindoubt.app"),
   title: {
     default: "Never In Doubt",
     template: "%s | Never In Doubt",

@@ -21,6 +21,7 @@ export const colors = {
   esports:     "#8b5cf6",
   basketball:  "#f59e0b",
   baseball:    "#ef4444",
+  hockey:      "#06b6d4",
   horseracing: "#e879f9",
 
   surfaceBase:    "#08120e",
@@ -80,6 +81,7 @@ export function sportColor(sport: string): string {
     esports:     colors.esports,
     basketball:  colors.basketball,
     baseball:    colors.baseball,
+    hockey:      colors.hockey,
     horseracing: colors.horseracing,
   };
   return map[sport.toLowerCase()] ?? colors.text1;

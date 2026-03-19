@@ -774,3 +774,40 @@ export async function getMatchReasoning(matchId: string): Promise<string | null>
     return null;
   }
 }
+
+export async function getMatchReasoningPreview(params: {
+  home: string;
+  away: string;
+  sport: string;
+  league?: string;
+  p_home?: number;
+  p_draw?: number;
+  p_away?: number;
+  confidence?: number;
+  fair_home?: number;
+  fair_draw?: number;
+  fair_away?: number;
+  elo_home?: number | null;
+  elo_away?: number | null;
+}): Promise<string | null> {
+  try {
+    const q = new URLSearchParams();
+    q.set("home", params.home);
+    q.set("away", params.away);
+    q.set("sport", params.sport);
+    if (params.league) q.set("league", params.league);
+    if (params.p_home != null) q.set("p_home", String(params.p_home));
+    if (params.p_draw != null) q.set("p_draw", String(params.p_draw));
+    if (params.p_away != null) q.set("p_away", String(params.p_away));
+    if (params.confidence != null) q.set("confidence", String(params.confidence));
+    if (params.fair_home != null) q.set("fair_home", String(params.fair_home));
+    if (params.fair_draw != null) q.set("fair_draw", String(params.fair_draw));
+    if (params.fair_away != null) q.set("fair_away", String(params.fair_away));
+    if (params.elo_home != null) q.set("elo_home", String(params.elo_home));
+    if (params.elo_away != null) q.set("elo_away", String(params.elo_away));
+    const res = await request<{ match_id: string; reasoning: string }>(`/reasoning/preview?${q.toString()}`);
+    return res.reasoning;
+  } catch {
+    return null;
+  }
+}

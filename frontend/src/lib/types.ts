@@ -447,6 +447,11 @@ export interface SportMatchDetail {
   adv_home?: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   adv_away?: any;
+  // Basketball player box scores
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  box_home?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  box_away?: any;
 }
 
 // Soccer-specific ELO history point
@@ -645,6 +650,8 @@ export interface TennisMatchDetail {
   profile_home?: TennisPlayerProfileOut | null;
   profile_away?: TennisPlayerProfileOut | null;
   tiebreaks?: TennisTiebreakOut | null;
+  odds_home?: number | null;
+  odds_away?: number | null;
   betting?: Record<string, unknown> | null;
   simulation?: { n_simulations: number; distribution: Array<{ score: string; probability: number }>; mean_home_goals?: number | null } | null;
 }
@@ -1520,7 +1527,10 @@ export interface BaseballMatchDetail {
   form_away?: BaseballTeamFormOut | null;
   inning_events?: BaseballInningEvent[] | null;
   h2h?: { total_matches: number; home_wins: number; away_wins: number; recent_matches: any[] } | null;
+  injuries_home?: Array<{ player_name: string; position?: string | null; status: string; reason?: string | null; expected_return?: string | null }> | null;
+  injuries_away?: Array<{ player_name: string; position?: string | null; status: string; reason?: string | null; expected_return?: string | null }> | null;
   context?: Record<string, any> | null;
+  league_context?: Record<string, any> | null;
   data_completeness?: Record<string, boolean> | null;
   batted_ball_home?: BattedBallStatsOut | null;
   batted_ball_away?: BattedBallStatsOut | null;
@@ -1636,7 +1646,10 @@ export interface HockeyMatchDetail {
   odds_home?: number | null;
   odds_away?: number | null;
   odds_draw?: number | null;
+  injuries_home?: Array<{ player_name: string; position?: string | null; status: string; reason?: string | null; expected_return?: string | null }> | null;
+  injuries_away?: Array<{ player_name: string; position?: string | null; status: string; reason?: string | null; expected_return?: string | null }> | null;
   context?: Record<string, any> | null;
+  league_context?: Record<string, any> | null;
   data_completeness?: Record<string, boolean> | null;
   simulation?: { n_simulations: number; distribution: Array<{ score: string; probability: number }>; mean_home_goals?: number | null } | null;
 }

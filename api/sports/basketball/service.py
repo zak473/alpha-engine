@@ -16,6 +16,8 @@ from api.sports.basketball.schemas import (
     BasketballMatchDetail,
     BasketballMatchListItem,
     BasketballMatchListResponse,
+    BasketballPlayerBoxOut,
+    BasketballTeamBoxScore,
     BasketballTeamFormOut,
     BasketballTeamStatsOut,
     EloPanelOut,
@@ -28,9 +30,9 @@ from api.sports.basketball.schemas import (
     ProbabilitiesOut,
     QuarterScore,
 )
-from api.sports.base.queries import compute_team_form, form_from_hl, form_summary, h2h_from_hl
-from db.models.basketball import BasketballTeamMatchStats
-from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, PredMatch, RatingEloTeam
+from api.sports.base.queries import compute_league_context, compute_team_form, form_from_hl, form_summary, h2h_from_hl
+from db.models.basketball import BasketballPlayerMatchStats, BasketballTeamMatchStats
+from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, PredMatch, RatingEloTeam, TeamInjury
 
 log = logging.getLogger(__name__)
 
@@ -117,6 +119,103 @@ def _h2h(db: Session, home_id: str, away_id: str) -> H2HRecordOut:
                 "outcome": result,
             })
     return H2HRecordOut(total_matches=len(rows), home_wins=home_wins, away_wins=away_wins, recent_matches=recent)
+
+
+def _injuries_for_team(db: Session, team_id: str) -> list[dict]:
+    from datetime import timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=72)
+    rows = (
+        db.query(TeamInjury)
+        .filter(TeamInjury.team_id == team_id, TeamInjury.fetched_at >= cutoff)
+        .order_by(TeamInjury.status, TeamInjury.player_name)
+        .all()
+    )
+    return [
+        {"player_name": r.player_name, "position": r.position, "status": r.status,
+         "reason": r.reason, "expected_return": r.expected_return}
+        for r in rows
+    ]
+
+
+def _build_box_score(db: Session, match_id: str, team_id: str, team_name: str, is_home: bool) -> Optional[BasketballTeamBoxScore]:
+    rows = (
+        db.query(BasketballPlayerMatchStats)
+        .filter(BasketballPlayerMatchStats.match_id == match_id, BasketballPlayerMatchStats.team_id == team_id)
+        .order_by(BasketballPlayerMatchStats.is_starter.desc(), BasketballPlayerMatchStats.points.desc())
+        .all()
+    )
+    if not rows:
+        return None
+
+    def _safe_pct(made, att):
+        if made is not None and att and att > 0:
+            return round(made / att, 3)
+        return None
+
+    players = [
+        BasketballPlayerBoxOut(
+            player_id=r.player_id,
+            name=r.player_name,
+            position=r.position,
+            jersey=r.jersey,
+            is_starter=r.is_starter,
+            minutes=r.minutes,
+            points=r.points,
+            rebounds=r.rebounds_total,
+            reb_off=r.rebounds_offensive,
+            reb_def=r.rebounds_defensive,
+            assists=r.assists,
+            steals=r.steals,
+            blocks=r.blocks,
+            turnovers=r.turnovers,
+            fouls=r.fouls,
+            plus_minus=r.plus_minus,
+            fg_made=r.fg_made,
+            fg_att=r.fg_attempted,
+            fg_pct=r.fg_pct,
+            fg3_made=r.fg3_made,
+            fg3_att=r.fg3_attempted,
+            fg3_pct=r.fg3_pct,
+            ft_made=r.ft_made,
+            ft_att=r.ft_attempted,
+            ft_pct=r.ft_pct,
+        )
+        for r in rows
+    ]
+
+    def _sum(vals):
+        vals = [v for v in vals if v is not None]
+        return sum(vals) if vals else None
+
+    tot_fg_made = _sum(r.fg_made for r in rows)
+    tot_fg_att = _sum(r.fg_attempted for r in rows)
+    tot_fg3_made = _sum(r.fg3_made for r in rows)
+    tot_fg3_att = _sum(r.fg3_attempted for r in rows)
+    tot_ft_made = _sum(r.ft_made for r in rows)
+    tot_ft_att = _sum(r.ft_attempted for r in rows)
+
+    return BasketballTeamBoxScore(
+        team_id=team_id,
+        team_name=team_name,
+        is_home=is_home,
+        players=players,
+        total_points=_sum(r.points for r in rows),
+        total_rebounds=_sum(r.rebounds_total for r in rows),
+        total_assists=_sum(r.assists for r in rows),
+        total_steals=_sum(r.steals for r in rows),
+        total_blocks=_sum(r.blocks for r in rows),
+        total_turnovers=_sum(r.turnovers for r in rows),
+        total_fouls=_sum(r.fouls for r in rows),
+        fg_made=tot_fg_made,
+        fg_att=tot_fg_att,
+        fg_pct=_safe_pct(tot_fg_made, tot_fg_att),
+        fg3_made=tot_fg3_made,
+        fg3_att=tot_fg3_att,
+        fg3_pct=_safe_pct(tot_fg3_made, tot_fg3_att),
+        ft_made=tot_ft_made,
+        ft_att=tot_ft_att,
+        ft_pct=_safe_pct(tot_ft_made, tot_ft_att),
+    )
 
 
 def _form_basketball(hl_matches: list[dict], team_name: str) -> Optional[BasketballTeamFormOut]:
@@ -405,6 +504,8 @@ class BasketballMatchService(BaseMatchListService):
         else:
             h2h = _h2h(db, m.home_team_id, m.away_team_id)
 
+        league_ctx = compute_league_context(db, "basketball", m.league_id, m.season, m.home_team_id, m.away_team_id)
+
         return BasketballMatchDetail(
             id=m.id,
             sport="basketball",
@@ -435,7 +536,12 @@ class BasketballMatchService(BaseMatchListService):
             h2h=h2h,
             odds_home=m.odds_home,
             odds_away=m.odds_away,
+            box_home=_build_box_score(db, m.id, m.home_team_id, home_name, True),
+            box_away=_build_box_score(db, m.id, m.away_team_id, away_name, False),
+            injuries_home=_injuries_for_team(db, m.home_team_id) or None,
+            injuries_away=_injuries_for_team(db, m.away_team_id) or None,
             context={"venue_name": m.venue} if m.venue else None,
+            league_context=league_ctx,
             data_completeness={
                 "has_elo": elo_h is not None,
                 "has_pred": pred is not None,

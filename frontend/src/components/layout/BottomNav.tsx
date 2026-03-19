@@ -27,9 +27,10 @@ const MORE_NAV = [
 const SPORTS = [
   { label: "Soccer",     href: "/sports/soccer/matches",     color: "#3b82f6" },
   { label: "Tennis",     href: "/sports/tennis/matches",     color: "#10b981" },
-  { label: "Esports",    href: "/sports/esports/matches",    color: "#a855f7" },
   { label: "Basketball", href: "/sports/basketball/matches", color: "#f59e0b" },
   { label: "Baseball",   href: "/sports/baseball/matches",   color: "#ef4444" },
+  { label: "Hockey",     href: "/sports/hockey/matches",     color: "#06b6d4" },
+  { label: "Esports",    href: "/sports/esports/matches",    color: "#a855f7" },
 ];
 
 export function BottomNav() {
@@ -70,7 +71,7 @@ export function BottomNav() {
           <div className="w-8 h-1 rounded-full bg-white/20 mx-auto mb-4" />
 
           <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-2 px-1">Sports</p>
-          <div className="grid grid-cols-5 gap-2 mb-4">
+          <div className="grid grid-cols-6 gap-2 mb-4">
             {SPORTS.map((s) => (
               <Link
                 key={s.href}

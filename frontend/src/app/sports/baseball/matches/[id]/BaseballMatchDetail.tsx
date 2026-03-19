@@ -455,7 +455,7 @@ function OverviewTab({ match }: { match: TMatch }) {
           const top = [...sim.distribution].sort((a, b) => b.probability - a.probability).slice(0, 8);
           const maxProb = top[0]?.probability ?? 1;
           return (
-            <Panel title="Score Simulation" subtitle={`${sim.n_simulations.toLocaleString()} simulations`}>
+            <Panel title={`Score Simulation · ${sim.n_simulations.toLocaleString()} simulations`}>
               <div className="flex flex-col gap-1.5">
                 {top.map((d) => (
                   <div key={d.score} className="flex items-center gap-3">
@@ -533,6 +533,28 @@ function OverviewTab({ match }: { match: TMatch }) {
             )}
           </Panel>
         )}
+
+        {/* Injuries / IL */}
+        {(match.injuries_home?.length || match.injuries_away?.length) ? (
+          <Panel title="Injured List">
+            {[
+              { injuries: match.injuries_home, teamName: match.home.name, color: C.emerald },
+              { injuries: match.injuries_away, teamName: match.away.name, color: C.blue },
+            ].map(({ injuries, teamName, color }) => injuries?.length ? (
+              <div key={teamName} className="mb-3 pb-3 last:mb-0 last:pb-0" style={{ borderBottom: `1px solid ${C.border}` }}>
+                <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color }}>{teamName}</div>
+                {injuries.map((inj: any, i: number) => (
+                  <div key={i} className="flex items-start justify-between py-1 text-xs gap-2" style={{ borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                    <span className="truncate" style={{ color: C.textMuted }}>{inj.player_name}</span>
+                    <span className="shrink-0 font-semibold" style={{
+                      color: inj.status === "Suspended" ? C.amber : C.red,
+                    }}>{inj.status}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null)}
+          </Panel>
+        ) : null}
       </Side>
     </Grid>
   );
@@ -1325,7 +1347,7 @@ export function BaseballMatchDetail({ match, eloHomeHistory, eloAwayHistory }: P
 
       {/* KPI strip */}
       <div className="rounded-[16px] border overflow-hidden my-3" style={{ background: C.surface, borderColor: C.border }}>
-        <div className="flex flex-wrap gap-0 divide-x" style={{ divideColor: C.border }}>
+        <div className="flex flex-wrap gap-0 divide-x divide-white/[0.08]">
           {[
             match.probabilities && { label: `${match.home.name} Win`, value: fmtPct(match.probabilities.home_win, 1), color: C.emerald },
             match.probabilities && { label: `${match.away.name} Win`, value: fmtPct(match.probabilities.away_win, 1), color: C.blue },
