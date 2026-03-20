@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { PerformanceClient } from "@/components/performance/PerformanceClient";
-import { getPicks, getPicksStats, getPerformance, getBankroll, getPredictionAccuracy } from "@/lib/api";
-import type { PickOut, PicksStatsOut, BankrollStatsOut, PredictionAccuracy } from "@/lib/api";
+import { getPicks, getPicksStats, getPerformance, getBankroll, getPredictionAccuracy, getBacktestSummary } from "@/lib/api";
+import type { PickOut, PicksStatsOut, BankrollStatsOut, PredictionAccuracy, BacktestRunResult } from "@/lib/api";
 import type { RoiPoint, MvpPerformance } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ function buildRoiSeries(picks: PickOut[]): RoiPoint[] {
 export default async function PerformancePage() {
 
   // Fetch everything in parallel, gracefully degrade on failure
-  const [picks, overallStats, perfData, bankroll, accuracy, ...sportStatsList] = await Promise.all([
+  const [picks, overallStats, perfData, bankroll, accuracy, backtestSummary, ...sportStatsList] = await Promise.all([
     getPicks({ limit: 500 }).catch((): PickOut[] => []),
     getPicksStats().catch((): PicksStatsOut => ({
       total: 0, settled: 0, pending: 0, won: 0, lost: 0, void: 0,
@@ -46,6 +46,7 @@ export default async function PerformancePage() {
       by_sport: {},
       recent: [],
     })),
+    getBacktestSummary().catch((): Record<string, BacktestRunResult> => ({})),
     ...SPORTS.map((s) =>
       getPicksStats(s).catch((): PicksStatsOut & { sport: string } => ({
         sport: s, total: 0, settled: 0, pending: 0, won: 0, lost: 0, void: 0,
@@ -69,6 +70,7 @@ export default async function PerformancePage() {
         recentPicks={recentPicks}
         bankroll={bankroll}
         accuracy={accuracy}
+        backtestSummary={backtestSummary}
       />
     </AppShell>
   );

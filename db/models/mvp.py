@@ -22,6 +22,7 @@ from sqlalchemy import (
     Boolean, DateTime, Float, Index, Integer,
     JSON, String, Text, UniqueConstraint, func,
 )
+from typing import Optional
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.base import Base
@@ -108,6 +109,7 @@ class CoreMatch(Base):
     )
     live_clock: Mapped[str] = mapped_column(String(20), nullable=True)           # "34'", "HT", "Q3", "Top 5th", "Map 2 R17"
     current_period: Mapped[int] = mapped_column(Integer, nullable=True)           # 1-based: half/quarter/inning/set/map
+    period_type: Mapped[str] = mapped_column(String(20), nullable=True)           # "regulation" | "overtime" | "shootout"
     current_state_json: Mapped[dict] = mapped_column(JSON, nullable=True)         # sport-specific live state blob
     extras_json: Mapped[dict] = mapped_column(JSON, nullable=True)                # Highlightly enrichment: lineups, statistics, events
     highlights_json: Mapped[dict] = mapped_column(JSON, nullable=True)            # Highlightly highlight clips
@@ -204,12 +206,42 @@ class RatingEloTeam(Base):
     expected_score: Mapped[float] = mapped_column(Float, nullable=False)
     actual_score: Mapped[float] = mapped_column(Float, nullable=False)
     k_factor: Mapped[float] = mapped_column(Float, nullable=False)
+    home_advantage_after: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     rated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     __table_args__ = (
         UniqueConstraint("team_id", "match_id", "context", name="uq_rating_elo_team"),
         Index("ix_rating_elo_team_id", "team_id"),
         Index("ix_rating_elo_rated_at", "rated_at"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# esports_game_result
+# ---------------------------------------------------------------------------
+
+class EsportsGameResult(Base):
+    """
+    Individual game (map) result within an esports match.
+    One row per (match, game_number). Used for per-map ELO.
+
+    For CS2: map is de_dust2, de_mirage, etc.
+    For LoL/Dota2: map is the game name (summoners_rift, etc.)
+    """
+    __tablename__ = "esports_game_result"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    match_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    game_number: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-indexed
+    map_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # e.g. "de_dust2"
+    home_team_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    away_team_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    winner_team_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    provider_game_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, unique=True)
+
+    __table_args__ = (
+        UniqueConstraint("match_id", "game_number", name="uq_esports_game_result"),
+        Index("ix_esports_game_match_id", "match_id"),
     )
 
 

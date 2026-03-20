@@ -23,9 +23,10 @@ from datetime import timezone
 from sqlalchemy.orm import Session
 
 from core.types import MatchContext, Sport
-from db.models.mvp import CoreMatch, RatingEloTeam
+from db.models.mvp import CoreLeague, CoreMatch, RatingEloTeam
 from db.session import SessionLocal
-from ratings.tennis_elo import TennisEloEngine
+from ratings.tennis_elo import TennisEloEngine, TOURNAMENT_IMPORTANCE
+from pipelines.common.league_importance import build_league_importance_map, infer_importance
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 log = logging.getLogger(__name__)
@@ -63,6 +64,15 @@ def run_backfill(incremental: bool = False) -> int:
             .all()
         )
         log.info("Found %d finished tennis matches to process.", len(matches))
+
+        # Preload all tennis leagues once — avoids N+1 queries in the match loop
+        leagues = session.query(CoreLeague).filter(CoreLeague.sport == "tennis").all()
+        league_by_id: dict[str, CoreLeague] = {lg.id: lg for lg in leagues}
+        league_importance = {
+            lg.id: infer_importance(lg.name, TOURNAMENT_IMPORTANCE)
+            for lg in leagues
+        }
+        log.info("Loaded %d tennis leagues.", len(leagues))
 
         if not incremental:
             sport_match_ids = [m.id for m in matches]
@@ -103,9 +113,7 @@ def run_backfill(incremental: bool = False) -> int:
             if kickoff.tzinfo is None:
                 kickoff = kickoff.replace(tzinfo=timezone.utc)
 
-            # Get league name via join
-            from db.models.mvp import CoreLeague
-            league = session.get(CoreLeague, match.league_id) if match.league_id else None
+            league = league_by_id.get(match.league_id) if match.league_id else None
             league_name_str = league.name if league else ""
             surface = _infer_surface(league_name_str)
 
@@ -115,7 +123,7 @@ def run_backfill(incremental: bool = False) -> int:
                 date=kickoff,
                 home_entity_id=match.home_team_id,
                 away_entity_id=match.away_team_id,
-                importance=1.0,
+                importance=league_importance.get(match.league_id, 1.0),
                 extra={"surface": surface},
             )
 

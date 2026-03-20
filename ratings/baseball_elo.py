@@ -42,15 +42,16 @@ BASEBALL_ELO_CONFIG = EloConfig(
 
 # Competition importance multipliers
 COMPETITION_IMPORTANCE = {
-    "mlb_world_series": 1.5,
-    "mlb_lcs": 1.3,
-    "mlb_lds": 1.2,
-    "mlb_wildcard": 1.1,
-    "mlb": 1.0,
-    "mlb_preseason": 0.3,
-    "ncaa_baseball": 0.8,
-    "college_world_series": 1.1,
-    "friendly": 0.2,
+    "mlb world series":    1.5,
+    "mlb lcs":             1.3,
+    "mlb lds":             1.2,
+    "mlb wild card":       1.1,
+    "mlb wildcard":        1.1,
+    "mlb preseason":       0.3,
+    "mlb":                 1.0,
+    "college world series": 1.1,
+    "ncaa baseball":       0.8,
+    "friendly":            0.2,
 }
 
 # Park factor constants — positive = hitter-friendly, negative = pitcher-friendly

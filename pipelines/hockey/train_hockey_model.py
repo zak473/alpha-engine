@@ -202,7 +202,7 @@ def _build_features_bulk(store: BulkDataStore, match: CoreMatch) -> list[float]:
                 if own.penalty_kill_pct is not None:   pk_pct.append(float(own.penalty_kill_pct))
                 if own.hits is not None:               hits_list.append(float(own.hits))
                 if own.blocked_shots is not None:      blocks_list.append(float(own.blocked_shots))
-                if own.faceoff_win_pct is not None:    fo_pct.append(float(own.faceoff_win_pct))
+                if own.faceoff_pct is not None:        fo_pct.append(float(own.faceoff_pct))
             else:
                 score = m.home_score if is_home else m.away_score
                 if score is not None:

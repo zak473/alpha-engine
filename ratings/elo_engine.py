@@ -59,6 +59,12 @@ class EloConfig:
     # Home advantage bonus added to the home entity's effective rating
     home_advantage: float = 65.0   # ~65 rating points ≈ 55% win prob at equal ratings
 
+    # Per-team home advantage learning
+    # After each match, the home team's individual home advantage is nudged by:
+    #   home_adv += home_adv_learning_rate * (actual - expected)
+    # Set to 0.0 to disable (falls back to global home_advantage for all teams).
+    home_adv_learning_rate: float = 1.5
+
     # Surface / map modifiers
     # Applied as additive deltas to effective rating.
     # Each sport provides a dict: {"hard": 0.0, "clay": -30.0, ...} per entity.
@@ -109,6 +115,7 @@ class EloEngine(RatingEngine):
         self._match_counts: dict[str, int] = {}        # entity_id → total matches processed
         self._last_active: dict[str, datetime] = {}    # entity_id → last match date
         self._history: dict[str, list[RatingUpdate]] = {}  # entity_id → update history
+        self._home_advantages: dict[str, float] = {}  # entity_id → learned home advantage
 
     # ------------------------------------------------------------------
     # RatingEngine interface
@@ -143,9 +150,9 @@ class EloEngine(RatingEngine):
         r_a_eff = rating_a
         r_b_eff = rating_b
 
-        # Home advantage
+        # Home advantage (per-team if learned, else global default)
         if context.home_entity_id:
-            r_a_eff += self.config.home_advantage
+            r_a_eff += self._home_advantages.get(context.home_entity_id, self.config.home_advantage)
 
         # Surface / map modifier
         # context.extra["surface_delta_a"] = modifier for entity A on this surface
@@ -186,13 +193,38 @@ class EloEngine(RatingEngine):
         actual_a = self._outcome_to_score(score_a, score_b)
         actual_b = 1.0 - actual_a
 
+        # OT/SO adjustment: games decided in extra time were effectively a draw
+        # at regulation — dampen the outcome 25% toward 0.5 to reduce rating swing.
+        # Only applies to hockey and basketball where OT is a known concept.
+        period_type = context.extra.get("period_type")
+        if period_type in ("overtime", "shootout"):
+            actual_a = actual_a * 0.75 + 0.5 * 0.25
+            actual_b = actual_b * 0.75 + 0.5 * 0.25
+
         # Dynamic K-factor
-        importance = context.extra.get("importance", self.config.importance_default)
+        # extra["importance"] takes precedence (sport engines inject it for per-match
+        # overrides); otherwise fall back to context.importance which callers set
+        # from a league/competition lookup.
+        importance = context.extra.get("importance", context.importance)
         k_a = self._k_factor(entity_a_id) * importance
         k_b = self._k_factor(entity_b_id) * importance
 
         # Margin of Victory multiplier
-        mov = self._mov_multiplier(score_a, score_b) if self.config.mov_enabled else 1.0
+        # Callers can supply alternative MoV signals (e.g. xG) via extra without
+        # changing the outcome — xG home/away override raw scores for MoV only.
+        # park_factor normalises MoV for baseball: 5-run win at Coors (PF=1.3)
+        # ≈ 3.8-run win at a neutral park.
+        mov_a = context.extra.get("xg_home", score_a)
+        mov_b = context.extra.get("xg_away", score_b)
+        park_factor = context.extra.get("park_factor", 1.0)
+        if park_factor != 1.0:
+            margin = abs(mov_a - mov_b)
+            adj_margin = margin / park_factor
+            if mov_a > mov_b:
+                mov_a, mov_b = adj_margin, 0.0
+            else:
+                mov_a, mov_b = 0.0, adj_margin
+        mov = self._mov_multiplier(mov_a, mov_b) if self.config.mov_enabled else 1.0
 
         # Rating deltas
         delta_a = k_a * mov * (actual_a - expected_a)
@@ -200,6 +232,13 @@ class EloEngine(RatingEngine):
 
         new_r_a = self._clamp(r_a + delta_a)
         new_r_b = self._clamp(r_b + delta_b)
+
+        # Update per-team home advantage for the home entity
+        if context.home_entity_id and self.config.home_adv_learning_rate > 0:
+            current_adv = self._home_advantages.get(entity_a_id, self.config.home_advantage)
+            new_adv = current_adv + self.config.home_adv_learning_rate * (actual_a - expected_a)
+            # Clamp to a sane range: never below 0, never above 200 rating points
+            self._home_advantages[entity_a_id] = max(0.0, min(200.0, new_adv))
 
         # Build update records
         now = context.date
@@ -233,6 +272,23 @@ class EloEngine(RatingEngine):
         self._history.setdefault(entity_b_id, []).append(update_b)
 
         return update_a, update_b
+
+    def season_revert(self, revert_fraction: float = 0.25) -> None:
+        """
+        Partial mean reversion at the start of a new season.
+
+        Blends every rating `revert_fraction` of the way back toward base_rating.
+        Prevents stale carry-forward advantage from prior seasons.
+
+        new_rating = old_rating * (1 - revert_fraction) + base_rating * revert_fraction
+
+        Typical values: 0.20–0.33 (FiveThirtyEight uses ~1/3 for NFL).
+        """
+        for entity_id in list(self._ratings):
+            old = self._ratings[entity_id]
+            self._ratings[entity_id] = self._clamp(
+                old * (1.0 - revert_fraction) + self.config.base_rating * revert_fraction
+            )
 
     def decay_ratings(self, as_of_date: datetime) -> dict[str, float]:
         """
@@ -288,6 +344,14 @@ class EloEngine(RatingEngine):
     def set_rating(self, entity_id: str, rating: float) -> None:
         """Manually set a rating (used when loading from DB on startup)."""
         self._ratings[entity_id] = self._clamp(rating)
+
+    def get_home_advantage(self, entity_id: str) -> float:
+        """Return the learned home advantage for entity, or global default."""
+        return self._home_advantages.get(entity_id, self.config.home_advantage)
+
+    def set_home_advantage(self, entity_id: str, home_adv: float) -> None:
+        """Manually set learned home advantage (for loading from DB on incremental run)."""
+        self._home_advantages[entity_id] = max(0.0, min(200.0, home_adv))
 
     def bulk_load(self, ratings: dict[str, float]) -> None:
         """Load ratings from a dict (e.g. from DB snapshot). Used at startup."""

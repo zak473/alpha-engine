@@ -35,15 +35,15 @@ BASKETBALL_ELO_CONFIG = EloConfig(
 )
 
 COMPETITION_IMPORTANCE = {
-    "nba_playoffs":    1.5,
-    "nba_finals":      1.8,
-    "nba":             1.0,
-    "nba_preseason":   0.3,
-    "euroleague":      0.95,
-    "eurocup":         0.9,
-    "ncaa":            0.75,
-    "nbl":             0.85,
-    "friendly":        0.2,
+    "nba finals":    1.8,
+    "nba playoffs":  1.5,
+    "nba preseason": 0.3,
+    "nba":           1.0,
+    "euroleague":    0.95,
+    "eurocup":       0.9,
+    "ncaa":          0.75,
+    "nbl":           0.85,
+    "friendly":      0.2,
 }
 
 

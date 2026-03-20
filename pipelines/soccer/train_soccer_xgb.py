@@ -76,6 +76,11 @@ DERIVED_FEATURES = [
     "form_pts_diff",        # home_form_pts - away_form_pts
     "xg_overperf_home",     # home_gf_avg - home_xg_avg  (scoring above/below xG)
     "xg_overperf_away",     # away_gf_avg - away_xg_avg
+    # Draw-tendency features
+    "draw_rate_home",       # home_form_d / games_played (recent draw rate)
+    "draw_rate_away",       # away_form_d / games_played
+    "draw_rate_sum",        # combined draw tendency
+    "elo_closeness",        # 1/(1+|elo_diff|) — high when teams are evenly matched
 ]
 
 FEATURE_NAMES = BASE_FEATURES + DERIVED_FEATURES
@@ -88,12 +93,15 @@ LABEL_OUTCOMES = {0: "home_win", 1: "draw", 2: "away_win"}
 # ── Data loading ───────────────────────────────────────────────────────────────
 
 def _load_training_data(session) -> tuple[np.ndarray, np.ndarray, list[str]]:
+    from db.models.mvp import CoreMatch
     rows = (
-        session.query(FeatSoccerMatch)
+        session.query(FeatSoccerMatch, CoreMatch)
+        .join(CoreMatch, CoreMatch.id == FeatSoccerMatch.match_id)
         .filter(FeatSoccerMatch.outcome.isnot(None))
-        .order_by(FeatSoccerMatch.computed_at.asc())
+        .order_by(CoreMatch.kickoff_utc.asc())
         .all()
     )
+    rows = [feat for feat, _ in rows]
 
     if len(rows) < 10:
         raise ValueError(f"Insufficient training data: only {len(rows)} labelled rows.")
@@ -112,6 +120,12 @@ def _load_training_data(session) -> tuple[np.ndarray, np.ndarray, list[str]]:
             v = getattr(row, name, None)
             return float(v) if v is not None else float("nan")
 
+        home_games = max(1.0, _f("home_form_w") + _f("home_form_d") + _f("home_form_l"))
+        away_games = max(1.0, _f("away_form_w") + _f("away_form_d") + _f("away_form_l"))
+        draw_rate_home = _f("home_form_d") / home_games
+        draw_rate_away = _f("away_form_d") / away_games
+        elo_diff_abs = abs(_f("elo_home") - _f("elo_away"))
+
         derived = [
             _f("home_xg_avg") - _f("away_xg_avg"),
             _f("home_xga_avg") - _f("away_xga_avg"),
@@ -120,6 +134,10 @@ def _load_training_data(session) -> tuple[np.ndarray, np.ndarray, list[str]]:
             _f("home_form_pts") - _f("away_form_pts"),
             _f("home_gf_avg") - _f("home_xg_avg"),
             _f("away_gf_avg") - _f("away_xg_avg"),
+            draw_rate_home,
+            draw_rate_away,
+            draw_rate_home + draw_rate_away,
+            1.0 / (1.0 + elo_diff_abs),
         ]
 
         X_raw.append(base + derived)

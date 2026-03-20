@@ -86,10 +86,11 @@ def _upsert_stats(session: Session, match_id: str, team_id: str, is_home: bool, 
             setattr(existing, k, v)
 
 
-def _parse_team_stats(team_data: dict, period_scores: list[dict], is_home: bool) -> dict:
+def _parse_team_stats(boxscore: dict, period_scores: list[dict], is_home: bool) -> dict:
     stats = {}
+    side = "homeTeam" if is_home else "awayTeam"
 
-    # Goals by period
+    # Goals by period from linescore
     goals_by_period = {}
     for p in period_scores:
         pnum = p.get("periodDescriptor", {}).get("number", 0)
@@ -101,41 +102,37 @@ def _parse_team_stats(team_data: dict, period_scores: list[dict], is_home: bool)
     stats["goals_p3"] = goals_by_period.get(3)
     stats["goals_ot"] = goals_by_period.get(4)
 
-    # Team stats from boxscore
-    ts = team_data.get("teamGameStats", [])
-    stat_map: dict[str, Any] = {}
-    for item in ts:
-        cat = item.get("category", "")
-        val = item.get("homeValue") if is_home else item.get("awayValue")
-        stat_map[cat] = val
+    # Shots on goal from top-level homeTeam/awayTeam
+    team_top = boxscore.get(side, {})
+    stats["shots_on_goal"] = team_top.get("sog")
 
-    def _int(v) -> Optional[int]:
-        try:
-            return int(v) if v is not None else None
-        except (ValueError, TypeError):
-            return None
+    # Aggregate skater stats from playerByGameStats
+    pgs = boxscore.get("playerByGameStats", {}).get(side, {})
+    skaters = pgs.get("forwards", []) + pgs.get("defense", [])
+    goalies = pgs.get("goalies", [])
 
-    def _float(v) -> Optional[float]:
-        try:
-            f = float(str(v).replace("%", "")) if v is not None else None
-            return round(f / 100.0, 4) if f is not None and f > 1.0 else f
-        except (ValueError, TypeError):
-            return None
+    hits = blocked = giveaways = takeaways = pim = fow = foa = ppg = 0
+    sog_skaters = 0
+    for p in skaters:
+        hits      += p.get("hits", 0) or 0
+        blocked   += p.get("blockedShots", 0) or 0
+        giveaways += p.get("giveaways", 0) or 0
+        takeaways += p.get("takeaways", 0) or 0
+        pim       += p.get("pim", 0) or 0
+        ppg       += p.get("powerPlayGoals", 0) or 0
+        sog_skaters += p.get("sog", 0) or 0
+        # Faceoffs: faceoffWinningPctg is a ratio, not useful for totals
+        # Use shifts as a proxy for faceoff opportunities isn't great, skip raw faceoff totals
 
-    stats["shots_on_goal"] = _int(stat_map.get("sog"))
-    stats["faceoff_pct"]   = _float(stat_map.get("faceoffWinningPctg"))
-    stats["power_play_pct"] = _float(stat_map.get("powerPlayPctg"))
-    stats["penalty_minutes"] = _int(stat_map.get("pim"))
-    stats["hits"]          = _int(stat_map.get("hits"))
-    stats["blocked_shots"] = _int(stat_map.get("blockedShots"))
-    stats["giveaways"]     = _int(stat_map.get("giveaways"))
-    stats["takeaways"]     = _int(stat_map.get("takeaways"))
-
-    pp_raw = stat_map.get("powerPlay", "")
-    if pp_raw and "/" in str(pp_raw):
-        parts = str(pp_raw).split("/")
-        stats["power_play_goals"]        = _int(parts[0].strip())
-        stats["power_play_opportunities"] = _int(parts[1].strip())
+    stats["hits"]          = hits or None
+    stats["blocked_shots"] = blocked or None
+    stats["giveaways"]     = giveaways or None
+    stats["takeaways"]     = takeaways or None
+    stats["penalty_minutes"] = pim or None
+    stats["power_play_goals"] = ppg or None
+    # shots from skaters as fallback if sog not in team header
+    if stats["shots_on_goal"] is None and sog_skaters:
+        stats["shots_on_goal"] = sog_skaters
 
     return stats
 
@@ -176,11 +173,11 @@ def fetch_all(days_back: int = 3, dry_run: bool = False) -> int:
                 away_norm = _norm(away_name)
 
                 home_teams = [t for t in session.query(CoreTeam).filter(
-                    CoreTeam.provider_id.like("odds-hockey-%")
+                    CoreTeam.provider_id.like("hl-hockey-team-%")
                 ).all() if _norm(t.name) == home_norm or home_norm in _norm(t.name)]
 
                 away_teams = [t for t in session.query(CoreTeam).filter(
-                    CoreTeam.provider_id.like("odds-hockey-%")
+                    CoreTeam.provider_id.like("hl-hockey-team-%")
                 ).all() if _norm(t.name) == away_norm or away_norm in _norm(t.name)]
 
                 if not home_teams or not away_teams:
@@ -221,6 +218,18 @@ def fetch_all(days_back: int = 3, dry_run: bool = False) -> int:
 
                 home_score_total = game.get("homeTeam", {}).get("score")
                 away_score_total = game.get("awayTeam", {}).get("score")
+
+                # Determine period_type from linescore
+                period_types_played = {
+                    p.get("periodDescriptor", {}).get("periodType", "REG")
+                    for p in period_scores
+                }
+                if "SO" in period_types_played:
+                    match.period_type = "shootout"
+                elif "OT" in period_types_played:
+                    match.period_type = "overtime"
+                else:
+                    match.period_type = "regulation"
 
                 home_stats = _parse_team_stats(boxscore, period_scores, is_home=True)
                 home_stats["goals"] = home_score_total

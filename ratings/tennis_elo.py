@@ -35,15 +35,46 @@ TENNIS_ELO_CONFIG = EloConfig(
     rating_ceiling=2300.0,
 )
 
-# Tournament tier K-factor multipliers
+# Tournament tier K-factor multipliers (also used for league name keyword matching)
+# Keys with spaces are matched as substrings against CoreLeague.name (case-insensitive).
+# Longer / more specific entries beat shorter ones (sorted by length in the resolver).
 TOURNAMENT_IMPORTANCE = {
+    # Grand Slams
+    "australian open": 1.5,
+    "roland garros": 1.5,
+    "wimbledon": 1.5,
+    "us open": 1.5,
+    "grand slam": 1.5,
+    # Masters 1000
+    "indian wells": 1.2,
+    "miami open": 1.2,
+    "monte-carlo": 1.2,
+    "madrid open": 1.2,
+    "italian open": 1.2,
+    "canadian open": 1.2,
+    "cincinnati": 1.2,
+    "shanghai": 1.2,
+    "paris masters": 1.2,
+    "masters 1000": 1.2,
+    "atp masters": 1.2,
+    # ATP Finals
+    "atp finals": 1.4,
+    "nitto atp": 1.4,
+    # ATP 500
+    "atp 500": 1.0,
+    "500": 1.0,
+    # ATP 250 / generic
+    "atp 250": 0.8,
+    "250": 0.8,
+    # Lower tiers
+    "challenger": 0.5,
+    "itf": 0.3,
+    "exhibition": 0.1,
+    # Tier slug aliases used by update_ratings_on_surface via context.extra["tournament_level"]
     "grand_slam": 1.5,
     "masters_1000": 1.2,
     "atp_500": 1.0,
     "atp_250": 0.8,
-    "challenger": 0.5,
-    "itf": 0.3,
-    "exhibition": 0.1,
 }
 
 # Round multipliers (later rounds carry more weight)

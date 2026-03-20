@@ -74,18 +74,100 @@ def _feature_vector(session: Session, match: CoreMatch, feature_names: list[str]
     if feat is None:
         raise ValueError(f"Could not build features for match {match.id}")
 
+    # Base column values from DB
     raw: dict = {}
+    for col in vars(feat.__class__).keys():
+        if not col.startswith("_"):
+            v = getattr(feat, col, None)
+            if v is not None:
+                raw[col] = v
+
+    # Derived features that may not be DB columns (computed from base features)
+    def _f(k: str) -> float:
+        v = raw.get(k)
+        return float(v) if v is not None else 0.0
+
+    # xG imputed from goals avg when unavailable (85% of matches lack Understat xG)
+    xg_h = _f("home_xg_avg") or _f("home_gf_avg") or 1.3
+    xg_a = _f("away_xg_avg") or _f("away_gf_avg") or 1.1
+    xga_h = _f("home_xga_avg") or _f("home_ga_avg") or 1.1
+    xga_a = _f("away_xga_avg") or _f("away_ga_avg") or 1.3
+
+    raw.setdefault("xg_diff",          xg_h - xg_a)
+    raw.setdefault("xga_diff",         xga_h - xga_a)
+    raw.setdefault("gf_diff",          _f("home_gf_avg") - _f("away_gf_avg"))
+    raw.setdefault("ga_diff",          _f("home_ga_avg") - _f("away_ga_avg"))
+    raw.setdefault("form_pts_diff",    _f("home_form_pts") - _f("away_form_pts"))
+    raw.setdefault("xg_overperf_home", _f("home_gf_avg") - xg_h)
+    raw.setdefault("xg_overperf_away", _f("away_gf_avg") - xg_a)
+
+    _home_games = max(1.0, _f("home_form_w") + _f("home_form_d") + _f("home_form_l"))
+    _away_games = max(1.0, _f("away_form_w") + _f("away_form_d") + _f("away_form_l"))
+    _dr_home = _f("home_form_d") / _home_games
+    _dr_away = _f("away_form_d") / _away_games
+    raw.setdefault("draw_rate_home",  _dr_home)
+    raw.setdefault("draw_rate_away",  _dr_away)
+    raw.setdefault("draw_rate_sum",   _dr_home + _dr_away)
+    raw.setdefault("elo_closeness",   1.0 / (1.0 + abs(_f("elo_home") - _f("elo_away"))))
+
+    # xG total and balance (draw indicators)
+    raw.setdefault("xg_total",   xg_h + xg_a)
+    raw.setdefault("xg_balance", min(xg_h, xg_a) / max(xg_h, xg_a) if max(xg_h, xg_a) > 0 else 0.5)
+
+    # Poisson goal model probabilities
+    import math
+    from pipelines.soccer.train_soccer_lgb import _poisson_probs
+    p_hwin, p_draw_p, p_awin = _poisson_probs(xg_h, xg_a)
+    raw.setdefault("poisson_home_prob", p_hwin)
+    raw.setdefault("poisson_draw_prob", p_draw_p)
+    raw.setdefault("poisson_away_prob", p_awin)
+
+    # League draw and home win rates
+    from db.models.mvp import CoreMatch as _CM
+    _league_id = match.league_id
+    if _league_id:
+        from sqlalchemy import func
+        _total = session.query(func.count(_CM.id)).filter(
+            _CM.league_id == _league_id, _CM.sport == "soccer", _CM.outcome.isnot(None)
+        ).scalar() or 0
+        if _total >= 20:
+            _draws = session.query(func.count(_CM.id)).filter(
+                _CM.league_id == _league_id, _CM.sport == "soccer", _CM.outcome.in_(["D", "draw"])
+            ).scalar() or 0
+            _hw = session.query(func.count(_CM.id)).filter(
+                _CM.league_id == _league_id, _CM.sport == "soccer", _CM.outcome.in_(["H", "home_win"])
+            ).scalar() or 0
+            raw.setdefault("league_draw_rate",     _draws / _total)
+            raw.setdefault("league_home_win_rate", _hw / _total)
+        else:
+            raw.setdefault("league_draw_rate",     0.243)
+            raw.setdefault("league_home_win_rate", 0.443)
+    else:
+        raw.setdefault("league_draw_rate",     0.243)
+        raw.setdefault("league_home_win_rate", 0.443)
+
+    # Market odds (implied probabilities, normalised)
+    if match.odds_home and match.odds_draw and match.odds_away:
+        _rh = 1.0 / match.odds_home
+        _rd = 1.0 / match.odds_draw
+        _ra = 1.0 / match.odds_away
+        _tot = _rh + _rd + _ra
+        raw.setdefault("odds_implied_home", _rh / _tot)
+        raw.setdefault("odds_implied_draw", _rd / _tot)
+        raw.setdefault("odds_implied_away", _ra / _tot)
+    else:
+        raw.setdefault("odds_implied_home", float("nan"))
+        raw.setdefault("odds_implied_draw", float("nan"))
+        raw.setdefault("odds_implied_away", float("nan"))
+
     vector = []
     for name in feature_names:
-        val = getattr(feat, name, None)
-        raw[name] = val
+        val = raw.get(name)
         vector.append(float(val) if val is not None else float("nan"))
 
     X = np.array(vector, dtype=float).reshape(1, -1)
-
-    # Impute NaN with 0 (simple fallback — training used column means, but at runtime use 0 for simplicity)
     X = np.nan_to_num(X, nan=0.0)
-    return X, raw
+    return X, {n: raw.get(n) for n in feature_names}
 
 
 # ---------------------------------------------------------------------------
@@ -105,18 +187,31 @@ def _confidence_score(proba: np.ndarray) -> int:
 
 def _key_drivers(feature_names: list[str], feature_values: dict, model_payload: dict) -> list[dict]:
     """
-    Extract top feature importances from the calibrated LR model.
-    Uses the absolute coefficients of the underlying LogisticRegression.
+    Extract top feature importances. Supports LR (coefficients) and XGBoost (feature_importances_).
     """
     try:
         cal_model = model_payload["model"]
-        # CalibratedClassifierCV wraps a list of calibrated classifiers; get the first
-        calibrators = cal_model.calibrated_classifiers_
-        lr = calibrators[0].estimator.named_steps["lr"]
-        # Mean absolute coefficient across 3 classes, normalised
-        coef_abs = np.abs(lr.coef_).mean(axis=0)
-        coef_norm = coef_abs / coef_abs.sum() if coef_abs.sum() > 0 else coef_abs
-        paired = list(zip(feature_names, coef_norm, [feature_values.get(f) for f in feature_names]))
+        importances = None
+
+        # Try XGBoost first (direct model, not wrapped in CalibratedClassifierCV)
+        if hasattr(cal_model, "feature_importances_"):
+            importances = cal_model.feature_importances_
+        elif hasattr(cal_model, "calibrated_classifiers_"):
+            estimator = cal_model.calibrated_classifiers_[0].estimator
+            # XGBoost wrapped in calibration
+            if hasattr(estimator, "feature_importances_"):
+                importances = estimator.feature_importances_
+            # LR wrapped in Pipeline
+            elif hasattr(estimator, "named_steps") and "lr" in estimator.named_steps:
+                lr = estimator.named_steps["lr"]
+                coef_abs = np.abs(lr.coef_).mean(axis=0)
+                importances = coef_abs / coef_abs.sum() if coef_abs.sum() > 0 else coef_abs
+
+        if importances is None:
+            return []
+
+        n = min(len(feature_names), len(importances))
+        paired = list(zip(feature_names[:n], importances[:n], [feature_values.get(f) for f in feature_names[:n]]))
         paired.sort(key=lambda x: x[1], reverse=True)
         return [
             {"feature": name, "importance": round(float(imp), 4), "value": val}
@@ -212,6 +307,9 @@ def run_predictions(session: Session, matches: list[CoreMatch], payload: dict) -
                 .filter_by(match_id=match.id, model_version=registry.model_name)
                 .first()
             )
+            # Replace NaN with None so the JSON snapshot is valid
+            feat_snap = {k: (None if isinstance(v, float) and np.isnan(v) else v)
+                         for k, v in feat_raw.items()}
             data = dict(
                 p_home=round(p_home, 4),
                 p_draw=round(p_draw, 4),
@@ -222,7 +320,7 @@ def run_predictions(session: Session, matches: list[CoreMatch], payload: dict) -
                 confidence=confidence,
                 key_drivers=drivers,
                 simulation=simulation,
-                features_snapshot=feat_raw,
+                features_snapshot=feat_snap,
             )
             if existing is None:
                 pred = PredMatch(

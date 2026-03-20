@@ -2,6 +2,7 @@
 from __future__ import annotations
 from datetime import datetime
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, func
+from typing import Optional
 from sqlalchemy.orm import Mapped, mapped_column
 from db.base import Base
 
@@ -22,9 +23,9 @@ class HltvMatchStats(Base):
     players_away: Mapped[list] = mapped_column(JSON, default=list)
 
     # Raw veto text from HLTV veto-box div
-    veto_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    veto_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    format: Mapped[str | None] = mapped_column(String(10), nullable=True)  # "bo1","bo3","bo5"
+    format: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # "bo1","bo3","bo5"
     is_lan: Mapped[bool] = mapped_column(Boolean, default=False)
 
     scraped_at: Mapped[datetime] = mapped_column(

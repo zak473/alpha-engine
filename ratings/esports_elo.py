@@ -39,7 +39,7 @@ ESPORTS_ELO_CONFIG = EloConfig(
     rating_ceiling=2200.0,
 )
 
-# Tournament tier multipliers
+# Tournament tier multipliers (used by per-map update logic)
 TOURNAMENT_IMPORTANCE = {
     "major": 1.5,        # CS2 Majors
     "s_tier": 1.3,       # ESL Pro League, IEM Katowice
@@ -47,6 +47,37 @@ TOURNAMENT_IMPORTANCE = {
     "b_tier": 0.7,
     "c_tier": 0.4,
     "online_qual": 0.3,
+}
+
+# League name keyword → importance (used by backfill to map CoreLeague.name)
+# Longer / more specific entries must come before shorter ones (matched in dict order
+# via build_league_importance_map which sorts by key length descending).
+LEAGUE_IMPORTANCE = {
+    # CS2
+    "cs2 major": 1.5,
+    "esl pro league": 1.3,
+    "iem katowice": 1.3,
+    "iem cologne": 1.3,
+    "blast premier final": 1.4,
+    "blast premier": 1.3,
+    "pgl major": 1.5,
+    # LoL
+    "world championship": 1.5,
+    "msi": 1.3,
+    "lck": 1.2,
+    "lpl": 1.2,
+    "lec": 1.1,
+    "lcs": 1.1,
+    # Dota
+    "the international": 1.5,
+    "dpc major": 1.3,
+    "dpc": 1.0,
+    # Generic qualifiers / lower tier
+    "qualifier": 0.3,
+    "open qualifier": 0.25,
+    "closed qualifier": 0.3,
+    "showmatch": 0.15,
+    "showdown": 0.4,
 }
 
 # LAN bonus — teams tend to perform differently on LAN

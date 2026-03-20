@@ -119,7 +119,6 @@ def _upsert_team(session, bdl_team: dict) -> str:
         id=str(uuid.uuid4()),
         name=full_name,
         short_name=bdl_team.get("abbreviation") or bdl_team.get("name", "")[:5],
-        sport="basketball",
         country="USA",
         provider_id=provider_id,
         logo_url=None,

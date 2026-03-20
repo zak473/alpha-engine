@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ROIChart } from "@/components/charts/ROIChart";
 import type { RoiPoint } from "@/lib/types";
-import type { PicksStatsOut, PickOut, BankrollStatsOut, PredictionAccuracy } from "@/lib/api";
+import type { PicksStatsOut, PickOut, BankrollStatsOut, PredictionAccuracy, BacktestRunResult } from "@/lib/api";
 import type { MvpModelMetrics } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { depositBankroll, withdrawBankroll } from "@/lib/api";
@@ -45,6 +45,7 @@ interface PerformanceClientProps {
   recentPicks: PickOut[];
   bankroll: BankrollStatsOut;
   accuracy: PredictionAccuracy;
+  backtestSummary: Record<string, BacktestRunResult>;
 }
 
 function fmt(n: number, decimals = 1) { return n.toFixed(decimals); }
@@ -78,7 +79,7 @@ function OutcomePill({ outcome }: { outcome: PickOut["outcome"] }) {
 }
 
 export function PerformanceClient({
-  overall, roiSeries, sportStats, models, recentPicks, bankroll, accuracy,
+  overall, roiSeries, sportStats, models, recentPicks, bankroll, accuracy, backtestSummary,
 }: PerformanceClientProps) {
   const router = useRouter();
   const [range, setRange] = useState<Range>("all");
@@ -494,6 +495,48 @@ export function PerformanceClient({
           )}
         </div>
       </div>
+
+      {/* ── Backtest summary ───────────────────────────────────────────────── */}
+      {Object.keys(backtestSummary).length > 0 && (
+        <div>
+          <SectionLabel sub="Historical predictions vs outcomes — flat staking">Model Backtest</SectionLabel>
+          <div className="overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.03]">
+            <div className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr] gap-0 text-[10px] font-bold uppercase tracking-wider text-white/30 px-5 py-2.5 border-b border-white/[0.06]">
+              <span>Sport</span>
+              <span className="text-right">Matches</span>
+              <span className="text-right">Accuracy</span>
+              <span className="text-right">ROI</span>
+              <span className="text-right">Sharpe</span>
+              <span className="text-right">P&L</span>
+            </div>
+            <div className="divide-y divide-white/[0.05]">
+              {Object.entries(backtestSummary).map(([sport, r]) => {
+                const roiPct = (r.roi * 100).toFixed(1);
+                const roiPos = r.roi >= 0;
+                return (
+                  <div key={sport} className="grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr] gap-0 items-center px-5 py-3">
+                    <div className="flex items-center gap-2 min-w-[100px]">
+                      <span className="text-base">{SPORT_ICONS[sport] ?? "🏟"}</span>
+                      <span className="text-[12px] font-semibold text-white capitalize">{sport}</span>
+                    </div>
+                    <span className="font-mono text-[12px] text-white/50 text-right">{r.n_predictions}</span>
+                    <span className="font-mono text-[12px] text-white text-right">{(r.accuracy * 100).toFixed(1)}%</span>
+                    <span className={`font-mono text-[12px] text-right font-semibold ${roiPos ? "text-emerald-400" : "text-red-400"}`}>
+                      {roiPos ? "+" : ""}{roiPct}%
+                    </span>
+                    <span className={`font-mono text-[12px] text-right ${r.sharpe_ratio >= 0 ? "text-white/70" : "text-red-400"}`}>
+                      {r.sharpe_ratio.toFixed(2)}
+                    </span>
+                    <span className={`font-mono text-[12px] text-right ${r.pnl_units >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {r.pnl_units >= 0 ? "+" : ""}{r.pnl_units.toFixed(1)}u
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Recent picks ───────────────────────────────────────────────────── */}
       {recentPicks.length > 0 && (

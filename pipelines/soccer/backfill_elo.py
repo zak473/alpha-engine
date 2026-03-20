@@ -20,10 +20,13 @@ from datetime import timezone
 
 from sqlalchemy.orm import Session
 
+from collections import defaultdict
+
 from core.types import MatchContext, Sport
-from db.models.mvp import CoreMatch, RatingEloTeam
+from db.models.mvp import CoreMatch, CoreTeamMatchStats, RatingEloTeam
 from db.session import SessionLocal
-from ratings.soccer_elo import SoccerEloEngine
+from ratings.soccer_elo import SoccerEloEngine, COMPETITION_IMPORTANCE
+from pipelines.common.league_importance import build_league_importance_map
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 log = logging.getLogger(__name__)
@@ -48,7 +51,22 @@ def run_backfill(incremental: bool = False) -> int:
         )
         log.info("Found %d finished soccer matches to process.", len(matches))
 
+        league_importance = build_league_importance_map(session, "soccer", COMPETITION_IMPORTANCE)
+        log.info("Loaded importance multipliers for %d leagues.", len(league_importance))
+
         sport_match_ids = [m.id for m in matches]
+
+        # Bulk-load xG data: match_id → {is_home: xg}
+        xg_rows = (
+            session.query(CoreTeamMatchStats)
+            .filter(CoreTeamMatchStats.match_id.in_(sport_match_ids))
+            .all()
+        )
+        xg_by_match: dict[str, dict[bool, float]] = defaultdict(dict)
+        for row in xg_rows:
+            if row.xg is not None:
+                xg_by_match[row.match_id][row.is_home] = float(row.xg)
+        log.info("Loaded xG data for %d match-sides.", len(xg_rows))
 
         if not incremental:
             # Full rebuild: clear existing ELO rows for soccer matches only
@@ -71,9 +89,14 @@ def run_backfill(incremental: bool = False) -> int:
             already_rated: set[tuple[str, str]] = set()
             for row in existing:
                 engine.set_rating(row.team_id, row.rating_after)
+                if row.home_advantage_after is not None:
+                    engine.set_home_advantage(row.team_id, row.home_advantage_after)
                 already_rated.add((row.team_id, row.match_id))
             log.info("Loaded %d existing ELO rows for incremental run.", len(existing))
 
+        # Track per-league season to avoid spurious reversions from interleaved seasons
+        season_by_league: dict[str, str] = {}
+        reverted_seasons: set[tuple[str, str]] = set()  # (league_id, new_season) already reverted
         for match in matches:
             if incremental:
                 # Skip if both teams already have a rating row for this match
@@ -83,6 +106,18 @@ def run_backfill(incremental: bool = False) -> int:
                 ):
                     continue
 
+            # Season reversion: per-league, applied once per (league, new_season) boundary
+            if match.season and match.league_id:
+                prev_season = season_by_league.get(match.league_id)
+                if prev_season and prev_season != match.season:
+                    key = (match.league_id, match.season)
+                    if key not in reverted_seasons:
+                        engine.season_revert(revert_fraction=0.20)
+                        reverted_seasons.add(key)
+                        log.info("Season reversion applied (league %s: %s → %s)",
+                                 match.league_id[:8], prev_season, match.season)
+                season_by_league[match.league_id] = match.season
+
             home_score = match.home_score if match.home_score is not None else 0
             away_score = match.away_score if match.away_score is not None else 0
 
@@ -90,14 +125,21 @@ def run_backfill(incremental: bool = False) -> int:
             if kickoff.tzinfo is None:
                 kickoff = kickoff.replace(tzinfo=timezone.utc)
 
+            # Use xG as MoV signal when available, fall back to goals
+            match_xg = xg_by_match.get(match.id, {})
+            extra: dict = {}
+            if True in match_xg and False in match_xg:
+                extra["xg_home"] = match_xg[True]
+                extra["xg_away"] = match_xg[False]
+
             context = MatchContext(
                 match_id=match.id,
                 sport=Sport.SOCCER,
                 date=kickoff,
                 home_entity_id=match.home_team_id,
                 away_entity_id=match.away_team_id,
-                importance=1.2,  # Premier League default
-                extra={},
+                importance=league_importance.get(match.league_id, 1.0),
+                extra=extra,
             )
 
             update_home, update_away = engine.update_ratings(
@@ -122,6 +164,7 @@ def run_backfill(incremental: bool = False) -> int:
                     expected_score=update.expected_score,
                     actual_score=update.actual_score,
                     k_factor=update.k_factor,
+                    home_advantage_after=engine.get_home_advantage(team_id) if team_id == match.home_team_id else None,
                     rated_at=rated_at,
                 )
                 session.add(row)

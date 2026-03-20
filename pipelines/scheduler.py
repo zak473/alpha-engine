@@ -378,7 +378,7 @@ def _job_retrain_models() -> None:
     log.info("[scheduler] Starting retrain_models job ...")
 
     for sport, module_path, fn_name in [
-        ("soccer",      "pipelines.soccer.train_soccer_xgb",           "main"),
+        ("soccer",      "pipelines.soccer.train_soccer_lgb",           "main"),
         ("baseball",    "pipelines.baseball.train_baseball_model",      "main"),
         ("tennis",      "pipelines.tennis.train_tennis_model",          "main"),
         ("esports",     "pipelines.esports.train_esports_model",        "main"),
@@ -570,6 +570,17 @@ def _job_sync_standings() -> None:
         log.info("[scheduler] sync_standings: %d rows synced.", n)
     except Exception as exc:
         log.error("[scheduler] sync_standings failed: %s", exc, exc_info=True)
+
+
+def _job_run_backtest() -> None:
+    """Run backtest across all live models and store results in model_registry.metrics."""
+    log.info("[scheduler] Starting run_backtest job ...")
+    try:
+        from pipelines.backtest.run_backtest import run as run_backtest
+        run_backtest()
+        log.info("[scheduler] run_backtest done.")
+    except Exception as exc:
+        log.error("[scheduler] run_backtest failed: %s", exc, exc_info=True)
 
 
 def _job_fetch_probable_pitchers() -> None:
@@ -926,6 +937,15 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
+    # Run backtest nightly at 5:00 AM UTC (after ELO + features + reasoning are fresh)
+    _scheduler.add_job(
+        _job_run_backtest,
+        trigger=CronTrigger(hour=5, minute=0, timezone="UTC"),
+        id="run_backtest",
+        name="Nightly backtest across all live models (5 AM UTC)",
+        replace_existing=True,
+    )
+
     # Fetch MLB probable pitchers daily at 8 AM UTC (rosters finalised by then)
     _scheduler.add_job(
         _job_fetch_probable_pitchers,
@@ -945,7 +965,8 @@ def start() -> BackgroundScheduler:
         "update_elo (nightly 03:00 UTC), build_soccer_features (nightly 03:30 UTC), "
         "fetch_player_profiles (weekly Sun), fetch_xg (nightly 03:00 UTC), "
         "retrain_models (weekly Sat), generate_weekly_challenges (weekly Mon 00:05), "
-        "generate_reasoning (daily 04:00 UTC), fetch_probable_pitchers (daily 08:00 UTC). "
+        "generate_reasoning (daily 04:00 UTC), run_backtest (daily 05:00 UTC), "
+        "fetch_probable_pitchers (daily 08:00 UTC). "
         "Executor: ThreadPoolExecutor(20 workers)."
     )
     return _scheduler

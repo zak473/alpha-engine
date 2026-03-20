@@ -262,9 +262,9 @@ def run(match_id: Optional[str] = None) -> int:
     count = 0
     try:
         if match_id:
-            matches = session.query(CoreMatch).filter(CoreMatch.id == match_id).all()
+            matches = session.query(CoreMatch).filter(CoreMatch.id == match_id, CoreMatch.sport == "soccer").all()
         else:
-            matches = session.query(CoreMatch).order_by(CoreMatch.kickoff_utc.asc()).all()
+            matches = session.query(CoreMatch).filter(CoreMatch.sport == "soccer").order_by(CoreMatch.kickoff_utc.asc()).all()
 
         log.info("Building features for %d matches...", len(matches))
         for match in matches:

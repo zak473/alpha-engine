@@ -679,6 +679,11 @@ export async function runBacktest(params?: {
   return request<BacktestRunResult>(`/backtest/run${suffix}`);
 }
 
+export async function getBacktestSummary(): Promise<Record<string, BacktestRunResult>> {
+  const res = await request<{ sports: Record<string, BacktestRunResult> }>("/backtest/summary");
+  return res.sports;
+}
+
 // ─── Edge utility ─────────────────────────────────────────────────────────
 
 /** Model edge = model probability − market implied probability (%). +ve = value bet. */

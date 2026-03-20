@@ -41,21 +41,39 @@ SOCCER_ELO_CONFIG = EloConfig(
     rating_ceiling=2200.0,
 )
 
-# Competition importance multipliers (applied to K-factor)
+# Competition importance multipliers — keys are matched as substrings against
+# CoreLeague.name (case-insensitive, spaces normalised). Longer keys win.
 COMPETITION_IMPORTANCE = {
-    "champions_league": 1.5,
-    "europa_league": 1.2,
-    "conference_league": 1.1,
-    "world_cup": 1.6,
-    "euros": 1.4,
-    "copa_america": 1.4,
-    "premier_league": 1.2,
-    "la_liga": 1.2,
+    # International tournaments
+    "world cup": 1.6,
+    "uefa champions league": 1.5,
+    "champions league": 1.5,
+    "uefa europa league": 1.2,
+    "europa league": 1.2,
+    "uefa conference league": 1.1,
+    "conference league": 1.1,
+    "euro 20": 1.4,          # Euro 2024, Euro 2020, etc.
+    "copa america": 1.4,
+    "african cup": 1.3,
+    "gold cup": 1.2,
+    "nations league": 1.1,
+    # Top domestic leagues
+    "premier league": 1.2,
+    "la liga": 1.2,
     "bundesliga": 1.2,
-    "serie_a": 1.2,
-    "ligue_1": 1.1,
-    "domestic_cup": 0.9,
+    "serie a": 1.2,
+    "ligue 1": 1.1,
+    "eredivisie": 1.0,
+    "primeira liga": 1.0,
+    "super lig": 1.0,
+    # Domestic cups
+    "fa cup": 0.9,
+    "copa del rey": 0.9,
+    "dfb-pokal": 0.9,
+    "coupe de france": 0.9,
+    # Friendly / low importance
     "friendly": 0.4,
+    "international friendly": 0.4,
 }
 
 

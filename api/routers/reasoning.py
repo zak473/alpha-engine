@@ -19,7 +19,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from api.deps import get_db, get_current_user
+from api.deps import get_db
 from config.settings import settings
 from db.models.mvp import (
     CoreMatch, CoreTeam, CoreLeague, CoreStanding,
@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/reasoning",
     tags=["reasoning"],
-    dependencies=[Depends(get_current_user)],
 )
 
 CACHE_TTL_HOURS = 24

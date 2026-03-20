@@ -22,6 +22,8 @@ from typing import Any
 import httpx
 
 from config.settings import settings
+from db.models.mvp import CoreMatch, CoreTeam, EsportsGameResult
+from db.session import SessionLocal
 from pipelines.soccer.ingest_matches import ingest_from_dicts
 
 log = logging.getLogger(__name__)
@@ -154,7 +156,105 @@ def _transform(match: dict[str, Any], game_label: str) -> dict | None:
         "venue":                  "",
         "odds_home":              "",
         "odds_away":              "",
+        "_raw_ps_id":             ps_id,
+        "_raw_home_ps_id":        home_ps_id,
+        "_raw_away_ps_id":        away_ps_id,
+        "_raw_games":             match.get("games") or [],
     }
+
+
+def _persist_game_results(raw_rows: list[dict]) -> int:
+    """
+    For finished matches that have game-level data, persist EsportsGameResult rows.
+    raw_rows are the dicts returned by _transform (with _raw_* private fields).
+    """
+    finished = [r for r in raw_rows if r.get("status") == "finished" and r.get("_raw_games")]
+    if not finished:
+        return 0
+
+    session = SessionLocal()
+    written = 0
+    try:
+        # Build provider_id → CoreMatch.id lookup
+        provider_ids = [f"ps-esports-{r['_raw_ps_id']}" for r in finished]
+        matches = (
+            session.query(CoreMatch)
+            .filter(CoreMatch.provider_id.in_(provider_ids))
+            .all()
+        )
+        match_by_provider = {m.provider_id: m for m in matches}
+
+        # Build ps_team_id → CoreTeam.id lookup for all teams in finished rows
+        team_provider_ids = set()
+        for r in finished:
+            team_provider_ids.add(f"ps-esports-team-{r['_raw_home_ps_id']}")
+            team_provider_ids.add(f"ps-esports-team-{r['_raw_away_ps_id']}")
+        teams = (
+            session.query(CoreTeam)
+            .filter(CoreTeam.provider_id.in_(team_provider_ids))
+            .all()
+        )
+        team_by_provider = {t.provider_id: t for t in teams}
+
+        for r in finished:
+            match = match_by_provider.get(f"ps-esports-{r['_raw_ps_id']}")
+            if not match:
+                continue
+            home_team = team_by_provider.get(f"ps-esports-team-{r['_raw_home_ps_id']}")
+            away_team = team_by_provider.get(f"ps-esports-team-{r['_raw_away_ps_id']}")
+            if not home_team or not away_team:
+                continue
+
+            for game in r["_raw_games"]:
+                if game.get("status") != "finished":
+                    continue
+                game_id = str(game.get("id") or "")
+                provider_game_id = f"ps-game-{game_id}" if game_id else None
+
+                # Skip if already stored (upsert via unique constraint)
+                if provider_game_id:
+                    existing = session.query(EsportsGameResult).filter(
+                        EsportsGameResult.provider_game_id == provider_game_id
+                    ).first()
+                    if existing:
+                        continue
+
+                # Map name
+                map_obj = game.get("map") or {}
+                map_name = (map_obj.get("name") or "").lower().replace(" ", "_") or None
+
+                # Winner
+                winner_obj = game.get("winner") or {}
+                winner_ps_id = str(winner_obj.get("id") or "")
+                if winner_ps_id == r["_raw_home_ps_id"]:
+                    winner_team_id = home_team.id
+                elif winner_ps_id == r["_raw_away_ps_id"]:
+                    winner_team_id = away_team.id
+                else:
+                    winner_team_id = None
+
+                position = int(game.get("position") or 0) or (written + 1)
+
+                row = EsportsGameResult(
+                    match_id=match.id,
+                    game_number=position,
+                    map_name=map_name,
+                    home_team_id=home_team.id,
+                    away_team_id=away_team.id,
+                    winner_team_id=winner_team_id,
+                    provider_game_id=provider_game_id,
+                )
+                session.add(row)
+                written += 1
+
+        session.commit()
+    except Exception:
+        session.rollback()
+        log.exception("[pandascore] Failed to persist game results")
+    finally:
+        session.close()
+
+    return written
 
 
 def fetch_all(dry_run: bool = False, days: int = 3) -> int:
@@ -196,8 +296,16 @@ def fetch_all(dry_run: bool = False, days: int = 3) -> int:
             log.info("  DRY RUN row: %s", r)
         return len(all_rows)
 
-    ingested = ingest_from_dicts(all_rows)
+    # Strip private fields before ingest (ingest_from_dicts doesn't know about them)
+    ingest_rows = [{k: v for k, v in r.items() if not k.startswith("_")} for r in all_rows]
+    ingested = ingest_from_dicts(ingest_rows)
     log.info("[pandascore] Ingested %d esports rows", ingested)
+
+    # Persist per-game (map) results for finished matches
+    games_written = _persist_game_results(all_rows)
+    if games_written:
+        log.info("[pandascore] Stored %d esports game results", games_written)
+
     return ingested
 
 

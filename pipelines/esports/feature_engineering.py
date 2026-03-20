@@ -7,6 +7,8 @@ Differences from common:
   - adds form_diff and win_pct_diff as explicit signal features
   - adds elo_diff_norm (ELO diff / 400, stable scale)
   - adds home/away win_streak_last3 (hot-hand signal)
+  - adds game type indicators (is_cs2, is_dota, is_lol, is_valorant, is_r6)
+    so the model can calibrate feature weights per game
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ from datetime import timezone
 
 from sqlalchemy.orm import Session
 
-from db.models.mvp import CoreMatch
+from db.models.mvp import CoreMatch, CoreLeague
 from pipelines.common.feature_engineering import (
     _get_elo_before,
     _last_n_matches,
@@ -34,6 +36,8 @@ FEATURE_NAMES = [
     "home_win_streak3", "away_win_streak3",
     "home_days_rest", "away_days_rest", "rest_diff",
     "h2h_home_win_pct", "h2h_matches_played",
+    # Game type indicators (one-hot, reference=other games)
+    "is_cs2", "is_dota", "is_lol", "is_valorant", "is_r6",
 ]
 
 OUTCOME_LABELS = {"home_win": 0, "away_win": 1, "H": 0, "A": 1}
@@ -51,6 +55,27 @@ def _win_streak(matches: list[CoreMatch], team_id: str, n: int = 3) -> float:
         or (m.away_team_id == team_id and m.outcome in ("away_win", "A"))
     )
     return wins / len(recent)
+
+
+def _game_type(db: Session, match: CoreMatch) -> str:
+    """Return the game title prefix from the league name (cs2/dota/lol/valorant/r6/other)."""
+    if not match.league_id:
+        return "other"
+    league = db.get(CoreLeague, match.league_id)
+    if not league or not league.name:
+        return "other"
+    name_lower = league.name.lower()
+    if "cs2" in name_lower or "counter-strike" in name_lower:
+        return "cs2"
+    if "dota" in name_lower:
+        return "dota"
+    if "league of legends" in name_lower or name_lower.startswith("lol"):
+        return "lol"
+    if "valorant" in name_lower:
+        return "valorant"
+    if "rainbow" in name_lower or "r6" in name_lower or "siege" in name_lower:
+        return "r6"
+    return "other"
 
 
 def build_feature_vector(
@@ -89,6 +114,8 @@ def build_feature_vector(
 
     h2h_win_pct, h2h_n = _h2h(db, home_id, away_id, kickoff, _SPORT)
 
+    game = _game_type(db, match)
+
     raw = {
         "elo_home":          elo_home,
         "elo_away":          elo_away,
@@ -107,6 +134,11 @@ def build_feature_vector(
         "rest_diff":         rest_diff,
         "h2h_home_win_pct":  h2h_win_pct,
         "h2h_matches_played": h2h_n,
+        "is_cs2":            1.0 if game == "cs2" else 0.0,
+        "is_dota":           1.0 if game == "dota" else 0.0,
+        "is_lol":            1.0 if game == "lol" else 0.0,
+        "is_valorant":       1.0 if game == "valorant" else 0.0,
+        "is_r6":             1.0 if game == "r6" else 0.0,
     }
 
     vector = [raw[f] for f in FEATURE_NAMES]

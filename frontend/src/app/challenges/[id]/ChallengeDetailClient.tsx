@@ -219,10 +219,17 @@ function SubmitEntryModal({
   onClose: () => void;
   onSubmitted: () => void;
 }) {
-  const SPORTS = ["soccer", "tennis", "basketball", "baseball", "esports"] as const;
+  const SPORTS = ["soccer", "tennis", "basketball", "baseball", "hockey", "esports"] as const;
   const availableSports = sportScope.length > 0 ? sportScope : [...SPORTS];
   const [sport, setSport] = useState(availableSports[0] ?? "soccer");
   const [matchLabel, setMatchLabel] = useState("");
+  const [eventStartAt, setEventStartAt] = useState(() => {
+    // Default to tomorrow at noon
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(12, 0, 0, 0);
+    return d.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:mm"
+  });
   const [pickType, setPickType] = useState("moneyline");
   const [selection, setSelection] = useState("");
   const [odds, setOdds] = useState("");
@@ -232,6 +239,7 @@ function SubmitEntryModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!matchLabel.trim()) { setError("Enter a match or event"); return; }
+    if (!eventStartAt) { setError("Enter the event date/time"); return; }
     if (!selection.trim()) { setError("Enter your selection"); return; }
     const oddsNum = Number(odds);
     if (!odds || isNaN(oddsNum) || oddsNum < 1.01) { setError("Enter valid decimal odds (≥ 1.01)"); return; }
@@ -241,7 +249,7 @@ function SubmitEntryModal({
       await submitChallengeEntry(challengeId, {
         event_id: matchLabel.trim().toLowerCase().replace(/\s+/g, "-"),
         sport,
-        event_start_at: new Date(Date.now() + 86400000).toISOString(),
+        event_start_at: new Date(eventStartAt).toISOString(),
         pick_type: pickType,
         pick_payload: { selection, odds: oddsNum, match_label: matchLabel },
         prediction_payload: {},
@@ -279,6 +287,15 @@ function SubmitEntryModal({
           <div className="flex flex-col gap-1.5">
             <label className="label">Match / Event</label>
             <input value={matchLabel} onChange={e => setMatchLabel(e.target.value)} placeholder="e.g. Arsenal vs Chelsea" className="input-field" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="label">Event date &amp; time</label>
+            <input
+              type="datetime-local"
+              value={eventStartAt}
+              onChange={e => setEventStartAt(e.target.value)}
+              className="input-field"
+            />
           </div>
           <div className="flex gap-3">
             <div className="flex flex-col gap-1.5 flex-shrink-0">

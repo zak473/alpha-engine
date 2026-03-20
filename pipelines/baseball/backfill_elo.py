@@ -22,7 +22,9 @@ from sqlalchemy.orm import Session
 from core.types import MatchContext, Sport
 from db.models.mvp import CoreMatch, RatingEloTeam
 from db.session import SessionLocal
-from ratings.baseball_elo import BaseballEloEngine
+from ratings.baseball_elo import BaseballEloEngine, COMPETITION_IMPORTANCE
+from pipelines.common.league_importance import build_league_importance_map
+from pipelines.baseball.compute_park_factors import load_park_factors
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 log = logging.getLogger(__name__)
@@ -41,6 +43,12 @@ def run_backfill(incremental: bool = False) -> int:
             .all()
         )
         log.info("Found %d finished baseball matches to process.", len(matches))
+
+        league_importance = build_league_importance_map(session, "baseball", COMPETITION_IMPORTANCE)
+        log.info("Loaded importance multipliers for %d leagues.", len(league_importance))
+
+        park_factors = load_park_factors(session)
+        log.info("Computed park factors for %d teams.", len(park_factors))
 
         if not incremental:
             sport_match_ids = [m.id for m in matches]
@@ -63,9 +71,13 @@ def run_backfill(incremental: bool = False) -> int:
             already_rated: set[tuple[str, str]] = set()
             for row in existing:
                 engine.set_rating(row.team_id, row.rating_after)
+                if row.home_advantage_after is not None:
+                    engine.set_home_advantage(row.team_id, row.home_advantage_after)
                 already_rated.add((row.team_id, row.match_id))
             log.info("Loaded %d existing ELO rows for incremental run.", len(existing))
 
+        season_by_league: dict[str, str] = {}
+        reverted_seasons: set[tuple[str, str]] = set()
         for match in matches:
             if incremental:
                 if (
@@ -74,6 +86,17 @@ def run_backfill(incremental: bool = False) -> int:
                 ):
                     continue
 
+            if match.season and match.league_id:
+                prev_season = season_by_league.get(match.league_id)
+                if prev_season and prev_season != match.season:
+                    key = (match.league_id, match.season)
+                    if key not in reverted_seasons:
+                        engine.season_revert(revert_fraction=0.20)
+                        reverted_seasons.add(key)
+                        log.info("Season reversion applied (league %s: %s → %s)",
+                                 match.league_id[:8], prev_season, match.season)
+                season_by_league[match.league_id] = match.season
+
             home_score = match.home_score if match.home_score is not None else 0
             away_score = match.away_score if match.away_score is not None else 0
 
@@ -81,14 +104,15 @@ def run_backfill(incremental: bool = False) -> int:
             if kickoff.tzinfo is None:
                 kickoff = kickoff.replace(tzinfo=timezone.utc)
 
+            park_factor = park_factors.get(match.home_team_id, 1.0)
             context = MatchContext(
                 match_id=match.id,
                 sport=Sport.BASEBALL,
                 date=kickoff,
                 home_entity_id=match.home_team_id,
                 away_entity_id=match.away_team_id,
-                importance=1.0,
-                extra={},
+                importance=league_importance.get(match.league_id, 1.0),
+                extra={"park_factor": park_factor},
             )
 
             update_home, update_away = engine.update_ratings(
@@ -113,6 +137,7 @@ def run_backfill(incremental: bool = False) -> int:
                     expected_score=update.expected_score,
                     actual_score=update.actual_score,
                     k_factor=update.k_factor,
+                    home_advantage_after=engine.get_home_advantage(team_id) if team_id == match.home_team_id else None,
                     rated_at=rated_at,
                 )
                 session.add(row)

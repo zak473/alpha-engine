@@ -34,10 +34,10 @@ HOCKEY_ELO_CONFIG = EloConfig(
 )
 
 COMPETITION_IMPORTANCE = {
-    "nhl_playoffs":    1.5,
-    "nhl_finals":      1.8,
+    "nhl stanley cup finals": 1.8,
+    "nhl playoffs":    1.5,
+    "nhl preseason":   0.3,
     "nhl":             1.0,
-    "nhl_preseason":   0.3,
     "shl":             0.9,
     "liiga":           0.9,
     "khl":             0.85,

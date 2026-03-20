@@ -12,6 +12,7 @@ import {
   getEsportsTeamEloHistory,
   getBasketballTeamEloHistory,
   getBaseballTeamEloHistory,
+  getMatchReasoning,
 } from "@/lib/api";
 import { formatOdds, formatPercent } from "@/lib/utils";
 import { notFound } from "next/navigation";
@@ -156,9 +157,10 @@ export default async function MatchDetailPage({ params }: { params: { id: string
       }
     } catch { return []; }
   }
-  const [homeElo, awayElo] = await Promise.all([
+  const [homeElo, awayElo, reasoning] = await Promise.all([
     fetchEloHistory(homeId, sport),
     fetchEloHistory(awayId, sport),
+    getMatchReasoning(params.id),
   ]);
 
   // Merge into combined history keyed by date
@@ -413,6 +415,25 @@ export default async function MatchDetailPage({ params }: { params: { id: string
               <FeatureDriverChart drivers={drivers} />
             </CardBody>
           </Card>
+
+          {/* AI reasoning card */}
+          {reasoning && (
+            <Card>
+              <CardHeader
+                title="AI Analysis"
+                right={
+                  <span style={{ fontSize: 10, color: "var(--text2)", fontStyle: "italic" }}>
+                    Claude Haiku
+                  </span>
+                }
+              />
+              <CardBody>
+                <p style={{ fontSize: 13, lineHeight: 1.7, color: "var(--text1)", margin: 0 }}>
+                  {reasoning}
+                </p>
+              </CardBody>
+            </Card>
+          )}
         </div>
 
         {/* ── RIGHT COLUMN (40%) ─────────────────────────────────────── */}

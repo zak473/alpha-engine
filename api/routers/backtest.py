@@ -13,10 +13,25 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from api.deps import get_db, get_current_user
+from api.deps import get_db
 from core.types import PredictionResult, Sport
 
-router = APIRouter(prefix="/backtest", tags=["Backtest"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/backtest", tags=["Backtest"])
+
+
+@router.get("/summary")
+def get_backtest_summary(db: Session = Depends(get_db)):
+    """
+    Return cached backtest results stored in model_registry.metrics['backtest'].
+    Updated nightly by pipelines/backtest/run_backtest.py.
+    """
+    from db.models.mvp import ModelRegistry
+    models = db.query(ModelRegistry).filter(ModelRegistry.is_live == True).all()
+    results = {}
+    for m in models:
+        if m.metrics and "backtest" in m.metrics:
+            results[m.sport] = m.metrics["backtest"]
+    return {"sports": results}
 
 
 def _outcome_to_float(outcome: str | None) -> float | None:
@@ -46,13 +61,21 @@ def run_backtest(
     Returns accuracy, ROI, Sharpe, max drawdown, Brier score, ECE.
     Uses market odds from CoreMatch when available; falls back to model fair odds.
     """
+    from sqlalchemy import func
     from evaluation.backtester import Backtester, StakingConfig
     from db.models.mvp import CoreMatch, PredMatch, ModelRegistry
 
-    # Load finished matches with model predictions
+    # Deduplicate by match_id, keep the latest prediction per match
+    subq = (
+        db.query(PredMatch.match_id, func.max(PredMatch.id).label("latest_id"))
+        .join(CoreMatch, CoreMatch.id == PredMatch.match_id)
+        .group_by(PredMatch.match_id)
+        .subquery()
+    )
     query = (
         db.query(CoreMatch, PredMatch)
-        .join(PredMatch, PredMatch.match_id == CoreMatch.id)
+        .join(subq, subq.c.match_id == CoreMatch.id)
+        .join(PredMatch, PredMatch.id == subq.c.latest_id)
         .filter(CoreMatch.status == "finished", CoreMatch.outcome.isnot(None))
     )
     if sport and sport != "all":
