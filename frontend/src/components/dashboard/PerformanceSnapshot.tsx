@@ -5,7 +5,7 @@ import { PanelCard } from "@/components/ui/PanelCard";
 import { StateTabs } from "@/components/ui/Tabs";
 import { SparklineChart } from "@/components/charts/SparklineChart";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { getPicksRoiSeries, type PerformanceWindow, type RoiSeriesPoint } from "@/lib/api";
+import { getPicksRoiSeries, getBacktestSummary, type PerformanceWindow, type RoiSeriesPoint, type BacktestRunResult } from "@/lib/api";
 import { cn, formatPercent } from "@/lib/utils";
 import type { MvpPerformance } from "@/lib/types";
 import { AlertTriangle, Info, ChevronDown } from "lucide-react";
@@ -23,7 +23,7 @@ const CHART_OPTIONS: { label: string; value: ChartMetric }[] = [
   { label: "PnL",   value: "pnl"    },
 ];
 
-function DrillTable({ rows }: { rows: { label: string; win: number; brier: number; count: number }[] }) {
+function DrillTable({ rows }: { rows: { label: string; win: number; brier: number; count: number; roi?: number }[] }) {
   if (rows.length === 0) {
     return (
       <p className="text-xs py-3 text-center" style={{ color: "var(--text2)" }}>
@@ -31,6 +31,7 @@ function DrillTable({ rows }: { rows: { label: string; win: number; brier: numbe
       </p>
     );
   }
+  const hasRoi = rows.some((r) => r.roi != null);
   return (
     <table className="data-table w-full text-xs">
       <thead>
@@ -38,6 +39,7 @@ function DrillTable({ rows }: { rows: { label: string; win: number; brier: numbe
           <th className="text-left py-1.5 font-medium" style={{ color: "var(--text2)" }}>Segment</th>
           <th className="text-right py-1.5 font-medium num" style={{ color: "var(--text2)" }}>Win %</th>
           <th className="text-right py-1.5 font-medium num" style={{ color: "var(--text2)" }}>Brier</th>
+          {hasRoi && <th className="text-right py-1.5 font-medium num" style={{ color: "var(--text2)" }}>ROI</th>}
           <th className="text-right py-1.5 font-medium num" style={{ color: "var(--text2)" }}>N</th>
         </tr>
       </thead>
@@ -63,6 +65,14 @@ function DrillTable({ rows }: { rows: { label: string; win: number; brier: numbe
             >
               {r.brier > 0 ? r.brier.toFixed(3) : "—"}
             </td>
+            {hasRoi && (
+              <td
+                className="py-1.5 text-right num font-medium"
+                style={{ color: r.roi == null ? "var(--text2)" : r.roi >= 0 ? "var(--positive)" : "var(--negative)" }}
+              >
+                {r.roi != null ? `${r.roi >= 0 ? "+" : ""}${(r.roi * 100).toFixed(1)}%` : "—"}
+              </td>
+            )}
             <td className="py-1.5 text-right num" style={{ color: "var(--text1)" }}>
               {r.count > 0 ? r.count : "—"}
             </td>
@@ -86,12 +96,17 @@ export function PerformanceSnapshot({ performance, loading }: PerformanceSnapsho
   const [showBrierInfo, setShowBrierInfo] = useState(false);
   const [showDrill, setShowDrill] = useState(false);
   const [series, setSeries] = useState<RoiSeriesPoint[]>([]);
+  const [backtest, setBacktest] = useState<Record<string, BacktestRunResult>>({});
 
   useEffect(() => {
     getPicksRoiSeries(window)
       .then((data) => setSeries(data.series))
       .catch(() => setSeries([]));
   }, [window]);
+
+  useEffect(() => {
+    getBacktestSummary().then(setBacktest).catch(() => {});
+  }, []);
 
   if (loading) {
     return (
@@ -132,6 +147,7 @@ export function PerformanceSnapshot({ performance, loading }: PerformanceSnapsho
       win:   m.accuracy ?? 0,
       brier: m.brier_score ?? 0,
       count: m.n_predictions ?? 0,
+      roi:   backtest[m.sport]?.roi ?? undefined,
     }));
 
   const chartLabel =
