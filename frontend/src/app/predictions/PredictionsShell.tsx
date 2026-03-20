@@ -445,8 +445,6 @@ function MatchCard({ match }: { match: MatchWithSport }) {
   }
 
   const hasModelProbs = match.pHome != null;
-  const hasConfidence = match.modelConfidence != null;
-  const conf = match.modelConfidence ?? 0;
 
   const ml = match.featuredMarkets?.[0];
   const homeOdds = ml?.selections[0]?.odds;
@@ -469,6 +467,16 @@ function MatchCard({ match }: { match: MatchWithSport }) {
     isMarketImplied = true;
   }
   const hasProbabilities = hPct != null && aPct != null;
+
+  // Derive confidence from probabilities when model didn't supply one (e.g. ELO fallback)
+  let conf = match.modelConfidence ?? 0;
+  if (match.modelConfidence == null && hasModelProbs && !isMarketImplied) {
+    const maxRaw = Math.max(match.pHome ?? 0, match.pAway ?? 0, match.pDraw ?? 0);
+    const numOutcomes = match.pDraw != null ? 3 : 2;
+    const random = 1 / numOutcomes;
+    conf = Math.max(0, Math.min(1, (maxRaw - random) / (1 - random)));
+  }
+  const hasConfidence = match.modelConfidence != null || (hasModelProbs && !isMarketImplied);
 
   const isHighConf = hasConfidence && conf >= 0.7;
   const confBarBg = conf >= 0.7 ? "bg-emerald-400" : conf >= 0.5 ? "bg-amber-400" : "bg-red-400";
