@@ -71,188 +71,179 @@ def _wait_for_db(max_attempts: int = 10, delay: float = 3.0) -> bool:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start background scheduler on startup; stop it on shutdown."""
-    # Wait for DB to be ready before running migrations or any startup jobs
-    _wait_for_db()
 
-    # Run DB migrations on startup
-    try:
-        from alembic.config import Config
-        from alembic import command
-        import os
-        alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
-        alembic_cfg.set_main_option("script_location", os.path.join(os.path.dirname(__file__), "..", "alembic"))
-        command.upgrade(alembic_cfg, "head")
-        logger.info("Startup: DB migrations applied.")
-    except Exception as exc:
-        logger.warning("Startup: DB migration failed (continuing): %s", exc)
+    def _background_startup():
+        """All slow startup work runs here so uvicorn can respond to health checks immediately."""
+        # Wait for DB
+        _wait_for_db()
 
-    # Safety net: create any missing tables that aren't covered by migrations
-    try:
-        from db.base import Base
-        from db.session import engine
-        import db.models  # noqa: ensure all models are imported
-        Base.metadata.create_all(bind=engine)
-        logger.info("Startup: create_all safety net complete.")
-    except Exception as exc:
-        logger.warning("Startup: create_all failed: %s", exc)
+        # Run DB migrations
+        try:
+            from alembic.config import Config
+            from alembic import command
+            import os as _os
+            alembic_cfg = Config(_os.path.join(_os.path.dirname(__file__), "..", "alembic.ini"))
+            alembic_cfg.set_main_option("script_location", _os.path.join(_os.path.dirname(__file__), "..", "alembic"))
+            command.upgrade(alembic_cfg, "head")
+            logger.info("Startup: DB migrations applied.")
+        except Exception as exc:
+            logger.warning("Startup: DB migration failed (continuing): %s", exc)
 
-    # Run stale-match cleanup + full fetch immediately on startup
-    try:
-        from pipelines.scheduler import _job_expire_stale
-        _job_expire_stale()
-        logger.info("Startup: stale live match cleanup done.")
-    except Exception as exc:
-        logger.warning("Startup stale cleanup failed: %s", exc)
+        # Safety net: create any missing tables
+        try:
+            from db.base import Base
+            from db.session import engine
+            import db.models  # noqa
+            Base.metadata.create_all(bind=engine)
+            logger.info("Startup: create_all safety net complete.")
+        except Exception as exc:
+            logger.warning("Startup: create_all failed: %s", exc)
 
-    try:
-        import threading
-        from pipelines.scheduler import _job_fetch_live
-        t = threading.Thread(target=_job_fetch_live, daemon=True, name="startup-fetch")
-        t.start()
-        logger.info("Startup: background fetch_live triggered.")
-    except Exception as exc:
-        logger.warning("Startup fetch_live failed to launch: %s", exc)
+        # Expire stale live matches
+        try:
+            from pipelines.scheduler import _job_expire_stale
+            _job_expire_stale()
+            logger.info("Startup: stale live match cleanup done.")
+        except Exception as exc:
+            logger.warning("Startup stale cleanup failed: %s", exc)
 
-    # Tennis Sackmann historical backfill — runs only when DB has < 500 finished tennis matches
-    try:
-        import threading as _th
+        # Trigger live fetch in sub-thread
+        try:
+            import threading as _th2
+            from pipelines.scheduler import _job_fetch_live
+            _th2.Thread(target=_job_fetch_live, daemon=True, name="startup-fetch").start()
+            logger.info("Startup: background fetch_live triggered.")
+        except Exception as exc:
+            logger.warning("Startup fetch_live failed to launch: %s", exc)
+
+        # Per-sport backfill checks
         from db.session import SessionLocal
         from db.models.mvp import CoreMatch
-        _db = SessionLocal()
-        try:
-            _tennis_finished = _db.query(CoreMatch).filter(
-                CoreMatch.sport == "tennis", CoreMatch.status == "finished"
-            ).count()
-        finally:
-            _db.close()
-        if _tennis_finished < 500:
-            logger.info("Startup: DB has %d finished tennis matches — triggering Sackmann backfill.", _tennis_finished)
-            def _run_tennis_backfill():
-                try:
-                    from pipelines.tennis.backfill_history import run as bh_run
-                    n = bh_run()
-                    logger.info("Startup: tennis backfill complete (%d matches).", n)
-                    from pipelines.tennis.backfill_elo import run_backfill as elo_run
-                    elo_run()
-                    logger.info("Startup: tennis ELO backfill complete.")
-                    from pipelines.tennis.fetch_api_tennis import build_player_form
-                    n2 = build_player_form()
-                    logger.info("Startup: tennis player form built (%d rows).", n2)
-                    from pipelines.tennis.fetch_player_profiles import run as prof_run
-                    prof_run()
-                    logger.info("Startup: tennis player profiles linked.")
-                except Exception as _exc:
-                    logger.error("Startup tennis backfill chain failed: %s", _exc, exc_info=True)
-            _th.Thread(target=_run_tennis_backfill, daemon=True, name="tennis-history").start()
-        else:
-            logger.info("Startup: DB has %d finished tennis matches — skipping Sackmann backfill.", _tennis_finished)
-    except Exception as exc:
-        logger.warning("Startup tennis backfill check failed: %s", exc)
+        import threading as _th
 
-    # Per-sport historical backfills — each runs only when that sport has < threshold finished matches
-    import threading as _th
-    from db.session import SessionLocal
-    from db.models.mvp import CoreMatch
+        def _sport_count(sport: str) -> int:
+            _db = SessionLocal()
+            try:
+                return _db.query(CoreMatch).filter(
+                    CoreMatch.sport == sport, CoreMatch.status == "finished"
+                ).count()
+            finally:
+                _db.close()
 
-    def _sport_count(sport: str) -> int:
-        _db = SessionLocal()
+        # Tennis backfill
         try:
-            return _db.query(CoreMatch).filter(
-                CoreMatch.sport == sport, CoreMatch.status == "finished"
-            ).count()
-        finally:
-            _db.close()
-
-    # Soccer — Highlightly 730-day history → ELO → features
-    if settings.HIGHLIGHTLY_API_KEY:
-        try:
-            _soccer_finished = _sport_count("soccer")
-            if _soccer_finished < 1000:
-                logger.info("Startup: %d finished soccer matches — triggering Highlightly backfill.", _soccer_finished)
-                def _run_soccer_backfill():
+            _tennis_finished = _sport_count("tennis")
+            if _tennis_finished < 500:
+                logger.info("Startup: %d finished tennis matches — triggering Sackmann backfill.", _tennis_finished)
+                def _run_tennis_backfill():
                     try:
-                        from pipelines.highlightly.fetch_all import fetch_historical
-                        fetch_historical(days_back=730)
-                        logger.info("Startup: soccer Highlightly backfill complete.")
-                        from pipelines.soccer.backfill_elo import run_backfill as _elo
-                        _elo()
-                        logger.info("Startup: soccer ELO backfill complete.")
-                        from pipelines.soccer.build_soccer_features import run as _feat
-                        _feat()
-                        logger.info("Startup: soccer features built.")
+                        from pipelines.tennis.backfill_history import run as bh_run
+                        n = bh_run()
+                        logger.info("Startup: tennis backfill complete (%d matches).", n)
+                        from pipelines.tennis.backfill_elo import run_backfill as elo_run
+                        elo_run()
+                        logger.info("Startup: tennis ELO backfill complete.")
+                        from pipelines.tennis.fetch_api_tennis import build_player_form
+                        n2 = build_player_form()
+                        logger.info("Startup: tennis player form built (%d rows).", n2)
+                        from pipelines.tennis.fetch_player_profiles import run as prof_run
+                        prof_run()
+                        logger.info("Startup: tennis player profiles linked.")
                     except Exception as _exc:
-                        logger.error("Startup soccer backfill failed: %s", _exc, exc_info=True)
-                _th.Thread(target=_run_soccer_backfill, daemon=True, name="soccer-history").start()
+                        logger.error("Startup tennis backfill chain failed: %s", _exc, exc_info=True)
+                _th.Thread(target=_run_tennis_backfill, daemon=True, name="tennis-history").start()
             else:
-                logger.info("Startup: %d finished soccer matches — skipping backfill.", _soccer_finished)
+                logger.info("Startup: %d finished tennis matches — skipping Sackmann backfill.", _tennis_finished)
         except Exception as exc:
-            logger.warning("Startup soccer backfill check failed: %s", exc)
+            logger.warning("Startup tennis backfill check failed: %s", exc)
 
-    # Baseball — Retrosheet 2015-2025 → ELO
-    try:
-        _baseball_finished = _sport_count("baseball")
-        if _baseball_finished < 500:
-            logger.info("Startup: %d finished baseball matches — triggering Retrosheet backfill.", _baseball_finished)
-            def _run_baseball_backfill():
-                try:
-                    from pipelines.baseball.backfill_history import run as bh_run
-                    n = bh_run()
-                    logger.info("Startup: baseball backfill complete (%d matches).", n)
-                    from pipelines.baseball.backfill_elo import run_backfill as _elo
-                    _elo()
-                    logger.info("Startup: baseball ELO backfill complete.")
-                except Exception as _exc:
-                    logger.error("Startup baseball backfill failed: %s", _exc, exc_info=True)
-            _th.Thread(target=_run_baseball_backfill, daemon=True, name="baseball-history").start()
-        else:
-            logger.info("Startup: %d finished baseball matches — skipping backfill.", _baseball_finished)
-    except Exception as exc:
-        logger.warning("Startup baseball backfill check failed: %s", exc)
+        # Soccer backfill
+        if settings.HIGHLIGHTLY_API_KEY:
+            try:
+                _soccer_finished = _sport_count("soccer")
+                if _soccer_finished < 1000:
+                    logger.info("Startup: %d finished soccer matches — triggering Highlightly backfill.", _soccer_finished)
+                    def _run_soccer_backfill():
+                        try:
+                            from pipelines.highlightly.fetch_all import fetch_historical
+                            fetch_historical(days_back=730)
+                            logger.info("Startup: soccer Highlightly backfill complete.")
+                            from pipelines.soccer.backfill_elo import run_backfill as _elo
+                            _elo()
+                            logger.info("Startup: soccer ELO backfill complete.")
+                            from pipelines.soccer.build_soccer_features import run as _feat
+                            _feat()
+                            logger.info("Startup: soccer features built.")
+                        except Exception as _exc:
+                            logger.error("Startup soccer backfill failed: %s", _exc, exc_info=True)
+                    _th.Thread(target=_run_soccer_backfill, daemon=True, name="soccer-history").start()
+                else:
+                    logger.info("Startup: %d finished soccer matches — skipping backfill.", _soccer_finished)
+            except Exception as exc:
+                logger.warning("Startup soccer backfill check failed: %s", exc)
 
+        # Baseball backfill
+        try:
+            _baseball_finished = _sport_count("baseball")
+            if _baseball_finished < 500:
+                logger.info("Startup: %d finished baseball matches — triggering Retrosheet backfill.", _baseball_finished)
+                def _run_baseball_backfill():
+                    try:
+                        from pipelines.baseball.backfill_history import run as bh_run
+                        n = bh_run()
+                        logger.info("Startup: baseball backfill complete (%d matches).", n)
+                        from pipelines.baseball.backfill_elo import run_backfill as _elo
+                        _elo()
+                        logger.info("Startup: baseball ELO backfill complete.")
+                    except Exception as _exc:
+                        logger.error("Startup baseball backfill failed: %s", _exc, exc_info=True)
+                _th.Thread(target=_run_baseball_backfill, daemon=True, name="baseball-history").start()
+            else:
+                logger.info("Startup: %d finished baseball matches — skipping backfill.", _baseball_finished)
+        except Exception as exc:
+            logger.warning("Startup baseball backfill check failed: %s", exc)
 
-    # Hockey — NHL stats API (free, no key) + ELO + train model
-    try:
-        _hockey_finished = _sport_count("hockey")
-        if _hockey_finished < 200:
-            logger.info("Startup: %d finished hockey matches — triggering NHL backfill.", _hockey_finished)
-            def _run_hockey_backfill():
-                try:
-                    from pipelines.hockey.fetch_stats import fetch_all as stats_run
-                    stats_run(days_back=30)
-                    logger.info("Startup: hockey stats fetch complete.")
-                    from pipelines.hockey.backfill_elo import run_backfill as _elo
-                    _elo()
-                    logger.info("Startup: hockey ELO backfill complete.")
-                except Exception as _exc:
-                    logger.error("Startup hockey backfill failed: %s", _exc, exc_info=True)
-            _th.Thread(target=_run_hockey_backfill, daemon=True, name="hockey-history").start()
-        else:
-            logger.info("Startup: %d finished hockey matches — skipping backfill.", _hockey_finished)
-    except Exception as exc:
-        logger.warning("Startup hockey backfill check failed: %s", exc)
+        # Hockey backfill
+        try:
+            _hockey_finished = _sport_count("hockey")
+            if _hockey_finished < 200:
+                logger.info("Startup: %d finished hockey matches — triggering NHL backfill.", _hockey_finished)
+                def _run_hockey_backfill():
+                    try:
+                        from pipelines.hockey.fetch_stats import fetch_all as stats_run
+                        stats_run(days_back=30)
+                        logger.info("Startup: hockey stats fetch complete.")
+                        from pipelines.hockey.backfill_elo import run_backfill as _elo
+                        _elo()
+                        logger.info("Startup: hockey ELO backfill complete.")
+                    except Exception as _exc:
+                        logger.error("Startup hockey backfill failed: %s", _exc, exc_info=True)
+                _th.Thread(target=_run_hockey_backfill, daemon=True, name="hockey-history").start()
+            else:
+                logger.info("Startup: %d finished hockey matches — skipping backfill.", _hockey_finished)
+        except Exception as exc:
+            logger.warning("Startup hockey backfill check failed: %s", exc)
 
-    # ── API key health report ──────────────────────────────────────────────
-    KEY_MAP = {
-        "TENNIS_LIVE_API_KEY":   ("Tennis live scores (api-tennis.com)", settings.TENNIS_LIVE_API_KEY),
-        "ODDS_API_KEY":          ("Real market odds + auto-pick", settings.ODDS_API_KEY),
-        "HIGHLIGHTLY_API_KEY":   ("Highlightly (soccer/basketball/baseball/hockey)", settings.HIGHLIGHTLY_API_KEY),
-        "RACING_API_USERNAME":   ("Horse racing (theracingapi.com)", settings.RACING_API_USERNAME),
-    }
-    active   = [(k, desc) for k, (desc, val) in KEY_MAP.items() if val]
-    inactive = [(k, desc) for k, (desc, val) in KEY_MAP.items() if not val]
+        # API key health report
+        KEY_MAP = {
+            "TENNIS_LIVE_API_KEY":   ("Tennis live scores (api-tennis.com)", settings.TENNIS_LIVE_API_KEY),
+            "ODDS_API_KEY":          ("Real market odds + auto-pick", settings.ODDS_API_KEY),
+            "HIGHLIGHTLY_API_KEY":   ("Highlightly (soccer/basketball/baseball/hockey)", settings.HIGHLIGHTLY_API_KEY),
+            "RACING_API_USERNAME":   ("Horse racing (theracingapi.com)", settings.RACING_API_USERNAME),
+        }
+        active   = [(k, desc) for k, (desc, val) in KEY_MAP.items() if val]
+        inactive = [(k, desc) for k, (desc, val) in KEY_MAP.items() if not val]
+        if active:
+            logger.info("Pipeline keys configured (%d/%d): %s", len(active), len(KEY_MAP),
+                        ", ".join(f"{k} ({desc})" for k, desc in active))
+        if inactive:
+            logger.warning("Pipeline keys missing (%d/%d) — those feeds disabled: %s",
+                           len(inactive), len(KEY_MAP),
+                           ", ".join(f"{k} ({desc})" for k, desc in inactive))
 
-    if active:
-        logger.info(
-            "Pipeline keys configured (%d/%d): %s",
-            len(active), len(KEY_MAP),
-            ", ".join(f"{k} ({desc})" for k, desc in active),
-        )
-    if inactive:
-        logger.warning(
-            "Pipeline keys missing (%d/%d) — those feeds disabled: %s",
-            len(inactive), len(KEY_MAP),
-            ", ".join(f"{k} ({desc})" for k, desc in inactive),
-        )
+    # Launch all slow startup work in the background so uvicorn can answer health checks immediately
+    import threading as _th_main
+    _th_main.Thread(target=_background_startup, daemon=True, name="startup-bg").start()
 
     if settings.ENV == "production" and SECRET_KEY_IS_DEFAULT:
         logger.critical(
