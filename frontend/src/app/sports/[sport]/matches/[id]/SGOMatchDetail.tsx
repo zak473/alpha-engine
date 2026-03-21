@@ -1399,6 +1399,57 @@ function PreMatchAnalysisSection({
   );
 }
 
+// Fallback when backend is unavailable: derive probabilities from market odds
+function MarketImpliedProbsSection({ match, homeName, awayName }: { match: ReturnType<typeof sgoEventToMatch>; homeName: string; awayName: string }) {
+  // Find the best H/D/A market: 1X2, Full Time Result, Moneyline, H2H
+  const MAIN_MARKET_NAMES = ["1x2", "full time result", "moneyline", "h2h", "match winner", "result"];
+  const mainMkt = match.allMarkets.find((m) => MAIN_MARKET_NAMES.some((n) => m.name.toLowerCase().includes(n)))
+    ?? match.allMarkets[0];
+
+  if (!mainMkt || mainMkt.selections.length < 2) {
+    return (
+      <div className="sportsbook-card p-5 text-sm text-text-muted">
+        No prediction data available for this match.
+      </div>
+    );
+  }
+
+  // Normalise implied probs from odds
+  const sels = mainMkt.selections;
+  const rawProbs = sels.map((s) => s.impliedProb ?? (s.odds > 0 ? 1 / s.odds : 0));
+  const total = rawProbs.reduce((a, b) => a + b, 0);
+  const normProbs = rawProbs.map((p) => total > 0 ? p / total : 1 / rawProbs.length);
+
+  const homeIdx = sels.findIndex((s) => s.label.toLowerCase().includes(homeName.toLowerCase().split(" ")[0]!) || s.id === "home" || s.id === "1");
+  const awayIdx = sels.findIndex((s) => s.label.toLowerCase().includes(awayName.toLowerCase().split(" ")[0]!) || s.id === "away" || s.id === "2");
+  const drawIdx = sels.findIndex((s) => s.id === "draw" || s.label.toLowerCase() === "draw" || s.label === "X");
+
+  // Fall back to positional if label matching fails
+  const hi = homeIdx >= 0 ? homeIdx : 0;
+  const ai = awayIdx >= 0 ? awayIdx : (sels.length > 1 ? sels.length - 1 : 1);
+  const di = drawIdx >= 0 ? drawIdx : -1;
+
+  const hasDraw = di >= 0;
+  const cols = [
+    { label: `${homeName} win`, prob: normProbs[hi] ?? 0, color: "#22c55e" },
+    ...(hasDraw ? [{ label: "Draw", prob: normProbs[di] ?? 0, color: "#f59e0b" }] : []),
+    { label: `${awayName} win`, prob: normProbs[ai] ?? 0, color: "#a855f7" },
+  ];
+
+  return (
+    <Card title="Market-Implied Probabilities">
+      <div className={cn("grid gap-3", hasDraw ? "grid-cols-3" : "grid-cols-2")}>
+        {cols.map(({ label, prob, color }) => (
+          <ProbCard key={label} label={label} prob={prob} color={color} />
+        ))}
+      </div>
+      <div className="pt-2 text-[10px] text-text-muted">
+        Derived from {mainMkt.name} odds · ML model predictions loading…
+      </div>
+    </Card>
+  );
+}
+
 interface Props {
   event: SGOEvent;
   sport: SportSlug;
@@ -1610,9 +1661,7 @@ export function SGOMatchDetail({ event, sport, backendMatch: backendMatchProp, e
                 <Loader2 size={14} className="animate-spin" /> Loading predictions…
               </div>
             ) : (
-              <div className="sportsbook-card p-5 text-sm text-text-muted">
-                No model prediction data available for this match.
-              </div>
+              <MarketImpliedProbsSection match={match} homeName={match.home.name} awayName={match.away.name} />
             )}
           </div>
         </div>
