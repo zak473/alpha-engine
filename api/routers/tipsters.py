@@ -21,7 +21,7 @@ from api.deps import get_db, get_current_user
 from db.models.tipsters import TipsterFollow, TipsterTip
 from db.models.user import User
 
-router = APIRouter(prefix="/tipsters", tags=["Tipsters"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/tipsters", tags=["Tipsters"])
 
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -30,6 +30,7 @@ class TipsterProfile(BaseModel):
     id: str
     username: str
     bio: Optional[str] = None
+    is_ai: bool = False
     followers: int
     is_following: bool
     weekly_win_rate: float
@@ -130,7 +131,8 @@ def _build_profile(
     return TipsterProfile(
         id=user.id,
         username=user.display_name or user.email.split("@")[0],
-        bio=None,
+        bio=user.bio,
+        is_ai=user.is_ai,
         followers=followers,
         is_following=is_following,
         weekly_win_rate=round(weekly_win_rate, 4),
@@ -152,9 +154,15 @@ def list_tipsters(
     Return all users who have posted at least one tip, with computed stats.
     Pass ?viewer_id=<user_id> (or rely on auth middleware) to populate is_following.
     """
-    # Find all user_ids that have posted tips
+    # Users who have posted tips OR are AI tipster accounts
     tipster_ids_q = db.query(TipsterTip.user_id).distinct().subquery()
-    users = db.query(User).filter(User.id.in_(tipster_ids_q)).all()
+    users = (
+        db.query(User)
+        .filter(
+            (User.id.in_(tipster_ids_q)) | (User.is_ai == True)  # noqa: E712
+        )
+        .all()
+    )
 
     return [_build_profile(db, u, current_user_id) for u in users]
 

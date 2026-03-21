@@ -581,6 +581,7 @@ export interface TipsterProfile {
   id: string;
   username: string;
   bio?: string | null;
+  is_ai: boolean;
   followers: number;
   is_following: boolean;
   weekly_win_rate: number;

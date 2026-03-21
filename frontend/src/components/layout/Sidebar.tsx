@@ -40,7 +40,7 @@ export function Sidebar() {
       {open && <div className="fixed inset-0 z-30 bg-black/55 backdrop-blur-sm lg:hidden" onClick={() => setOpen(false)} />}
 
       <aside
-        className={open ? "" : "-translate-x-full lg:translate-x-0"}
+        className={`transition-transform duration-200 ${open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
         style={{
           position: "fixed",
           left: 0,
@@ -52,8 +52,6 @@ export function Sidebar() {
           background: "linear-gradient(180deg,#08120e 0%,#0a1510 100%)",
           borderRight: "1px solid rgba(255,255,255,0.08)",
           zIndex: 40,
-          transform: open ? "translateX(0)" : undefined,
-          transition: "transform 200ms",
           boxShadow: "24px 0 60px rgba(0,0,0,0.28)",
         }}
       >

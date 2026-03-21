@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import String, DateTime
+from sqlalchemy import Boolean, String, DateTime, Text
 from typing import Optional
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -22,6 +22,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     display_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    is_ai: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

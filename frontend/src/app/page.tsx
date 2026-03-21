@@ -38,7 +38,7 @@ const FEATURES = [
   {
     icon: "🧠",
     title: "ML Predictions",
-    body: "Logistic regression models trained on years of historical data give calibrated win probabilities, not gut feelings.",
+    body: "Machine learning models trained on years of historical data give calibrated win probabilities, not gut feelings.",
     tag: "Core",
   },
   {

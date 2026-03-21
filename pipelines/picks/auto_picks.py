@@ -29,7 +29,9 @@ from sqlalchemy.orm import Session
 from config.settings import settings
 from db.models.mvp import CoreMatch, PredMatch, CoreLeague, CoreTeam
 from db.models.picks import TrackedPick
+from db.models.tipsters import TipsterTip
 from db.session import SessionLocal
+from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
 
 log = logging.getLogger(__name__)
 
@@ -63,6 +65,26 @@ def _already_picked(db: Session, user_id: str, match_id: str, market: str, selec
         TrackedPick.market_name == market,
         TrackedPick.selection_label == selection,
     ).first() is not None
+
+
+def _already_tipped(db: Session, user_id: str, match_label: str, market: str, selection: str) -> bool:
+    return db.query(TipsterTip).filter(
+        TipsterTip.user_id == user_id,
+        TipsterTip.match_label == match_label,
+        TipsterTip.market_name == market,
+        TipsterTip.selection_label == selection,
+    ).first() is not None
+
+
+# ── Per-sport thresholds ───────────────────────────────────────────────────────
+# Baseball: model picks heavy favourites with no real edge → require much higher
+# bar before auto-betting. Raise min_edge to 8% and min_confidence to 65%.
+SPORT_MIN_EDGE: dict[str, float] = {
+    "baseball": 0.08,
+}
+SPORT_MIN_CONFIDENCE: dict[str, float] = {
+    "baseball": 0.65,
+}
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -123,13 +145,16 @@ def run(
             if match.odds_draw and pred.p_draw and pred.p_draw > 0.01:
                 candidates.append(("draw", pred.p_draw, match.odds_draw, ml_market))
 
+            effective_min_edge = SPORT_MIN_EDGE.get(sport, min_edge)
+            effective_min_conf = SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
+
             for selection_label, model_prob, book_odds, market_name in candidates:
                 e = edge_pct(model_prob, book_odds)
                 confidence = pred.confidence / 100.0 if pred.confidence else model_prob
 
-                if e < min_edge:
+                if e < effective_min_edge:
                     continue
-                if confidence < min_confidence:
+                if confidence < effective_min_conf:
                     continue
                 if book_odds < settings.MIN_ODDS or book_odds > settings.MAX_ODDS:
                     continue
@@ -167,6 +192,24 @@ def run(
                     )
                     db.add(pick)
                     created += 1
+
+                    # Also post under the sport-specific AI tipster account
+                    ai_tipster_id = AI_TIPSTER_IDS.get(sport)
+                    if ai_tipster_id and not _already_tipped(
+                        db, ai_tipster_id, match_label, market_name, selection_label
+                    ):
+                        tip = TipsterTip(
+                            user_id=ai_tipster_id,
+                            sport=sport,
+                            match_label=match_label,
+                            market_name=market_name,
+                            selection_label=selection_label,
+                            odds=book_odds,
+                            start_time=match.kickoff_utc,
+                            match_id=match.id,
+                            note=f"Edge: +{round(e * 100, 1)}% | Kelly: {round(k * 100, 1)}%",
+                        )
+                        db.add(tip)
 
         if not dry_run:
             db.commit()

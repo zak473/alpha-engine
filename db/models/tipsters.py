@@ -4,6 +4,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
+from typing import Optional
+
 from sqlalchemy import DateTime, Float, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -30,6 +32,7 @@ class TipsterTip(Base):
     odds: Mapped[float] = mapped_column(Float, nullable=False)
     outcome: Mapped[str] = mapped_column(String(20), nullable=True)            # won|lost|void|None
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    match_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True) # FK → core_matches.id (AI tips only)
     note: Mapped[str] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -42,6 +45,7 @@ class TipsterTip(Base):
         Index("ix_tipster_tips_user_id", "user_id"),
         Index("ix_tipster_tips_outcome", "outcome"),
         Index("ix_tipster_tips_user_outcome", "user_id", "outcome"),
+        Index("ix_tipster_tips_match_id", "match_id"),
     )
 
 

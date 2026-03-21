@@ -373,6 +373,104 @@ def _job_settle_pending_picks() -> None:
         db.close()
 
 
+def _job_settle_challenge_entries() -> None:
+    """Lock and settle challenge entries whose matches are now finished."""
+    from db.session import SessionLocal
+    from db.models.mvp import CoreMatch
+    from db.models.challenges import ChallengeEntry
+
+    db = SessionLocal()
+    locked = 0
+    settled = 0
+    try:
+        from api.services.entries import lock_due_entries, settle_entry
+
+        # Step 1: lock any open entries whose event has started
+        locked = lock_due_entries(db)
+
+        # Step 2: settle locked entries where the match is finished
+        pending = (
+            db.query(ChallengeEntry)
+            .filter(ChallengeEntry.status == "locked")
+            .all()
+        )
+        for entry in pending:
+            match = db.query(CoreMatch).filter(CoreMatch.id == entry.event_id).first()
+            if not match or match.status != "finished" or not match.outcome:
+                continue
+
+            outcome = match.outcome  # "home_win" | "away_win" | "draw"
+            correct = entry.pick_type == outcome
+            try:
+                settle_entry(
+                    db,
+                    entry.id,
+                    outcome_payload={"outcome": outcome, "correct": correct},
+                )
+                settled += 1
+            except Exception as exc:
+                log.warning("[scheduler] settle_challenge_entry %s failed: %s", entry.id, exc)
+
+        if locked or settled:
+            log.info(
+                "[scheduler] settle_challenge_entries: locked=%d settled=%d",
+                locked, settled,
+            )
+    except Exception as exc:
+        db.rollback()
+        log.error("[scheduler] settle_challenge_entries failed: %s", exc)
+    finally:
+        db.close()
+
+
+def _job_settle_ai_tipster_tips() -> None:
+    """Settle pending TipsterTip rows for AI tipster accounts when matches finish."""
+    from datetime import datetime, timezone
+    from db.session import SessionLocal
+    from db.models.mvp import CoreMatch
+    from db.models.tipsters import TipsterTip
+    from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
+
+    ai_ids = set(AI_TIPSTER_IDS.values())
+    # Maps selection_label → expected outcome string in CoreMatch.outcome
+    outcome_map = {"home": "home_win", "away": "away_win", "draw": "draw"}
+
+    db = SessionLocal()
+    settled = 0
+    try:
+        pending = (
+            db.query(TipsterTip)
+            .filter(
+                TipsterTip.user_id.in_(ai_ids),
+                TipsterTip.outcome.is_(None),
+                TipsterTip.match_id.isnot(None),
+            )
+            .all()
+        )
+
+        for tip in pending:
+            match = db.query(CoreMatch).filter(CoreMatch.id == tip.match_id).first()
+            if not match or match.status != "finished" or not match.outcome:
+                continue
+
+            expected = outcome_map.get(tip.selection_label)
+            if expected is None:
+                continue
+
+            tip.outcome = "won" if match.outcome == expected else "lost"
+            tip.settled_at = datetime.now(timezone.utc)
+            settled += 1
+
+        if settled:
+            db.commit()
+            log.info("[scheduler] settle_ai_tipster_tips: settled %d tips.", settled)
+    except Exception as exc:
+        db.rollback()
+        log.error("[scheduler] settle_ai_tipster_tips failed: %s", exc)
+    finally:
+        db.close()
+
+
 def _job_retrain_models() -> None:
     """Retrain ML models for all sports that have sufficient data. Runs weekly."""
     log.info("[scheduler] Starting retrain_models job ...")
@@ -382,8 +480,8 @@ def _job_retrain_models() -> None:
         ("baseball",    "pipelines.baseball.train_baseball_model",      "main"),
         ("tennis",      "pipelines.tennis.train_tennis_model",          "main"),
         ("esports",     "pipelines.esports.train_esports_model",        "main"),
-        ("hockey",      "pipelines.hockey.train_hockey_model",          "main"),
-        ("basketball",  "pipelines.basketball.train_basketball_model",  "main"),
+        ("hockey",      "pipelines.hockey.train_hockey_lgb",            "main"),
+        ("basketball",  "pipelines.basketball.train_basketball_lgb",   "main"),
     ]:
         try:
             import importlib
@@ -801,6 +899,24 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
+    # Settle challenge entries every 15 minutes (lock on start, score on finish)
+    _scheduler.add_job(
+        _job_settle_challenge_entries,
+        trigger=IntervalTrigger(minutes=15),
+        id="settle_challenge_entries",
+        name="Settle challenge entries",
+        replace_existing=True,
+    )
+
+    # Settle AI tipster tips every 15 minutes
+    _scheduler.add_job(
+        _job_settle_ai_tipster_tips,
+        trigger=IntervalTrigger(minutes=15),
+        id="settle_ai_tipster_tips",
+        name="Settle AI tipster tips",
+        replace_existing=True,
+    )
+
     # Fetch real box score stats every 6 hours
     _scheduler.add_job(
         _job_fetch_stats,
@@ -961,7 +1077,7 @@ def start() -> BackgroundScheduler:
         "[scheduler] Started. Jobs: expire_stale (5m), fetch_live (30m), fetch_odds (30m), "
         "highlightly_live (2m, scores only), fetch_highlightly (10m, extras+odds), prematch_extras (30m), "
         "highlightly_historical (daily 03:00), sync_standings (12h), "
-        "settle_picks (15m), predict_only (1h), fetch_stats (6h), "
+        "settle_picks (15m), settle_challenges (15m), settle_ai_tips (15m), predict_only (1h), fetch_stats (6h), "
         "update_elo (nightly 03:00 UTC), build_soccer_features (nightly 03:30 UTC), "
         "fetch_player_profiles (weekly Sun), fetch_xg (nightly 03:00 UTC), "
         "retrain_models (weekly Sat), generate_weekly_challenges (weekly Mon 00:05), "

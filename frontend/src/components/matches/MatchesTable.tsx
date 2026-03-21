@@ -103,45 +103,49 @@ export function MatchesTable({ initialMatches }: { initialMatches: Match[]; load
     <div className="space-y-5 pb-10">
       <section className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.22)]">
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex min-w-max items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] p-1.5">
-              {SPORTS.map((item) => (
-                <button
-                  key={item.value}
-                  onClick={() => {
-                    setSport(item.value);
-                    setPage(1);
-                  }}
-                  className={cn(
-                    "rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all",
-                    sport === item.value
-                      ? "bg-[#2edb6c] text-[#07110d]"
-                      : "text-white/55 hover:bg-white/[0.06] hover:text-white"
-                  )}
-                >
-                  {item.label}
-                </button>
-              ))}
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+            <div className="overflow-x-auto pb-0.5 sm:pb-0">
+              <div className="flex min-w-max items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] p-1.5">
+                {SPORTS.map((item) => (
+                  <button
+                    key={item.value}
+                    onClick={() => {
+                      setSport(item.value);
+                      setPage(1);
+                    }}
+                    className={cn(
+                      "rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all",
+                      sport === item.value
+                        ? "bg-[#2edb6c] text-[#07110d]"
+                        : "text-white/55 hover:bg-white/[0.06] hover:text-white"
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="flex min-w-max items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] p-1.5">
-              {STATUSES.map((item) => (
-                <button
-                  key={item.value}
-                  onClick={() => {
-                    setStatus(item.value);
-                    setPage(1);
-                  }}
-                  className={cn(
-                    "rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all",
-                    status === item.value
-                      ? "bg-[#2edb6c] text-[#07110d]"
-                      : "text-white/55 hover:bg-white/[0.06] hover:text-white"
-                  )}
-                >
-                  {item.label}
-                </button>
-              ))}
+            <div className="overflow-x-auto pb-0.5 sm:pb-0">
+              <div className="flex min-w-max items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] p-1.5">
+                {STATUSES.map((item) => (
+                  <button
+                    key={item.value}
+                    onClick={() => {
+                      setStatus(item.value);
+                      setPage(1);
+                    }}
+                    className={cn(
+                      "rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all",
+                      status === item.value
+                        ? "bg-[#2edb6c] text-[#07110d]"
+                        : "text-white/55 hover:bg-white/[0.06] hover:text-white"
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -201,7 +205,7 @@ export function MatchesTable({ initialMatches }: { initialMatches: Match[]; load
                 paginated.map((match) => (
                   <tr
                     key={match.id}
-                    onClick={() => (window.location.href = `/sports/${match.sport}/matches/${match.id}`)}
+                    onClick={() => (window.location.href = `/matches/${match.id}`)}
                     className="cursor-pointer border-b border-white/8 text-sm transition hover:bg-white/[0.04]"
                   >
                     <td className="px-4 py-3">
