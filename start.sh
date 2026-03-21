@@ -13,7 +13,7 @@ url = __import__('os').environ.get('DATABASE_URL') or __import__('os').environ.g
 if url.startswith('postgres://'):
     url = 'postgresql://' + url[len('postgres://'):]
 try:
-    engine = create_engine(url)
+    engine = create_engine(url, pool_size=1, max_overflow=0)
     with engine.connect() as conn:
         conn.execute(text('SELECT 1'))
     print('DB ready.')
