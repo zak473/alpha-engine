@@ -206,7 +206,7 @@ def _job_update_elo() -> None:
             n = fn(incremental=True)
             log.info("[scheduler] %s ELO: %d rows written.", sport, n)
         except Exception as exc:
-            log.error("[scheduler] %s ELO update failed: %s", sport, exc, exc_info=True)
+            log.error("[scheduler] %s ELO update failed: %s", sport, exc)
 
     log.info("[scheduler] update_elo done.")
 
@@ -877,7 +877,7 @@ def start() -> BackgroundScheduler:
         id="predict_only",
         name="Re-run prediction pipeline",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=20),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=50),
     )
 
     # Fetch real market odds + run auto-pick bot every 30 minutes (delay 8m on startup)
@@ -926,7 +926,7 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
-    # Incremental ELO update nightly (3 AM UTC) — also runs once on startup
+    # Incremental ELO update nightly (3 AM UTC) — first run 30m after startup
     from apscheduler.triggers.cron import CronTrigger
     _scheduler.add_job(
         _job_update_elo,
@@ -934,18 +934,18 @@ def start() -> BackgroundScheduler:
         id="update_elo",
         name="Incremental ELO ratings update (all sports)",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=5),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=30),
     )
 
     # Build soccer features daily at 3:30 AM UTC (after ELO update at 3:00)
-    # Also runs after the startup ELO run (ELO at +5m → features at +15m → predict at +20m)
+    # First run 40m after startup (after ELO at +30m)
     _scheduler.add_job(
         _job_build_soccer_features,
         trigger=CronTrigger(hour=3, minute=30, timezone="UTC"),
         id="build_soccer_features",
         name="Build feat_soccer_match feature table",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=15),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=40),
     )
 
     # Tennis player profiles refresh (weekly, Sunday 4 AM UTC)
@@ -1022,7 +1022,7 @@ def start() -> BackgroundScheduler:
         id="prematch_extras",
         name="Highlightly prematch extras (lastfivegames/h2h/players)",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=2),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=12),
     )
 
     # Standings sync every 12 hours
@@ -1032,7 +1032,7 @@ def start() -> BackgroundScheduler:
         id="sync_standings",
         name="Highlightly standings sync (12h)",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=15),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=20),
     )
 
     # Historical fixture sync daily at 3:00 AM UTC — 90 days back, no extras
