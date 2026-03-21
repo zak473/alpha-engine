@@ -126,6 +126,11 @@ export async function fetchMatchPageData(
       { cache: "no-store", headers: authHeaders }
     );
 
+    // Sports that support the preview endpoint (ELO-based prediction from team names)
+    const PREVIEW_SPORTS = new Set(["baseball", "basketball", "hockey", "soccer", "tennis", "esports"]);
+
+    // Step 1: search backend by home team name for an exact DB match
+    let best: SearchResult | null = null;
     if (searchRes.ok) {
       const results: SearchResult[] = await searchRes.json();
 
@@ -147,46 +152,45 @@ export async function fetchMatchPageData(
         return { r, nameScore: homeScore + awayScore, dateDiff };
       });
       scored.sort((a, b) => b.nameScore - a.nameScore || a.dateDiff - b.dateDiff);
-      const best: SearchResult | null = scored[0]?.r ?? null;
+      best = scored[0]?.r ?? null;
+    } else {
+      console.warn(`[fetchMatchPageData] Search failed (${searchRes.status}) for ${sgoHome} vs ${sgoAway}`);
+    }
 
-      // Sports that support the preview endpoint (ELO-based prediction from team names)
-      const PREVIEW_SPORTS = new Set(["baseball", "basketball", "hockey", "soccer", "tennis", "esports"]);
-
-      if (best) {
-        const detailRes = await fetch(
-          `${API_BASE}/sports/${sport}/matches/${best.id}`,
-          { cache: "no-store", headers: authHeaders }
-        );
-
-        if (detailRes.ok) {
-          backendMatch = await detailRes.json();
-        }
-      } else if (PREVIEW_SPORTS.has(sport)) {
-        // Fallback: build ELO preview from team names when no DB match found
-        const previewRes = await fetch(
-          `${API_BASE}/sports/${sport}/matches/preview?home=${encodeURIComponent(sgoHome)}&away=${encodeURIComponent(sgoAway)}`,
-          { cache: "no-store", headers: authHeaders }
-        );
-        if (previewRes.ok) {
-          backendMatch = await previewRes.json();
-        } else {
-          console.warn(`[fetchMatchPageData] No match found for ${sgoHome} vs ${sgoAway} (${sport})`);
-        }
-      } else {
-        console.warn(`[fetchMatchPageData] No match found for ${sgoHome} vs ${sgoAway} (${sport})`);
+    // Step 2: fetch full detail for the best match
+    if (best) {
+      const detailRes = await fetch(
+        `${API_BASE}/sports/${sport}/matches/${best.id}`,
+        { cache: "no-store", headers: authHeaders }
+      );
+      if (detailRes.ok) {
+        backendMatch = await detailRes.json();
       }
+    }
 
-      // Fetch ELO history using team IDs from the match/preview response
-      if (backendMatch?.home?.id && backendMatch?.away?.id) {
-        const isPreview = backendMatch.home.id.startsWith("preview-");
-        if (!isPreview) {
-          const [eloHomeRes, eloAwayRes] = await Promise.all([
-            fetch(eloHistoryUrl(sport, backendMatch.home.id), { cache: "no-store", headers: authHeaders }),
-            fetch(eloHistoryUrl(sport, backendMatch.away.id), { cache: "no-store", headers: authHeaders }),
-          ]);
-          if (eloHomeRes.ok) { const d = await eloHomeRes.json(); eloHome = Array.isArray(d) ? d : (d.history ?? []); }
-          if (eloAwayRes.ok) { const d = await eloAwayRes.json(); eloAway = Array.isArray(d) ? d : (d.history ?? []); }
-        }
+    // Step 3: fallback to ELO preview when no DB match found or detail fetch failed
+    if (!backendMatch && PREVIEW_SPORTS.has(sport)) {
+      const previewRes = await fetch(
+        `${API_BASE}/sports/${sport}/matches/preview?home=${encodeURIComponent(sgoHome)}&away=${encodeURIComponent(sgoAway)}`,
+        { cache: "no-store", headers: authHeaders }
+      );
+      if (previewRes.ok) {
+        backendMatch = await previewRes.json();
+      } else {
+        console.warn(`[fetchMatchPageData] Preview fallback failed (${previewRes.status}) for ${sgoHome} vs ${sgoAway} (${sport})`);
+      }
+    }
+
+    // Step 4: fetch ELO history using team IDs from whichever response we got
+    if (backendMatch?.home?.id && backendMatch?.away?.id) {
+      const isPreview = backendMatch.home.id.startsWith("preview-");
+      if (!isPreview) {
+        const [eloHomeRes, eloAwayRes] = await Promise.all([
+          fetch(eloHistoryUrl(sport, backendMatch.home.id), { cache: "no-store", headers: authHeaders }),
+          fetch(eloHistoryUrl(sport, backendMatch.away.id), { cache: "no-store", headers: authHeaders }),
+        ]);
+        if (eloHomeRes.ok) { const d = await eloHomeRes.json(); eloHome = Array.isArray(d) ? d : (d.history ?? []); }
+        if (eloAwayRes.ok) { const d = await eloAwayRes.json(); eloAway = Array.isArray(d) ? d : (d.history ?? []); }
       }
     }
   } catch (err) {
