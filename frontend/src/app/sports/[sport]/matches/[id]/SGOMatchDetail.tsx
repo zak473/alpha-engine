@@ -1401,7 +1401,6 @@ function PreMatchAnalysisSection({
 
 // Fallback when backend is unavailable: derive probabilities from market odds
 function MarketImpliedProbsSection({ match, homeName, awayName }: { match: ReturnType<typeof sgoEventToMatch>; homeName: string; awayName: string }) {
-  // Find the best H/D/A market: 1X2, Full Time Result, Moneyline, H2H
   const MAIN_MARKET_NAMES = ["1x2", "full time result", "moneyline", "h2h", "match winner", "result"];
   const mainMkt = match.allMarkets.find((m) => MAIN_MARKET_NAMES.some((n) => m.name.toLowerCase().includes(n)))
     ?? match.allMarkets[0];
@@ -1419,34 +1418,112 @@ function MarketImpliedProbsSection({ match, homeName, awayName }: { match: Retur
   const rawProbs = sels.map((s) => s.impliedProb ?? (s.odds > 0 ? 1 / s.odds : 0));
   const total = rawProbs.reduce((a, b) => a + b, 0);
   const normProbs = rawProbs.map((p) => total > 0 ? p / total : 1 / rawProbs.length);
+  const overround = total > 0 ? ((total - 1) * 100).toFixed(1) : null;
 
   const homeIdx = sels.findIndex((s) => s.label.toLowerCase().includes(homeName.toLowerCase().split(" ")[0]!) || s.id === "home" || s.id === "1");
   const awayIdx = sels.findIndex((s) => s.label.toLowerCase().includes(awayName.toLowerCase().split(" ")[0]!) || s.id === "away" || s.id === "2");
   const drawIdx = sels.findIndex((s) => s.id === "draw" || s.label.toLowerCase() === "draw" || s.label === "X");
 
-  // Fall back to positional if label matching fails
   const hi = homeIdx >= 0 ? homeIdx : 0;
   const ai = awayIdx >= 0 ? awayIdx : (sels.length > 1 ? sels.length - 1 : 1);
   const di = drawIdx >= 0 ? drawIdx : -1;
-
   const hasDraw = di >= 0;
+
+  const pHome = normProbs[hi] ?? 0;
+  const pAway = normProbs[ai] ?? 0;
+  const pDraw = di >= 0 ? (normProbs[di] ?? 0) : 0;
+
   const cols = [
-    { label: `${homeName} win`, prob: normProbs[hi] ?? 0, color: "#22c55e" },
-    ...(hasDraw ? [{ label: "Draw", prob: normProbs[di] ?? 0, color: "#f59e0b" }] : []),
-    { label: `${awayName} win`, prob: normProbs[ai] ?? 0, color: "#a855f7" },
+    { label: `${homeName} win`, prob: pHome, color: "#22c55e", odds: sels[hi]?.odds },
+    ...(hasDraw ? [{ label: "Draw", prob: pDraw, color: "#f59e0b", odds: sels[di]?.odds }] : []),
+    { label: `${awayName} win`, prob: pAway, color: "#a855f7", odds: sels[ai]?.odds }
   ];
 
+  // Derive expected goals from totals markets
+  const totalsMkt = match.allMarkets.find((m) => m.name.toLowerCase().includes("total") && !m.name.toLowerCase().includes("home") && !m.name.toLowerCase().includes("away") && !m.name.toLowerCase().includes("player"));
+  const over25 = totalsMkt?.selections.find((s) => s.label.toLowerCase().includes("over") && s.label.includes("2.5"));
+  const homeTotalMkt = match.allMarkets.find((m) => m.name.toLowerCase().includes("home total") || (m.name.toLowerCase().includes("home") && m.name.toLowerCase().includes("total")));
+  const awayTotalMkt = match.allMarkets.find((m) => m.name.toLowerCase().includes("away total") || (m.name.toLowerCase().includes("away") && m.name.toLowerCase().includes("total")));
+  const homeOver15 = homeTotalMkt?.selections.find((s) => s.label.toLowerCase().includes("over") && s.label.includes("1.5"));
+  const awayOver15 = awayTotalMkt?.selections.find((s) => s.label.toLowerCase().includes("over") && s.label.includes("1.5"));
+
+  // Expected goals: P(>1.5 goals) implies mean of a Poisson ~ -ln(1-p) roughly
+  const expGoals = (sel: typeof over25) => {
+    if (!sel) return null;
+    const p = sel.odds > 0 ? 1 / sel.odds : 0;
+    // Invert Poisson CDF: P(X>=2) = 1 - e^(-λ)(1+λ) ≈ 1 - e^(-λ) for λ>1.5
+    return p > 0 && p < 1 ? Math.max(0.5, -Math.log(1 - p) * 1.1).toFixed(1) : null;
+  };
+  const homeXG = expGoals(homeOver15);
+  const awayXG = expGoals(awayOver15);
+
+  // Favorite indicator
+  const favorite = pHome > pAway ? homeName : awayName;
+  const favoriteProb = Math.max(pHome, pAway);
+  const spreadMkt = match.allMarkets.find((m) => m.name.toLowerCase().includes("spread") || m.name.toLowerCase().includes("handicap") || m.name.toLowerCase().includes("asian"));
+
   return (
-    <Card title="Market-Implied Probabilities">
-      <div className={cn("grid gap-3", hasDraw ? "grid-cols-3" : "grid-cols-2")}>
-        {cols.map(({ label, prob, color }) => (
-          <ProbCard key={label} label={label} prob={prob} color={color} />
-        ))}
-      </div>
-      <div className="pt-2 text-[10px] text-text-muted">
-        Derived from {mainMkt.name} odds · ML model predictions unavailable
-      </div>
-    </Card>
+    <>
+      <Card title="Market-Implied Probabilities">
+        <div className={cn("grid gap-3 mb-3", hasDraw ? "grid-cols-3" : "grid-cols-2")}>
+          {cols.map(({ label, prob, color, odds }) => (
+            <div key={label} className="rounded-xl border p-3 text-center" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+              <div className="text-[9px] uppercase tracking-[0.14em] text-text-muted mb-1 truncate">{label}</div>
+              <div className="text-2xl font-bold" style={{ color }}>{Math.round(prob * 100)}%</div>
+              {odds && <div className="text-[10px] text-text-muted mt-0.5">{odds.toFixed(2)}</div>}
+              <div className="mt-1.5 h-1 rounded-full overflow-hidden" style={{ background: "var(--bg3)" }}>
+                <div className="h-full rounded-full" style={{ width: `${Math.round(prob * 100)}%`, background: color }} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-[11px]">
+          <div className="rounded-lg p-2.5" style={{ background: "var(--bg2)", border: "1px solid var(--border0)" }}>
+            <div className="text-text-muted mb-0.5">Favourite</div>
+            <div className="font-semibold text-text-primary truncate">{favorite}</div>
+            <div style={{ color: "#22c55e" }}>{Math.round(favoriteProb * 100)}% implied win</div>
+          </div>
+          {overround && (
+            <div className="rounded-lg p-2.5" style={{ background: "var(--bg2)", border: "1px solid var(--border0)" }}>
+              <div className="text-text-muted mb-0.5">Book margin</div>
+              <div className="font-semibold text-text-primary">{overround}%</div>
+              <div className="text-text-muted">over-round</div>
+            </div>
+          )}
+        </div>
+        <div className="pt-2 text-[10px] text-text-muted">Derived from {mainMkt.name} odds</div>
+      </Card>
+
+      {(homeXG || awayXG || spreadMkt || over25) && (
+        <Card title="Match Projections">
+          <div className="space-y-2 text-[12px]">
+            {(homeXG || awayXG) && (
+              <div className="flex items-center justify-between py-1.5 border-b" style={{ borderColor: "var(--border0)" }}>
+                <span className="text-text-muted">Expected goals</span>
+                <span className="font-semibold text-text-primary">
+                  {homeXG ?? "?"} – {awayXG ?? "?"}
+                  <span className="text-text-muted font-normal ml-1">({homeName.split(" ")[0]} – {awayName.split(" ")[0]})</span>
+                </span>
+              </div>
+            )}
+            {over25 && (
+              <div className="flex items-center justify-between py-1.5 border-b" style={{ borderColor: "var(--border0)" }}>
+                <span className="text-text-muted">Over 2.5 goals</span>
+                <span className="font-semibold" style={{ color: "#22c55e" }}>
+                  {Math.round((over25.odds > 0 ? 1 / over25.odds : 0) * 100)}% · {over25.odds.toFixed(2)}
+                </span>
+              </div>
+            )}
+            {spreadMkt?.selections.map((s) => (
+              <div key={s.id} className="flex items-center justify-between py-1.5 border-b last:border-0" style={{ borderColor: "var(--border0)" }}>
+                <span className="text-text-muted">{s.label}</span>
+                <span className="font-semibold text-text-primary">{s.odds.toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+    </>
   );
 }
 
