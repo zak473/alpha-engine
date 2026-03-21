@@ -881,6 +881,308 @@ function InjuriesSection({ match, homeName, awayName }: { match: SportMatchDetai
   );
 }
 
+// ─── Highlights section ───────────────────────────────────────────────────────
+
+function HighlightsSection({ match }: { match: SportMatchDetail }) {
+  const clips = match.highlights as Array<Record<string, unknown>> | null | undefined;
+  if (!clips?.length) return null;
+  return (
+    <Card title="Highlights">
+      <div className="space-y-2">
+        {clips.slice(0, 6).map((clip, i) => {
+          const url = String(clip.url ?? "");
+          const title = String(clip.title ?? clip.event_type ?? "Highlight");
+          const thumb = clip.thumbnail ? String(clip.thumbnail) : null;
+          const min = clip.minute != null ? `${clip.minute}'` : null;
+          const dur = clip.duration != null ? `${Math.round(Number(clip.duration) / 60)}m` : null;
+          if (!url) return null;
+          return (
+            <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors hover:border-white/20"
+              style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+              {thumb ? (
+                <img src={thumb} alt="" className="h-12 w-20 rounded-lg object-cover shrink-0" />
+              ) : (
+                <div className="h-12 w-20 rounded-lg shrink-0 flex items-center justify-center text-2xl"
+                  style={{ background: "var(--bg3)" }}>▶</div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-text-primary truncate">{title}</div>
+                <div className="text-[10px] text-text-muted mt-0.5">
+                  {[min, dur].filter(Boolean).join(" · ")}
+                </div>
+              </div>
+              <span className="text-text-muted text-xs shrink-0">▶</span>
+            </a>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+// ─── Full standings section ───────────────────────────────────────────────────
+
+function FullStandingsSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
+  const rows = (match as unknown as { full_standings?: Array<Record<string, unknown>> }).full_standings;
+  if (!rows?.length) return null;
+  const [collapsed, setCollapsed] = useState(true);
+  const display = collapsed ? rows.slice(0, 6) : rows;
+  return (
+    <Card title="League Table">
+      <div className="overflow-x-auto">
+        <table className="w-full text-[11px]">
+          <thead>
+            <tr className="text-text-muted border-b" style={{ borderColor: "var(--border0)" }}>
+              <th className="text-left font-medium pb-1 pr-1 w-5">#</th>
+              <th className="text-left font-medium pb-1">Team</th>
+              <th className="text-center font-medium pb-1 px-1">P</th>
+              <th className="text-center font-medium pb-1 px-1">W</th>
+              <th className="text-center font-medium pb-1 px-1">D</th>
+              <th className="text-center font-medium pb-1 px-1">L</th>
+              <th className="text-center font-medium pb-1 px-1">GD</th>
+              <th className="text-center font-medium pb-1 px-1">Pts</th>
+              <th className="text-right font-medium pb-1 pl-1">Form</th>
+            </tr>
+          </thead>
+          <tbody>
+            {display.map((row, i) => {
+              const isHome = String(row.team_name ?? "").toLowerCase() === homeName.toLowerCase();
+              const isAway = String(row.team_name ?? "").toLowerCase() === awayName.toLowerCase();
+              const highlight = isHome || isAway;
+              const formStr = String(row.form ?? "");
+              return (
+                <tr key={i} className="border-t" style={{
+                  borderColor: "var(--border0)",
+                  background: highlight ? "rgba(255,255,255,0.04)" : undefined,
+                }}>
+                  <td className="py-1.5 pr-1 text-text-muted">{String(row.position ?? i + 1)}</td>
+                  <td className="py-1.5 font-medium truncate max-w-[100px]" style={{ color: highlight ? "var(--text-primary)" : "var(--text-muted)" }}>
+                    {String(row.team_name ?? "")}
+                  </td>
+                  <td className="py-1.5 text-center text-text-muted">{String(row.played ?? "")}</td>
+                  <td className="py-1.5 text-center text-text-muted">{String(row.won ?? "")}</td>
+                  <td className="py-1.5 text-center text-text-muted">{String(row.drawn ?? "")}</td>
+                  <td className="py-1.5 text-center text-text-muted">{String(row.lost ?? "")}</td>
+                  <td className="py-1.5 text-center text-text-muted">{row.goal_diff != null ? (Number(row.goal_diff) > 0 ? `+${row.goal_diff}` : String(row.goal_diff)) : ""}</td>
+                  <td className="py-1.5 text-center font-bold text-text-primary">{String(row.points ?? "")}</td>
+                  <td className="py-1.5 pl-1 text-right">
+                    <div className="flex justify-end gap-0.5">
+                      {formStr.split("").slice(-5).map((r, j) => (
+                        <span key={j} className="inline-flex h-4 w-4 items-center justify-center rounded-sm text-[8px] font-bold"
+                          style={{
+                            background: r === "W" ? "rgba(34,197,94,0.20)" : r === "L" ? "rgba(239,68,68,0.20)" : "rgba(148,163,184,0.15)",
+                            color: r === "W" ? "#22c55e" : r === "L" ? "#ef4444" : "#94a3b8",
+                          }}>
+                          {r}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 6 && (
+        <button onClick={() => setCollapsed(!collapsed)}
+          className="mt-2 text-[10px] text-text-muted hover:text-text-primary transition-colors w-full text-center">
+          {collapsed ? `Show all ${rows.length} teams ↓` : "Show less ↑"}
+        </button>
+      )}
+    </Card>
+  );
+}
+
+// ─── Soccer form section ──────────────────────────────────────────────────────
+
+function SoccerFormSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
+  const fh = match.form_home as Record<string, unknown> | null | undefined;
+  const fa = match.form_away as Record<string, unknown> | null | undefined;
+  if (!fh && !fa) return null;
+
+  const renderTeam = (name: string, form: Record<string, unknown> | null | undefined) => {
+    if (!form) return null;
+    const results: string[] = (form.form_last_5 as string[] | undefined) ?? [];
+    return (
+      <div className="rounded-xl border p-3 space-y-2" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold text-text-primary truncate">{name}</span>
+          {form.form_pts != null && <span className="text-[10px] font-bold text-emerald-400">{String(form.form_pts)} pts</span>}
+        </div>
+        {results.length > 0 && (
+          <div className="flex items-center gap-1">
+            {results.slice(-5).map((r, i) => <FormPill key={i} result={r} />)}
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px] text-text-muted">
+          {form.wins != null && <span>W/D/L: <b className="text-text-primary">{String(form.wins)}/{String(form.draws ?? 0)}/{String(form.losses ?? 0)}</b></span>}
+          {form.goals_scored_avg != null && <span>Scored avg: <b className="text-text-primary">{Number(form.goals_scored_avg).toFixed(2)}</b></span>}
+          {form.goals_conceded_avg != null && <span>Conceded avg: <b className="text-text-primary">{Number(form.goals_conceded_avg).toFixed(2)}</b></span>}
+          {form.xg_avg != null && <span>xG avg: <b className="text-text-primary">{Number(form.xg_avg).toFixed(2)}</b></span>}
+          {form.xga_avg != null && <span>xGA avg: <b className="text-text-primary">{Number(form.xga_avg).toFixed(2)}</b></span>}
+          {form.ppda_avg != null && <span>PPDA: <b className="text-text-primary">{Number(form.ppda_avg).toFixed(2)}</b></span>}
+          {form.shots_avg != null && <span>Shots avg: <b className="text-text-primary">{Number(form.shots_avg).toFixed(1)}</b></span>}
+          {form.shots_on_target_avg != null && <span>On target avg: <b className="text-text-primary">{Number(form.shots_on_target_avg).toFixed(1)}</b></span>}
+          {form.corners_avg != null && <span>Corners avg: <b className="text-text-primary">{Number(form.corners_avg).toFixed(1)}</b></span>}
+          {form.clean_sheets != null && <span>Clean sheets: <b className="text-text-primary">{String(form.clean_sheets)}</b></span>}
+          {form.btts != null && <span>BTTS: <b className="text-text-primary">{String(form.btts)}</b></span>}
+          {form.days_rest != null && <span>Days rest: <b className="text-text-primary">{Number(form.days_rest).toFixed(0)}</b></span>}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <Card title="Recent Form">
+      <div className="grid gap-2 sm:grid-cols-2">
+        {renderTeam(homeName, fh)}
+        {renderTeam(awayName, fa)}
+      </div>
+    </Card>
+  );
+}
+
+// ─── Soccer stats bar section ─────────────────────────────────────────────────
+
+function SoccerStatsBarSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
+  const sh = match.stats_home as Record<string, unknown> | null | undefined;
+  const sa = match.stats_away as Record<string, unknown> | null | undefined;
+  if (!sh && !sa) return null;
+
+  const statRows: { label: string; hKey: string; pct?: boolean }[] = [
+    { label: "Possession", hKey: "possession_pct", pct: true },
+    { label: "Shots", hKey: "shots_total" },
+    { label: "On Target", hKey: "shots_on_target" },
+    { label: "xG", hKey: "xg" },
+    { label: "Corners", hKey: "corners" },
+    { label: "Passes", hKey: "passes_completed" },
+    { label: "Pass Acc %", hKey: "pass_accuracy_pct", pct: true },
+    { label: "Fouls", hKey: "fouls" },
+    { label: "Yellow Cards", hKey: "yellow_cards" },
+    { label: "Offsides", hKey: "offsides" },
+    { label: "Aerial Won", hKey: "aerial_duels_won" },
+    { label: "Big Chances", hKey: "big_chances_created" },
+  ];
+
+  const active = statRows.filter(r => sh?.[r.hKey] != null || sa?.[r.hKey] != null);
+  if (!active.length) return null;
+
+  return (
+    <Card title="Match Stats">
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-x-2 mb-2">
+        <span className="text-right text-[10px] font-semibold text-text-muted truncate">{homeName}</span>
+        <span />
+        <span className="text-[10px] font-semibold text-text-muted truncate">{awayName}</span>
+      </div>
+      <div className="space-y-2">
+        {active.map(({ label, hKey, pct }) => {
+          const hv = sh?.[hKey] != null ? Number(sh[hKey]) : null;
+          const av = sa?.[hKey] != null ? Number(sa[hKey]) : null;
+          const total = (hv ?? 0) + (av ?? 0);
+          const hPct = total > 0 ? (hv ?? 0) / total : 0.5;
+          const aPct = total > 0 ? (av ?? 0) / total : 0.5;
+          const fmtVal = (v: number | null) => {
+            if (v == null) return "—";
+            if (pct) return `${v.toFixed(0)}%`;
+            return Number.isInteger(v) ? String(v) : v.toFixed(2);
+          };
+          return (
+            <div key={label}>
+              <div className="flex items-center justify-between text-[10px] mb-0.5">
+                <span className="font-mono font-semibold text-text-primary w-8 text-left">{fmtVal(hv)}</span>
+                <span className="text-text-muted text-center flex-1">{label}</span>
+                <span className="font-mono font-semibold text-text-primary w-8 text-right">{fmtVal(av)}</span>
+              </div>
+              <div className="flex h-1.5 rounded-full overflow-hidden gap-px" style={{ background: "var(--bg3)" }}>
+                <div className="h-full rounded-l-full" style={{ width: `${hPct * 100}%`, background: "#22c55e", opacity: 0.7 }} />
+                <div className="h-full rounded-r-full" style={{ width: `${aPct * 100}%`, background: "#a855f7", opacity: 0.7 }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+// ─── Soccer odds edge section ─────────────────────────────────────────────────
+
+function SoccerOddsEdgeSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
+  const m = match as unknown as { odds_home?: number | null; odds_draw?: number | null; odds_away?: number | null };
+  const mktH = m.odds_home;
+  const mktD = m.odds_draw;
+  const mktA = m.odds_away;
+  const fairH = match.fair_odds?.home_win;
+  const fairD = match.fair_odds?.draw;
+  const fairA = match.fair_odds?.away_win;
+  if (!mktH && !mktD && !mktA) return null;
+
+  const edge = (mkt?: number | null, fair?: number | null) => {
+    if (!mkt || !fair || fair <= 0) return null;
+    return ((mkt / fair) - 1) * 100;
+  };
+
+  const rows = [
+    { label: homeName, mkt: mktH, fair: fairH, edge: edge(mktH, fairH) },
+    { label: "Draw", mkt: mktD, fair: fairD, edge: edge(mktD, fairD) },
+    { label: awayName, mkt: mktA, fair: fairA, edge: edge(mktA, fairA) },
+  ].filter(r => r.mkt != null);
+
+  if (!rows.length) return null;
+
+  return (
+    <Card title="Odds & Edge">
+      <div className="space-y-1.5">
+        {rows.map(({ label, mkt, fair, edge: e }) => (
+          <div key={label} className="flex items-center justify-between rounded-xl border px-3 py-2" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+            <span className="text-sm text-text-muted truncate max-w-[120px]">{label}</span>
+            <div className="flex items-center gap-4 text-right shrink-0">
+              {fair != null && <span className="text-[11px] text-text-muted">Fair: <span className="font-mono font-semibold text-text-primary">{fair.toFixed(2)}</span></span>}
+              <span className="text-[11px] text-text-muted">Mkt: <span className="font-mono font-semibold text-text-primary">{mkt?.toFixed(2)}</span></span>
+              {e != null && (
+                <span className={cn("text-[11px] font-bold min-w-[48px] text-right", e > 2 ? "text-emerald-400" : e > 0 ? "text-emerald-300/70" : "text-text-muted")}>
+                  {e > 0 ? "+" : ""}{e.toFixed(1)}%
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="text-[10px] text-text-muted pt-1">Edge = how much market odds exceed model fair odds</div>
+    </Card>
+  );
+}
+
+// ─── Model meta section ───────────────────────────────────────────────────────
+
+function ModelMetaSection({ match }: { match: SportMatchDetail }) {
+  const model = match.model as Record<string, unknown> | null | undefined;
+  if (!model) return null;
+  const fields = [
+    { label: "Version", value: model.version },
+    { label: "Algorithm", value: model.algorithm },
+    { label: "Accuracy", value: model.accuracy != null ? `${(Number(model.accuracy) * 100).toFixed(1)}%` : null },
+    { label: "Brier score", value: model.brier_score != null ? Number(model.brier_score).toFixed(4) : null },
+    { label: "Trained", value: model.trained_at ? new Date(String(model.trained_at)).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }) : null },
+    { label: "Training samples", value: model.n_train_samples != null ? Number(model.n_train_samples).toLocaleString() : null },
+  ].filter(f => f.value != null);
+  if (!fields.length) return null;
+  return (
+    <Card title="Model Info">
+      <div className="grid grid-cols-2 gap-1.5">
+        {fields.map(({ label, value }) => (
+          <div key={label} className="rounded-lg border px-2.5 py-1.5" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+            <div className="text-[9px] uppercase tracking-[0.12em] text-text-muted">{label}</div>
+            <div className="text-xs text-text-primary font-medium">{String(value)}</div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 // ─── Basketball box score section ─────────────────────────────────────────────
 
 function BasketballBoxScoreSection({ match, homeName, awayName }: { match: SportMatchDetail; homeName: string; awayName: string }) {
@@ -1702,6 +2004,8 @@ export function SGOMatchDetail({ event, sport, backendMatch: backendMatchProp, e
                 {backendMatch && <LineupSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
                 {backendMatch && sport === "basketball" && <BasketballBoxScoreSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
                 {backendMatch && <InjuriesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
+                {backendMatch && <HighlightsSection match={backendMatch} />}
+                {backendMatch && sport === "soccer" && <FullStandingsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
               </>
             )}
           </div>
@@ -1733,6 +2037,8 @@ export function SGOMatchDetail({ event, sport, backendMatch: backendMatchProp, e
                 <EloSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} eloHome={eloHome} eloAway={eloAway} cfg={cfg} />
                 {sport === "tennis" ? (
                   <TennisFormSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                ) : sport === "soccer" ? (
+                  <SoccerFormSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
                 ) : (
                   <FormSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
                 )}
@@ -1740,7 +2046,13 @@ export function SGOMatchDetail({ event, sport, backendMatch: backendMatchProp, e
                 {sport !== "tennis" && <LeagueContextSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
                 <KeyDriversSection match={backendMatch} />
                 <SimulationSection match={backendMatch} />
-                {sport !== "tennis" && <StatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
+                {sport === "soccer" && <SoccerOddsEdgeSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
+                <ModelMetaSection match={backendMatch} />
+                {sport === "soccer" ? (
+                  <SoccerStatsBarSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                ) : sport !== "tennis" ? (
+                  <StatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                ) : null}
                 {sport !== "tennis" && <AdvancedStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
                 <ContextSection match={backendMatch} />
                 {sport === "esports" && <EsportsInfoSection match={backendMatch} />}

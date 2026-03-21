@@ -391,6 +391,8 @@ class SoccerMatchDetail(BaseModel):
     # Advanced team stats
     adv_home: Optional[SoccerAdvancedTeamStatsOut] = None
     adv_away: Optional[SoccerAdvancedTeamStatsOut] = None
+    # Full league standings table
+    full_standings: list[StandingRowOut] = []
     # Match events (goals, cards, subs from Highlightly)
     events: list[MatchEventOut] = []
     # In-match statistics from Highlightly (alternative to CoreTeamMatchStats)

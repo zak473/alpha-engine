@@ -45,10 +45,12 @@ from api.sports.soccer.schemas import (
     SoccerPlayerOut,
     SoccerRefereeOut,
     SoccerTeamStatsOut,
+    StandingRowOut,
 )
 from db.models.mvp import (
     CoreLeague,
     CoreMatch,
+    CoreStanding,
     CoreTeam,
     CoreTeamMatchStats,
     FeatSoccerMatch,
@@ -1156,6 +1158,34 @@ class SoccerMatchService(BaseMatchListService):
         )
         h2h = hl_h2h or _h2h(db, match.home_team_id, match.away_team_id, home_name, away_name)
 
+        # Full league table
+        standing_rows = (
+            db.query(CoreStanding)
+            .filter(CoreStanding.league_id == match.league_id, CoreStanding.season == match.season)
+            .order_by(CoreStanding.position.asc())
+            .limit(40)
+            .all()
+        )
+        full_standings = [
+            StandingRowOut(
+                position=r.position,
+                team_id=r.team_id,
+                team_name=r.team_name,
+                team_logo=r.team_logo,
+                played=r.played,
+                won=r.won,
+                drawn=r.drawn,
+                lost=r.lost,
+                goals_for=r.goals_for,
+                goals_against=r.goals_against,
+                goal_diff=r.goal_diff,
+                points=r.points,
+                form=r.form,
+                group_name=r.group_name,
+            )
+            for r in standing_rows
+        ]
+
         return SoccerMatchDetail(
             id=match.id,
             sport="soccer",
@@ -1198,6 +1228,7 @@ class SoccerMatchService(BaseMatchListService):
             league_context=_real_league_context(db, match, match.home_team_id, match.away_team_id),
             adv_home=_adv_stats_out(db, match_id, match.home_team_id, home_name),
             adv_away=_adv_stats_out(db, match_id, match.away_team_id, away_name),
+            full_standings=full_standings,
             betting={
                 "home_ml": round(1 / probabilities.home_win, 2) if probabilities and probabilities.home_win > 0 else None,
                 "draw_ml": round(1 / probabilities.draw, 2) if probabilities and probabilities.draw and probabilities.draw > 0 else None,
