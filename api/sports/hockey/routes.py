@@ -17,7 +17,7 @@ from api.deps import get_db, get_current_user
 from api.sports.hockey.schemas import EloHistoryPoint, HockeyMatchDetail, HockeyMatchListResponse
 from api.sports.hockey.service import HockeyMatchService
 
-router = APIRouter(prefix="/sports/hockey", tags=["Hockey Matches"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/sports/hockey", tags=["Hockey Matches"])
 _service = HockeyMatchService()
 
 

@@ -17,7 +17,7 @@ from api.deps import get_db, get_current_user
 from api.sports.soccer.schemas import StandingRowOut, StandingsResponse
 from db.models.mvp import CoreLeague, CoreStanding
 
-router = APIRouter(prefix="/api/v1/standings", tags=["Standings"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/api/v1/standings", tags=["Standings"])
 
 
 def _build_response(

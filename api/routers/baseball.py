@@ -14,7 +14,7 @@ from api.deps import get_db, get_current_user
 from db.models.baseball import BaseballTeamMatchStats
 from db.models.mvp import CoreMatch, CoreTeam
 
-router = APIRouter(prefix="/baseball", tags=["Baseball"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/baseball", tags=["Baseball"])
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────

@@ -12,7 +12,7 @@ from api.sports.esports.schemas import EloHistoryPoint, EsportsMatchDetail, Espo
 from api.sports.esports.service import EsportsMatchService
 from db.models.mvp import RatingEloTeam
 
-router = APIRouter(prefix="/sports/esports", tags=["Esports Matches"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/sports/esports", tags=["Esports Matches"])
 _service = EsportsMatchService()
 
 

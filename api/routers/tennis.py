@@ -11,7 +11,7 @@ from api.deps import get_session, get_current_user
 from api.schemas.predictions import PredictionResponse, RatingResponse, HeadToHeadResponse
 from db.models import PlayerRating, HeadToHead, Prediction
 
-router = APIRouter(prefix="/tennis", tags=["Tennis"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/tennis", tags=["Tennis"])
 
 
 @router.get("/ratings/{player_id}", response_model=RatingResponse)

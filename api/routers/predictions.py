@@ -36,7 +36,7 @@ from api.schemas.mvp import (
 )
 from db.models.mvp import CoreLeague, CoreMatch, CoreTeam, ModelRegistry, PredMatch, RatingEloTeam
 
-router = APIRouter(prefix="/predictions", tags=["predictions"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/predictions", tags=["predictions"])
 
 
 # ---------------------------------------------------------------------------

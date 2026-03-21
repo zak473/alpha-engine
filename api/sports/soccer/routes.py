@@ -17,7 +17,7 @@ from api.sports.soccer.schemas import EloHistoryPoint, SoccerMatchDetail, Soccer
 from api.sports.soccer.service import SoccerMatchService
 from db.models.mvp import RatingEloTeam
 
-router = APIRouter(prefix="/sports/soccer", tags=["Soccer Matches"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/sports/soccer", tags=["Soccer Matches"])
 
 _service = SoccerMatchService()
 
