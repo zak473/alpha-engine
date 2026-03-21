@@ -880,14 +880,14 @@ def start() -> BackgroundScheduler:
         next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=20),
     )
 
-    # Fetch real market odds + run auto-pick bot every 30 minutes (run immediately on startup)
+    # Fetch real market odds + run auto-pick bot every 30 minutes (delay 8m on startup)
     _scheduler.add_job(
         _job_fetch_odds,
         trigger=IntervalTrigger(minutes=30),
         id="fetch_odds",
         name="Fetch real odds + auto-pick bot",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=8),
     )
 
     # Settle pending picks every 15 minutes
@@ -1001,7 +1001,7 @@ def start() -> BackgroundScheduler:
         id="highlightly_live",
         name="Highlightly live scores (2m, scores only)",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=3),
     )
 
     # Highlightly full sync every 10 minutes — today+tomorrow with live extras + inline odds
@@ -1012,7 +1012,7 @@ def start() -> BackgroundScheduler:
         id="fetch_highlightly",
         name="Highlightly sync with live extras (10m)",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=6),
     )
 
     # Prematch extras (lastfivegames, headtohead, players) every 15 min

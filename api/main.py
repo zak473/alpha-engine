@@ -107,15 +107,6 @@ async def lifespan(app: FastAPI):
         except Exception as exc:
             logger.warning("Startup stale cleanup failed: %s", exc)
 
-        # Trigger live fetch in sub-thread
-        try:
-            import threading as _th2
-            from pipelines.scheduler import _job_fetch_live
-            _th2.Thread(target=_job_fetch_live, daemon=True, name="startup-fetch").start()
-            logger.info("Startup: background fetch_live triggered.")
-        except Exception as exc:
-            logger.warning("Startup fetch_live failed to launch: %s", exc)
-
         # Per-sport backfill checks
         from db.session import SessionLocal
         from db.models.mvp import CoreMatch

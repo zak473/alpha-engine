@@ -44,7 +44,14 @@ def _try_load_model(session: Session) -> Optional[dict]:
         )
         if reg is None:
             return None
-        payload = joblib.load(reg.artifact_path)
+        import os as _os
+        _apath = reg.artifact_path
+        if not _os.path.exists(_apath):
+            _fname = _os.path.basename(_apath)
+            _rpath = _os.path.join('/app/artefacts', _fname)
+            if _os.path.exists(_rpath):
+                _apath = _rpath
+        payload = joblib.load(_apath)
         payload["registry"] = reg
         payload["model_name"] = reg.model_name
         log.info("Loaded ML model %s", reg.model_name)

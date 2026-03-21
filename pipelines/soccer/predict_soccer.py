@@ -50,8 +50,17 @@ def _load_live_model(session: Session) -> dict:
     if registry is None:
         raise RuntimeError("No live soccer model found. Run train_soccer_model.py first.")
 
-    log.info("Loading model %s from %s", registry.model_name, registry.artifact_path)
-    payload = joblib.load(registry.artifact_path)
+    import os as _os
+    artifact_path = registry.artifact_path
+    if not _os.path.exists(artifact_path):
+        # Normalize paths stored with local dev prefix to Railway's /app/artefacts/
+        filename = _os.path.basename(artifact_path)
+        railway_path = _os.path.join("/app/artefacts", filename)
+        if _os.path.exists(railway_path):
+            artifact_path = railway_path
+            log.info("Remapped artifact path to %s", artifact_path)
+    log.info("Loading model %s from %s", registry.model_name, artifact_path)
+    payload = joblib.load(artifact_path)
     payload["registry"] = registry
     return payload
 
