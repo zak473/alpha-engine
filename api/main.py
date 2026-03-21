@@ -49,9 +49,31 @@ logger = logging.getLogger("alpha_engine")
 
 # ─── Lifespan (scheduler start/stop) ─────────────────────────────────────
 
+def _wait_for_db(max_attempts: int = 10, delay: float = 3.0) -> bool:
+    """Block until the DB accepts a connection, or give up after max_attempts."""
+    import time
+    from sqlalchemy import text
+    from db.session import engine
+    for attempt in range(1, max_attempts + 1):
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            logger.info("Startup: DB ready (attempt %d).", attempt)
+            return True
+        except Exception as exc:
+            logger.warning("Startup: DB not ready (attempt %d/%d): %s", attempt, max_attempts, exc)
+            if attempt < max_attempts:
+                time.sleep(delay)
+    logger.error("Startup: DB never became ready after %d attempts.", max_attempts)
+    return False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start background scheduler on startup; stop it on shutdown."""
+    # Wait for DB to be ready before running migrations or any startup jobs
+    _wait_for_db()
+
     # Run DB migrations on startup
     try:
         from alembic.config import Config
