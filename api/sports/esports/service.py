@@ -268,7 +268,7 @@ class EsportsMatchService(BaseMatchListService):
         elo_away = _elo_panel(db, match.away_team_id, away_name)
 
         # Prediction
-        live_registry = db.query(ModelRegistry).filter_by(is_live=True).first()
+        live_registry = db.query(ModelRegistry).filter_by(is_live=True, sport="esports").first()
         pred = None
         if live_registry:
             pred = (

@@ -794,7 +794,7 @@ class TennisMatchService(BaseMatchListService):
         live_registry = db.query(ModelRegistry).filter_by(is_live=True, sport="tennis").first()
         if live_registry is None:
             # Fall back to any live model
-            live_registry = db.query(ModelRegistry).filter_by(is_live=True).first()
+            live_registry = db.query(ModelRegistry).filter_by(is_live=True, sport="tennis").first()
         pred: PredMatch | None = None
         if live_registry:
             pred = (

@@ -913,7 +913,7 @@ class SoccerMatchService(BaseMatchListService):
 
         # Batch fetch predictions (optional — present when model exists)
         match_ids = [m.id for m in rows]
-        live_registry = db.query(ModelRegistry).filter_by(is_live=True).first()
+        live_registry = db.query(ModelRegistry).filter_by(is_live=True, sport="soccer").first()
         pred_map: dict[str, PredMatch] = {}
         feat_map: dict[str, FeatSoccerMatch] = {}
         if live_registry and match_ids:
@@ -1016,7 +1016,7 @@ class SoccerMatchService(BaseMatchListService):
         league_logo = league_obj.logo_url if league_obj else None
 
         # Prediction
-        live_registry = db.query(ModelRegistry).filter_by(is_live=True).first()
+        live_registry = db.query(ModelRegistry).filter_by(is_live=True, sport="soccer").first()
         pred: PredMatch | None = None
         if live_registry:
             pred = (
