@@ -23,6 +23,7 @@ from datetime import timezone
 from typing import Optional
 
 from sqlalchemy import func
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from db.models.mvp import (
@@ -214,9 +215,8 @@ def build_features_for_match(session: Session, match: CoreMatch) -> None:
     target_map = {"home_win": 1.0, "draw": 0.5, "away_win": 0.0}
     target = target_map.get(outcome) if outcome else None
 
-    # Upsert
-    feat = session.query(FeatSoccerMatch).filter_by(match_id=match.id).first()
     data = dict(
+        match_id=match.id,
         elo_home=elo_home,
         elo_away=elo_away,
         elo_diff=elo_diff,
@@ -246,14 +246,17 @@ def build_features_for_match(session: Session, match: CoreMatch) -> None:
         target=target,
     )
 
-    if feat is None:
-        feat = FeatSoccerMatch(match_id=match.id, **data)
-        session.add(feat)
-        log.debug("  [+] feat  %s", match.id[:8])
-    else:
-        for k, v in data.items():
-            setattr(feat, k, v)
-        log.debug("  [~] feat  %s  updated", match.id[:8])
+    # Atomic upsert — safe against concurrent scheduler runs
+    stmt = (
+        pg_insert(FeatSoccerMatch)
+        .values(**data)
+        .on_conflict_do_update(
+            index_elements=["match_id"],
+            set_={k: v for k, v in data.items() if k != "match_id"},
+        )
+    )
+    session.execute(stmt)
+    log.debug("  [~] upsert %s", match.id[:8])
 
 
 def run(match_id: Optional[str] = None) -> int:
