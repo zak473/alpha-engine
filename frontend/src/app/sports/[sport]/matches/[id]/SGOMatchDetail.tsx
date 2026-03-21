@@ -1444,7 +1444,7 @@ function MarketImpliedProbsSection({ match, homeName, awayName }: { match: Retur
         ))}
       </div>
       <div className="pt-2 text-[10px] text-text-muted">
-        Derived from {mainMkt.name} odds · ML model predictions loading…
+        Derived from {mainMkt.name} odds · ML model predictions unavailable
       </div>
     </Card>
   );
@@ -1476,12 +1476,17 @@ export function SGOMatchDetail({ event, sport, backendMatch: backendMatchProp, e
     const sgoHome = event.teams?.home?.names?.long ?? "";
     const sgoAway = event.teams?.away?.names?.long ?? "";
 
-    async function fetchBackend() {
-      try {
-        const searchTerm = sport === "tennis" ? (sgoHome.split(" ").pop() ?? sgoHome) : sgoHome;
-        let detail: SportMatchDetail | null = null;
+    // Try both relative (rewrite) and absolute (env var) base URLs
+    const API_BASES = [
+      "/api/v1",
+      ...(process.env.NEXT_PUBLIC_API_URL ? [`${process.env.NEXT_PUBLIC_API_URL}/api/v1`] : []),
+    ];
 
-        const searchRes = await fetch(`/api/v1/matches/search?q=${encodeURIComponent(searchTerm)}&limit=20`);
+    async function tryFetch(base: string): Promise<SportMatchDetail | null> {
+      const searchTerm = sport === "tennis" ? (sgoHome.split(" ").pop() ?? sgoHome) : sgoHome;
+      let detail: SportMatchDetail | null = null;
+      try {
+        const searchRes = await fetch(`${base}/matches/search?q=${encodeURIComponent(searchTerm)}&limit=20`);
         if (searchRes.ok) {
           const results: Array<{ id: string; type: string; sport: string; title: string }> = await searchRes.json();
           const best = results.find(
@@ -1489,22 +1494,30 @@ export function SGOMatchDetail({ event, sport, backendMatch: backendMatchProp, e
               r.title.split(" vs ").pop()?.toLowerCase().includes(sgoAway.toLowerCase().split(" ")[0] ?? "")
           );
           if (best) {
-            const dr = await fetch(`/api/v1/sports/${sport}/matches/${best.id}`);
+            const dr = await fetch(`${base}/sports/${sport}/matches/${best.id}`);
             if (dr.ok) detail = await dr.json();
           }
         }
-
         if (!detail) {
-          const pr = await fetch(`/api/v1/sports/${sport}/matches/preview?home=${encodeURIComponent(sgoHome)}&away=${encodeURIComponent(sgoAway)}`);
+          const pr = await fetch(`${base}/sports/${sport}/matches/preview?home=${encodeURIComponent(sgoHome)}&away=${encodeURIComponent(sgoAway)}`);
           if (pr.ok) detail = await pr.json();
         }
+      } catch { /* try next base */ }
+      return detail;
+    }
 
+    async function fetchBackend() {
+      try {
+        let detail: SportMatchDetail | null = null;
+        for (const base of API_BASES) {
+          detail = await tryFetch(base);
+          if (detail) break;
+        }
         if (detail) {
           setBackendMatch(detail);
           if (!detail.id.startsWith("preview-") && detail.home?.id && detail.away?.id) {
-            const eloBase = sport === "tennis"
-              ? `/api/v1/sports/tennis/players`
-              : `/api/v1/sports/${sport}/teams`;
+            const base = API_BASES[0];
+            const eloBase = sport === "tennis" ? `${base}/sports/tennis/players` : `${base}/sports/${sport}/teams`;
             const [eh, ea] = await Promise.all([
               fetch(`${eloBase}/${detail.home.id}/elo-history?limit=30`),
               fetch(`${eloBase}/${detail.away.id}/elo-history?limit=30`),
