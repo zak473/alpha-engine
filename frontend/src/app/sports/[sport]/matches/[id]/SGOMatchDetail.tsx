@@ -1407,12 +1407,70 @@ interface Props {
   eloAway?: EloPoint[];
 }
 
-export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAway = [] }: Props) {
+export function SGOMatchDetail({ event, sport, backendMatch: backendMatchProp, eloHome: eloHomeProp = [], eloAway: eloAwayProp = [] }: Props) {
   const match = sgoEventToMatch(event, sport);
   const cfg = SPORT_CONFIG[sport];
   const isLive = match.status === "live";
   const isFinished = match.status === "finished";
   const matchLabel = `${match.home.name} vs ${match.away.name}`;
+
+  // backendMatch starts from SSR prop but can be fetched client-side if SSR returned null
+  const [backendMatch, setBackendMatch] = useState<SportMatchDetail | null>(backendMatchProp ?? null);
+  const [eloHome, setEloHome] = useState<EloPoint[]>(eloHomeProp);
+  const [eloAway, setEloAway] = useState<EloPoint[]>(eloAwayProp);
+  const [loadingBackend, setLoadingBackend] = useState(!backendMatchProp);
+
+  useEffect(() => {
+    if (backendMatch) { setLoadingBackend(false); return; } // SSR already provided it
+    const sgoHome = event.teams?.home?.names?.long ?? "";
+    const sgoAway = event.teams?.away?.names?.long ?? "";
+
+    async function fetchBackend() {
+      try {
+        const searchTerm = sport === "tennis" ? (sgoHome.split(" ").pop() ?? sgoHome) : sgoHome;
+        let detail: SportMatchDetail | null = null;
+
+        const searchRes = await fetch(`/api/v1/matches/search?q=${encodeURIComponent(searchTerm)}&limit=20`);
+        if (searchRes.ok) {
+          const results: Array<{ id: string; type: string; sport: string; title: string }> = await searchRes.json();
+          const best = results.find(
+            (r) => r.type === "match" && r.sport === sport &&
+              r.title.split(" vs ").pop()?.toLowerCase().includes(sgoAway.toLowerCase().split(" ")[0] ?? "")
+          );
+          if (best) {
+            const dr = await fetch(`/api/v1/sports/${sport}/matches/${best.id}`);
+            if (dr.ok) detail = await dr.json();
+          }
+        }
+
+        if (!detail) {
+          const pr = await fetch(`/api/v1/sports/${sport}/matches/preview?home=${encodeURIComponent(sgoHome)}&away=${encodeURIComponent(sgoAway)}`);
+          if (pr.ok) detail = await pr.json();
+        }
+
+        if (detail) {
+          setBackendMatch(detail);
+          if (!detail.id.startsWith("preview-") && detail.home?.id && detail.away?.id) {
+            const eloBase = sport === "tennis"
+              ? `/api/v1/sports/tennis/players`
+              : `/api/v1/sports/${sport}/teams`;
+            const [eh, ea] = await Promise.all([
+              fetch(`${eloBase}/${detail.home.id}/elo-history?limit=30`),
+              fetch(`${eloBase}/${detail.away.id}/elo-history?limit=30`),
+            ]);
+            if (eh.ok) { const d = await eh.json(); setEloHome(Array.isArray(d) ? d : (d.history ?? [])); }
+            if (ea.ok) { const d = await ea.json(); setEloAway(Array.isArray(d) ? d : (d.history ?? [])); }
+          }
+        }
+      } catch (err) {
+        console.error("[SGOMatchDetail] client-side backend fetch failed:", err);
+      } finally {
+        setLoadingBackend(false);
+      }
+    }
+    void fetchBackend();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set(["Full Game"]));
   const toggleCat = (cat: string) => setExpandedCats((prev) => {
@@ -1547,6 +1605,10 @@ export function SGOMatchDetail({ event, sport, backendMatch, eloHome = [], eloAw
                 {sport === "esports" && <EsportsInfoSection match={backendMatch} />}
                 {sport !== "tennis" && <RefereeSection match={backendMatch} />}
               </>
+            ) : loadingBackend ? (
+              <div className="sportsbook-card p-5 flex items-center gap-2 text-sm text-text-muted">
+                <Loader2 size={14} className="animate-spin" /> Loading predictions…
+              </div>
             ) : (
               <div className="sportsbook-card p-5 text-sm text-text-muted">
                 No model prediction data available for this match.
