@@ -88,21 +88,145 @@ interface SearchResult {
   status: string | null;
 }
 
+/** Decimal odds → American odds string (e.g. 2.5 → "+150", 1.5 → "-200") */
+function decimalToAmerican(decimal: number): string {
+  if (decimal <= 1) return "+100";
+  if (decimal >= 2.0) return `+${Math.round((decimal - 1) * 100)}`;
+  return `${Math.round(-100 / (decimal - 1))}`;
+}
+
+import type { SGOOdd } from "@/lib/sgo";
+
+function makeSGOOdd(id: string, decimalOdds: number): SGOOdd {
+  return {
+    oddID: id,
+    statID: id.split("-")[0] ?? "points",
+    statEntityID: id.split("-")[1] ?? "home",
+    periodID: id.split("-")[2] ?? "game",
+    betTypeID: id.includes("ml3way") ? "ml3way" : "ml",
+    sideID: id.split("-").slice(-1)[0] ?? "home",
+    bookOddsAvailable: true,
+    bookOdds: decimalToAmerican(decimalOdds),
+    byBookmaker: {},
+  };
+}
+
+/** Build a minimal SGOEvent from a backend SportMatchDetail so SGOMatchDetail renders. */
+function buildSyntheticSGOEvent(m: SportMatchDetail): SGOEvent {
+  const status = m.status ?? "scheduled";
+  const isLive = status === "live";
+  const isFinished = status === "finished" || status === "completed";
+  const isCancelled = status === "cancelled";
+
+  // Populate odds from fair_odds (model-derived) or betting (market odds if available)
+  const odds: Record<string, SGOOdd> = {};
+  const src = m.betting ?? m.fair_odds;
+  if (src) {
+    const hw = src.home_win != null ? Number(src.home_win) : null;
+    const aw = src.away_win != null ? Number(src.away_win) : null;
+    const dr = (src as { draw?: number | null }).draw != null ? Number((src as { draw?: number | null }).draw) : null;
+    if (hw && hw > 1) {
+      odds["points-home-reg-ml3way-home"] = makeSGOOdd("points-home-reg-ml3way-home", hw);
+      odds["points-home-game-ml-home"]    = makeSGOOdd("points-home-game-ml-home", hw);
+    }
+    if (aw && aw > 1) {
+      odds["points-away-reg-ml3way-away"] = makeSGOOdd("points-away-reg-ml3way-away", aw);
+      odds["points-away-game-ml-away"]    = makeSGOOdd("points-away-game-ml-away", aw);
+    }
+    if (dr && dr > 1) {
+      odds["points-all-reg-ml3way-draw"]  = makeSGOOdd("points-all-reg-ml3way-draw", dr);
+    }
+  }
+
+  return {
+    eventID: m.id,
+    sportID: m.sport,
+    leagueID: m.league,
+    teams: {
+      home: {
+        teamID: m.home.id,
+        names: { long: m.home.name },
+        score: m.home_score ?? undefined,
+      },
+      away: {
+        teamID: m.away.id,
+        names: { long: m.away.name },
+        score: m.away_score ?? undefined,
+      },
+    },
+    status: {
+      live: isLive,
+      started: isLive || isFinished,
+      ended: isFinished,
+      completed: isFinished,
+      cancelled: isCancelled,
+      startsAt: m.kickoff_utc,
+      displayLong: isLive ? "Live" : isFinished ? "Final" : isCancelled ? "Cancelled" : "Upcoming",
+      currentPeriodID: m.current_period ? String(m.current_period) : "",
+      clock: m.live_clock ?? undefined,
+    },
+    odds,
+    info: m.context ? {
+      venue: {
+        name: m.context.venue_name ?? undefined,
+        city: m.context.venue_city ?? undefined,
+      },
+    } : undefined,
+  };
+}
+
 export async function fetchMatchPageData(
   sport: SportSlug,
   eventID: string
 ): Promise<MatchPageData | null> {
   const apiKey = process.env.SGO_API_KEY ?? "";
+  const authHeaders = getServerAuthHeaders();
 
-  const sgoRes = await fetch(
-    `https://api.sportsgameodds.com/v2/events/?apiKey=${apiKey}&eventID=${eventID}`,
-    { cache: "no-store" }
-  );
-  if (!sgoRes.ok) return null;
-  const sgoData = await sgoRes.json();
-  const event = sgoData.data?.[0];
-  if (!event) return null;
+  // ── Step 1: Try SGO ──────────────────────────────────────────────────────
+  let event: SGOEvent | null = null;
+  try {
+    if (apiKey) {
+      const sgoRes = await fetch(
+        `https://api.sportsgameodds.com/v2/events/?apiKey=${apiKey}&eventID=${eventID}`,
+        { cache: "no-store" }
+      );
+      if (sgoRes.ok) {
+        const sgoData = await sgoRes.json();
+        event = sgoData.data?.[0] ?? null;
+      }
+    }
+  } catch {
+    // SGO unreachable, fall through
+  }
 
+  // ── Step 2: Backend-direct path (when SGO unavailable or ID is a backend ID) ──
+  if (!event) {
+    try {
+      const directRes = await fetch(
+        `${API_BASE}/sports/${sport}/matches/${eventID}`,
+        { cache: "no-store", headers: authHeaders }
+      );
+      if (directRes.ok) {
+        const backendMatch: SportMatchDetail = await directRes.json();
+        let eloHome: EloPoint[] = [];
+        let eloAway: EloPoint[] = [];
+        if (backendMatch.home?.id && backendMatch.away?.id && !backendMatch.home.id.startsWith("preview-")) {
+          const [eloHomeRes, eloAwayRes] = await Promise.all([
+            fetch(eloHistoryUrl(sport, backendMatch.home.id), { cache: "no-store", headers: authHeaders }),
+            fetch(eloHistoryUrl(sport, backendMatch.away.id), { cache: "no-store", headers: authHeaders }),
+          ]);
+          if (eloHomeRes.ok) { const d = await eloHomeRes.json(); eloHome = Array.isArray(d) ? d : (d.history ?? []); }
+          if (eloAwayRes.ok) { const d = await eloAwayRes.json(); eloAway = Array.isArray(d) ? d : (d.history ?? []); }
+        }
+        return { event: buildSyntheticSGOEvent(backendMatch), backendMatch, eloHome, eloAway };
+      }
+    } catch (err) {
+      console.error("[fetchMatchPageData] Backend-direct fetch failed:", err);
+    }
+    return null;
+  }
+
+  // ── Step 3: SGO event found — enrich with backend data ───────────────────
   let backendMatch: SportMatchDetail | null = null;
   let eloHome: EloPoint[] = [];
   let eloAway: EloPoint[] = [];
@@ -118,8 +242,6 @@ export async function fetchMatchPageData(
       ? (sgoHome.split(" ").slice(-1)[0] ?? sgoHome)
       : sgoHome;
 
-    const authHeaders = getServerAuthHeaders();
-
     // Search backend by home team name
     const searchRes = await fetch(
       `${API_BASE}/matches/search?q=${encodeURIComponent(searchTerm)}&limit=20`,
@@ -129,7 +251,7 @@ export async function fetchMatchPageData(
     // Sports that support the preview endpoint (ELO-based prediction from team names)
     const PREVIEW_SPORTS = new Set(["baseball", "basketball", "hockey", "soccer", "tennis", "esports"]);
 
-    // Step 1: search backend by home team name for an exact DB match
+    // Step 3a: search backend by home team name for an exact DB match
     let best: SearchResult | null = null;
     if (searchRes.ok) {
       const results: SearchResult[] = await searchRes.json();
@@ -157,7 +279,7 @@ export async function fetchMatchPageData(
       console.warn(`[fetchMatchPageData] Search failed (${searchRes.status}) for ${sgoHome} vs ${sgoAway}`);
     }
 
-    // Step 2: fetch full detail for the best match
+    // Step 3b: fetch full detail for the best match
     if (best) {
       const detailRes = await fetch(
         `${API_BASE}/sports/${sport}/matches/${best.id}`,
@@ -168,7 +290,7 @@ export async function fetchMatchPageData(
       }
     }
 
-    // Step 3: fallback to ELO preview when no DB match found or detail fetch failed
+    // Step 3c: fallback to ELO preview when no DB match found or detail fetch failed
     if (!backendMatch && PREVIEW_SPORTS.has(sport)) {
       const previewRes = await fetch(
         `${API_BASE}/sports/${sport}/matches/preview?home=${encodeURIComponent(sgoHome)}&away=${encodeURIComponent(sgoAway)}`,
@@ -181,7 +303,7 @@ export async function fetchMatchPageData(
       }
     }
 
-    // Step 4: fetch ELO history using team IDs from whichever response we got
+    // Step 3d: fetch ELO history using team IDs from whichever response we got
     if (backendMatch?.home?.id && backendMatch?.away?.id) {
       const isPreview = backendMatch.home.id.startsWith("preview-");
       if (!isPreview) {

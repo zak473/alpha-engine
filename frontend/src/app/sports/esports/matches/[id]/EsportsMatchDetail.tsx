@@ -372,6 +372,7 @@ function EsportsMatchHeader({ match }: { match: EsportsMatch }) {
       formHome={null}
       formAway={null}
       venue={undefined}
+      confidence={match.confidence}
       centerExtras={info?.series_format ? (
         <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/60">
           {info.series_format.toUpperCase()}{info.game_type ? ` · ${info.game_type.toUpperCase()}` : ""}

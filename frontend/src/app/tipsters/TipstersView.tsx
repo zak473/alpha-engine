@@ -409,8 +409,8 @@ function LeaderboardView({ tipsters }: { tipsters: TipsterProfile[] }) {
   );
 }
 
-export function TipstersView() {
-  const [tipsters, setTipsters] = useState<TipsterProfile[]>([]);
+export function TipstersView({ initialTipsters = [] }: { initialTipsters?: TipsterProfile[] }) {
+  const [tipsters, setTipsters] = useState<TipsterProfile[]>(initialTipsters);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortOpt>("followers");
   const [tab, setTab] = useState<Tab>("tipsters");
@@ -419,7 +419,7 @@ export function TipstersView() {
   const [showPostModal, setShowPostModal] = useState(false);
 
   useEffect(() => {
-    getTipsters().then(setTipsters).catch(() => setTipsters([]));
+    getTipsters().then(setTipsters).catch(() => {});
   }, []);
 
   function handleOpenTipster(tipster: TipsterProfile) {

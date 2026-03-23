@@ -60,8 +60,8 @@ class Settings(BaseSettings):
 
     # Auto-pick bot settings
     AUTO_PICK_USER_ID: str = "bot"          # user_id for auto-generated picks
-    AUTO_PICK_MIN_EDGE: float = 0.03        # minimum edge to generate a pick (3%)
-    AUTO_PICK_MIN_CONFIDENCE: float = 0.45  # minimum model confidence
+    AUTO_PICK_MIN_EDGE: float = 0.02        # minimum edge to generate a pick (2%)
+    AUTO_PICK_MIN_CONFIDENCE: float = 0.40  # minimum model confidence
     AUTO_PICK_KELLY_FRACTION: float = 0.25  # fractional Kelly (25% = conservative)
 
     # Scheduler — set to False to disable background fetching (e.g. in tests)

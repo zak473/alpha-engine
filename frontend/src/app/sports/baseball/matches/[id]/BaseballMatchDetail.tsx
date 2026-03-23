@@ -329,6 +329,7 @@ function BaseballMatchHeader({ match }: { match: TMatch }) {
       formHome={match.form_home ? { wins: match.form_home.wins_last_5, losses: match.form_home.losses_last_5 } : null}
       formAway={match.form_away ? { wins: match.form_away.wins_last_5, losses: match.form_away.losses_last_5 } : null}
       venue={info?.ballpark ?? undefined}
+      confidence={match.confidence}
       homeExtras={match.starter_home ? (
         <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-0.5 text-[10px] font-mono text-white/60">
           SP: {match.starter_home.name}

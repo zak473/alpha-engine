@@ -14,7 +14,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from api.deps import get_db, get_current_user
@@ -64,69 +64,107 @@ class PostTipIn(BaseModel):
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
+def _bulk_stats(db: Session, user_ids: list[str]) -> dict:
+    """
+    Compute all tip stats for a list of users in 3 queries instead of 7×N.
+    Returns dict keyed by user_id.
+    """
+    if not user_ids:
+        return {}
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+
+    # Query 1: aggregate counts per user in one pass
+    rows = (
+        db.query(
+            TipsterTip.user_id,
+            func.count(TipsterTip.id).label("total"),
+            func.sum(case((TipsterTip.outcome == "won", 1), else_=0)).label("won"),
+            func.sum(case((TipsterTip.outcome.is_(None), 1), else_=0)).label("active"),
+            func.sum(case(
+                (TipsterTip.outcome.in_(["won", "lost"]) & (TipsterTip.settled_at >= cutoff), 1),
+                else_=0,
+            )).label("weekly_settled"),
+            func.sum(case(
+                ((TipsterTip.outcome == "won") & (TipsterTip.settled_at >= cutoff), 1),
+                else_=0,
+            )).label("weekly_won"),
+        )
+        .filter(TipsterTip.user_id.in_(user_ids))
+        .group_by(TipsterTip.user_id)
+        .all()
+    )
+
+    stats: dict = {uid: {"total": 0, "won": 0, "active": 0, "weekly_settled": 0, "weekly_won": 0, "recent": []} for uid in user_ids}
+    for r in rows:
+        stats[r.user_id] = {
+            "total": r.total or 0,
+            "won": r.won or 0,
+            "active": r.active or 0,
+            "weekly_settled": r.weekly_settled or 0,
+            "weekly_won": r.weekly_won or 0,
+            "recent": [],
+        }
+
+    # Query 2: follower counts per user
+    follower_rows = (
+        db.query(TipsterFollow.tipster_id, func.count(TipsterFollow.id).label("cnt"))
+        .filter(TipsterFollow.tipster_id.in_(user_ids))
+        .group_by(TipsterFollow.tipster_id)
+        .all()
+    )
+    followers_map = {r.tipster_id: r.cnt for r in follower_rows}
+
+    # Query 3: last 8 settled tips per user (window function emulated with subquery)
+    from sqlalchemy import text
+    uid_list = ", ".join(f"'{uid}'" for uid in user_ids)
+    recent_rows = db.execute(
+        text(
+            f"SELECT user_id, outcome FROM ("
+            f"  SELECT user_id, outcome, settled_at,"
+            f"  ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY settled_at DESC) AS rn"
+            f"  FROM tipster_tips"
+            f"  WHERE user_id IN ({uid_list}) AND outcome IN ('won','lost')"
+            f") sub WHERE rn <= 8 ORDER BY user_id, settled_at DESC"
+        )
+    ).fetchall()
+    for row in recent_rows:
+        stats[row.user_id]["recent"].append("W" if row.outcome == "won" else "L")
+
+    return stats, followers_map
+
+
 def _build_profile(
     db: Session,
     user: User,
     current_user_id: Optional[str],
+    precomputed: Optional[dict] = None,
+    followers_map: Optional[dict] = None,
 ) -> TipsterProfile:
-    """Compute stats for one tipster from DB."""
-    # Follower count
-    followers = db.query(func.count(TipsterFollow.id)).filter(
-        TipsterFollow.tipster_id == user.id
-    ).scalar() or 0
+    """Build a tipster profile — uses precomputed bulk stats when available."""
+    if precomputed is not None:
+        s = precomputed.get(user.id, {"total": 0, "won": 0, "active": 0, "weekly_settled": 0, "weekly_won": 0, "recent": []})
+        followers = (followers_map or {}).get(user.id, 0)
+    else:
+        # Single-user fallback (used by get_tipster endpoint)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+        s = {
+            "total": db.query(func.count(TipsterTip.id)).filter(TipsterTip.user_id == user.id).scalar() or 0,
+            "won": db.query(func.count(TipsterTip.id)).filter(TipsterTip.user_id == user.id, TipsterTip.outcome == "won").scalar() or 0,
+            "active": db.query(func.count(TipsterTip.id)).filter(TipsterTip.user_id == user.id, TipsterTip.outcome.is_(None)).scalar() or 0,
+            "weekly_settled": db.query(func.count(TipsterTip.id)).filter(TipsterTip.user_id == user.id, TipsterTip.settled_at >= cutoff, TipsterTip.outcome.in_(["won", "lost"])).scalar() or 0,
+            "weekly_won": db.query(func.count(TipsterTip.id)).filter(TipsterTip.user_id == user.id, TipsterTip.settled_at >= cutoff, TipsterTip.outcome == "won").scalar() or 0,
+            "recent": ["W" if t.outcome == "won" else "L" for t in db.query(TipsterTip).filter(TipsterTip.user_id == user.id, TipsterTip.outcome.in_(["won", "lost"])).order_by(TipsterTip.settled_at.desc()).limit(8).all()],
+        }
+        followers = db.query(func.count(TipsterFollow.id)).filter(TipsterFollow.tipster_id == user.id).scalar() or 0
 
-    # Is the requesting user following this tipster?
     is_following = False
     if current_user_id:
         is_following = db.query(TipsterFollow).filter_by(
-            follower_id=current_user_id,
-            tipster_id=user.id,
+            follower_id=current_user_id, tipster_id=user.id,
         ).first() is not None
 
-    # All-time pick counts
-    total_picks = db.query(func.count(TipsterTip.id)).filter(
-        TipsterTip.user_id == user.id
-    ).scalar() or 0
-
-    won_picks = db.query(func.count(TipsterTip.id)).filter(
-        TipsterTip.user_id == user.id,
-        TipsterTip.outcome == "won",
-    ).scalar() or 0
-
-    # Active (unsettled) tips
-    active_tips_count = db.query(func.count(TipsterTip.id)).filter(
-        TipsterTip.user_id == user.id,
-        TipsterTip.outcome.is_(None),
-    ).scalar() or 0
-
-    # Weekly win rate: settled picks in last 7 days
-    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
-    weekly_settled = db.query(func.count(TipsterTip.id)).filter(
-        TipsterTip.user_id == user.id,
-        TipsterTip.settled_at >= cutoff,
-        TipsterTip.outcome.in_(["won", "lost"]),
-    ).scalar() or 0
-
-    weekly_won = db.query(func.count(TipsterTip.id)).filter(
-        TipsterTip.user_id == user.id,
-        TipsterTip.settled_at >= cutoff,
-        TipsterTip.outcome == "won",
-    ).scalar() or 0
-
-    weekly_win_rate = (weekly_won / weekly_settled) if weekly_settled > 0 else 0.0
-
-    # Recent results: last 8 settled picks newest-first
-    recent_tips = (
-        db.query(TipsterTip)
-        .filter(
-            TipsterTip.user_id == user.id,
-            TipsterTip.outcome.in_(["won", "lost"]),
-        )
-        .order_by(TipsterTip.settled_at.desc())
-        .limit(8)
-        .all()
-    )
-    recent_results = ["W" if t.outcome == "won" else "L" for t in recent_tips]
+    weekly_win_rate = (s["weekly_won"] / s["weekly_settled"]) if s["weekly_settled"] > 0 else 0.0
 
     return TipsterProfile(
         id=user.id,
@@ -136,10 +174,10 @@ def _build_profile(
         followers=followers,
         is_following=is_following,
         weekly_win_rate=round(weekly_win_rate, 4),
-        total_picks=total_picks,
-        won_picks=won_picks,
-        active_tips_count=active_tips_count,
-        recent_results=recent_results,
+        total_picks=s["total"],
+        won_picks=s["won"],
+        active_tips_count=s["active"],
+        recent_results=s["recent"],
     )
 
 
@@ -163,8 +201,12 @@ def list_tipsters(
         )
         .all()
     )
+    if not users:
+        return []
 
-    return [_build_profile(db, u, current_user_id) for u in users]
+    user_ids = [u.id for u in users]
+    bulk, followers_map = _bulk_stats(db, user_ids)
+    return [_build_profile(db, u, current_user_id, bulk, followers_map) for u in users]
 
 
 @router.get("/{tipster_id}", response_model=TipsterProfile)

@@ -329,7 +329,7 @@ def _compute_extended_form(
     # Ranking trend: ELO change over last 28 days (positive = rising)
     recent_elos = (
         db.query(RatingEloTeam)
-        .filter(RatingEloTeam.team_id == player_id, RatingEloTeam.context == "global")
+        .filter(RatingEloTeam.team_id == player_id)
         .order_by(RatingEloTeam.rated_at.desc())
         .limit(10)
         .all()
@@ -384,10 +384,10 @@ def _league_name(db: Session, league_id: str) -> str:
 
 
 def _elo_snapshot(db: Session, player_id: str, name: str) -> EloHistoryPoint | None:
-    """Latest global ELO for a player (used in list view)."""
+    """Latest ELO for a player (used in list view). Context-agnostic — backfill writes surface contexts, not 'global'."""
     rows = (
         db.query(RatingEloTeam)
-        .filter(RatingEloTeam.team_id == player_id, RatingEloTeam.context == "global")
+        .filter(RatingEloTeam.team_id == player_id)
         .order_by(RatingEloTeam.rated_at.desc())
         .limit(2)
         .all()
@@ -404,11 +404,11 @@ def _elo_snapshot(db: Session, player_id: str, name: str) -> EloHistoryPoint | N
 
 
 def _surface_elo(db: Session, player_id: str, name: str, surface: str | None) -> TennisSurfaceEloOut | None:
-    """Return overall ELO + optional surface-specific rating."""
-    # Global rating
+    """Return overall ELO + optional surface-specific rating. Context-agnostic for overall (backfill uses surface contexts, not 'global')."""
+    # Overall rating = most recent row regardless of surface context
     global_rows = (
         db.query(RatingEloTeam)
-        .filter(RatingEloTeam.team_id == player_id, RatingEloTeam.context == "global")
+        .filter(RatingEloTeam.team_id == player_id)
         .order_by(RatingEloTeam.rated_at.desc())
         .limit(2)
         .all()

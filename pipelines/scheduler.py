@@ -860,7 +860,7 @@ def start() -> BackgroundScheduler:
     from datetime import datetime as _dt, timezone as _tz, timedelta as _timedelta
     from apscheduler.executors.pool import ThreadPoolExecutor as APThreadPoolExecutor
     _scheduler = BackgroundScheduler(
-        executors={"default": APThreadPoolExecutor(max_workers=20)},
+        executors={"default": APThreadPoolExecutor(max_workers=4)},
         job_defaults={"coalesce": True, "max_instances": 1},
     )
 

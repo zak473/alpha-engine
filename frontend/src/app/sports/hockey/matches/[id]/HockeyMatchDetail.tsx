@@ -569,6 +569,7 @@ export function HockeyMatchDetail({ match: initialMatch, eloHomeHistory, eloAway
         formHome={match.form_home ? { wins: match.form_home.wins, draws: match.form_home.draws, losses: match.form_home.losses } : null}
         formAway={match.form_away ? { wins: match.form_away.wins, draws: match.form_away.draws, losses: match.form_away.losses } : null}
         venue={match.context?.venue_name ?? undefined}
+        confidence={match.confidence}
         centerExtras={(match.home_periods || match.away_periods) ? <PeriodScoreTable match={match} /> : undefined}
       />
 

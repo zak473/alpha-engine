@@ -56,14 +56,12 @@ def get_player_elo_history(
     db: Session = Depends(get_db),
 ):
     """ELO rating history for a tennis player (chronological, most recent N matches)."""
-    context = surface.lower() if surface else "global"
-    rows = (
-        db.query(RatingEloTeam)
-        .filter(RatingEloTeam.team_id == player_id, RatingEloTeam.context == context)
-        .order_by(RatingEloTeam.rated_at.desc())
-        .limit(limit)
-        .all()
-    )
+    # When no surface specified, return all contexts (backfill uses surface contexts not 'global')
+    context = surface.lower() if surface else None
+    q = db.query(RatingEloTeam).filter(RatingEloTeam.team_id == player_id)
+    if context:
+        q = q.filter(RatingEloTeam.context == context)
+    rows = q.order_by(RatingEloTeam.rated_at.desc()).limit(limit).all()
     return [
         EloHistoryPoint(
             date=r.rated_at.isoformat(),

@@ -219,8 +219,9 @@ function buildMarkets(odds: Record<string, SGOOdd>, homeName: string, awayName: 
         { id: "under", label: `Under${line}`, odds: p2 },
       ];
     } else {
-      const sp1 = o1.bookSpread ? ` (${parseFloat(o1.bookSpread) > 0 ? "+" : ""}${o1.bookSpread})` : "";
-      const sp2 = o2.bookSpread ? ` (${parseFloat(o2.bookSpread) > 0 ? "+" : ""}${o2.bookSpread})` : "";
+      const fmtSpread = (s: string) => { const n = parseFloat(s); return isNaN(n) ? s : n > 0 ? `+${n}` : String(n); };
+      const sp1 = o1.bookSpread ? ` (${fmtSpread(o1.bookSpread)})` : "";
+      const sp2 = o2.bookSpread ? ` (${fmtSpread(o2.bookSpread)})` : "";
       selections = [{ id: "home", label: shortName(homeName) + sp1, odds: p1 }];
       if (def.d) {
         const od = odds[def.d];

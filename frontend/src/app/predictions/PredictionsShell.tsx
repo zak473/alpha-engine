@@ -132,7 +132,7 @@ function backendItemToMatch(item: BackendItem, sport: SportSlug): BettingMatch &
     sport,
     league: item.league ?? sport,
     startTime: item.kickoff_utc,
-    status: item.status ?? "upcoming",
+    status: (item.status === "scheduled" ? "upcoming" : item.status ?? "upcoming") as import("@/lib/betting-types").MatchStatus,
     homeScore: item.home_score ?? undefined,
     awayScore: item.away_score ?? undefined,
     home: { id: item.home_id ?? homeName, name: homeName, shortName: homeName.slice(0, 14) },

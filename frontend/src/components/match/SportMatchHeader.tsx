@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Calendar, Clock, MapPin } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, MapPin, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FormStreak } from "@/components/charts/FormStreak";
 
@@ -41,6 +41,7 @@ export interface SportMatchHeaderProps {
   formHome?: FormPanel | null;
   formAway?: FormPanel | null;
   venue?: string | null;
+  confidence?: number | null;
   /** Extra content rendered below the score (period scores, set scores, etc.) */
   centerExtras?: React.ReactNode;
   /** Extra content rendered below team name on home side */
@@ -166,7 +167,7 @@ export function SportMatchHeader({
   sport, league, season, status, kickoffUtc, liveClock,
   home, away, homeScore, awayScore, outcome,
   probabilities, eloHome, eloAway, formHome, formAway,
-  venue, centerExtras, homeExtras, awayExtras,
+  venue, confidence, centerExtras, homeExtras, awayExtras,
 }: SportMatchHeaderProps) {
   const isLive = status.toLowerCase() === "live";
   const isFinished = status.toLowerCase() === "finished";
@@ -268,6 +269,17 @@ export function SportMatchHeader({
                 <MapPin size={11} />
                 {venue}
               </span>
+            )}
+            {confidence != null && (
+              <div className="mt-2 flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold"
+                style={{
+                  borderColor: confidence >= 65 ? "rgba(34,197,94,0.35)" : confidence >= 55 ? "rgba(245,158,11,0.35)" : "rgba(255,255,255,0.10)",
+                  background: confidence >= 65 ? "rgba(34,197,94,0.10)" : confidence >= 55 ? "rgba(245,158,11,0.10)" : "rgba(255,255,255,0.04)",
+                  color: confidence >= 65 ? "rgb(134,239,172)" : confidence >= 55 ? "rgb(252,211,77)" : "rgba(255,255,255,0.45)",
+                }}>
+                <Shield size={11} />
+                {confidence}% confidence
+              </div>
             )}
           </div>
         </div>

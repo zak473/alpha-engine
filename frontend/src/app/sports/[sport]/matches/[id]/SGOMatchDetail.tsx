@@ -1763,6 +1763,8 @@ function MarketImpliedProbsSection({ match, homeName, awayName }: { match: Retur
   const favorite = pHome > pAway ? homeName : awayName;
   const favoriteProb = Math.max(pHome, pAway);
   const spreadMkt = match.allMarkets.find((m) => m.name.toLowerCase().includes("spread") || m.name.toLowerCase().includes("handicap") || m.name.toLowerCase().includes("asian"));
+  // Pick the favorite's spread selection (home if home is favored, else away)
+  const favSpreadSel = spreadMkt?.selections.find((s) => s.id === (pHome > pAway ? "home" : "away"));
 
   return (
     <>
@@ -1796,9 +1798,23 @@ function MarketImpliedProbsSection({ match, homeName, awayName }: { match: Retur
         <div className="pt-2 text-[10px] text-text-muted">Derived from {mainMkt.name} odds</div>
       </Card>
 
-      {(homeXG || awayXG || spreadMkt || over25) && (
+      {(homeXG || awayXG || favSpreadSel || over25) && (
         <Card title="Match Projections">
           <div className="space-y-2 text-[12px]">
+            {/* Predicted winner */}
+            <div className="flex items-center justify-between py-1.5 border-b" style={{ borderColor: "var(--border0)" }}>
+              <span className="text-text-muted">Predicted winner</span>
+              <span className="font-semibold" style={{ color: "#22c55e" }}>
+                {favorite} · {Math.round(favoriteProb * 100)}%
+              </span>
+            </div>
+            {/* Spread reference — single line for the favourite */}
+            {favSpreadSel && (
+              <div className="flex items-center justify-between py-1.5 border-b" style={{ borderColor: "var(--border0)" }}>
+                <span className="text-text-muted">Point spread</span>
+                <span className="font-semibold text-text-primary">{favSpreadSel.label} · {favSpreadSel.odds.toFixed(2)}</span>
+              </div>
+            )}
             {(homeXG || awayXG) && (
               <div className="flex items-center justify-between py-1.5 border-b" style={{ borderColor: "var(--border0)" }}>
                 <span className="text-text-muted">Expected goals</span>
@@ -1809,19 +1825,13 @@ function MarketImpliedProbsSection({ match, homeName, awayName }: { match: Retur
               </div>
             )}
             {over25 && (
-              <div className="flex items-center justify-between py-1.5 border-b" style={{ borderColor: "var(--border0)" }}>
+              <div className="flex items-center justify-between py-1.5" style={{ borderColor: "var(--border0)" }}>
                 <span className="text-text-muted">Over 2.5 goals</span>
                 <span className="font-semibold" style={{ color: "#22c55e" }}>
                   {Math.round((over25.odds > 0 ? 1 / over25.odds : 0) * 100)}% · {over25.odds.toFixed(2)}
                 </span>
               </div>
             )}
-            {spreadMkt?.selections.map((s) => (
-              <div key={s.id} className="flex items-center justify-between py-1.5 border-b last:border-0" style={{ borderColor: "var(--border0)" }}>
-                <span className="text-text-muted">{s.label}</span>
-                <span className="font-semibold text-text-primary">{s.odds.toFixed(2)}</span>
-              </div>
-            ))}
           </div>
         </Card>
       )}
@@ -1928,7 +1938,7 @@ export function SGOMatchDetail({ event, sport, backendMatch: backendMatchProp, e
   const hasInfoData = !!(backendMatch || event.results?.game || event.info?.venue);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-4 lg:px-6 space-y-4">
+    <div className="mx-auto max-w-4xl px-4 py-4 lg:px-6 space-y-4">
 
       {/* Hero — full width */}
       <div className="sportsbook-card overflow-hidden">
@@ -1954,7 +1964,7 @@ export function SGOMatchDetail({ event, sport, backendMatch: backendMatchProp, e
           )}
         </div>
 
-        <div className="grid gap-3 px-4 py-4 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+        <div className="grid gap-3 px-4 py-4 grid-cols-[1fr_auto_1fr] items-center">
           <div>
             <p className="text-[11px] uppercase tracking-[0.16em] text-text-subtle">Home</p>
             <p className="mt-1 text-2xl font-bold leading-tight text-text-primary">{match.home.name}</p>
@@ -1969,104 +1979,138 @@ export function SGOMatchDetail({ event, sport, backendMatch: backendMatchProp, e
           ) : (
             <div className="text-center text-2xl font-thin text-text-subtle">vs</div>
           )}
-          <div className="text-left lg:text-right">
+          <div className="text-right">
             <p className="text-[11px] uppercase tracking-[0.16em] text-text-subtle">Away</p>
             <p className="mt-1 text-2xl font-bold leading-tight text-text-primary">{match.away.name}</p>
           </div>
         </div>
+        {backendMatch?.confidence != null && (
+          <div className="flex justify-center pb-4">
+            <span className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold"
+              style={{
+                borderColor: backendMatch.confidence >= 65 ? "rgba(34,197,94,0.35)" : backendMatch.confidence >= 55 ? "rgba(245,158,11,0.35)" : "var(--border0)",
+                background: backendMatch.confidence >= 65 ? "rgba(34,197,94,0.08)" : backendMatch.confidence >= 55 ? "rgba(245,158,11,0.08)" : "var(--bg2)",
+                color: backendMatch.confidence >= 65 ? "#86efac" : backendMatch.confidence >= 55 ? "#fcd34d" : "var(--text-muted)",
+              }}>
+              <Shield size={11} /> {backendMatch.confidence}% model confidence
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Info grid — two columns on desktop */}
-      {hasInfoData && (
-        <div className="grid gap-4 lg:grid-cols-2">
+      {/* Analytics */}
+      {backendMatch ? (
+        <>
+          {/* Full-width: AI analysis + probabilities */}
+          <PreMatchAnalysisSection
+            matchId={backendMatch.id}
+            isFinished={isFinished}
+            previewParams={backendMatch.id.startsWith("preview-") ? {
+              home: backendMatch.home.name,
+              away: backendMatch.away.name,
+              sport: backendMatch.sport ?? sport,
+              league: backendMatch.league ?? undefined,
+              p_home: backendMatch.probabilities?.home_win ?? undefined,
+              p_draw: backendMatch.probabilities?.draw ?? undefined,
+              p_away: backendMatch.probabilities?.away_win ?? undefined,
+              confidence: backendMatch.confidence ?? undefined,
+              fair_home: backendMatch.fair_odds?.home_win ?? undefined,
+              fair_draw: backendMatch.fair_odds?.draw ?? undefined,
+              fair_away: backendMatch.fair_odds?.away_win ?? undefined,
+              elo_home: typeof backendMatch.elo_home === "object" && backendMatch.elo_home ? (backendMatch.elo_home as { rating?: number }).rating : null,
+              elo_away: typeof backendMatch.elo_away === "object" && backendMatch.elo_away ? (backendMatch.elo_away as { rating?: number }).rating : null,
+            } : undefined}
+          />
+          <ProbabilitiesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
 
-          {/* Left info column */}
-          <div className="space-y-3">
+          {/* Single 2-col auto-flow grid — sections fill naturally, no empty halves */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <EloSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} eloHome={eloHome} eloAway={eloAway} cfg={cfg} />
             {sport === "tennis" ? (
-              /* Tennis: match info, serve stats, tiebreaks, profiles */
-              backendMatch && (
-                <>
-                  <TennisOddsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                  <TennisInfoSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                  <TennisServeStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                  <TennisTiebreakSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                  <TennisProfileSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                </>
-              )
+              <TennisFormSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+            ) : sport === "soccer" ? (
+              <SoccerFormSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
             ) : (
-              /* Other sports: SGO live data */
-              <>
-                <SGOVenueSection event={event} />
-                <SGOTeamStatsSection event={event} homeName={match.home.name} awayName={match.away.name} />
-                {backendMatch && (isLive || isFinished) && <EventsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
-                <LiveStatsSection match={backendMatch ?? ({} as SportMatchDetail)} homeName={match.home.name} awayName={match.away.name} />
-                <SGOPlayerStatsSection event={event} homeName={match.home.name} awayName={match.away.name} />
-                {backendMatch && <LineupSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
-                {backendMatch && sport === "basketball" && <BasketballBoxScoreSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
-                {backendMatch && <InjuriesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
-                {backendMatch && <HighlightsSection match={backendMatch} />}
-                {backendMatch && sport === "soccer" && <FullStandingsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
-              </>
+              <FormSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
             )}
-          </div>
-
-          {/* Right info column: model + analytics */}
-          <div className="space-y-3">
-            {backendMatch ? (
-              <>
-                <PreMatchAnalysisSection
-                  matchId={backendMatch.id}
-                  isFinished={isFinished}
-                  previewParams={backendMatch.id.startsWith("preview-") ? {
-                    home: backendMatch.home.name,
-                    away: backendMatch.away.name,
-                    sport: backendMatch.sport ?? sport,
-                    league: backendMatch.league ?? undefined,
-                    p_home: backendMatch.probabilities?.home_win ?? undefined,
-                    p_draw: backendMatch.probabilities?.draw ?? undefined,
-                    p_away: backendMatch.probabilities?.away_win ?? undefined,
-                    confidence: backendMatch.confidence ?? undefined,
-                    fair_home: backendMatch.fair_odds?.home_win ?? undefined,
-                    fair_draw: backendMatch.fair_odds?.draw ?? undefined,
-                    fair_away: backendMatch.fair_odds?.away_win ?? undefined,
-                    elo_home: typeof backendMatch.elo_home === "object" && backendMatch.elo_home ? (backendMatch.elo_home as { rating?: number }).rating : null,
-                    elo_away: typeof backendMatch.elo_away === "object" && backendMatch.elo_away ? (backendMatch.elo_away as { rating?: number }).rating : null,
-                  } : undefined}
-                />
-                <ProbabilitiesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                <EloSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} eloHome={eloHome} eloAway={eloAway} cfg={cfg} />
-                {sport === "tennis" ? (
-                  <TennisFormSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                ) : sport === "soccer" ? (
-                  <SoccerFormSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                ) : (
-                  <FormSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                )}
-                <H2HSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                {sport !== "tennis" && <LeagueContextSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
-                <KeyDriversSection match={backendMatch} />
-                <SimulationSection match={backendMatch} />
-                {sport === "soccer" && <SoccerOddsEdgeSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
-                <ModelMetaSection match={backendMatch} />
-                {sport === "soccer" ? (
-                  <SoccerStatsBarSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                ) : sport !== "tennis" ? (
-                  <StatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
-                ) : null}
-                {sport !== "tennis" && <AdvancedStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
-                <ContextSection match={backendMatch} />
-                {sport === "esports" && <EsportsInfoSection match={backendMatch} />}
-                {sport !== "tennis" && <RefereeSection match={backendMatch} />}
-              </>
-            ) : loadingBackend ? (
-              <div className="sportsbook-card p-5 flex items-center gap-2 text-sm text-text-muted">
-                <Loader2 size={14} className="animate-spin" /> Loading predictions…
-              </div>
+            <H2HSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+            <KeyDriversSection match={backendMatch} />
+            <SimulationSection match={backendMatch} />
+            {sport === "soccer" ? (
+              <SoccerOddsEdgeSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
             ) : (
               <MarketImpliedProbsSection match={match} homeName={match.home.name} awayName={match.away.name} />
             )}
+            {sport !== "tennis" && <LeagueContextSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />}
+            <ContextSection match={backendMatch} />
+            {/* Stats — full width */}
+            {sport === "soccer" ? (
+              <div className="lg:col-span-2">
+                <SoccerStatsBarSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+              </div>
+            ) : sport !== "tennis" ? (
+              <div className="lg:col-span-2">
+                <StatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+              </div>
+            ) : null}
+            {sport !== "tennis" && (
+              <div className="lg:col-span-2">
+                <AdvancedStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+              </div>
+            )}
+            {/* Tennis-specific — flow into the same grid */}
+            {sport === "tennis" && (
+              <>
+                <TennisOddsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                <TennisInfoSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                <TennisServeStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                <TennisTiebreakSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                <div className="lg:col-span-2">
+                  <TennisProfileSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                </div>
+              </>
+            )}
+            {/* Live / match data */}
+            {sport !== "tennis" && (
+              <>
+                {(isLive || isFinished) && (
+                  <div className="lg:col-span-2">
+                    <EventsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                  </div>
+                )}
+                <SGOVenueSection event={event} />
+                <LiveStatsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                <div className="lg:col-span-2">
+                  <SGOTeamStatsSection event={event} homeName={match.home.name} awayName={match.away.name} />
+                </div>
+                <SGOPlayerStatsSection event={event} homeName={match.home.name} awayName={match.away.name} />
+                <LineupSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                {sport === "basketball" && (
+                  <div className="lg:col-span-2">
+                    <BasketballBoxScoreSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                  </div>
+                )}
+                <InjuriesSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                <HighlightsSection match={backendMatch} />
+                {sport === "soccer" && (
+                  <div className="lg:col-span-2">
+                    <FullStandingsSection match={backendMatch} homeName={match.home.name} awayName={match.away.name} />
+                  </div>
+                )}
+              </>
+            )}
+            {/* Footer meta — flow naturally */}
+            <ModelMetaSection match={backendMatch} />
+            {sport === "esports" && <EsportsInfoSection match={backendMatch} />}
+            {sport !== "tennis" && <RefereeSection match={backendMatch} />}
           </div>
+        </>
+      ) : loadingBackend ? (
+        <div className="sportsbook-card p-5 flex items-center gap-2 text-sm text-text-muted">
+          <Loader2 size={14} className="animate-spin" /> Loading predictions…
         </div>
+      ) : (
+        <MarketImpliedProbsSection match={match} homeName={match.home.name} awayName={match.away.name} />
       )}
 
       {/* Odds — full width at bottom */}
