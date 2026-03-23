@@ -177,6 +177,14 @@ def _job_fetch_odds() -> None:
     except Exception as exc:
         log.error("[scheduler] sgo_odds failed: %s", exc, exc_info=True)
 
+    # BallDontLie: real sportsbook odds for NBA (DraftKings/FanDuel/Caesars)
+    try:
+        from pipelines.odds.fetch_odds_bdl import fetch_all as fetch_odds_bdl
+        n = fetch_odds_bdl()
+        log.info("[scheduler] bdl_odds: %d NBA matches updated.", n)
+    except Exception as exc:
+        log.error("[scheduler] bdl_odds failed: %s", exc, exc_info=True)
+
     # Fallback: The Odds API (only runs if ODDS_API_KEY set)
     try:
         from config.settings import settings as _s

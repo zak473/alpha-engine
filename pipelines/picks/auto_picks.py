@@ -80,7 +80,8 @@ def _already_tipped(db: Session, user_id: str, match_label: str, market: str, se
 # Baseball: model picks heavy favourites with no real edge → require much higher
 # bar before auto-betting. Raise min_edge to 8% and min_confidence to 65%.
 SPORT_MIN_EDGE: dict[str, float] = {
-    "baseball": 0.05,
+    "baseball":    0.05,
+    "basketball":  0.01,  # NBA books are efficient; accept any genuine edge ≥1%
 }
 SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "baseball": 0.50,
