@@ -150,6 +150,14 @@ async def lifespan(app: FastAPI):
         except Exception as exc:
             logger.warning("Startup: model registry auto-register failed: %s", exc)
 
+        # Seed AI tipster accounts (idempotent)
+        try:
+            from pipelines.tipsters.seed_ai_tipsters import seed as seed_tipsters
+            seed_tipsters()
+            logger.info("Startup: AI tipster seed complete.")
+        except Exception as exc:
+            logger.warning("Startup: AI tipster seed failed: %s", exc)
+
         # Expire stale live matches
         try:
             from pipelines.scheduler import _job_expire_stale

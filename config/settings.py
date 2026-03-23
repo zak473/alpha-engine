@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     # Register at https://the-odds-api.com → Get API Key
     ODDS_API_KEY: str = ""
 
+    # SportsGameOdds — events + odds for all sports (soccer, NBA, MLB, NHL, ATP/WTA)
+    SGO_API_KEY: str = ""
+
     # Live data — Highlightly (soccer 950+ leagues, basketball, baseball, hockey)
     # Register at https://highlightly.net → API key
     HIGHLIGHTLY_API_KEY: str = ""

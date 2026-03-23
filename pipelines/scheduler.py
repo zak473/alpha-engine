@@ -166,14 +166,26 @@ def _job_predict_only() -> None:
 
 
 def _job_fetch_odds() -> None:
-    """Fetch real market odds from The Odds API and run auto-pick bot + CLV settlement."""
+    """Fetch real market odds (SGO primary, The Odds API fallback) then run auto-pick bot."""
     log.info("[scheduler] Starting fetch_odds job ...")
+
+    # Primary: SportsGameOdds (covers all our sports)
     try:
-        from pipelines.odds.fetch_odds import fetch_all as fetch_odds
-        n = fetch_odds()
-        log.info("[scheduler] odds: %d matches updated.", n)
+        from pipelines.odds.fetch_odds_sgo import fetch_all as fetch_odds_sgo
+        n = fetch_odds_sgo()
+        log.info("[scheduler] sgo_odds: %d matches updated.", n)
     except Exception as exc:
-        log.error("[scheduler] fetch_odds failed: %s", exc, exc_info=True)
+        log.error("[scheduler] sgo_odds failed: %s", exc, exc_info=True)
+
+    # Fallback: The Odds API (only runs if ODDS_API_KEY set)
+    try:
+        from config.settings import settings as _s
+        if _s.ODDS_API_KEY:
+            from pipelines.odds.fetch_odds import fetch_all as fetch_odds
+            n = fetch_odds()
+            log.info("[scheduler] odds_api: %d matches updated.", n)
+    except Exception as exc:
+        log.error("[scheduler] odds_api failed: %s", exc, exc_info=True)
 
     try:
         from pipelines.picks.auto_picks import run as run_auto_picks, settle_all_clv
