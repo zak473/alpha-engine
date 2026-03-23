@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Trash2, TrendingUp, ChevronRight, CheckCircle2, Loader2, Zap, Plus } from "lucide-react";
+import { X, Trash2, TrendingUp, CheckCircle2, Loader2, Zap, Plus, Trophy, BookMarked } from "lucide-react";
 import type { BettingMatch, QueueSelection } from "@/lib/betting-types";
 import { useBetting } from "./BettingContext";
 import { TopPicksMiniModule } from "./TopPicksMiniModule";
+import { ChallengePickerModal } from "./ChallengePickerModal";
 import { cn } from "@/lib/utils";
 import { SPORT_CONFIG } from "@/lib/betting-types";
 import { trackPicks } from "@/lib/api";
@@ -68,6 +69,7 @@ export function MobileQueueDrawer({ open, onClose, matches }: MobileQueueDrawerP
   const router = useRouter();
   const [tracking, setTracking] = useState(false);
   const [tracked, setTracked] = useState(false);
+  const [challengeModalOpen, setChallengeModalOpen] = useState(false);
   const isEmpty = queue.length === 0;
 
   const handleTrack = async () => {
@@ -217,26 +219,35 @@ export function MobileQueueDrawer({ open, onClose, matches }: MobileQueueDrawerP
                 </div>
               </div>
 
-              {/* Track button */}
-              <button
-                onClick={handleTrack}
-                disabled={tracking || tracked}
-                className="btn btn-primary w-full h-12 text-sm font-semibold disabled:opacity-70"
-              >
-                {tracked ? (
-                  <><CheckCircle2 size={16} /> Tracked!</>
-                ) : tracking ? (
-                  <><Loader2 size={16} className="animate-spin" /> Saving...</>
-                ) : (
-                  <>Track {queue.length} pick{queue.length !== 1 ? "s" : ""} <ChevronRight size={16} /></>
-                )}
-              </button>
+              {/* CTAs */}
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={handleTrack}
+                  disabled={tracking || tracked}
+                  className="btn btn-primary w-full h-12 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-70"
+                >
+                  {tracked ? (
+                    <><CheckCircle2 size={16} /> Tracked!</>
+                  ) : tracking ? (
+                    <><Loader2 size={16} className="animate-spin" /> Saving...</>
+                  ) : (
+                    <><BookMarked size={16} /> Add to Tracker</>
+                  )}
+                </button>
+                <button
+                  onClick={() => setChallengeModalOpen(true)}
+                  className="w-full flex items-center justify-center gap-2 h-12 rounded-xl text-sm font-bold transition-all"
+                  style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.25)" }}
+                >
+                  <Trophy size={16} /> Post to Challenge
+                </button>
+              </div>
             </div>
           )}
         </div>
 
         {/* Footer tip */}
-        <div 
+        <div
           className="px-4 py-3 border-t"
           style={{ borderColor: "var(--border0)" }}
         >
@@ -248,6 +259,14 @@ export function MobileQueueDrawer({ open, onClose, matches }: MobileQueueDrawerP
           </div>
         </div>
       </div>
+
+      {challengeModalOpen && (
+        <ChallengePickerModal
+          queue={queue}
+          onClose={() => setChallengeModalOpen(false)}
+          onSuccess={clearQueue}
+        />
+      )}
     </>
   );
 }

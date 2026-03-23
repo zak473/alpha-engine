@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Trash2, TrendingUp, ChevronRight, CheckCircle2, Loader2, Zap, Plus } from "lucide-react";
+import { X, Trash2, TrendingUp, ChevronRight, CheckCircle2, Loader2, Zap, Plus, Trophy, BookMarked } from "lucide-react";
 import type { BettingMatch, QueueSelection } from "@/lib/betting-types";
 import { useBetting } from "./BettingContext";
 import { TopPicksMiniModule } from "./TopPicksMiniModule";
+import { ChallengePickerModal } from "./ChallengePickerModal";
 import { cn } from "@/lib/utils";
 import { SPORT_CONFIG } from "@/lib/betting-types";
 import { trackPicks } from "@/lib/api";
@@ -175,6 +176,7 @@ export function QueueRail({ matches }: QueueRailProps) {
   const router = useRouter();
   const [tracking, setTracking] = useState(false);
   const [tracked, setTracked] = useState(false);
+  const [challengeModalOpen, setChallengeModalOpen] = useState(false);
   const isEmpty = queue.length === 0;
 
   const handleTrack = async () => {
@@ -278,30 +280,39 @@ export function QueueRail({ matches }: QueueRailProps) {
             {/* EV summary */}
             <EvSummary queue={queue} />
 
-            {/* Track CTA */}
-            <button
-              onClick={handleTrack}
-              disabled={tracking || tracked}
-              className="btn btn-primary w-full flex items-center justify-center gap-2 h-10 disabled:opacity-70"
-            >
-              {tracked ? (
-                <><CheckCircle2 size={14} /> Tracked!</>
-              ) : tracking ? (
-                <><Loader2 size={14} className="animate-spin" /> Saving...</>
-              ) : (
-                <>Track picks <ChevronRight size={14} /></>
-              )}
-            </button>
+            {/* CTAs */}
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleTrack}
+                disabled={tracking || tracked}
+                className="btn btn-primary w-full flex items-center justify-center gap-2 h-10 disabled:opacity-70"
+              >
+                {tracked ? (
+                  <><CheckCircle2 size={14} /> Tracked!</>
+                ) : tracking ? (
+                  <><Loader2 size={14} className="animate-spin" /> Saving...</>
+                ) : (
+                  <><BookMarked size={14} /> Add to Tracker</>
+                )}
+              </button>
+              <button
+                onClick={() => setChallengeModalOpen(true)}
+                className="w-full flex items-center justify-center gap-2 h-10 rounded-xl text-sm font-bold transition-all"
+                style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.25)" }}
+              >
+                <Trophy size={14} /> Post to Challenge
+              </button>
+            </div>
 
             <p className="text-[10px] text-text-muted text-center leading-relaxed">
-              Picks are saved to your Record for performance tracking.
+              Track to your Record or post to an active challenge.
             </p>
           </>
         )}
       </div>
 
       {/* Footer hint */}
-      <div 
+      <div
         className="px-4 py-3 border-t flex-shrink-0"
         style={{ borderColor: "var(--border0)" }}
       >
@@ -312,6 +323,14 @@ export function QueueRail({ matches }: QueueRailProps) {
           </span>
         </div>
       </div>
+
+      {challengeModalOpen && (
+        <ChallengePickerModal
+          queue={queue}
+          onClose={() => setChallengeModalOpen(false)}
+          onSuccess={clearQueue}
+        />
+      )}
     </aside>
   );
 }
