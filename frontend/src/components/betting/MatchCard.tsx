@@ -62,7 +62,7 @@ function OddsButton({ selection, market, match, compact = false }: { selection: 
         {flash || added ? "✓ Added" : selection.odds.toFixed(2)}
       </span>
       <span className={cn("mt-0.5 max-w-full truncate leading-tight text-text-muted", compact ? "text-[9px]" : "text-[9px]")}>
-        {flash || added ? "Tracked" : selection.label}
+        {flash || added ? "In slip" : selection.label}
       </span>
       {!flash && !added && edgePct > 0.5 && (
         <span className="mt-0.5 rounded bg-emerald-500/12 px-1 py-px text-[8px] font-bold text-emerald-300">

@@ -37,7 +37,7 @@ function OddsButton({ selId, selection, matchLabel, sport, league, marketId, mar
         added || flash ? "text-white" : "text-text-primary hover:-translate-y-[1px]")}
       style={added || flash ? { background: "rgba(46,219,108,0.12)", borderColor: "rgba(46,219,108,0.20)", boxShadow: "0 10px 22px rgba(46,219,108,0.10)" } : { background: "var(--bg2)", borderColor: "var(--border0)" }}>
       <span className="font-mono font-bold tabular-nums leading-tight text-sm">{flash || added ? "✓ Added" : selection.odds.toFixed(2)}</span>
-      <span className="mt-0.5 max-w-full truncate leading-tight text-text-muted text-[10px]">{flash || added ? "Tracked" : selection.label}</span>
+      <span className="mt-0.5 max-w-full truncate leading-tight text-text-muted text-[10px]">{flash || added ? "In slip" : selection.label}</span>
     </button>
   );
 }

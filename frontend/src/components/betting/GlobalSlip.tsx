@@ -1,17 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { TrendingUp } from "lucide-react";
 import { useBetting } from "./BettingContext";
 import { MobileQueueDrawer } from "./MobileQueueDrawer";
 
 /**
  * Global floating slip button — visible on every page when the queue has picks.
- * Renders the full MobileQueueDrawer so the slip is accessible anywhere.
+ * Auto-opens the drawer whenever a new pick is added.
  */
 export function GlobalSlip() {
   const { queue } = useBetting();
   const [open, setOpen] = useState(false);
+  const prevLen = useRef(queue.length);
+
+  // Auto-open slip whenever a new pick is added
+  useEffect(() => {
+    if (queue.length > prevLen.current) {
+      setOpen(true);
+    }
+    prevLen.current = queue.length;
+  }, [queue.length]);
 
   if (queue.length === 0 && !open) return null;
 
