@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
 import { BettingProvider } from "@/components/betting/BettingContext";
+import { GlobalSlip } from "@/components/betting/GlobalSlip";
 import { AuthProvider } from "@/lib/auth";
 import { OddsFormatProvider } from "@/lib/odds-format";
 import { ThemeProvider } from "@/lib/theme";
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AuthProvider>
               <BettingProvider>
                 <ToastProvider>{children}</ToastProvider>
+                <GlobalSlip />
               </BettingProvider>
             </AuthProvider>
           </OddsFormatProvider>
