@@ -877,7 +877,7 @@ def start() -> BackgroundScheduler:
         id="predict_only",
         name="Re-run prediction pipeline",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=50),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=15),
     )
 
     # Fetch real market odds + run auto-pick bot every 30 minutes (delay 8m on startup)

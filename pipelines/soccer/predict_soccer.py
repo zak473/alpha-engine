@@ -48,7 +48,8 @@ def _load_live_model(session: Session) -> dict:
         .first()
     )
     if registry is None:
-        raise RuntimeError("No live soccer model found. Run train_soccer_model.py first.")
+        log.warning("No live soccer model in model_registry — skipping soccer predictions.")
+        return None
 
     import os as _os
     artifact_path = registry.artifact_path
@@ -358,6 +359,8 @@ def run(match_id: Optional[str] = None, all_matches: bool = False) -> int:
     session: Session = SessionLocal()
     try:
         payload = _load_live_model(session)
+        if payload is None:
+            return 0
 
         if match_id:
             matches = session.query(CoreMatch).filter(CoreMatch.id == match_id).all()

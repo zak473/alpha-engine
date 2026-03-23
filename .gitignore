@@ -27,12 +27,19 @@ npm-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# Data / ML artefacts
+# Data / ML artefacts — all ignored except the 6 live models shipped in the Docker image
 artefacts/*.pkl
 artefacts/*.joblib
 artefacts/*.h5
 artefacts/*.pt
 artefacts/*.bin
+!artefacts/soccer_lgb_v18.joblib
+!artefacts/soccer_xgb_v6.joblib
+!artefacts/tennis_lr_v7.joblib
+!artefacts/esports_lr_v3.joblib
+!artefacts/basketball_lr_v4.joblib
+!artefacts/baseball_lr_v3.joblib
+!artefacts/hockey_lr_v4.joblib
 data/raw/
 data/processed/
 
@@ -56,3 +63,4 @@ Thumbs.db
 *.key
 secrets/
 check_venv/
+.vercel

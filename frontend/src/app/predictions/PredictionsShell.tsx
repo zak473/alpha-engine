@@ -39,8 +39,14 @@ const CONF_THRESHOLDS = [
 
 interface BackendItem {
   id?: string;
+  home_id?: string;
+  away_id?: string;
   home_name: string;
   away_name: string;
+  league?: string;
+  status?: string;
+  home_score?: number | null;
+  away_score?: number | null;
   p_home: number | null;
   p_away: number | null;
   p_draw?: number | null;
@@ -116,6 +122,29 @@ async function fetchPreview(sport: SportSlug, home: string, away: string): Promi
 function eloProb(eloHome: number, eloAway: number): { pHome: number; pAway: number } {
   const p = 1 / (1 + Math.pow(10, -(eloHome - eloAway) / 400));
   return { pHome: Math.round(p * 10000) / 10000, pAway: Math.round((1 - p) * 10000) / 10000 };
+}
+
+function backendItemToMatch(item: BackendItem, sport: SportSlug): BettingMatch & { sport: SportSlug; backendId?: string } {
+  const homeName = item.home_name;
+  const awayName = item.away_name;
+  return {
+    id: item.id ?? `be-${sport}-${homeName}-${awayName}`,
+    sport,
+    league: item.league ?? sport,
+    startTime: item.kickoff_utc,
+    status: item.status ?? "upcoming",
+    homeScore: item.home_score ?? undefined,
+    awayScore: item.away_score ?? undefined,
+    home: { id: item.home_id ?? homeName, name: homeName, shortName: homeName.slice(0, 14) },
+    away: { id: item.away_id ?? awayName, name: awayName, shortName: awayName.slice(0, 14) },
+    pHome: item.p_home ?? undefined,
+    pAway: item.p_away ?? undefined,
+    pDraw: item.p_draw ?? undefined,
+    modelConfidence: item.confidence != null ? item.confidence / 100 : undefined,
+    featuredMarkets: [],
+    allMarkets: [],
+    backendId: item.id,
+  };
 }
 
 function mergeBackend(match: BettingMatch, items: BackendItem[]): BettingMatch {
@@ -738,13 +767,32 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
       const now = Date.now();
       const cutoff = now + 48 * 3600_000;
 
-      // First pass: merge with backend DB matches
-      const firstPass: MatchWithSportLocal[] = sgoMatches
-        .filter((m) => {
-          const t = new Date(m.startTime).getTime();
-          return t >= now && t <= cutoff;
-        })
-        .map((m) => ({ ...mergeBackend(m, backendMap[m.sport] ?? []), sport: m.sport }))
+      // First pass: merge SGO events with backend DB predictions
+      const sgoFiltered = sgoMatches.filter((m) => {
+        const t = new Date(m.startTime).getTime();
+        return t >= now && t <= cutoff;
+      });
+
+      const sgoMerged: MatchWithSportLocal[] = sgoFiltered
+        .map((m) => ({ ...mergeBackend(m, backendMap[m.sport] ?? []), sport: m.sport }));
+
+      // Backend-only fallback: include DB matches not already covered by SGO events
+      const backendOnly: MatchWithSportLocal[] = [];
+      for (const { sport: s, items } of backendBySport) {
+        for (const item of items) {
+          const t = new Date(item.kickoff_utc).getTime();
+          if (t < now || t > cutoff) continue;
+          // Skip if already matched by an SGO event
+          const alreadyCovered = sgoMerged.some(
+            (m) => m.sport === s && teamsMatch(m.home.name, item.home_name) && teamsMatch(m.away.name, item.away_name)
+          );
+          if (!alreadyCovered) {
+            backendOnly.push(backendItemToMatch(item, s));
+          }
+        }
+      }
+
+      const firstPass: MatchWithSportLocal[] = [...sgoMerged, ...backendOnly]
         .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
       setMatches(firstPass);

@@ -77,17 +77,9 @@ async def lifespan(app: FastAPI):
         # Wait for DB
         _wait_for_db()
 
-        # Run DB migrations
-        try:
-            from alembic.config import Config
-            from alembic import command
-            import os as _os
-            alembic_cfg = Config(_os.path.join(_os.path.dirname(__file__), "..", "alembic.ini"))
-            alembic_cfg.set_main_option("script_location", _os.path.join(_os.path.dirname(__file__), "..", "alembic"))
-            command.upgrade(alembic_cfg, "head")
-            logger.info("Startup: DB migrations applied.")
-        except Exception as exc:
-            logger.warning("Startup: DB migration failed (continuing): %s", exc)
+        # DB migrations: skipped at startup to avoid stale advisory lock hangs.
+        # Migrations are applied manually via `alembic upgrade head` when needed.
+        # create_all() below handles any missing tables as a safety net.
 
         # Safety net: create any missing tables
         try:
@@ -98,6 +90,65 @@ async def lifespan(app: FastAPI):
             logger.info("Startup: create_all safety net complete.")
         except Exception as exc:
             logger.warning("Startup: create_all failed: %s", exc)
+
+        # Ensure live ML models are registered in model_registry
+        try:
+            import os as _os, joblib as _jl
+            from db.session import SessionLocal as _SL
+            from db.models.mvp import ModelRegistry as _MR
+            from datetime import datetime, timezone
+            _LIVE_MODELS = {
+                "soccer":     "soccer_lgb_v18",
+                "tennis":     "tennis_lr_v7",
+                "esports":    "esports_lr_v3",
+                "baseball":   "baseball_lr_v3",
+                "basketball": "basketball_lr_v4",
+                "hockey":     "hockey_lr_v4",
+            }
+            _artefacts_dir = "/app/artefacts"
+            import glob as _glob
+            _found = [_os.path.basename(f) for f in _glob.glob(_os.path.join(_artefacts_dir, "*.joblib"))]
+            logger.info("Startup: artefacts in image: %s", _found)
+            _sess = _SL()
+            try:
+                for _sport, _mname in _LIVE_MODELS.items():
+                    _path = _os.path.join(_artefacts_dir, f"{_mname}.joblib")
+                    if not _os.path.exists(_path):
+                        continue
+                    _existing = _sess.query(_MR).filter_by(sport=_sport, is_live=True).first()
+                    # Register if missing, or update if the registered path no longer exists
+                    _needs_update = (
+                        _existing is None or
+                        not _os.path.exists(_existing.artifact_path)
+                    )
+                    if _needs_update:
+                        _payload = _jl.load(_path)
+                        _feat_names = _payload.get("feature_names", [])
+                        if _existing:
+                            _existing.model_name = _mname
+                            _existing.artifact_path = _path
+                            _existing.feature_names = _feat_names
+                            _existing.trained_at = datetime.now(timezone.utc)
+                            logger.info("Startup: updated %s model → %s in model_registry.", _sport, _mname)
+                        else:
+                            _reg = _MR(
+                                sport=_sport,
+                                model_name=_mname,
+                                artifact_path=_path,
+                                feature_names=_feat_names,
+                                is_live=True,
+                                trained_at=datetime.now(timezone.utc),
+                            )
+                            _sess.add(_reg)
+                            logger.info("Startup: registered %s model %s in model_registry.", _sport, _mname)
+                _sess.commit()
+            except Exception as _exc:
+                _sess.rollback()
+                logger.warning("Startup: model registry check failed: %s", _exc)
+            finally:
+                _sess.close()
+        except Exception as exc:
+            logger.warning("Startup: model registry auto-register failed: %s", exc)
 
         # Expire stale live matches
         try:
