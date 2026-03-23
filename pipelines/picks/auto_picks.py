@@ -83,7 +83,7 @@ SPORT_MIN_EDGE: dict[str, float] = {
     "baseball": 0.05,
 }
 SPORT_MIN_CONFIDENCE: dict[str, float] = {
-    "baseball": 0.60,
+    "baseball": 0.50,
 }
 
 

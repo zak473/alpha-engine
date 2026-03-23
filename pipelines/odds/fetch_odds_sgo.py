@@ -179,7 +179,7 @@ def fetch_all(dry_run: bool = False) -> int:
             team_ids.add(m.away_team_id)
         teams = {t.id: t.name for t in db.query(CoreTeam).filter(CoreTeam.id.in_(team_ids)).all()}
 
-        with httpx.Client(http2=True) as client:
+        with httpx.Client() as client:
             for league_id, sport in LEAGUE_SPORT.items():
                 events = fetch_sgo_events(league_id, client)
                 if not events:
