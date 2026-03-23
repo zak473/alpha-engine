@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Trophy, Loader2, CheckCircle2, Globe, Lock, Users, Calendar, Zap } from "lucide-react";
+import { X, Trophy, Loader2, Globe, Lock, Users, Zap } from "lucide-react";
 import { createChallenge } from "@/lib/api";
 import type { Challenge, ChallengeCreate } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -26,8 +26,6 @@ const INITIAL: ChallengeCreate = {
   description: "",
   visibility: "public",
   sport_scope: [],
-  start_at: "",
-  end_at: "",
   max_members: undefined,
   entry_limit_per_day: undefined,
   scoring_type: "points",
@@ -58,10 +56,6 @@ export function CreateChallengeModal({ open, onClose, onCreated }: Props) {
   function validate(): boolean {
     const errs: typeof errors = {};
     if (!form.name.trim()) errs.name = "Name is required";
-    if (!form.start_at) errs.start_at = "Required";
-    if (!form.end_at) errs.end_at = "Required";
-    if (form.start_at && form.end_at && form.end_at <= form.start_at)
-      errs.end_at = "Must be after start";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
@@ -235,40 +229,6 @@ export function CreateChallengeModal({ open, onClose, onCreated }: Props) {
                       </button>
                     );
                   })}
-                </div>
-              </div>
-
-              {/* Dates */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-text-muted flex items-center gap-1">
-                    <Calendar size={10} /> Start
-                  </label>
-                  <input
-                    type="datetime-local"
-                    className={cn(
-                      "w-full rounded-xl px-3.5 py-2.5 text-sm text-text-primary bg-white/[0.05] border outline-none transition-colors",
-                      errors.start_at ? "border-red-500/50" : "border-white/[0.08] focus:border-white/20"
-                    )}
-                    value={form.start_at}
-                    onChange={(e) => set("start_at", e.target.value)}
-                  />
-                  {errors.start_at && <p className="text-[11px] text-red-400">{errors.start_at}</p>}
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-text-muted flex items-center gap-1">
-                    <Calendar size={10} /> End
-                  </label>
-                  <input
-                    type="datetime-local"
-                    className={cn(
-                      "w-full rounded-xl px-3.5 py-2.5 text-sm text-text-primary bg-white/[0.05] border outline-none transition-colors",
-                      errors.end_at ? "border-red-500/50" : "border-white/[0.08] focus:border-white/20"
-                    )}
-                    value={form.end_at}
-                    onChange={(e) => set("end_at", e.target.value)}
-                  />
-                  {errors.end_at && <p className="text-[11px] text-red-400">{errors.end_at}</p>}
                 </div>
               </div>
 

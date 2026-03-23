@@ -89,7 +89,11 @@ def create_challenge(
     user_id: str = Depends(get_current_user),
 ):
     """Create a new challenge. Creator is automatically joined as owner."""
-    if body.end_at <= body.start_at:
+    from datetime import timezone, timedelta
+    now = __import__("datetime").datetime.now(timezone.utc)
+    start_at = body.start_at or now
+    end_at = body.end_at or (now + timedelta(days=30))
+    if end_at <= start_at:
         raise HTTPException(status_code=400, detail="end_at must be after start_at")
 
     challenge = Challenge(
@@ -98,8 +102,8 @@ def create_challenge(
         description=body.description,
         visibility=body.visibility,
         sport_scope=body.sport_scope,
-        start_at=body.start_at,
-        end_at=body.end_at,
+        start_at=start_at,
+        end_at=end_at,
         max_members=body.max_members,
         entry_limit_per_day=body.entry_limit_per_day,
         scoring_type=body.scoring_type,

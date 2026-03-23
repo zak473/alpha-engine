@@ -4,7 +4,7 @@ Pydantic schemas for the Challenges API.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
@@ -17,8 +17,8 @@ class ChallengeCreate(BaseModel):
     description: Optional[str] = None
     visibility: str = Field("public", pattern="^(public|private)$")
     sport_scope: list[str] = Field(default_factory=list)
-    start_at: datetime
-    end_at: datetime
+    start_at: Optional[datetime] = None  # defaults to now
+    end_at: Optional[datetime] = None    # defaults to 30 days from now
     max_members: Optional[int] = Field(None, ge=1)
     entry_limit_per_day: Optional[int] = Field(None, ge=1)
     scoring_type: str = Field("points", pattern="^(brier|points)$")

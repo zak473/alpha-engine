@@ -263,8 +263,6 @@ export interface ChallengeCreate {
   description?: string;
   visibility: "public" | "private";
   sport_scope: string[];
-  start_at: string;
-  end_at: string;
   max_members?: number;
   entry_limit_per_day?: number;
   scoring_type: "brier" | "points";
