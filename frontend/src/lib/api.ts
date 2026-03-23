@@ -594,6 +594,7 @@ export interface TipsterProfile {
 export interface TipsterTip {
   id: string;
   sport: string;
+  match_id?: string | null;
   match_label: string;
   market_name: string;
   selection_label: string;

@@ -43,6 +43,7 @@ class TipsterProfile(BaseModel):
 class TipsterTipSchema(BaseModel):
     id: str
     sport: str
+    match_id: Optional[str] = None
     match_label: str
     market_name: str
     selection_label: str
@@ -238,6 +239,7 @@ def get_tipster_tips(
         TipsterTipSchema(
             id=t.id,
             sport=t.sport,
+            match_id=t.match_id,
             match_label=t.match_label,
             market_name=t.market_name,
             selection_label=t.selection_label,

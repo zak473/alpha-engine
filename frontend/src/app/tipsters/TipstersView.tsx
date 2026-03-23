@@ -55,7 +55,17 @@ function TipRow({ tip, tipsterUsername }: { tip: TipsterTip; tipsterUsername: st
           {tip.selection_label}
           <span className="text-text-muted font-normal ml-1">· {tip.market_name}</span>
         </p>
-        <p className="text-[11px] text-text-muted truncate">{tip.match_label}</p>
+        {tip.match_id ? (
+          <a
+            href={`/sports/${tip.sport}/matches/${tip.match_id}`}
+            className="text-[11px] text-text-muted truncate hover:text-text-primary hover:underline transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {tip.match_label}
+          </a>
+        ) : (
+          <p className="text-[11px] text-text-muted truncate">{tip.match_label}</p>
+        )}
       </div>
       <span className="text-xs font-mono font-bold tabular-nums text-text-primary flex-shrink-0">{tip.odds.toFixed(2)}</span>
       {isPending && (

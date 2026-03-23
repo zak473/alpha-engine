@@ -87,9 +87,18 @@ def _load_elo_engine(session: Session) -> TennisEloEngine:
     return engine
 
 
-def _predict_ml(match: CoreMatch, payload: dict, session: Session) -> dict:
+def _predict_ml(match: CoreMatch, payload: dict, session: Session) -> dict | None:
     model = payload["model"]
     vector, raw = build_feature_vector(session, match)
+    # If ELO is default (1000/1000) and all other features are zero, the model has no signal.
+    # Check for meaningful features: non-default ELO or non-zero ranking_diff.
+    elo_home = raw.get("elo_home", 1000.0)
+    elo_away = raw.get("elo_away", 1000.0)
+    ranking_diff = raw.get("ranking_diff", 0.0)
+    has_signal = (abs(elo_home - 1000.0) > 1) or (abs(elo_away - 1000.0) > 1) or (abs(ranking_diff) > 0)
+    if not has_signal:
+        log.info("  SKIP ML (no signal — defaulted features) for %s, using ELO fallback", match.provider_id)
+        return None
     X = np.nan_to_num(np.array(vector, dtype=float).reshape(1, -1), nan=0.0)
     proba = model.predict_proba(X)[0]
     p_home, p_away = float(proba[0]), float(proba[1])
@@ -145,11 +154,17 @@ def _predict_elo(match: CoreMatch, engine: TennisEloEngine) -> dict:
 
 
 def run_predictions(session, matches, payload, engine) -> int:
+    # Always store under the live model version so the service finds it
     model_version = payload["model_name"] if payload else "elo-v1"
     count = 0
     for match in matches:
         try:
-            data = _predict_ml(match, payload, session) if payload else _predict_elo(match, engine)
+            data = None
+            if payload:
+                data = _predict_ml(match, payload, session)
+            if data is None:
+                # Fall back to ELO (either no ML model, or ML had no signal)
+                data = _predict_elo(match, engine)
             existing = session.query(PredMatch).filter_by(match_id=match.id, model_version=model_version).first()
             if existing is None:
                 session.add(PredMatch(id=str(uuid.uuid4()), match_id=match.id, model_version=model_version, **data))
@@ -168,7 +183,8 @@ def run(match_id: Optional[str] = None, all_matches: bool = False) -> int:
     session: Session = SessionLocal()
     try:
         payload = _try_load_model(session)
-        engine = _load_elo_engine(session) if not payload else None
+        # Always load ELO engine — used as fallback when ML model has no signal
+        engine = _load_elo_engine(session)
 
         if match_id:
             matches = session.query(CoreMatch).filter(

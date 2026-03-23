@@ -21,6 +21,7 @@ const SPORT_META: { value: string; label: string; icon: string }[] = [
   { value: "basketball", label: "Basketball", icon: "🏀" },
   { value: "baseball",   label: "Baseball",   icon: "⚾" },
   { value: "hockey",     label: "Hockey",     icon: "🏒" },
+  { value: "esports",    label: "Esports",    icon: "🎮" },
 ];
 
 const SPORT_ICONS: Record<string, string> = Object.fromEntries(
@@ -473,14 +474,17 @@ function MatchCard({ match }: { match: MatchWithSport }) {
     setLoadingReasoning(false);
   }
 
-  const hasModelProbs = match.pHome != null;
+  // A model prediction of exactly 50/50 (confidence=0) means features were all default/zero
+  // — treat it the same as having no prediction so we fall through to market-implied odds.
+  const modelConf = match.modelConfidence ?? 0;
+  const hasModelProbs = match.pHome != null && modelConf > 0;
 
   const ml = match.featuredMarkets?.[0];
   const homeOdds = ml?.selections[0]?.odds;
   const drawSel = ml?.selections.find((s) => s.id === "draw");
   const awayOdds = ml?.selections[ml.selections.length - 1]?.odds;
 
-  // Compute implied probability from market odds if no model prediction
+  // Compute implied probability from market odds if no useful model prediction
   let hPct: number | null = hasModelProbs ? Math.round((match.pHome ?? 0) * 100) : null;
   let aPct: number | null = hasModelProbs ? Math.round((match.pAway ?? 0) * 100) : null;
   let dPct: number | null = hasModelProbs && match.pDraw != null ? Math.round(match.pDraw * 100) : null;
@@ -498,7 +502,7 @@ function MatchCard({ match }: { match: MatchWithSport }) {
   const hasProbabilities = hPct != null && aPct != null;
 
   // Derive confidence from probabilities when model didn't supply one (e.g. ELO fallback)
-  let conf = match.modelConfidence ?? 0;
+  let conf = hasModelProbs ? modelConf : 0;
   if (match.modelConfidence == null && hasModelProbs && !isMarketImplied) {
     const maxRaw = Math.max(match.pHome ?? 0, match.pAway ?? 0, match.pDraw ?? 0);
     const numOutcomes = match.pDraw != null ? 3 : 2;
@@ -882,6 +886,40 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
   return (
     <div className="space-y-6 pb-12">
 
+      {/* ── Sport bar ─────────────────────────────────────────────────────── */}
+      <div className="overflow-x-auto no-scrollbar">
+        <div className="flex min-w-max items-center gap-2 rounded-[24px] border border-white/8 bg-white/[0.03] p-2">
+          {SPORT_META.map((s) => {
+            const badge = sportSignals[s.value];
+            return (
+              <button
+                key={s.value}
+                onClick={() => navigate({ sport: s.value })}
+                className={cn(
+                  "relative flex items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-all",
+                  s.value === sport
+                    ? "bg-[#2edb6c] text-[#07110d] shadow-sm"
+                    : "text-white/60 hover:bg-white/[0.06] hover:text-white"
+                )}
+              >
+                <span>{s.icon}</span>
+                <span>{s.label}</span>
+                {badge != null && badge > 0 && (
+                  <span className={cn(
+                    "inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold tabular-nums leading-none",
+                    s.value === sport
+                      ? "bg-[#07110d]/30 text-[#07110d]"
+                      : "bg-emerald-400/20 text-emerald-300"
+                  )}>
+                    {badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* ── Page header ───────────────────────────────────────────────────── */}
       <div className="overflow-hidden rounded-[24px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -914,18 +952,12 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
         {/* Filters */}
         <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-white/[0.05] pt-4">
           <PillGroup
-            label="Sport"
-            options={SPORT_META}
-            active={sport}
-            onChange={(v) => navigate({ sport: v })}
-            badges={sportSignals}
-          />
-          <PillGroup
             label="Confidence"
             options={CONF_THRESHOLDS}
             active={minConf}
             onChange={setMinConf}
           />
+
           <button
             onClick={() => setShowAll((v) => !v)}
             className={cn(
