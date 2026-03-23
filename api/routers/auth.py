@@ -33,7 +33,7 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 # ── Secret / JWT settings ─────────────────────────────────────────────────
 SECRET_KEY = os.environ.get("JWT_SECRET", "change-me-in-production-please")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 365  # 1 year
 
 
 # ── Password hashing (bcrypt directly, sha256 fallback) ───────────────────
