@@ -205,7 +205,7 @@ export function MatchesTable({ initialMatches }: { initialMatches: Match[]; load
                 paginated.map((match) => (
                   <tr
                     key={match.id}
-                    onClick={() => (window.location.href = `/matches/${match.id}`)}
+                    onClick={() => (window.location.href = `/predictions`)}
                     className="cursor-pointer border-b border-white/8 text-sm transition hover:bg-white/[0.04]"
                   >
                     <td className="px-4 py-3">

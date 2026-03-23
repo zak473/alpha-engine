@@ -3,17 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Swords, ClipboardList, TrendingUp, MoreHorizontal,
+  LayoutDashboard, ClipboardList, TrendingUp, MoreHorizontal,
   Trophy, ShieldCheck, BrainCircuit, Users, Radio, MessageSquare,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const PRIMARY_NAV = [
-  { label: "Dashboard",   href: "/dashboard",   icon: LayoutDashboard },
-  { label: "Live",        href: "/live",         icon: Radio           },
-  { label: "Matches",     href: "/matches",      icon: Swords          },
-  { label: "Record",      href: "/record",       icon: ClipboardList   },
+  { label: "Dashboard",   href: "/dashboard",    icon: LayoutDashboard },
+  { label: "Live",        href: "/live",          icon: Radio           },
+  { label: "Predictions", href: "/predictions",   icon: BrainCircuit    },
+  { label: "Record",      href: "/record",        icon: ClipboardList   },
 ];
 
 const MORE_NAV = [
@@ -125,7 +125,7 @@ export function BottomNav() {
         }}
       >
         {PRIMARY_NAV.map(({ label, href, icon: Icon }) => {
-          const active = isActive(href) || (label === "Matches" && isSport);
+          const active = isActive(href);
           return (
             <Link
               key={href}

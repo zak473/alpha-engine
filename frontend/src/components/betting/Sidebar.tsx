@@ -4,14 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Swords, TrendingUp, ShieldCheck, Trophy,
+  LayoutDashboard, TrendingUp, ShieldCheck, Trophy,
   Activity, Circle, ClipboardList, BrainCircuit,
 } from "lucide-react";
 import { useSidebar } from "@/components/layout/SidebarContext";
 
 const NAV = [
   { label: "Betting Board", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Matches", href: "/matches", icon: Swords },
   { label: "Predictions", href: "/predictions", icon: BrainCircuit },
   { label: "Challenges", href: "/challenges", icon: Trophy },
   { label: "Record", href: "/record", icon: ClipboardList },
