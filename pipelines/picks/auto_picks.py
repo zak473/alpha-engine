@@ -139,12 +139,15 @@ def run(
             sport = match.sport
             ml_market = "Moneyline" if sport in ("basketball", "baseball") else "Match Winner" if sport in ("tennis", "esports") else "1X2"
 
+            home_name = home_team.name
+            away_name = away_team.name
+
             if match.odds_home and pred.p_home:
-                candidates.append(("home", pred.p_home, match.odds_home, ml_market))
+                candidates.append((home_name, pred.p_home, match.odds_home, ml_market))
             if match.odds_away and pred.p_away:
-                candidates.append(("away", pred.p_away, match.odds_away, ml_market))
+                candidates.append((away_name, pred.p_away, match.odds_away, ml_market))
             if match.odds_draw and pred.p_draw and pred.p_draw > 0.01:
-                candidates.append(("draw", pred.p_draw, match.odds_draw, ml_market))
+                candidates.append(("Draw", pred.p_draw, match.odds_draw, ml_market))
 
             effective_min_edge = SPORT_MIN_EDGE.get(sport, min_edge)
             effective_min_conf = SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
