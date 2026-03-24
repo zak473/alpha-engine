@@ -7,17 +7,58 @@ import { EntryFeed } from "@/components/challenges/EntryFeed";
 import { joinChallenge, leaveChallenge, submitChallengeEntry } from "@/lib/api";
 import type { Challenge, EntryFeedPage, LeaderboardOut } from "@/lib/types";
 import {
-  Users, Calendar, Trophy, Target, Lock, Globe,
+  Users, Trophy, Lock, Globe,
   ArrowLeft, LogIn, LogOut, Plus, X,
 } from "lucide-react";
 import Link from "next/link";
 
 type Tab = "overview" | "leaderboard" | "feed" | "rules";
+type PickScope = "feed" | "mine";
+
+function PicksTab({ challengeId, feedData }: { challengeId: string; feedData: EntryFeedPage }) {
+  const [scope, setScope] = useState<PickScope>("feed");
+
+  return (
+    <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+      <div className="panel-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="panel-title">Picks</div>
+        <div style={{ display: "flex", gap: 4, padding: "2px 4px", borderRadius: 8, background: "rgba(255,255,255,0.05)" }}>
+          {(["feed", "mine"] as PickScope[]).map((s) => (
+            <button
+              key={s}
+              onClick={() => setScope(s)}
+              style={{
+                padding: "3px 10px",
+                borderRadius: 6,
+                fontSize: 11,
+                fontWeight: 600,
+                background: scope === s ? "rgba(255,255,255,0.1)" : "transparent",
+                color: scope === s ? "var(--text0)" : "var(--text2)",
+                border: "none",
+                cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+            >
+              {s === "feed" ? "Everyone" : "Mine"}
+            </button>
+          ))}
+        </div>
+      </div>
+      <EntryFeed
+        challengeId={challengeId}
+        scope={scope}
+        initialData={scope === "feed" ? feedData : { items: [], total: 0, page: 1, page_size: 20, has_next: false }}
+        key={scope}
+      />
+    </div>
+  );
+}
 
 interface Props {
   challenge: Challenge;
   leaderboard: LeaderboardOut;
   feedData: EntryFeedPage;
+  initialTab?: string;
 }
 
 function formatDate(iso: string) {
@@ -325,8 +366,8 @@ function SubmitEntryModal({
   );
 }
 
-export function ChallengeDetailClient({ challenge, leaderboard, feedData }: Props) {
-  const [tab, setTab] = useState<Tab>("overview");
+export function ChallengeDetailClient({ challenge, leaderboard, feedData, initialTab = "overview" }: Props) {
+  const [tab, setTab] = useState<Tab>(initialTab as Tab);
   const [isMember, setIsMember] = useState(challenge.is_member);
   const [memberCount, setMemberCount] = useState(challenge.member_count);
   const [actionLoading, setActionLoading] = useState(false);
@@ -484,16 +525,7 @@ export function ChallengeDetailClient({ challenge, leaderboard, feedData }: Prop
         )}
 
         {tab === "feed" && (
-          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-            <div className="panel-header">
-              <div className="panel-title">All Picks</div>
-            </div>
-            <EntryFeed
-              challengeId={challenge.id}
-              scope="feed"
-              initialData={feedData}
-            />
-          </div>
+          <PicksTab challengeId={challenge.id} feedData={feedData} />
         )}
 
         {tab === "rules" && <RulesTab challenge={challenge} />}

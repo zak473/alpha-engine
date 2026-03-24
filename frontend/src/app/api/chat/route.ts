@@ -3,6 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
 const SYSTEM_PROMPT = `You are an expert sports betting advisor for Never In Doubt — a premium sports intelligence platform. You help users with:
 
 - Match analysis and predictions across soccer, basketball, baseball, hockey, tennis, and esports
@@ -26,6 +28,22 @@ export async function POST(req: NextRequest) {
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return new Response("Invalid messages", { status: 400 });
+  }
+
+  // Deduct a token before streaming
+  const authHeader = req.headers.get("authorization");
+  if (authHeader) {
+    const tokenRes = await fetch(`${API_ORIGIN}/api/v1/advisor/use-token`, {
+      method: "POST",
+      headers: { Authorization: authHeader },
+    });
+    if (!tokenRes.ok) {
+      const body = await tokenRes.json().catch(() => ({}));
+      return new Response(JSON.stringify(body), {
+        status: tokenRes.status,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
   }
 
   // Stream the response back

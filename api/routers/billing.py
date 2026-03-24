@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from api.deps import get_session, get_current_user
+from api.routers.advisor import PRO_MONTHLY_TOKENS
 from config.settings import settings
 from db.models.user import User
 
@@ -198,6 +199,9 @@ async def stripe_webhook(
         elif event_type == "checkout.session.completed":
             _handle_checkout_completed(db, data_object)
 
+        elif event_type == "invoice.paid":
+            _handle_invoice_paid(db, data_object)
+
         else:
             logger.debug("Unhandled Stripe event type: %s", event_type)
 
@@ -222,12 +226,20 @@ def _handle_subscription_upsert(db: Session, sub: dict) -> None:
         logger.warning("Webhook: no user found for Stripe customer %s", customer_id)
         return
 
+    prev_status = user.subscription_status
     _apply_subscription(user, sub)
+
+    # Top up AI tokens when a subscription becomes active or renews
+    new_status = sub.get("status")
+    if new_status in ("active", "trialing") and prev_status not in ("active", "trialing"):
+        user.ai_tokens = (user.ai_tokens or 0) + PRO_MONTHLY_TOKENS
+        logger.info("Webhook: added %d AI tokens to user %s (new Pro)", PRO_MONTHLY_TOKENS, user.id)
+
     db.commit()
     logger.info(
         "Webhook: subscription %s → status=%s for user %s",
         sub.get("id"),
-        sub.get("status"),
+        new_status,
         user.id,
     )
 
@@ -285,4 +297,27 @@ def _handle_checkout_completed(db: Session, session: dict) -> None:
         "Webhook: checkout completed — linked Stripe customer %s to user %s",
         customer_id,
         user_id,
+    )
+
+
+def _handle_invoice_paid(db: Session, invoice: dict) -> None:
+    """Top up AI tokens on each successful subscription renewal."""
+    # Only process subscription invoices (not one-off charges)
+    if invoice.get("billing_reason") not in ("subscription_cycle", "subscription_create"):
+        return
+
+    customer_id: str = invoice.get("customer", "")
+    if not customer_id:
+        return
+
+    user = db.query(User).filter(User.stripe_customer_id == customer_id).first()
+    if not user:
+        logger.warning("Webhook invoice.paid: no user for customer %s", customer_id)
+        return
+
+    user.ai_tokens = (user.ai_tokens or 0) + PRO_MONTHLY_TOKENS
+    db.commit()
+    logger.info(
+        "Webhook invoice.paid: added %d AI tokens to user %s (%d total)",
+        PRO_MONTHLY_TOKENS, user.id, user.ai_tokens,
     )

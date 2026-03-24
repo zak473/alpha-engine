@@ -15,6 +15,7 @@ interface MobileQueueDrawerProps {
   open: boolean;
   onClose: () => void;
   matches: BettingMatch[];
+  allowDesktop?: boolean;
 }
 
 function MobileQueueItem({ sel, onRemove }: { sel: QueueSelection; onRemove: () => void }) {
@@ -64,7 +65,7 @@ function MobileQueueItem({ sel, onRemove }: { sel: QueueSelection; onRemove: () 
   );
 }
 
-export function MobileQueueDrawer({ open, onClose, matches }: MobileQueueDrawerProps) {
+export function MobileQueueDrawer({ open, onClose, matches, allowDesktop = false }: MobileQueueDrawerProps) {
   const { queue, removeFromQueue, clearQueue } = useBetting();
   const router = useRouter();
   const [tracking, setTracking] = useState(false);
@@ -110,7 +111,7 @@ export function MobileQueueDrawer({ open, onClose, matches }: MobileQueueDrawerP
       {/* Backdrop */}
       {open && (
         <div
-          className="fixed inset-0 z-40 lg:hidden"
+          className={cn("fixed inset-0 z-40", !allowDesktop && "lg:hidden")}
           style={{ background: "rgba(0,0,0,0.6)" }}
           onClick={onClose}
         />
@@ -119,7 +120,8 @@ export function MobileQueueDrawer({ open, onClose, matches }: MobileQueueDrawerP
       {/* Drawer */}
       <div
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 lg:hidden transition-transform duration-300 rounded-t-2xl overflow-hidden",
+          "fixed inset-x-0 bottom-0 z-50 transition-transform duration-300 rounded-t-2xl overflow-hidden",
+          !allowDesktop && "lg:hidden",
           open ? "translate-y-0" : "translate-y-full"
         )}
         style={{

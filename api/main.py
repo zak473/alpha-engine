@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from api.deps import get_db, get_current_user
 from api.exceptions import register_exception_handlers
 from api.middleware import RequestLoggingMiddleware
-from api.routers import auth, backtest, baseball as baseball_router, billing, challenges, esports, matches, notifications, picks, predictions, reasoning, soccer, standings as standings_router, tennis, tipsters
+from api.routers import advisor, auth, backtest, baseball as baseball_router, billing, challenges, esports, matches, notifications, picks, predictions, reasoning, soccer, standings as standings_router, tennis, tipsters
 from api.sports.soccer import routes as soccer_sport
 from api.sports.tennis import routes as tennis_sport
 from api.sports.esports import routes as esports_sport
@@ -90,6 +90,27 @@ async def lifespan(app: FastAPI):
             logger.info("Startup: create_all safety net complete.")
         except Exception as exc:
             logger.warning("Startup: create_all failed: %s", exc)
+
+        # Ensure ai_tokens column exists (idempotent; handles pre-migration deployments)
+        def _ensure_ai_tokens(retries: int = 20, delay: float = 30.0):
+            import time as _time
+            from db.session import engine as _eng
+            for _attempt in range(1, retries + 1):
+                try:
+                    with _eng.connect() as _conn:
+                        _conn.execute(text(
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_tokens INTEGER NOT NULL DEFAULT 10"
+                        ))
+                        _conn.commit()
+                    logger.info("Startup: ai_tokens column ensured (attempt %d).", _attempt)
+                    return
+                except Exception as _exc:
+                    logger.warning("Startup: ai_tokens column check failed (attempt %d/%d): %s", _attempt, retries, _exc)
+                    if _attempt < retries:
+                        _time.sleep(delay)
+            logger.error("Startup: ai_tokens column could not be ensured after %d attempts.", retries)
+        import threading as _ai_th
+        _ai_th.Thread(target=_ensure_ai_tokens, daemon=True, name="ai-tokens-migration").start()
 
         # Ensure live ML models are registered in model_registry
         try:
@@ -376,6 +397,7 @@ app.include_router(notifications.router, prefix=settings.API_PREFIX)
 from api.routers import bankroll
 app.include_router(bankroll.router,    prefix=settings.API_PREFIX)
 app.include_router(billing.router,     prefix=settings.API_PREFIX, tags=["billing"])
+app.include_router(advisor.router,     prefix=settings.API_PREFIX)
 app.include_router(standings_router.router)
 app.include_router(backtest.router,    prefix=settings.API_PREFIX)
 app.include_router(baseball_router.router,   prefix=settings.API_PREFIX)

@@ -11,7 +11,6 @@ import { StickyFilterBar } from "@/components/betting/StickyFilterBar";
 import { MatchList } from "@/components/betting/MatchList";
 import { QueueRail } from "@/components/betting/QueueRail";
 import { MobileQueueDrawer } from "@/components/betting/MobileQueueDrawer";
-import { useBetting } from "@/components/betting/BettingContext";
 import { cn } from "@/lib/utils";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import { SPORT_LEAGUES, fetchSGOEvents, sgoEventToMatch } from "@/lib/sgo";
@@ -127,7 +126,6 @@ interface Props {
 }
 
 export function SportMatchesView({ sport }: Props) {
-  const { queue } = useBetting();
   const [filter, setFilter] = useState<BettingFilter>(DEFAULT_BETTING_FILTER);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [mobileQueueOpen, setMobileQueueOpen] = useState(false);
@@ -275,20 +273,6 @@ export function SportMatchesView({ sport }: Props) {
       </div>
 
       <MobileQueueDrawer open={mobileQueueOpen} onClose={() => setMobileQueueOpen(false)} matches={matches} />
-
-      {/* Mobile floating slip button */}
-      {queue.length > 0 && !mobileQueueOpen && (
-        <button
-          onClick={() => setMobileQueueOpen(true)}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 lg:hidden flex items-center gap-2.5 px-5 py-3 rounded-full text-sm font-bold shadow-xl transition-all"
-          style={{ background: "#22e283", color: "#07110d" }}
-        >
-          <span className="flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-black" style={{ background: "rgba(0,0,0,0.18)" }}>
-            {queue.length}
-          </span>
-          View Slip
-        </button>
-      )}
     </div>
   );
 }

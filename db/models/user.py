@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, String, DateTime, Text, UniqueConstraint
+from sqlalchemy import Boolean, Integer, String, DateTime, Text, UniqueConstraint
 from typing import Optional
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -29,6 +29,9 @@ class User(Base):
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+
+    # AI advisor token balance
+    ai_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=10, server_default="10")
 
     # Stripe subscription fields
     stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True)

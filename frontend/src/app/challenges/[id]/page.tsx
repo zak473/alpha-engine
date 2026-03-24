@@ -8,9 +8,10 @@ export const dynamic = "force-dynamic";
 
 interface Props {
   params: { id: string };
+  searchParams: { tab?: string };
 }
 
-export default async function ChallengeDetailPage({ params }: Props) {
+export default async function ChallengeDetailPage({ params, searchParams }: Props) {
   let challenge: Challenge | null = null;
   let leaderboard: LeaderboardOut = { challenge_id: params.id, scoring_type: "points", rows: [] };
   let feedData: EntryFeedPage = { items: [], total: 0, page: 1, page_size: 20, has_next: false };
@@ -33,6 +34,7 @@ export default async function ChallengeDetailPage({ params }: Props) {
         challenge={challenge}
         leaderboard={leaderboard}
         feedData={feedData}
+        initialTab={searchParams.tab ?? "overview"}
       />
     </AppShell>
   );

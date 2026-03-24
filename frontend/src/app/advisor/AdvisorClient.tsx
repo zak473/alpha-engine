@@ -1,8 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Bot, User, Sparkles, RotateCcw } from "lucide-react";
+import { Send, Bot, User, Sparkles, RotateCcw, Coins } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+function getAuthHeader(): string | null {
+  if (typeof window === "undefined") return null;
+  const token = localStorage.getItem("alpha_engine_token");
+  return token ? `Bearer ${token}` : null;
+}
 
 interface Message {
   role: "user" | "assistant";
@@ -53,6 +59,8 @@ export function AdvisorClient() {
   const [input,       setInput]       = useState("");
   const [streaming,   setStreaming]   = useState(false);
   const [error,       setError]       = useState<string | null>(null);
+  const [tokens,      setTokens]      = useState<number | null>(null);
+  const [outOfTokens, setOutOfTokens] = useState(false);
   const bottomRef  = useRef<HTMLDivElement>(null);
   const inputRef   = useRef<HTMLTextAreaElement>(null);
   const abortRef   = useRef<AbortController | null>(null);
@@ -60,6 +68,16 @@ export function AdvisorClient() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Fetch token balance on mount
+  useEffect(() => {
+    const auth = getAuthHeader();
+    if (!auth) return;
+    fetch("/api/v1/advisor/tokens", { headers: { Authorization: auth } })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.tokens !== undefined) setTokens(data.tokens); })
+      .catch(() => {});
+  }, []);
 
   const send = useCallback(async (text: string) => {
     const trimmed = text.trim();
@@ -79,12 +97,23 @@ export function AdvisorClient() {
     abortRef.current = ctrl;
 
     try {
+      const auth = getAuthHeader();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (auth) headers["Authorization"] = auth;
+
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ messages: next }),
         signal: ctrl.signal,
       });
+
+      if (res.status === 402) {
+        setOutOfTokens(true);
+        setMessages((prev) => prev.slice(0, -1));
+        setStreaming(false);
+        return;
+      }
 
       if (!res.ok) throw new Error(`API error ${res.status}`);
       if (!res.body) throw new Error("Response body is empty");
@@ -104,6 +133,9 @@ export function AdvisorClient() {
           return copy;
         });
       }
+
+      // Deduct from local token count
+      setTokens((prev) => (prev !== null ? Math.max(0, prev - 1) : prev));
     } catch (err: unknown) {
       if ((err as Error)?.name === "AbortError") return;
       setError("Something went wrong. Please try again.");
@@ -128,6 +160,7 @@ export function AdvisorClient() {
     setInput("");
     setError(null);
     setStreaming(false);
+    setOutOfTokens(false);
   }
 
   const isEmpty = messages.length === 0;
@@ -135,8 +168,39 @@ export function AdvisorClient() {
   return (
     <div className="flex flex-col h-full min-h-0">
 
+      {/* ── Token badge ──────────────────────────────────────────────────── */}
+      {tokens !== null && (
+        <div className="shrink-0 flex justify-end px-4 pt-3">
+          <div className={cn(
+            "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border",
+            tokens === 0
+              ? "bg-red-500/10 border-red-500/20 text-red-400"
+              : tokens <= 3
+              ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
+              : "bg-violet-500/10 border-violet-500/20 text-violet-300"
+          )}>
+            <Coins size={11} />
+            {tokens} token{tokens !== 1 ? "s" : ""} remaining
+          </div>
+        </div>
+      )}
+
+      {/* ── Out-of-tokens paywall ─────────────────────────────────────────── */}
+      {outOfTokens && (
+        <div className="mx-4 mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-5 text-center">
+          <p className="text-[13px] font-semibold text-amber-300 mb-1">You&apos;ve used all your tokens</p>
+          <p className="text-[12px] text-white/40 mb-3">Upgrade to Pro for 150 tokens per month, or wait for your next cycle.</p>
+          <a
+            href="/pricing"
+            className="inline-block px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-[12px] font-semibold transition-colors"
+          >
+            Upgrade to Pro
+          </a>
+        </div>
+      )}
+
       {/* ── Empty state ──────────────────────────────────────────────────── */}
-      {isEmpty && (
+      {isEmpty && !outOfTokens && (
         <div className="flex-1 flex flex-col items-center justify-center gap-8 px-4 py-12">
           <div className="flex flex-col items-center gap-3 text-center">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500/30 to-blue-500/30 border border-white/[0.1] flex items-center justify-center">
@@ -204,13 +268,13 @@ export function AdvisorClient() {
               onKeyDown={onKeyDown}
               placeholder="Ask about a match, player, or betting strategy…"
               rows={1}
-              disabled={streaming}
+              disabled={streaming || outOfTokens}
               className="flex-1 bg-transparent text-[13px] text-white/85 placeholder-white/25 resize-none outline-none min-h-[20px] max-h-32 overflow-y-auto disabled:opacity-50"
               style={{ fieldSizing: "content" } as React.CSSProperties}
             />
             <button
               onClick={() => send(input)}
-              disabled={!input.trim() || streaming}
+              disabled={!input.trim() || streaming || outOfTokens}
               className="shrink-0 w-8 h-8 rounded-xl bg-violet-500 hover:bg-violet-400 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-all"
             >
               <Send size={13} className="text-white" />

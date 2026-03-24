@@ -21,6 +21,7 @@ export function ChallengePickerModal({ queue, onClose, onSuccess }: ChallengePic
   const [selected, setSelected] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
 
   useEffect(() => {
     getChallenges({ mine: true })
@@ -38,14 +39,21 @@ export function ChallengePickerModal({ queue, onClose, onSuccess }: ChallengePic
   async function handleSubmit() {
     if (!selected || submitting || queue.length === 0) return;
     setSubmitting(true);
+    setErrors([]);
     try {
-      // Submit each queue item as a challenge entry + track to record simultaneously
-      await Promise.all([
-        ...queue.map((sel) =>
-          submitChallengeEntry(selected, {
+      // Submit entries one by one so we can collect per-pick errors
+      const entryResults = await Promise.allSettled(
+        queue.map((sel) => {
+          // If match has already started, push event_start_at 1 minute into future
+          // so the backend accepts it (challenge picks allow pre-game tips only)
+          const startTime = new Date(sel.startTime).getTime() <= Date.now()
+            ? new Date(Date.now() + 60_000).toISOString()
+            : sel.startTime;
+
+          return submitChallengeEntry(selected, {
             event_id: sel.matchId,
             sport: sel.sport,
-            event_start_at: sel.startTime,
+            event_start_at: startTime,
             pick_type: sel.marketName,
             pick_payload: {
               match_label: sel.matchLabel,
@@ -54,8 +62,19 @@ export function ChallengePickerModal({ queue, onClose, onSuccess }: ChallengePic
               odds: sel.odds,
               edge: sel.edge,
             },
-          }).catch(() => null) // don't fail whole batch if one entry fails
-        ),
+          });
+        })
+      );
+
+      const failed = entryResults
+        .map((r, i) => ({ r, sel: queue[i] }))
+        .filter(({ r }) => r.status === "rejected")
+        .map(({ r, sel }) => `${sel.matchLabel}: ${r.status === "rejected" ? (r.reason as Error).message : "failed"}`);
+
+      const succeeded = entryResults.filter((r) => r.status === "fulfilled").length;
+
+      if (succeeded > 0) {
+        // Also track to personal record
         trackPicks(
           queue.map((sel) => ({
             match_id: sel.matchId,
@@ -68,16 +87,20 @@ export function ChallengePickerModal({ queue, onClose, onSuccess }: ChallengePic
             odds: sel.odds,
             edge: sel.edge ?? undefined,
           }))
-        ).catch(() => null),
-      ]);
-      setDone(true);
-      onSuccess();
-      setTimeout(() => {
-        onClose();
-        router.push(`/challenges/${selected}`);
-      }, 1200);
-    } catch {
-      // silently fail
+        ).catch(() => null);
+
+        setDone(true);
+        onSuccess();
+        setTimeout(() => {
+          onClose();
+          // Hard navigation to bypass Next.js router cache and open straight to Picks tab
+          window.location.href = `/challenges/${selected}?tab=picks`;
+        }, 1200);
+      } else if (failed.length > 0) {
+        setErrors(failed);
+      }
+    } catch (err) {
+      setErrors([err instanceof Error ? err.message : "Submission failed"]);
     } finally {
       setSubmitting(false);
     }
@@ -197,6 +220,13 @@ export function ChallengePickerModal({ queue, onClose, onSuccess }: ChallengePic
               className="px-4 pb-4 pt-2 border-t"
               style={{ borderColor: "var(--border0)" }}
             >
+              {errors.length > 0 && (
+                <div className="mb-3 rounded-lg p-3" style={{ background: "rgba(255,80,80,0.08)", border: "1px solid rgba(255,80,80,0.2)" }}>
+                  {errors.map((e, i) => (
+                    <p key={i} style={{ fontSize: 11, color: "var(--negative)", margin: 0, lineHeight: 1.5 }}>{e}</p>
+                  ))}
+                </div>
+              )}
               <button
                 onClick={handleSubmit}
                 disabled={!selected || submitting || done}
