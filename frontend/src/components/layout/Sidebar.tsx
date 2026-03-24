@@ -3,16 +3,17 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BrainCircuit, Circle, ClipboardList, MessageSquare, ShieldCheck, TrendingUp, Trophy, Users } from "lucide-react";
+import { Activity, BrainCircuit, Circle, ClipboardList, MessageSquare, Radio, ShieldCheck, TrendingUp, Trophy, Users } from "lucide-react";
 import { useSidebar } from "./SidebarContext";
 
 const NAV = [
   { label: "Predictions", href: "/predictions", icon: BrainCircuit },
-  { label: "Tipsters", href: "/tipsters", icon: Users },
-  { label: "Challenges", href: "/challenges", icon: Trophy },
-  { label: "Record", href: "/record", icon: ClipboardList },
+  { label: "Live",        href: "/live",        icon: Radio },
+  { label: "Tipsters",   href: "/tipsters",    icon: Users },
+  { label: "Challenges", href: "/challenges",  icon: Trophy },
+  { label: "Record",     href: "/record",      icon: ClipboardList },
   { label: "Performance", href: "/performance", icon: TrendingUp },
-  { label: "AI Advisor", href: "/advisor", icon: MessageSquare },
+  { label: "AI Advisor", href: "/advisor",     icon: MessageSquare },
 ];
 
 const SPORTS = [

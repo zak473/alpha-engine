@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 const AUTH_PAGES = ["/login", "/register", "/forgot-password", "/auth/callback"];
 
 // Fully public pages (no auth check at all)
-const PUBLIC_PAGES = ["/"];
+const PUBLIC_PAGES = ["/", "/pricing"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

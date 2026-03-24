@@ -194,12 +194,6 @@ export function LoginForm() {
                 <label className="text-[12px] font-semibold uppercase tracking-[0.16em] text-white/50">
                   Password
                 </label>
-                <Link
-                  href="#"
-                  className="text-[12px] font-medium text-emerald-400 transition hover:opacity-80"
-                >
-                  Forgot password?
-                </Link>
               </div>
               <input
                 type="password"

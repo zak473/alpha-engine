@@ -30,6 +30,7 @@ from api.sports.esports import routes as esports_sport
 from api.sports.baseball import routes as baseball_sport
 from api.sports.basketball import routes as basketball_sport
 from api.sports.hockey import routes as hockey_sport
+from api.sports.horseracing import routes as horseracing_sport
 from config.settings import settings
 
 SECRET_KEY_IS_DEFAULT = (
@@ -407,8 +408,9 @@ app.include_router(soccer_sport.router,      prefix=settings.API_PREFIX)
 app.include_router(tennis_sport.router,      prefix=settings.API_PREFIX)
 app.include_router(esports_sport.router,     prefix=settings.API_PREFIX)
 app.include_router(baseball_sport.router,    prefix=settings.API_PREFIX)
-app.include_router(basketball_sport.router,  prefix=settings.API_PREFIX)
-app.include_router(hockey_sport.router,      prefix=settings.API_PREFIX)
+app.include_router(basketball_sport.router,   prefix=settings.API_PREFIX)
+app.include_router(hockey_sport.router,       prefix=settings.API_PREFIX)
+app.include_router(horseracing_sport.router,  prefix=settings.API_PREFIX)
 
 # ─── Shared endpoints ─────────────────────────────────────────────────────
 
