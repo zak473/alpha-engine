@@ -68,6 +68,7 @@ export default async function PerformancePage() {
         sportStats={sportStatsList}
         models={perfData.models}
         recentPicks={recentPicks}
+        allPicks={picks}
         bankroll={bankroll}
         accuracy={accuracy}
         backtestSummary={backtestSummary}

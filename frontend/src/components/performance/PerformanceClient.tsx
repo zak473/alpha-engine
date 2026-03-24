@@ -8,7 +8,7 @@ import type { PicksStatsOut, PickOut, BankrollStatsOut, PredictionAccuracy, Back
 import type { MvpModelMetrics } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { depositBankroll, withdrawBankroll } from "@/lib/api";
-import { TrendingUp, TrendingDown, Zap, Target, BarChart3, Clock, Wallet, ChevronRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Zap, Target, BarChart3, Clock, Wallet, ChevronRight, ChevronLeft } from "lucide-react";
 
 type Range = "7d" | "30d" | "90d" | "all";
 
@@ -43,6 +43,7 @@ interface PerformanceClientProps {
   sportStats: (PicksStatsOut & { sport: string })[];
   models: MvpModelMetrics[];
   recentPicks: PickOut[];
+  allPicks: PickOut[];
   bankroll: BankrollStatsOut;
   accuracy: PredictionAccuracy;
   backtestSummary: Record<string, BacktestRunResult>;
@@ -78,8 +79,151 @@ function OutcomePill({ outcome }: { outcome: PickOut["outcome"] }) {
   );
 }
 
+const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+interface DayData { pnl: number; wins: number; losses: number; }
+
+function MonthlyCalendar({ picks }: { picks: PickOut[] }) {
+  const today = new Date();
+  const [year, setYear] = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth()); // 0-indexed
+
+  const dayMap = useMemo(() => {
+    const map: Record<string, DayData> = {};
+    for (const p of picks) {
+      if (!p.outcome || p.outcome === "void") continue;
+      const date = (p.settled_at ?? p.created_at).slice(0, 10);
+      if (!map[date]) map[date] = { pnl: 0, wins: 0, losses: 0 };
+      const stake = 1;
+      map[date].pnl += p.outcome === "won" ? stake * (p.odds - 1) : -stake;
+      if (p.outcome === "won") map[date].wins++;
+      else map[date].losses++;
+    }
+    // round pnl
+    for (const k of Object.keys(map)) map[k].pnl = Math.round(map[k].pnl * 100) / 100;
+    return map;
+  }, [picks]);
+
+  // First day of month (0=Sun..6=Sat), convert to Mon-first (0=Mon..6=Sun)
+  const firstDow = new Date(year, month, 1).getDay();
+  const startOffset = (firstDow + 6) % 7; // shift so Mon=0
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+
+  const monthName = new Date(year, month, 1).toLocaleString("default", { month: "long" });
+  const todayStr = today.toISOString().slice(0, 10);
+
+  const monthPnl = useMemo(() => {
+    let total = 0;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      total += dayMap[key]?.pnl ?? 0;
+    }
+    return Math.round(total * 100) / 100;
+  }, [year, month, daysInMonth, dayMap]);
+
+  const prevMonth = () => {
+    if (month === 0) { setYear(y => y - 1); setMonth(11); }
+    else setMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (month === 11) { setYear(y => y + 1); setMonth(0); }
+    else setMonth(m => m + 1);
+  };
+
+  const cells = Array.from({ length: totalCells }, (_, i) => {
+    const day = i - startOffset + 1;
+    if (day < 1 || day > daysInMonth) return null;
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const data = dayMap[dateStr];
+    return { day, dateStr, data };
+  });
+
+  return (
+    <div className="overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.03]">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+        <div className="flex items-center gap-3">
+          <button onClick={prevMonth} className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.06] transition-colors">
+            <ChevronLeft size={15} />
+          </button>
+          <span className="text-[15px] font-bold text-white min-w-[140px] text-center">{monthName} {year}</span>
+          <button
+            onClick={nextMonth}
+            disabled={year === today.getFullYear() && month === today.getMonth()}
+            className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+          >
+            <ChevronRight size={15} />
+          </button>
+        </div>
+        <div className={cn("font-mono text-[15px] font-bold tabular-nums", monthPnl > 0 ? "text-emerald-300" : monthPnl < 0 ? "text-red-400" : "text-white/40")}>
+          {monthPnl > 0 ? "+" : ""}{monthPnl === 0 ? "—" : monthPnl.toFixed(2) + "u"}
+        </div>
+      </div>
+
+      {/* Day labels */}
+      <div className="grid grid-cols-7 border-b border-white/[0.05]">
+        {DAY_LABELS.map((d) => (
+          <div key={d} className="py-2 text-center text-[9px] font-bold uppercase tracking-widest text-white/25">
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 divide-x divide-y divide-white/[0.04]">
+        {cells.map((cell, i) => {
+          if (!cell) return (
+            <div key={`empty-${i}`} className="aspect-square min-h-[52px]" />
+          );
+          const { day, dateStr, data } = cell;
+          const isToday = dateStr === todayStr;
+          const pos = data && data.pnl > 0;
+          const neg = data && data.pnl < 0;
+
+          return (
+            <div
+              key={dateStr}
+              className={cn(
+                "relative flex flex-col items-center justify-center gap-0.5 min-h-[52px] py-2 px-1 transition-colors",
+                pos && "bg-emerald-400/[0.07]",
+                neg && "bg-red-400/[0.07]",
+                isToday && "ring-1 ring-inset ring-white/20",
+              )}
+            >
+              <span className={cn(
+                "text-[11px] font-semibold leading-tight",
+                isToday ? "text-white" : "text-white/50",
+              )}>
+                {day}
+              </span>
+              {data ? (
+                <>
+                  <span className={cn(
+                    "text-[10px] font-mono font-bold leading-tight tabular-nums",
+                    pos ? "text-emerald-300" : "text-red-400",
+                  )}>
+                    {pos ? "+" : ""}{data.pnl.toFixed(1)}u
+                  </span>
+                  <span className="text-[9px] text-white/30 leading-tight">
+                    {data.wins > 0 && <span className="text-emerald-400">{data.wins}W</span>}
+                    {data.wins > 0 && data.losses > 0 && " "}
+                    {data.losses > 0 && <span className="text-red-400">{data.losses}L</span>}
+                  </span>
+                </>
+              ) : (
+                <span className="text-[9px] text-white/15">·</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function PerformanceClient({
-  overall, roiSeries, sportStats, models, recentPicks, bankroll, accuracy, backtestSummary,
+  overall, roiSeries, sportStats, models, recentPicks, allPicks, bankroll, accuracy, backtestSummary,
 }: PerformanceClientProps) {
   const router = useRouter();
   const [range, setRange] = useState<Range>("all");
@@ -223,6 +367,12 @@ export function PerformanceClient({
         </div>
       </div>
 
+      {/* ── Monthly calendar ───────────────────────────────────────────────── */}
+      <div>
+        <SectionLabel sub="Daily P&L — units staked flat">Monthly Tracker</SectionLabel>
+        <MonthlyCalendar picks={allPicks} />
+      </div>
+
       {/* ── Per-sport ──────────────────────────────────────────────────────── */}
       {sportStats.some((r) => r.total > 0) && (
         <div>
@@ -333,8 +483,8 @@ export function PerformanceClient({
         </div>
       )}
 
-      {/* ── Model registry ─────────────────────────────────────────────────── */}
-      {models.length > 0 && (
+      {/* ── Model registry — hidden from UI ────────────────────────────────── */}
+      {false && models.length > 0 && (
         <div>
           <SectionLabel sub="Live prediction models">Model Registry</SectionLabel>
           <div className="space-y-2">
