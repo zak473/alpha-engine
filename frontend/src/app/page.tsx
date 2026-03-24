@@ -292,28 +292,32 @@ export default function LandingPage() {
           </div>
 
           <div className="sp sp--tennis">
-            <div className="sp__overlay sp__overlay--color" style={{ background: "linear-gradient(135deg,#0d1a0a,#142d14)" }}></div>
+            <div className="sp__img" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&w=1200&q=80')" }}></div>
+            <div className="sp__overlay"></div>
             <div className="sp__content">
               <span className="sp__name">TENNIS</span>
               <Link href="/register" className="btn-sport">Explore</Link>
             </div>
           </div>
           <div className="sp sp--baseball">
-            <div className="sp__overlay sp__overlay--color" style={{ background: "linear-gradient(135deg,#1a0a0a,#2d1414)" }}></div>
+            <div className="sp__img" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1566577739112-5180d4bf9390?auto=format&fit=crop&w=1200&q=80')" }}></div>
+            <div className="sp__overlay"></div>
             <div className="sp__content">
               <span className="sp__name">BASEBALL</span>
               <Link href="/register" className="btn-sport">Explore</Link>
             </div>
           </div>
           <div className="sp sp--hockey">
-            <div className="sp__overlay sp__overlay--color" style={{ background: "linear-gradient(135deg,#0a0d1a,#14182d)" }}></div>
+            <div className="sp__img" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1515703407324-5f753afd8be8?auto=format&fit=crop&w=1200&q=80')" }}></div>
+            <div className="sp__overlay"></div>
             <div className="sp__content">
               <span className="sp__name">HOCKEY</span>
               <Link href="/register" className="btn-sport">Explore</Link>
             </div>
           </div>
           <div className="sp sp--esports">
-            <div className="sp__overlay sp__overlay--color" style={{ background: "linear-gradient(135deg,#0d0a1a,#1a1430)" }}></div>
+            <div className="sp__img" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=80')" }}></div>
+            <div className="sp__overlay"></div>
             <div className="sp__content">
               <span className="sp__name">ESPORTS</span>
               <Link href="/register" className="btn-sport">Explore</Link>
