@@ -206,6 +206,7 @@ height: 44px;
 width: auto;
 display: block;
 object-fit: contain;
+mix-blend-mode: screen;
 filter: brightness(1.15) drop-shadow(0 0 10px rgba(0,255,65,0.35));
 transition: filter .2s;
 }
@@ -213,9 +214,9 @@ transition: filter .2s;
 filter: brightness(1.25) drop-shadow(0 0 18px rgba(0,255,65,0.55));
 }
 .nid-landing .footer-logo {
-opacity: 0.55;
 height: 32px;
-filter: brightness(1.1);
+mix-blend-mode: screen;
+filter: brightness(0.7);
 }
 
 .nid-landing .nav__links {
