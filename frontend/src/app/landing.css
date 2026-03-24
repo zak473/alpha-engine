@@ -199,25 +199,17 @@ gap: 36px;
 .nid-landing .nav__logo {
 display: flex;
 align-items: center;
-gap: 10px;
 flex-shrink: 0;
 }
-.nid-landing .nav__logo-mark {
-width: 32px; height: 32px;
-background: var(--green);
-color: #000;
-font-family: 'Barlow Condensed', sans-serif;
-font-weight: 900;
-font-size: 20px;
-display: flex; align-items: center; justify-content: center;
-border-radius: 6px;
-letter-spacing: -.01em;
+.nid-landing .nav__logo-img {
+height: 36px;
+width: auto;
+display: block;
+object-fit: contain;
 }
-.nid-landing .nav__logo-text {
-font-size: 13px;
-font-weight: 700;
-letter-spacing: .06em;
-text-transform: uppercase;
+.nid-landing .footer-logo {
+opacity: 0.5;
+height: 28px;
 }
 
 .nid-landing .nav__links {
@@ -1229,7 +1221,7 @@ MOBILE
 ============================================================ */
 @media (max-width: 640px) {
   .nid-landing .nav__inner { padding: 0 16px; height: 60px; }
-  .nid-landing .nav__logo-text { display: none; }
+  .nid-landing .nav__logo-img { height: 28px; }
 
   .nid-landing .hero__content { padding: 40px 16px 64px; }
   .nid-landing .hero__headline { font-size: clamp(62px, 17vw, 96px); }

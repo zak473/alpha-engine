@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import './landing.css';
 
 export default function LandingPage() {
@@ -120,8 +121,7 @@ export default function LandingPage() {
       <header className="nav" id="nav">
         <div className="nav__inner">
           <a href="#" className="nav__logo">
-            <div className="nav__logo-mark">N</div>
-            <span className="nav__logo-text">Never In Doubt</span>
+            <Image src="/never-in-doubt-logo.png" alt="Never In Doubt" width={140} height={48} className="nav__logo-img" />
           </a>
           <nav className="nav__links" id="navLinks">
             <a href="#predictions">Live Predictions</a>
@@ -631,8 +631,7 @@ export default function LandingPage() {
         <div className="footer__top">
           <div className="footer__brand">
             <a href="#" className="nav__logo">
-              <div className="nav__logo-mark">N</div>
-              <span className="nav__logo-text">Never In Doubt</span>
+              <Image src="/never-in-doubt-logo.png" alt="Never In Doubt" width={120} height={40} className="nav__logo-img footer-logo" />
             </a>
             <p className="footer__tagline">AI-powered sports intelligence for smarter betting decisions.</p>
           </div>
