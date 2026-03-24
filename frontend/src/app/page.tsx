@@ -1,419 +1,656 @@
-import Link from "next/link";
-import Image from "next/image";
+'use client';
 
-// ─── Edit these to change the page content ────────────────────────────────────
-
-const HERO_BADGE    = "AI Sports Intelligence · Free to start";
-const HERO_LINE1    = "Never bet";
-const HERO_GREEN    = "in the dark";
-const HERO_LINE2    = "again.";
-const HERO_SUB      = "Never In Doubt gives you machine-learning predictions, live market odds, and a personal AI advisor across 6 sports — so every bet you place is backed by data.";
-
-const STATS = [
-  { value: "6",    label: "Sports" },
-  { value: "60%+", label: "Model accuracy" },
-  { value: "10k+", label: "Matches analysed" },
-  { value: "Live", label: "Odds feed" },
-];
-
-const HOW = [
-  {
-    step: "01",
-    title: "Browse today's matches",
-    body: "Every match across soccer, basketball, tennis, baseball, hockey and esports — ranked by edge and confidence.",
-  },
-  {
-    step: "02",
-    title: "See the AI edge",
-    body: "Our models output a fair probability for each outcome. Where the bookmaker's odds are worse, you see a positive edge — in plain english.",
-  },
-  {
-    step: "03",
-    title: "Track and improve",
-    body: "Log your picks, watch your bankroll grow, and review your ROI over time. Know exactly where you're winning.",
-  },
-];
-
-const FEATURES = [
-  {
-    icon: "🧠",
-    title: "ML Predictions",
-    body: "Machine learning models trained on years of historical data give calibrated win probabilities, not gut feelings.",
-    tag: "Core",
-  },
-  {
-    icon: "⚡",
-    title: "Live Odds Feed",
-    body: "Real-time market odds updated continuously, with your edge highlighted the moment it appears.",
-    tag: "Live",
-  },
-  {
-    icon: "🤖",
-    title: "AI Advisor",
-    body: "Ask anything — match previews, bankroll strategy, accumulator ideas. Your personal analyst, 24/7.",
-    tag: "AI",
-  },
-  {
-    icon: "📈",
-    title: "ROI Tracking",
-    body: "Full P&L history with win rate, Sharpe ratio, drawdown, and Kelly-staked returns.",
-    tag: "Analytics",
-  },
-  {
-    icon: "📊",
-    title: "Edge Scoring",
-    body: "Every match card shows the gap between our fair odds and the bookmaker line — so you back value, not noise.",
-    tag: "Core",
-  },
-  {
-    icon: "🏆",
-    title: "Challenges",
-    body: "Compete in weekly prediction challenges, follow the sharpest tipsters, and climb the public leaderboard.",
-    tag: "Social",
-  },
-];
-
-const SPORTS = [
-  { icon: "⚽", label: "Soccer",     color: "#3b82f6" },
-  { icon: "🏀", label: "Basketball", color: "#f59e0b" },
-  { icon: "🎾", label: "Tennis",     color: "#22c55e" },
-  { icon: "⚾", label: "Baseball",   color: "#ef4444" },
-  { icon: "🏒", label: "Hockey",     color: "#06b6d4" },
-  { icon: "🎮", label: "Esports",    color: "#a855f7" },
-];
-
-const MOCK_MATCHES = [
-  { sport: "⚽", league: "Premier League", home: "Arsenal", away: "Man City",   edge: "+4.2%", conf: 71, status: "LIVE · 67'",    edgePos: true },
-  { sport: "🏀", league: "NBA",            home: "Lakers",  away: "Celtics",    edge: "+2.8%", conf: 63, status: "Tonight 21:30", edgePos: true },
-  { sport: "🎾", league: "ATP",            home: "Djokovic",away: "Alcaraz",    edge: "+3.5%", conf: 68, status: "Tomorrow",      edgePos: true },
-];
-
-const TESTIMONIALS = [
-  { quote: "Finally a platform that shows me why to bet, not just what to bet.", name: "James R.", role: "Recreational punter" },
-  { quote: "The edge scoring alone is worth it. I've stopped backing odds I shouldn't.", name: "Sarah M.", role: "Value bettor" },
-  { quote: "The AI advisor explained Kelly staking better than any article I've read.", name: "Tom K.", role: "Sports trader" },
-];
-
-// ─────────────────────────────────────────────────────────────────────────────
+import { useEffect } from 'react';
+import Link from 'next/link';
+import './landing.css';
 
 export default function LandingPage() {
+  useEffect(() => {
+    const nav = document.getElementById('nav');
+    if (!nav) return;
+
+    // Nav solid on scroll
+    const onScroll = () => nav.classList.toggle('solid', window.scrollY > 40);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+
+    // Mobile nav
+    const burger = document.getElementById('burger') as HTMLButtonElement | null;
+    const navLinks = document.getElementById('navLinks');
+    if (burger && navLinks) {
+      const burgerClick = () => {
+        const open = navLinks.classList.toggle('open');
+        burger.classList.toggle('open', open);
+        document.body.style.overflow = open ? 'hidden' : '';
+      };
+      burger.addEventListener('click', burgerClick);
+      navLinks.querySelectorAll('a').forEach(a => {
+        a.addEventListener('click', () => {
+          navLinks.classList.remove('open');
+          burger.classList.remove('open');
+          document.body.style.overflow = '';
+        });
+      });
+    }
+
+    // Scroll reveal
+    const reveals = document.querySelectorAll('.nid-landing .reveal');
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+    reveals.forEach(el => io.observe(el));
+
+    // Stat counter
+    const counts = document.querySelectorAll('.nid-landing .count');
+    const statsEl = document.getElementById('stats');
+    function runCounters() {
+      counts.forEach(el => {
+        const target = parseInt((el as HTMLElement).dataset.target ?? '0', 10);
+        if (!target) return;
+        const dur = 1600;
+        const start = performance.now();
+        const tick = (now: number) => {
+          const p = Math.min((now - start) / dur, 1);
+          const ease = 1 - Math.pow(1 - p, 3);
+          el.textContent = Math.round(ease * target).toString();
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    }
+    if (statsEl) {
+      const so = new IntersectionObserver(([e]) => {
+        if (e.isIntersecting) { runCounters(); so.disconnect(); }
+      }, { threshold: 0.4 });
+      so.observe(statsEl);
+    }
+
+    // FAQ accordion
+    document.querySelectorAll('.nid-landing .faq-item').forEach(item => {
+      item.querySelector('.faq-q')?.addEventListener('click', () => {
+        const isOpen = item.classList.contains('open');
+        document.querySelectorAll('.nid-landing .faq-item').forEach(i => {
+          i.classList.remove('open');
+          i.querySelector('.faq-q')?.setAttribute('aria-expanded', 'false');
+        });
+        if (!isOpen) {
+          item.classList.add('open');
+          item.querySelector('.faq-q')?.setAttribute('aria-expanded', 'true');
+        }
+      });
+    });
+
+    // Smooth scroll
+    document.querySelectorAll('.nid-landing a[href^="#"]').forEach(a => {
+      a.addEventListener('click', (e) => {
+        const href = a.getAttribute('href');
+        if (!href || href === '#') return;
+        const t = document.querySelector(href);
+        if (t) {
+          e.preventDefault();
+          window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - 76, behavior: 'smooth' });
+        }
+      });
+    });
+
+    // Live match ticker
+    const liveEl = document.querySelector('.nid-landing .pred-row__time.live');
+    let min = 67;
+    let ticker: ReturnType<typeof setInterval> | undefined;
+    if (liveEl) {
+      ticker = setInterval(() => {
+        if (min < 90) { min++; liveEl.textContent = `LIVE · ${min}'`; }
+        else { liveEl.textContent = 'FT'; (liveEl as HTMLElement).style.color = 'var(--text-mute)'; }
+      }, 12000);
+    }
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (ticker) clearInterval(ticker);
+      io.disconnect();
+    };
+  }, []);
+
   return (
-    <div className="min-h-screen text-white overflow-x-hidden"
-      style={{ background: "#07100c", fontFamily: "Inter, sans-serif" }}>
+    <div className="nid-landing">
 
-      {/* ─── Nav ─────────────────────────────────────────────────────────── */}
-      <nav className="fixed top-0 inset-x-0 z-50"
-        style={{ background: "rgba(7,16,12,0.80)", backdropFilter: "blur(24px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        <div className="mx-auto max-w-6xl flex items-center justify-between px-6 h-16">
-          <Image src="/never-in-doubt-logo.png" alt="Never In Doubt" width={130} height={44} className="h-8 w-auto" />
-          <div className="hidden sm:flex items-center gap-8 text-sm" style={{ color: "rgba(255,255,255,0.55)" }}>
-            <a href="#how" className="hover:text-white transition-colors">How it works</a>
-            <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#sports" className="hover:text-white transition-colors">Sports</a>
+      {/* ── NAVIGATION ── */}
+      <header className="nav" id="nav">
+        <div className="nav__inner">
+          <a href="#" className="nav__logo">
+            <div className="nav__logo-mark">N</div>
+            <span className="nav__logo-text">Never In Doubt</span>
+          </a>
+          <nav className="nav__links" id="navLinks">
+            <a href="#predictions">Live Predictions</a>
+            <a href="#track">Performance Tracking</a>
+            <a href="#features">About AI</a>
+            <Link href="/login">Sign In</Link>
+          </nav>
+          <Link href="/register" className="btn-cta">Get started free</Link>
+          <button className="nav__burger" id="burger" aria-label="Menu">
+            <span></span><span></span><span></span>
+          </button>
+        </div>
+      </header>
+
+      {/* ── HERO ── */}
+      <section className="hero" id="hero">
+        <div className="hero__bg">
+          <div className="hero__player" style={{ backgroundImage: "url('https://sspark.genspark.ai/cfimages?u1=tOQ6Eaz2Od%2FXmqC2TbIqPahCHsEkuQTrQ4OvdoIDCxe0w%2FjVoLfiZKhlDGcaBKRtt4oztHYYYjVFXlbold%2BEHBbdzCsGICzBTT6tD6ZxWW4cG%2BsKTd8wr2NkJrF3o1XRtwoZZ37lQr4JnXXlP%2FqSC4Fq2TKZP7Sy0Q%3D%3D&u2=5L6nyz53qeNVWsZG&width=2560')" }}></div>
+          <div className="hero__overlay"></div>
+        </div>
+
+        <div className="hero__waves" aria-hidden="true">
+          <svg className="waves-svg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+            <path className="wave wave-1" d="M-200,450 C0,200 200,700 400,450 S800,200 1000,450 S1400,700 1640,450" fill="none" stroke="#00FF41" strokeWidth="2.5" opacity="0.9" />
+            <path className="wave wave-2" d="M-200,490 C0,240 200,740 400,490 S800,240 1000,490 S1400,740 1640,490" fill="none" stroke="#00FF41" strokeWidth="1.5" opacity="0.55" />
+            <path className="wave wave-3" d="M-200,410 C0,160 200,660 400,410 S800,160 1000,410 S1400,660 1640,410" fill="none" stroke="#00FF41" strokeWidth="1" opacity="0.35" />
+            <path className="wave wave-4" d="M-200,540 C0,290 200,790 400,540 S800,290 1000,540 S1400,790 1640,540" fill="none" stroke="#00FF41" strokeWidth="0.8" opacity="0.2" />
+            <path className="wave wave-5" d="M-200,380 C50,130 250,630 450,380 S850,130 1050,380 S1450,630 1690,380" fill="none" stroke="#00FF41" strokeWidth="0.6" opacity="0.15" />
+          </svg>
+        </div>
+
+        <div className="hero__content">
+          <div className="hero__text">
+            <p className="hero__eyebrow">DOMINATE EVERY BET. NEVER IN DOUBT.</p>
+            <h1 className="hero__headline">
+              <span className="h-white">STOP<br />GUESSING.</span>
+              <span className="h-green">START<br />WINNING.</span>
+            </h1>
+            <p className="hero__sub">Never In Doubt combines machine-learning predictions, live market odds, and a personal AI advisor across 6 sports — so every bet you place is backed by data.</p>
+            <div className="hero__ctas">
+              <Link href="/register" className="btn-cta btn-cta--large">Get started free</Link>
+              <a href="#predictions" className="btn-ghost btn-ghost--large">See today&apos;s edges</a>
+            </div>
+            <p className="hero__micro">No credit card required</p>
           </div>
-          <div className="flex items-center gap-3">
-            <Link href="/login" className="hidden sm:block text-sm font-medium transition-colors hover:text-white"
-              style={{ color: "rgba(255,255,255,0.55)" }}>
-              Sign in
-            </Link>
-            <Link href="/register"
-              className="rounded-full px-5 py-2 text-sm font-semibold transition-all hover:opacity-90 hover:-translate-y-px"
-              style={{ background: "#2edb6c", color: "#07110d", boxShadow: "0 4px 14px rgba(46,219,108,0.35)" }}>
-              Get started free
-            </Link>
-          </div>
-        </div>
-      </nav>
 
-      {/* ─── Hero ────────────────────────────────────────────────────────── */}
-      <section className="relative flex flex-col items-center text-center px-6 pt-36 pb-8"
-        style={{ minHeight: "100svh" }}>
-
-        {/* Background glow */}
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 left-1/2 -translate-x-1/2 rounded-full"
-            style={{ width: 900, height: 600, background: "radial-gradient(ellipse, rgba(46,219,108,0.15) 0%, transparent 65%)", filter: "blur(1px)" }} />
-        </div>
-
-        {/* Badge */}
-        <div className="relative mb-8 inline-flex items-center gap-2.5 rounded-full border px-4 py-2 text-xs font-semibold"
-          style={{ borderColor: "rgba(46,219,108,0.30)", background: "rgba(46,219,108,0.08)", color: "#5DF5A0", letterSpacing: "0.06em" }}>
-          <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: "#36f28f", boxShadow: "0 0 10px #36f28f" }} />
-          {HERO_BADGE}
-        </div>
-
-        {/* Headline */}
-        <h1 className="relative max-w-5xl font-bold" style={{ fontSize: "clamp(42px, 8vw, 88px)", lineHeight: 1.04, letterSpacing: "-0.045em" }}>
-          {HERO_LINE1}{" "}
-          <span style={{
-            background: "linear-gradient(135deg, #5DF5A0 0%, #2edb6c 45%, #1ab858 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-          }}>
-            {HERO_GREEN}
-          </span>
-          <br />{HERO_LINE2}
-        </h1>
-
-        {/* Subtitle */}
-        <p className="relative mt-7 max-w-xl text-lg leading-relaxed"
-          style={{ color: "rgba(237,247,240,0.55)", fontSize: "clamp(15px, 2vw, 18px)" }}>
-          {HERO_SUB}
-        </p>
-
-        {/* CTAs */}
-        <div className="relative mt-10 flex flex-wrap justify-center gap-4">
-          <Link href="/register"
-            className="rounded-full px-8 py-4 text-base font-bold transition-all hover:-translate-y-0.5 hover:shadow-2xl"
-            style={{ background: "linear-gradient(135deg,#5DF5A0,#2edb6c)", color: "#07110d", boxShadow: "0 10px 40px rgba(46,219,108,0.40)" }}>
-            Start for free →
-          </Link>
-          <Link href="/login"
-            className="rounded-full border px-8 py-4 text-base font-medium transition-all hover:-translate-y-0.5"
-            style={{ borderColor: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.75)", background: "rgba(255,255,255,0.05)" }}>
-            Sign in
-          </Link>
-        </div>
-
-        <p className="mt-4 text-xs" style={{ color: "rgba(255,255,255,0.28)" }}>
-          No credit card required · Free forever plan available
-        </p>
-
-        {/* App preview */}
-        <div className="relative mt-16 w-full max-w-4xl">
-          <div className="rounded-[20px] border overflow-hidden"
-            style={{ borderColor: "rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.03)", boxShadow: "0 0 0 1px rgba(46,219,108,0.08), 0 60px 120px rgba(0,0,0,0.70)" }}>
-
-            {/* Window chrome */}
-            <div className="flex items-center gap-2 px-5 py-3.5 border-b"
-              style={{ borderColor: "rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
-              <div className="flex gap-1.5">
-                <div className="h-3 w-3 rounded-full" style={{ background: "rgba(255,255,255,0.12)" }} />
-                <div className="h-3 w-3 rounded-full" style={{ background: "rgba(255,255,255,0.12)" }} />
-                <div className="h-3 w-3 rounded-full" style={{ background: "rgba(255,255,255,0.12)" }} />
+          <div className="hero__card-wrap">
+            <div className="pred-card">
+              <div className="pred-card__head">
+                <span className="pred-card__label">TODAY&apos;S TOP EDGES</span>
+                <span className="pred-card__badge">3 live</span>
               </div>
-              <div className="flex-1 mx-4">
-                <div className="mx-auto w-48 h-5 rounded-md text-center text-[10px] flex items-center justify-center"
-                  style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.30)" }}>
-                  neverindoubt.app/sports/soccer
+              <div className="pred-row">
+                <span className="dot dot--green"></span>
+                <div className="pred-row__info">
+                  <span className="pred-row__league">Premier League</span>
+                  <span className="pred-row__match">Arsenal vs Man City</span>
+                </div>
+                <span className="pred-row__edge">+4.2%</span>
+                <span className="pred-row__time live">LIVE · 67&apos;</span>
+              </div>
+              <div className="pred-row">
+                <span className="dot dot--orange"></span>
+                <div className="pred-row__info">
+                  <span className="pred-row__league">NBA</span>
+                  <span className="pred-row__match">Lakers vs Celtics</span>
+                </div>
+                <span className="pred-row__edge">+2.8%</span>
+                <span className="pred-row__time">Tonight 21:30</span>
+              </div>
+              <div className="pred-row">
+                <span className="dot dot--yellow"></span>
+                <div className="pred-row__info">
+                  <span className="pred-row__league">ATP</span>
+                  <span className="pred-row__match">Djokovic vs Alcaraz</span>
+                </div>
+                <span className="pred-row__edge">+3.5%</span>
+                <span className="pred-row__time">Tomorrow</span>
+              </div>
+              <div className="pred-card__chart">
+                <svg viewBox="0 0 220 48" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#AAFF00" stopOpacity={0.6} />
+                      <stop offset="100%" stopColor="#00FF41" stopOpacity={1} />
+                    </linearGradient>
+                  </defs>
+                  <polyline points="0,42 30,36 60,28 90,32 120,18 150,12 180,6 220,2" fill="none" stroke="url(#g1)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className="trend-arrow">↑</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── STATS STRIP ── */}
+      <div className="stats-strip" id="stats">
+        <div className="stats-strip__inner">
+          <div className="stat">
+            <div className="stat__num"><span className="count" data-target="60">0</span>%+</div>
+            <div className="stat__lbl">Model Accuracy at High Confidence</div>
+          </div>
+          <div className="stat-sep"></div>
+          <div className="stat">
+            <div className="stat__num"><span className="count" data-target="10">0</span>k+</div>
+            <div className="stat__lbl">Matches Analysed &amp; Growing Daily</div>
+          </div>
+          <div className="stat-sep"></div>
+          <div className="stat">
+            <div className="stat__num"><span className="count" data-target="6">0</span></div>
+            <div className="stat__lbl">Sports Covered Across All Markets</div>
+          </div>
+          <div className="stat-sep"></div>
+          <div className="stat">
+            <div className="stat__num stat__num--green">Live</div>
+            <div className="stat__lbl">Odds Feed with Real-Time Updates</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── SPORT PANELS ── */}
+      <section className="sport-panels" id="predictions">
+        <div className="sport-panels__header">
+          <h2 className="section-title">LIVE EDGE<br /><span className="green">PREDICTIONS</span></h2>
+          <p className="section-sub">One platform. Six sports. Constantly updated opportunities across every major market.</p>
+        </div>
+        <div className="sport-panels__grid">
+
+          <div className="sp sp--soccer">
+            <div className="sp__img" style={{ backgroundImage: "url('https://sspark.genspark.ai/cfimages?u1=PABb8LYg7HoPapWzzVYn3rae%2BsrSq750Ns4P3Ijcr6NPntIWczCBonnatoOo69sdnQcYMvDHobSweLaDaQCSsk0TJv%2F4Rclz3xpMDr4YW8kFUX%2FI3qgf7wUvNCo2xmPwMRqlfdN8K%2BgDi0l%2BXSgzEGvijhvLf0dqYtoOW2fRYyYrd6%2F%2BiNhjWhhrJN%2FqtTUdCFY%3D&u2=PU0eM1TlW8AwoaVM&width=2560')" }}></div>
+            <div className="sp__overlay"></div>
+            <div className="sp__chart" aria-hidden="true">
+              <svg viewBox="0 0 400 120" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="sg1" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#AAFF00" stopOpacity={0.8} />
+                    <stop offset="100%" stopColor="#00FF41" stopOpacity={1} />
+                  </linearGradient>
+                </defs>
+                <polyline points="0,100 50,80 100,90 150,55 200,40 250,50 300,20 350,8 400,4" fill="none" stroke="url(#sg1)" strokeWidth="2.5" />
+              </svg>
+            </div>
+            <div className="sp__content">
+              <span className="sp__name">SOCCER</span>
+              <Link href="/register" className="btn-sport">Explore Edges</Link>
+            </div>
+          </div>
+
+          <div className="sp sp--basketball">
+            <div className="sp__img" style={{ backgroundImage: "url('https://sspark.genspark.ai/cfimages?u1=Vl1na%2BHlRS0o9R9pXUDIwhlTlbAp9x%2FDhHiNNNHt8XTGM90r68sm7wfRIFP2D2%2FutWLweGVxzzQnDvKJvkq%2FIlFkMlayf79XrnuHznETtcaP2FLLH9YWAWmGG4mZHRoLIy1s73CfGZrjM46kKOJqXStcthx5xlO3woG4d5139fkLktbt&u2=sLZgXwFzGRHXpasn&width=2560')" }}></div>
+            <div className="sp__overlay"></div>
+            <div className="sp__chart sp__chart--bars" aria-hidden="true">
+              <svg viewBox="0 0 400 120" xmlns="http://www.w3.org/2000/svg">
+                <rect x="20" y="80" width="28" height="40" fill="#00FF41" opacity="0.35" />
+                <rect x="70" y="60" width="28" height="60" fill="#00FF41" opacity="0.4" />
+                <rect x="120" y="40" width="28" height="80" fill="#00FF41" opacity="0.5" />
+                <rect x="170" y="50" width="28" height="70" fill="#00FF41" opacity="0.5" />
+                <rect x="220" y="25" width="28" height="95" fill="#00FF41" opacity="0.6" />
+                <rect x="270" y="35" width="28" height="85" fill="#00FF41" opacity="0.65" />
+                <rect x="320" y="10" width="28" height="110" fill="#00FF41" opacity="0.8" />
+              </svg>
+            </div>
+            <div className="sp__content">
+              <span className="sp__name">BASKETBALL</span>
+              <Link href="/register" className="btn-sport">Explore Edges</Link>
+            </div>
+          </div>
+
+          <div className="sp sp--tennis">
+            <div className="sp__overlay sp__overlay--color" style={{ background: "linear-gradient(135deg,#0d1a0a,#142d14)" }}></div>
+            <div className="sp__content">
+              <span className="sp__name">TENNIS</span>
+              <Link href="/register" className="btn-sport">Explore</Link>
+            </div>
+          </div>
+          <div className="sp sp--baseball">
+            <div className="sp__overlay sp__overlay--color" style={{ background: "linear-gradient(135deg,#1a0a0a,#2d1414)" }}></div>
+            <div className="sp__content">
+              <span className="sp__name">BASEBALL</span>
+              <Link href="/register" className="btn-sport">Explore</Link>
+            </div>
+          </div>
+          <div className="sp sp--hockey">
+            <div className="sp__overlay sp__overlay--color" style={{ background: "linear-gradient(135deg,#0a0d1a,#14182d)" }}></div>
+            <div className="sp__content">
+              <span className="sp__name">HOCKEY</span>
+              <Link href="/register" className="btn-sport">Explore</Link>
+            </div>
+          </div>
+          <div className="sp sp--esports">
+            <div className="sp__overlay sp__overlay--color" style={{ background: "linear-gradient(135deg,#0d0a1a,#1a1430)" }}></div>
+            <div className="sp__content">
+              <span className="sp__name">ESPORTS</span>
+              <Link href="/register" className="btn-sport">Explore</Link>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* ── TRACK YOUR DOMINANCE ── */}
+      <section className="track" id="track">
+        <div className="track__inner">
+          <div className="track__left">
+            <div className="section-label">HOW IT WORKS</div>
+            <h2 className="section-title">TRACK YOUR<br /><span className="green">DOMINANCE</span></h2>
+            <p className="section-sub">A sharper process for finding value, reading the market, and tracking what actually works.</p>
+            <div className="steps">
+              <div className="step reveal">
+                <div className="step__num">01</div>
+                <div className="step__body">
+                  <h3>Browse Today&apos;s Matches</h3>
+                  <p>See every fixture across 6 sports, ranked by model confidence and edge size, so the best opportunities rise to the top.</p>
                 </div>
               </div>
-              <div className="h-2 w-2 rounded-full" style={{ background: "#2edb6c", boxShadow: "0 0 8px #2edb6c" }} />
-            </div>
-
-            {/* Match cards */}
-            <div className="p-5">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.30)" }}>Today's top edges</span>
-                <span className="text-xs rounded-full px-2.5 py-1" style={{ background: "rgba(46,219,108,0.10)", color: "#5DF5A0" }}>3 value bets found</span>
+              <div className="step reveal">
+                <div className="step__num">02</div>
+                <div className="step__body">
+                  <h3>Read the AI Edge</h3>
+                  <p>Our models calculate fair probability for every outcome. When the market price creates value, you&apos;ll see the edge clearly — in plain English.</p>
+                </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {MOCK_MATCHES.map((m) => (
-                  <div key={m.home} className="rounded-2xl border p-4 flex flex-col gap-3"
-                    style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)" }}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.35)" }}>
-                        {m.sport} {m.league}
-                      </span>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                        style={{ background: m.status.startsWith("LIVE") ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.06)", color: m.status.startsWith("LIVE") ? "#fca5a5" : "rgba(255,255,255,0.40)" }}>
-                        {m.status}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-sm leading-tight">{m.home}</span>
-                      <span className="text-[10px] shrink-0 px-2 py-0.5 rounded" style={{ color: "rgba(255,255,255,0.30)", background: "rgba(255,255,255,0.04)" }}>vs</span>
-                      <span className="font-semibold text-sm leading-tight text-right">{m.away}</span>
-                    </div>
-                    <div>
-                      <div className="h-1.5 rounded-full overflow-hidden mb-1.5" style={{ background: "rgba(255,255,255,0.07)" }}>
-                        <div className="h-full rounded-full" style={{ width: `${m.conf}%`, background: "linear-gradient(90deg,#36f28f,#2edb6c)" }} />
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.30)" }}>Confidence {m.conf}%</span>
-                        <span className="text-[10px] font-bold" style={{ color: "#5DF5A0" }}>{m.edge} edge</span>
-                      </div>
-                    </div>
+              <div className="step reveal">
+                <div className="step__num">03</div>
+                <div className="step__body">
+                  <h3>Track and Improve</h3>
+                  <p>Log your picks, monitor ROI, and review performance over time so every decision gets smarter.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="track__right">
+            <div className="dash">
+              <div className="dash__bar">
+                <span className="dash__dot r"></span>
+                <span className="dash__dot y"></span>
+                <span className="dash__dot g"></span>
+                <span className="dash__url">neverindoubt.co.uk/dashboard</span>
+              </div>
+              <div className="dash__body">
+                <div className="dash__header">
+                  <span className="dash__title">Analytics Dashboard</span>
+                  <span className="dash__dropdown">All Sports ▾</span>
+                </div>
+                <div className="dash__table">
+                  <div className="dash__th">
+                    <span></span>
+                    <span>Match</span>
+                    <span>League</span>
+                    <span>Edge</span>
+                    <span>Status</span>
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom fade */}
-          <div className="pointer-events-none absolute bottom-0 inset-x-0 h-28 rounded-b-[20px]"
-            style={{ background: "linear-gradient(to bottom, transparent, #07100c)" }} />
-        </div>
-      </section>
-
-      {/* ─── Stats ───────────────────────────────────────────────────────── */}
-      <section className="py-16 border-y" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-        <div className="mx-auto max-w-4xl px-6 grid grid-cols-2 sm:grid-cols-4 gap-8">
-          {STATS.map((s) => (
-            <div key={s.label} className="flex flex-col items-center gap-2 text-center">
-              <span className="font-bold" style={{ fontSize: 38, color: "#36f28f", lineHeight: 1, letterSpacing: "-0.04em" }}>{s.value}</span>
-              <span className="text-xs uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.35)" }}>{s.label}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ─── How it works ────────────────────────────────────────────────── */}
-      <section id="how" className="py-28 px-6">
-        <div className="mx-auto max-w-5xl">
-          <div className="text-center mb-20">
-            <p className="text-xs font-bold uppercase tracking-[0.22em] mb-4" style={{ color: "#36f28f" }}>How it works</p>
-            <h2 className="font-bold" style={{ fontSize: "clamp(28px, 5vw, 48px)", letterSpacing: "-0.03em" }}>
-              From match list to confident bet<br />in three steps
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-            {/* Connector line (desktop) */}
-            <div className="hidden md:block absolute top-10 left-1/4 right-1/4 h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(46,219,108,0.25), transparent)" }} />
-
-            {HOW.map((h, i) => (
-              <div key={h.step} className="flex flex-col gap-5">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl font-bold text-sm"
-                    style={{ background: "rgba(46,219,108,0.10)", border: "1px solid rgba(46,219,108,0.25)", color: "#36f28f" }}>
-                    {h.step}
+                  <div className="dash__tr">
+                    <span className="dot dot--green"></span>
+                    <span className="fw6">Arsenal vs Man City</span>
+                    <span className="muted">Premier League</span>
+                    <span className="edge-pos">+4.2%</span>
+                    <span className="tag-live">LIVE</span>
                   </div>
-                  {i < HOW.length - 1 && (
-                    <div className="md:hidden flex-1 h-px" style={{ background: "rgba(255,255,255,0.08)" }} />
-                  )}
+                  <div className="dash__tr">
+                    <span className="dot dot--orange"></span>
+                    <span className="fw6">Lakers vs Celtics</span>
+                    <span className="muted">NBA</span>
+                    <span className="edge-pos">+2.8%</span>
+                    <span className="tag-soon">TONIGHT</span>
+                  </div>
+                  <div className="dash__tr">
+                    <span className="dot dot--yellow"></span>
+                    <span className="fw6">Djokovic vs Alcaraz</span>
+                    <span className="muted">ATP</span>
+                    <span className="edge-pos">+3.5%</span>
+                    <span className="tag-soon">TOMORROW</span>
+                  </div>
+                  <div className="dash__tr">
+                    <span className="dot dot--blue"></span>
+                    <span className="fw6">Panthers vs Rangers</span>
+                    <span className="muted">NHL</span>
+                    <span className="edge-pos">+1.9%</span>
+                    <span className="tag-soon">FRI</span>
+                  </div>
                 </div>
-                <h3 className="text-xl font-semibold" style={{ letterSpacing: "-0.02em" }}>{h.title}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: "rgba(237,247,240,0.52)" }}>{h.body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── Sports ──────────────────────────────────────────────────────── */}
-      <section id="sports" className="py-20 px-6 border-y" style={{ borderColor: "rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.015)" }}>
-        <div className="mx-auto max-w-4xl">
-          <p className="text-center text-xs font-bold uppercase tracking-[0.22em] mb-10" style={{ color: "rgba(255,255,255,0.30)" }}>
-            Covering every major market
-          </p>
-          <div className="flex flex-wrap justify-center gap-3">
-            {SPORTS.map((s) => (
-              <div key={s.label}
-                className="flex items-center gap-3 rounded-2xl border px-6 py-3.5 transition-all hover:-translate-y-px"
-                style={{ borderColor: `${s.color}22`, background: `${s.color}0d` }}>
-                <span className="text-2xl">{s.icon}</span>
-                <span className="font-semibold text-sm" style={{ color: "rgba(255,255,255,0.80)" }}>{s.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── Features ────────────────────────────────────────────────────── */}
-      <section id="features" className="py-28 px-6">
-        <div className="mx-auto max-w-5xl">
-          <div className="text-center mb-20">
-            <p className="text-xs font-bold uppercase tracking-[0.22em] mb-4" style={{ color: "#36f28f" }}>Features</p>
-            <h2 className="font-bold" style={{ fontSize: "clamp(28px, 5vw, 48px)", letterSpacing: "-0.03em" }}>
-              Everything the sharp money uses
-            </h2>
-            <p className="mt-4 text-base" style={{ color: "rgba(237,247,240,0.50)" }}>
-              Built for serious bettors who want data, not tips.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {FEATURES.map((f) => (
-              <div key={f.title}
-                className="group rounded-3xl border p-7 flex flex-col gap-4 transition-all hover:-translate-y-px hover:border-white/20"
-                style={{ borderColor: "rgba(255,255,255,0.08)", background: "linear-gradient(160deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))" }}>
-                <div className="flex items-start justify-between">
-                  <span className="text-3xl">{f.icon}</span>
-                  <span className="text-[10px] font-semibold uppercase tracking-widest px-2.5 py-1 rounded-full"
-                    style={{ background: "rgba(46,219,108,0.08)", color: "#5DF5A0", border: "1px solid rgba(46,219,108,0.15)" }}>
-                    {f.tag}
-                  </span>
-                </div>
-                <h3 className="text-base font-semibold" style={{ letterSpacing: "-0.02em" }}>{f.title}</h3>
-                <p className="text-sm leading-relaxed flex-1" style={{ color: "rgba(237,247,240,0.50)" }}>{f.body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── Testimonials ────────────────────────────────────────────────── */}
-      <section className="py-20 px-6 border-y" style={{ borderColor: "rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.015)" }}>
-        <div className="mx-auto max-w-5xl">
-          <p className="text-center text-xs font-bold uppercase tracking-[0.22em] mb-12" style={{ color: "rgba(255,255,255,0.30)" }}>
-            What bettors are saying
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {TESTIMONIALS.map((t) => (
-              <div key={t.name} className="rounded-3xl border p-7 flex flex-col gap-5"
-                style={{ borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>
-                <div className="flex gap-0.5">
-                  {[...Array(5)].map((_, i) => <span key={i} style={{ color: "#36f28f", fontSize: 14 }}>★</span>)}
-                </div>
-                <p className="text-sm leading-relaxed flex-1" style={{ color: "rgba(237,247,240,0.70)" }}>"{t.quote}"</p>
-                <div>
-                  <p className="text-sm font-semibold">{t.name}</p>
-                  <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>{t.role}</p>
+                <div className="dash__stats">
+                  <div className="ds"><div className="ds__n">60%+</div><div className="ds__l">Model Accuracy</div></div>
+                  <div className="ds"><div className="ds__n">10k+</div><div className="ds__l">Matches Analyzed</div></div>
+                  <div className="ds"><div className="ds__n">6</div><div className="ds__l">Sports Covered</div></div>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── CTA ─────────────────────────────────────────────────────────── */}
-      <section className="py-32 px-6">
-        <div className="mx-auto max-w-3xl relative">
-          {/* Glow behind CTA */}
-          <div className="pointer-events-none absolute inset-0 rounded-[40px]"
-            style={{ background: "radial-gradient(ellipse at center, rgba(46,219,108,0.20) 0%, transparent 65%)", filter: "blur(30px)" }} />
-
-          <div className="relative rounded-[40px] border p-14 text-center"
-            style={{ borderColor: "rgba(46,219,108,0.20)", background: "linear-gradient(160deg,rgba(46,219,108,0.07),rgba(255,255,255,0.02))" }}>
-            <h2 className="font-bold" style={{ fontSize: "clamp(28px,5vw,48px)", letterSpacing: "-0.03em" }}>
-              Ready to find your edge?
-            </h2>
-            <p className="mt-4 text-base max-w-md mx-auto" style={{ color: "rgba(237,247,240,0.55)" }}>
-              Join Never In Doubt and start every bet with the confidence of a professional analyst.
-            </p>
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-              <Link href="/register"
-                className="rounded-full px-10 py-4 text-base font-bold transition-all hover:-translate-y-0.5"
-                style={{ background: "linear-gradient(135deg,#5DF5A0,#2edb6c)", color: "#07110d", boxShadow: "0 12px 40px rgba(46,219,108,0.45)" }}>
-                Create free account →
-              </Link>
-              <Link href="/login"
-                className="rounded-full border px-10 py-4 text-base font-medium transition-all hover:-translate-y-0.5"
-                style={{ borderColor: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.70)" }}>
-                Sign in
-              </Link>
             </div>
-            <p className="mt-5 text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>
-              No credit card required
-            </p>
           </div>
         </div>
       </section>
 
-      {/* ─── Footer ──────────────────────────────────────────────────────── */}
-      <footer className="border-t px-6 py-12" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-        <div className="mx-auto max-w-5xl flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
-          <Image src="/never-in-doubt-logo.png" alt="Never In Doubt" width={110} height={36} className="h-7 w-auto opacity-50" />
-          <div className="flex gap-6 text-xs" style={{ color: "rgba(255,255,255,0.35)" }}>
-            <Link href="/login" className="hover:text-white transition-colors">Sign in</Link>
-            <Link href="/register" className="hover:text-white transition-colors">Register</Link>
+      {/* ── FEATURES ── */}
+      <section className="features" id="features">
+        <div className="features__inner">
+          <div className="features__head">
+            <div className="section-label">PLATFORM CAPABILITIES</div>
+            <h2 className="section-title">EVERYTHING YOU NEED<br /><span className="green">TO BET SHARPER</span></h2>
+            <p className="section-sub">Built for bettors who want structure, signal, and a repeatable edge — not guesswork.</p>
           </div>
-          <p className="text-xs text-center sm:text-right" style={{ color: "rgba(255,255,255,0.25)" }}>
-            For entertainment only · Please gamble responsibly
-          </p>
+          <div className="features__grid">
+
+            <div className="feat reveal">
+              <div className="feat__tag">CORE</div>
+              <div className="feat__icon">
+                <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                  <circle cx="14" cy="14" r="12" stroke="#00FF41" strokeWidth="1.5" />
+                  <path d="M7 18 L11 12 L15 16 L19 8 L22 12" stroke="#00FF41" strokeWidth="2" fill="none" strokeLinecap="round" />
+                </svg>
+              </div>
+              <h3 className="feat__title">ML Predictions</h3>
+              <p className="feat__desc">Models trained on years of historical data produce calibrated win probabilities — not gut-feel picks.</p>
+            </div>
+
+            <div className="feat reveal">
+              <div className="feat__tag">LIVE</div>
+              <div className="feat__icon">
+                <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                  <rect x="3" y="7" width="22" height="14" rx="2" stroke="#00FF41" strokeWidth="1.5" />
+                  <circle cx="14" cy="18" r="1.5" fill="#00FF41" />
+                  <line x1="3" y1="11" x2="25" y2="11" stroke="#00FF41" strokeWidth="1" />
+                </svg>
+              </div>
+              <h3 className="feat__title">Live Odds Feed</h3>
+              <p className="feat__desc">Real-time market odds updated continuously. Your edge is highlighted the instant it appears.</p>
+            </div>
+
+            <div className="feat reveal">
+              <div className="feat__tag">AI</div>
+              <div className="feat__icon">
+                <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                  <path d="M5 21 C5 16 9 12 14 12 C19 12 23 16 23 21" stroke="#00FF41" strokeWidth="1.5" fill="none" />
+                  <circle cx="14" cy="8" r="4" stroke="#00FF41" strokeWidth="1.5" />
+                </svg>
+              </div>
+              <h3 className="feat__title">AI Advisor</h3>
+              <p className="feat__desc">Ask anything about a match, market, or strategy. Your personal analyst, available 24/7.</p>
+            </div>
+
+            <div className="feat reveal">
+              <div className="feat__tag">ANALYTICS</div>
+              <div className="feat__icon">
+                <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                  <path d="M5 23 L9 16 L13 20 L17 10 L21 14 L25 5" stroke="#00FF41" strokeWidth="2" fill="none" strokeLinecap="round" />
+                  <circle cx="25" cy="5" r="2" fill="#00FF41" />
+                </svg>
+              </div>
+              <h3 className="feat__title">ROI Tracking</h3>
+              <p className="feat__desc">Full P&amp;L history with win rate, Sharpe ratio, drawdown, and Kelly-staked returns.</p>
+            </div>
+
+            <div className="feat reveal">
+              <div className="feat__tag">CORE</div>
+              <div className="feat__icon">
+                <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                  <polygon points="14,3 17,10 25,11 19,17 21,25 14,21 7,25 9,17 3,11 11,10" stroke="#00FF41" strokeWidth="1.5" fill="none" />
+                </svg>
+              </div>
+              <h3 className="feat__title">Edge Scoring</h3>
+              <p className="feat__desc">Every match card shows the gap between our fair odds and the bookmaker line. Back value, not noise.</p>
+            </div>
+
+            <div className="feat reveal">
+              <div className="feat__tag">SOCIAL</div>
+              <div className="feat__icon">
+                <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                  <circle cx="14" cy="14" r="11" stroke="#00FF41" strokeWidth="1.5" />
+                  <path d="M14 7 L14 14 L20 14" stroke="#00FF41" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </div>
+              <h3 className="feat__title">Challenges</h3>
+              <p className="feat__desc">Compete in weekly prediction challenges, follow the sharpest tipsters, and climb the leaderboard.</p>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* ── PRICING ── */}
+      <section className="pricing" id="pricing">
+        <div className="pricing__inner">
+          <div className="section-label">SIMPLE PRICING</div>
+          <h2 className="section-title">SELECT YOUR<br /><span className="green">PLAN</span></h2>
+          <p className="section-sub">Start free. Upgrade when you&apos;re ready.</p>
+          <div className="pricing__grid">
+
+            <div className="plan reveal">
+              <div className="plan__tier">STARTER</div>
+              <div className="plan__price">£<span>0</span></div>
+              <div className="plan__period">/ forever</div>
+              <p className="plan__tagline">Best for getting started with predictions, tracking, and the AI advisor.</p>
+              <ul className="plan__feats">
+                <li><span className="chk">✓</span>10 AI advisor messages</li>
+                <li><span className="chk">✓</span>All predictions &amp; odds</li>
+                <li><span className="chk">✓</span>Pick tracking</li>
+                <li><span className="chk">✓</span>ROI analytics</li>
+              </ul>
+              <Link href="/register" className="plan__btn">Start free</Link>
+            </div>
+
+            <div className="plan plan--featured reveal">
+              <div className="plan__popular">MOST POPULAR</div>
+              <div className="plan__tier">ELITE</div>
+              <div className="plan__price">£<span>9</span></div>
+              <div className="plan__period">/ month</div>
+              <p className="plan__tagline">Best for regular bettors who want deeper analysis and more AI usage.</p>
+              <ul className="plan__feats">
+                <li><span className="chk">✓</span>150 AI advisor messages/mo</li>
+                <li><span className="chk">✓</span>Priority model updates</li>
+                <li><span className="chk">✓</span>Advanced analytics</li>
+                <li><span className="chk">✓</span>Early access features</li>
+              </ul>
+              <Link href="/register" className="plan__btn plan__btn--green">Go Elite</Link>
+            </div>
+
+            <div className="plan reveal">
+              <div className="plan__tier">INSTITUTIONAL</div>
+              <div className="plan__price" style={{ fontSize: '2rem' }}>Custom</div>
+              <div className="plan__period">&nbsp;</div>
+              <p className="plan__tagline">For syndicates, tipster services, and serious professional bettors.</p>
+              <ul className="plan__feats">
+                <li><span className="chk">✓</span>Unlimited AI messages</li>
+                <li><span className="chk">✓</span>API access</li>
+                <li><span className="chk">✓</span>Dedicated model training</li>
+                <li><span className="chk">✓</span>Priority support</li>
+              </ul>
+              <a href="mailto:hello@neverindoubt.co.uk" className="plan__btn">Contact us</a>
+            </div>
+
+          </div>
+          <p className="pricing__notes">No credit card required &nbsp;·&nbsp; Cancel anytime &nbsp;·&nbsp; Real ML models, not tips</p>
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section className="faq" id="faq">
+        <div className="faq__inner">
+          <div className="faq__left">
+            <div className="section-label">FAQ</div>
+            <h2 className="section-title">QUESTIONS,<br /><span className="green">ANSWERED</span></h2>
+          </div>
+          <div className="faq__right">
+            <div className="faq-list" id="faqList">
+              <div className="faq-item">
+                <button className="faq-q" aria-expanded="false">
+                  <span>How accurate are the models?</span><span className="faq-icon">+</span>
+                </button>
+                <div className="faq-a"><p>Our models achieve 60%+ accuracy at high-confidence thresholds, trained on years of historical data and market context. We show you where the edge appears so you can make more informed decisions.</p></div>
+              </div>
+              <div className="faq-item">
+                <button className="faq-q" aria-expanded="false">
+                  <span>Which sports are covered?</span><span className="faq-icon">+</span>
+                </button>
+                <div className="faq-a"><p>Never In Doubt currently covers Soccer, Basketball, Tennis, Baseball, Hockey, and Esports across all major markets and leagues.</p></div>
+              </div>
+              <div className="faq-item">
+                <button className="faq-q" aria-expanded="false">
+                  <span>Do I need a credit card to get started?</span><span className="faq-icon">+</span>
+                </button>
+                <div className="faq-a"><p>No. The Starter plan is completely free — no card required. You can start without payment details and upgrade to Elite anytime.</p></div>
+              </div>
+              <div className="faq-item">
+                <button className="faq-q" aria-expanded="false">
+                  <span>What&apos;s included in Elite?</span><span className="faq-icon">+</span>
+                </button>
+                <div className="faq-a"><p>Elite gives you 150 AI advisor messages per month, priority model updates, advanced analytics including Sharpe ratio and drawdown tracking, and early access to new features.</p></div>
+              </div>
+              <div className="faq-item">
+                <button className="faq-q" aria-expanded="false">
+                  <span>Can I track ROI and performance?</span><span className="faq-icon">+</span>
+                </button>
+                <div className="faq-a"><p>Yes. All plans include pick tracking and ROI analytics. Track P&amp;L, win rate, and bankroll performance over time to understand exactly what&apos;s working.</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FINAL CTA ── */}
+      <section className="final-cta" id="cta">
+        <div className="final-cta__waves" aria-hidden="true">
+          <svg viewBox="0 0 1440 400" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M-200,200 C100,50 300,350 600,200 S1100,50 1440,200" fill="none" stroke="#00FF41" strokeWidth="2" opacity="0.4" />
+            <path d="M-200,240 C100,90 300,390 600,240 S1100,90 1440,240" fill="none" stroke="#00FF41" strokeWidth="1" opacity="0.2" />
+          </svg>
+        </div>
+        <div className="final-cta__glow"></div>
+        <div className="final-cta__content">
+          <p className="cta-eye">READY TO FIND YOUR EDGE?</p>
+          <h2 className="cta-hl">
+            <span className="h-white">NEVER GUESS.</span>
+            <span className="h-green">ALWAYS WIN.</span>
+          </h2>
+          <p className="cta-body">Start every bet with the confidence of a professional analyst — powered by machine-learning predictions, live market odds, and AI-driven insight.</p>
+          <div className="cta-btns">
+            <Link href="/register" className="btn-cta btn-cta--large">Start free</Link>
+            <a href="#predictions" className="btn-ghost btn-ghost--large">See today&apos;s edges</a>
+          </div>
+          <p className="cta-micro">No credit card required</p>
+        </div>
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer className="footer">
+        <div className="footer__top">
+          <div className="footer__brand">
+            <a href="#" className="nav__logo">
+              <div className="nav__logo-mark">N</div>
+              <span className="nav__logo-text">Never In Doubt</span>
+            </a>
+            <p className="footer__tagline">AI-powered sports intelligence for smarter betting decisions.</p>
+          </div>
+          <nav className="footer__nav">
+            <a href="#predictions">How it Works</a>
+            <a href="#predictions">Sports</a>
+            <a href="#features">Features</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#faq">FAQ</a>
+            <Link href="/login">Sign In</Link>
+          </nav>
+        </div>
+        <div className="footer__bottom">
+          <span>© 2025 Never In Doubt. All rights reserved.</span>
+          <span>Bet with discipline. Use data responsibly. 18+</span>
         </div>
       </footer>
+
     </div>
   );
 }
