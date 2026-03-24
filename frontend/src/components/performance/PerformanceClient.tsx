@@ -142,21 +142,21 @@ function MonthlyCalendar({ picks }: { picks: PickOut[] }) {
   return (
     <div className="overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.03]">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
-        <div className="flex items-center gap-3">
-          <button onClick={prevMonth} className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.06] transition-colors">
-            <ChevronLeft size={15} />
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+        <div className="flex items-center gap-2">
+          <button onClick={prevMonth} className="p-1 rounded-md text-white/40 hover:text-white hover:bg-white/[0.06] transition-colors">
+            <ChevronLeft size={13} />
           </button>
-          <span className="text-[15px] font-bold text-white min-w-[140px] text-center">{monthName} {year}</span>
+          <span className="text-[13px] font-bold text-white min-w-[120px] text-center">{monthName} {year}</span>
           <button
             onClick={nextMonth}
             disabled={year === today.getFullYear() && month === today.getMonth()}
-            className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+            className="p-1 rounded-md text-white/40 hover:text-white hover:bg-white/[0.06] transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
           >
-            <ChevronRight size={15} />
+            <ChevronRight size={13} />
           </button>
         </div>
-        <div className={cn("font-mono text-[15px] font-bold tabular-nums", monthPnl > 0 ? "text-emerald-300" : monthPnl < 0 ? "text-red-400" : "text-white/40")}>
+        <div className={cn("font-mono text-[13px] font-bold tabular-nums", monthPnl > 0 ? "text-emerald-300" : monthPnl < 0 ? "text-red-400" : "text-white/40")}>
           {monthPnl > 0 ? "+" : ""}{monthPnl === 0 ? "—" : monthPnl.toFixed(2) + "u"}
         </div>
       </div>
@@ -164,7 +164,7 @@ function MonthlyCalendar({ picks }: { picks: PickOut[] }) {
       {/* Day labels */}
       <div className="grid grid-cols-7 border-b border-white/[0.05]">
         {DAY_LABELS.map((d) => (
-          <div key={d} className="py-2 text-center text-[9px] font-bold uppercase tracking-widest text-white/25">
+          <div key={d} className="py-1.5 text-center text-[8px] font-bold uppercase tracking-widest text-white/25">
             {d}
           </div>
         ))}
@@ -174,7 +174,7 @@ function MonthlyCalendar({ picks }: { picks: PickOut[] }) {
       <div className="grid grid-cols-7 divide-x divide-y divide-white/[0.04]">
         {cells.map((cell, i) => {
           if (!cell) return (
-            <div key={`empty-${i}`} className="aspect-square min-h-[52px]" />
+            <div key={`empty-${i}`} className="h-[56px]" />
           );
           const { day, dateStr, data } = cell;
           const isToday = dateStr === todayStr;
@@ -185,34 +185,34 @@ function MonthlyCalendar({ picks }: { picks: PickOut[] }) {
             <div
               key={dateStr}
               className={cn(
-                "relative flex flex-col items-center justify-center gap-0.5 min-h-[52px] py-2 px-1 transition-colors",
+                "h-[56px] flex flex-col items-center justify-center gap-[1px] overflow-hidden transition-colors",
                 pos && "bg-emerald-400/[0.07]",
                 neg && "bg-red-400/[0.07]",
                 isToday && "ring-1 ring-inset ring-white/20",
               )}
             >
               <span className={cn(
-                "text-[11px] font-semibold leading-tight",
-                isToday ? "text-white" : "text-white/50",
+                "text-[10px] font-semibold leading-none",
+                isToday ? "text-white" : "text-white/45",
               )}>
                 {day}
               </span>
               {data ? (
                 <>
                   <span className={cn(
-                    "text-[10px] font-mono font-bold leading-tight tabular-nums",
+                    "text-[9px] font-mono font-bold leading-none tabular-nums",
                     pos ? "text-emerald-300" : "text-red-400",
                   )}>
                     {pos ? "+" : ""}{data.pnl.toFixed(1)}u
                   </span>
-                  <span className="text-[9px] text-white/30 leading-tight">
+                  <span className="text-[8px] leading-none tabular-nums">
                     {data.wins > 0 && <span className="text-emerald-400">{data.wins}W</span>}
-                    {data.wins > 0 && data.losses > 0 && " "}
+                    {data.wins > 0 && data.losses > 0 && <span className="text-white/20"> </span>}
                     {data.losses > 0 && <span className="text-red-400">{data.losses}L</span>}
                   </span>
                 </>
               ) : (
-                <span className="text-[9px] text-white/15">·</span>
+                <span className="text-[8px] text-white/10">·</span>
               )}
             </div>
           );
