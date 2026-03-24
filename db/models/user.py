@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, String, DateTime, Text
+from sqlalchemy import Boolean, String, DateTime, Text, UniqueConstraint
 from typing import Optional
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -28,4 +28,12 @@ class User(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
+    )
+
+    # Stripe subscription fields
+    stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True)
+    subscription_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    subscription_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    subscription_current_period_end: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )

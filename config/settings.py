@@ -108,6 +108,12 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     FRONTEND_URL: str = "http://localhost:3000"   # Override in Railway/Vercel
 
+    # Stripe — subscription billing
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_PUBLISHABLE_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRICE_ID: str = ""  # monthly £24.99 price ID
+
     # API
     API_PREFIX: str = "/api/v1"
     CORS_ORIGINS: list[str] = ["*"]

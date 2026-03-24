@@ -43,3 +43,6 @@ pytest==8.3.3
 
 # AI reasoning
 anthropic>=0.40.0
+
+# Payments
+stripe>=8.0.0

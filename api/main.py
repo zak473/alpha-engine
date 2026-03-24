@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from api.deps import get_db, get_current_user
 from api.exceptions import register_exception_handlers
 from api.middleware import RequestLoggingMiddleware
-from api.routers import auth, backtest, baseball as baseball_router, challenges, esports, matches, notifications, picks, predictions, reasoning, soccer, standings as standings_router, tennis, tipsters
+from api.routers import auth, backtest, baseball as baseball_router, billing, challenges, esports, matches, notifications, picks, predictions, reasoning, soccer, standings as standings_router, tennis, tipsters
 from api.sports.soccer import routes as soccer_sport
 from api.sports.tennis import routes as tennis_sport
 from api.sports.esports import routes as esports_sport
@@ -375,6 +375,7 @@ app.include_router(notifications.router, prefix=settings.API_PREFIX)
 
 from api.routers import bankroll
 app.include_router(bankroll.router,    prefix=settings.API_PREFIX)
+app.include_router(billing.router,     prefix=settings.API_PREFIX, tags=["billing"])
 app.include_router(standings_router.router)
 app.include_router(backtest.router,    prefix=settings.API_PREFIX)
 app.include_router(baseball_router.router,   prefix=settings.API_PREFIX)

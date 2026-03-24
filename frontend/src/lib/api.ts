@@ -823,3 +823,21 @@ export async function getMatchReasoningPreview(params: {
     return null;
   }
 }
+
+// ─── Billing ──────────────────────────────────────────────────────────────────
+
+export async function createCheckoutSession(): Promise<{ url: string }> {
+  return mutate<{ url: string }>("/billing/checkout", "POST");
+}
+
+export async function createPortalSession(): Promise<{ url: string }> {
+  return mutate<{ url: string }>("/billing/portal", "POST");
+}
+
+export async function getBillingStatus(): Promise<{
+  status: string | null;
+  current_period_end: string | null;
+  is_active: boolean;
+}> {
+  return request("/billing/status");
+}
