@@ -87,8 +87,11 @@ def seed(dry_run: bool = False) -> None:
                 created += 1
                 log.info("  [CREATE] %s (%s)", tipster["display_name"], tipster["id"])
             else:
-                # Ensure bio/is_ai are up to date
-                if existing.bio != tipster["bio"] or not existing.is_ai:
+                # Ensure display_name, bio, and is_ai are up to date
+                if (existing.display_name != tipster["display_name"]
+                        or existing.bio != tipster["bio"]
+                        or not existing.is_ai):
+                    existing.display_name = tipster["display_name"]
                     existing.bio = tipster["bio"]
                     existing.is_ai = True
                     updated += 1
