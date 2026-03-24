@@ -48,6 +48,7 @@ export function ChallengePickerModal({ queue, onClose, onSuccess }: ChallengePic
             event_start_at: sel.startTime,
             pick_type: sel.marketName,
             pick_payload: {
+              match_label: sel.matchLabel,
               selection_label: sel.selectionLabel,
               market_name: sel.marketName,
               odds: sel.odds,

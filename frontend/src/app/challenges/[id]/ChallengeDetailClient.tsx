@@ -370,7 +370,7 @@ export function ChallengeDetailClient({ challenge, leaderboard, feedData }: Prop
   const TABS: { label: string; value: Tab }[] = [
     { label: "Overview",    value: "overview" },
     { label: "Leaderboard", value: "leaderboard" },
-    { label: "Feed",        value: "feed" },
+    { label: "Picks",       value: "feed" },
     { label: "Rules",       value: "rules" },
   ];
 
@@ -486,7 +486,7 @@ export function ChallengeDetailClient({ challenge, leaderboard, feedData }: Prop
         {tab === "feed" && (
           <div className="card" style={{ padding: 0, overflow: "hidden" }}>
             <div className="panel-header">
-              <div className="panel-title">Recent Picks</div>
+              <div className="panel-title">All Picks</div>
             </div>
             <EntryFeed
               challengeId={challenge.id}
