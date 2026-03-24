@@ -139,7 +139,7 @@ export default function LandingPage() {
       {/* ── HERO ── */}
       <section className="hero" id="hero">
         <div className="hero__bg">
-          <div className="hero__player" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1552674605-db6ffd4facb5?auto=format&fit=crop&w=2560&q=80')" }}></div>
+          <div className="hero__player" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=2560&q=80')" }}></div>
           <div className="hero__overlay"></div>
         </div>
 
