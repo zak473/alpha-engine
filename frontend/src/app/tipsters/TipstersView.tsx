@@ -22,6 +22,36 @@ function initials(username: string) {
   return username.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2).toUpperCase();
 }
 
+const AI_SPORT_EMOJI: Record<string, string> = {
+  soccer:     "⚽",
+  tennis:     "🎾",
+  basketball: "🏀",
+  baseball:   "⚾",
+  hockey:     "🏒",
+  esports:    "🎮",
+};
+
+function aiSportEmoji(displayName: string): string {
+  const lower = displayName.toLowerCase();
+  for (const [sport, emoji] of Object.entries(AI_SPORT_EMOJI)) {
+    if (lower.includes(sport)) return emoji;
+  }
+  return "🤖";
+}
+
+function AiAvatar({ displayName, size = "md" }: { displayName: string; size?: "sm" | "md" | "lg" }) {
+  const emoji = aiSportEmoji(displayName);
+  const sizeClass = size === "lg" ? "w-14 h-14 text-2xl" : size === "sm" ? "w-8 h-8 text-base" : "w-11 h-11 text-xl";
+  return (
+    <div
+      className={`${sizeClass} rounded-full flex items-center justify-center flex-shrink-0`}
+      style={{ background: "rgba(245,158,11,0.12)", border: "1.5px solid rgba(245,158,11,0.25)" }}
+    >
+      {emoji}
+    </div>
+  );
+}
+
 // ── Result badge ──────────────────────────────────────────────────────────────
 
 function ResultBadge({ result }: { result: "W" | "L" }) {
@@ -124,9 +154,13 @@ function TipsterModal({
       <div className="w-full max-w-lg rounded-2xl overflow-hidden flex flex-col" style={{ background: "rgba(8,18,14,0.97)", border: "1px solid var(--border0)", maxHeight: "85vh" }}>
         {/* Header */}
         <div className="flex items-center gap-4 px-6 py-5 border-b" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.04)" }}>
-          <div className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold text-white flex-shrink-0" style={{ background: color }}>
-            {initials(tipster.username)}
-          </div>
+          {tipster.is_ai ? (
+            <AiAvatar displayName={tipster.username} size="lg" />
+          ) : (
+            <div className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold text-white flex-shrink-0" style={{ background: color }}>
+              {initials(tipster.username)}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-bold text-text-primary">@{tipster.username}</h2>
             {tipster.bio && <p className="text-xs text-text-muted mt-0.5 truncate">{tipster.bio}</p>}
@@ -315,12 +349,16 @@ function TipsterCard({
     >
       {/* Top section */}
       <div className="flex items-start gap-3 p-4 pb-3">
-        <div
-          className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-          style={{ background: color }}
-        >
-          {initials(tipster.username)}
-        </div>
+        {tipster.is_ai ? (
+          <AiAvatar displayName={tipster.display_name ?? tipster.username} />
+        ) : (
+          <div
+            className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+            style={{ background: color }}
+          >
+            {initials(tipster.username)}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-text-primary leading-tight">@{tipster.username}</p>
           {tipster.bio && <p className="text-[11px] text-text-muted leading-snug mt-0.5 line-clamp-1">{tipster.bio}</p>}

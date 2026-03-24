@@ -580,6 +580,7 @@ export async function withdrawBankroll(amount: number, notes?: string): Promise<
 export interface TipsterProfile {
   id: string;
   username: string;
+  display_name?: string | null;
   bio?: string | null;
   is_ai: boolean;
   followers: number;
