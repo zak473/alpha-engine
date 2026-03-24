@@ -139,7 +139,7 @@ export default function LandingPage() {
       {/* ── HERO ── */}
       <section className="hero" id="hero">
         <div className="hero__bg">
-          <div className="hero__player" style={{ backgroundImage: "url('https://sspark.genspark.ai/cfimages?u1=tOQ6Eaz2Od%2FXmqC2TbIqPahCHsEkuQTrQ4OvdoIDCxe0w%2FjVoLfiZKhlDGcaBKRtt4oztHYYYjVFXlbold%2BEHBbdzCsGICzBTT6tD6ZxWW4cG%2BsKTd8wr2NkJrF3o1XRtwoZZ37lQr4JnXXlP%2FqSC4Fq2TKZP7Sy0Q%3D%3D&u2=5L6nyz53qeNVWsZG&width=2560')" }}></div>
+          <div className="hero__player" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1552674605-db6ffd4facb5?auto=format&fit=crop&w=2560&q=80')" }}></div>
           <div className="hero__overlay"></div>
         </div>
 
