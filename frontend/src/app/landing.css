@@ -202,14 +202,20 @@ align-items: center;
 flex-shrink: 0;
 }
 .nid-landing .nav__logo-img {
-height: 36px;
+height: 44px;
 width: auto;
 display: block;
 object-fit: contain;
+filter: brightness(1.15) drop-shadow(0 0 10px rgba(0,255,65,0.35));
+transition: filter .2s;
+}
+.nid-landing .nav__logo:hover .nav__logo-img {
+filter: brightness(1.25) drop-shadow(0 0 18px rgba(0,255,65,0.55));
 }
 .nid-landing .footer-logo {
-opacity: 0.5;
-height: 28px;
+opacity: 0.55;
+height: 32px;
+filter: brightness(1.1);
 }
 
 .nid-landing .nav__links {
@@ -1221,7 +1227,7 @@ MOBILE
 ============================================================ */
 @media (max-width: 640px) {
   .nid-landing .nav__inner { padding: 0 16px; height: 60px; }
-  .nid-landing .nav__logo-img { height: 28px; }
+  .nid-landing .nav__logo-img { height: 34px; }
 
   .nid-landing .hero__content { padding: 40px 16px 64px; }
   .nid-landing .hero__headline { font-size: clamp(62px, 17vw, 96px); }
