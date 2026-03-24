@@ -203,20 +203,26 @@ flex-shrink: 0;
 }
 .nid-landing .nav__logo-img {
 height: 44px;
-width: auto;
+width: 160px;
 display: block;
-object-fit: contain;
-mix-blend-mode: screen;
-filter: brightness(1.15) drop-shadow(0 0 10px rgba(0,255,65,0.35));
-transition: filter .2s;
+background: #fff;
+-webkit-mask-image: url('/never-in-doubt-logo.png');
+mask-image: url('/never-in-doubt-logo.png');
+-webkit-mask-size: contain;
+mask-size: contain;
+-webkit-mask-repeat: no-repeat;
+mask-repeat: no-repeat;
+-webkit-mask-position: center;
+mask-position: center;
+transition: background .2s;
 }
 .nid-landing .nav__logo:hover .nav__logo-img {
-filter: brightness(1.25) drop-shadow(0 0 18px rgba(0,255,65,0.55));
+background: var(--green);
 }
 .nid-landing .footer-logo {
-height: 32px;
-mix-blend-mode: screen;
-filter: brightness(0.7);
+height: 28px;
+width: 120px;
+background: rgba(255,255,255,0.45);
 }
 
 .nid-landing .nav__links {
