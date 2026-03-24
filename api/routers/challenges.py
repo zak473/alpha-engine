@@ -5,7 +5,7 @@ Challenges API — /api/v1/challenges
 from __future__ import annotations
 
 import uuid
-from datetime import timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
@@ -89,10 +89,15 @@ def create_challenge(
     user_id: str = Depends(get_current_user),
 ):
     """Create a new challenge. Creator is automatically joined as owner."""
-    from datetime import timezone, timedelta
-    now = __import__("datetime").datetime.now(timezone.utc)
-    start_at = body.start_at or now
-    end_at = body.end_at or (now + timedelta(days=30))
+    def _utc(dt: datetime) -> datetime:
+        """Ensure datetime is timezone-aware UTC."""
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+
+    now = datetime.now(timezone.utc)
+    start_at = _utc(body.start_at) if body.start_at else now
+    end_at = _utc(body.end_at) if body.end_at else (now + timedelta(days=30))
     if end_at <= start_at:
         raise HTTPException(status_code=400, detail="end_at must be after start_at")
 
