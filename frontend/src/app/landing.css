@@ -214,6 +214,8 @@ mask-size: contain;
 mask-repeat: no-repeat;
 -webkit-mask-position: center;
 mask-position: center;
+-webkit-mask-mode: luminance;
+mask-mode: luminance;
 transition: background .2s;
 }
 .nid-landing .nav__logo:hover .nav__logo-img {
