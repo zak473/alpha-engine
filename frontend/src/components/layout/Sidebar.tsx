@@ -23,7 +23,6 @@ const SPORTS = [
   { label: "Basketball",   href: "/sports/basketball/matches",  color: "#f59e0b" },
   { label: "Baseball",     href: "/sports/baseball/matches",    color: "#ef4444" },
   { label: "Hockey",       href: "/sports/hockey/matches",      color: "#06b6d4" },
-  { label: "Horse Racing", href: "/sports/horseracing",         color: "#e879f9" },
 ];
 
 export function Sidebar() {
