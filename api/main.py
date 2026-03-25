@@ -535,6 +535,74 @@ def admin_fix_baseball_outcomes(secret: str, db: Session = Depends(get_db)):
     return {"outcomes_fixed": fixed, "tips_resettled": resettled}
 
 
+@app.get("/api/v1/admin/debug-sgo-odds", tags=["Admin"])
+def admin_debug_sgo_odds(secret: str, sport: str = "soccer", limit: int = 20):
+    """
+    Debug SGO odds matching: fetch live SGO events for a sport and show which DB matches
+    they would/wouldn't match, and what the name differences look like.
+    """
+    if secret != "nid-settle-2026":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    import httpx
+    from datetime import datetime, timedelta, timezone
+    from db.session import SessionLocal
+    from db.models.mvp import CoreMatch, CoreTeam
+    from pipelines.odds.fetch_odds_sgo import LEAGUE_SPORT, fetch_sgo_events, _teams_match, _normalize
+
+    SPORT_LEAGUES = {v: k for k, v in LEAGUE_SPORT.items()}
+    leagues = [k for k, v in LEAGUE_SPORT.items() if v == sport]
+
+    db2 = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        soon = now + timedelta(days=5)
+        upcoming = db2.query(CoreMatch).filter(
+            CoreMatch.sport == sport,
+            CoreMatch.status.in_(["scheduled", "live"]),
+            CoreMatch.kickoff_utc > now,
+            CoreMatch.kickoff_utc < soon,
+        ).all()
+        team_ids = set()
+        for m in upcoming:
+            team_ids.update([m.home_team_id, m.away_team_id])
+        teams = {t.id: t.name for t in db2.query(CoreTeam).filter(CoreTeam.id.in_(team_ids)).all()}
+    finally:
+        db2.close()
+
+    results = []
+    with httpx.Client() as client:
+        for league_id in leagues[:3]:
+            events = fetch_sgo_events(league_id, client)
+            for ev in events[:limit]:
+                sgo_home = (ev.get("teams") or {}).get("home", {}).get("names", {}).get("long", "")
+                sgo_away = (ev.get("teams") or {}).get("away", {}).get("names", {}).get("long", "")
+                # Try to find a match
+                matched = None
+                for m in upcoming:
+                    hn = teams.get(m.home_team_id, "")
+                    an = teams.get(m.away_team_id, "")
+                    if _teams_match(sgo_home, hn) and _teams_match(sgo_away, an):
+                        matched = f"{hn} vs {an}"
+                        break
+                results.append({
+                    "league": league_id,
+                    "sgo": f"{sgo_home} vs {sgo_away}",
+                    "sgo_norm": f"{_normalize(sgo_home)} vs {_normalize(sgo_away)}",
+                    "matched_to": matched,
+                })
+
+    return {
+        "sport": sport,
+        "db_upcoming": len(upcoming),
+        "sgo_events_checked": len(results),
+        "matched": sum(1 for r in results if r["matched_to"]),
+        "unmatched": [r for r in results if not r["matched_to"]],
+        "matched_list": [r for r in results if r["matched_to"]],
+    }
+
+
 @app.get("/api/v1/sports/elo-movers", tags=["ELO"], dependencies=[Depends(get_current_user)])
 def get_elo_movers(limit: int = 10, db: Session = Depends(get_db)):
     """Return top ELO rating movers (by absolute change) across all sports."""

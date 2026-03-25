@@ -103,22 +103,58 @@ def _extract_odds(event: dict) -> tuple[Optional[float], Optional[float], Option
 
 def _normalize(name: str) -> str:
     import re
-    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]", " ",
-        re.sub(r"\b(fc|afc|cf|ac|as|sc|cd|rsc|fk|sk|bk|hc)\b", "",
-               name.lower()))).strip()
+    import unicodedata
+    # Strip accents (e.g. é→e, ü→u, ñ→n)
+    nfkd = unicodedata.normalize("NFKD", name)
+    ascii_name = nfkd.encode("ascii", "ignore").decode("ascii")
+    # Expand common abbreviations before stripping
+    expanded = re.sub(r"\butd\b", "united", ascii_name, flags=re.IGNORECASE)
+    expanded = re.sub(r"\bspurs\b", "tottenham", expanded, flags=re.IGNORECASE)
+    expanded = re.sub(r"\bpsg\b", "paris saint germain", expanded, flags=re.IGNORECASE)
+    expanded = re.sub(r"\bman\s+utd\b", "manchester united", expanded, flags=re.IGNORECASE)
+    expanded = re.sub(r"\bman\s+city\b", "manchester city", expanded, flags=re.IGNORECASE)
+    # Strip club suffixes
+    stripped = re.sub(r"\b(fc|afc|cf|ac|as|sc|cd|rsc|fk|sk|bk|hc|sfc|rfc|bfc|united kingdom)\b", "", expanded, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]", " ", stripped.lower())).strip()
+
+
+def _acronym_matches(short: str, long_name: str) -> bool:
+    """Check if `short` is an acronym of words in `long_name` (e.g. 'mcfc' ~ 'manchester city')."""
+    words = [w for w in long_name.split() if len(w) > 1]
+    if not words:
+        return False
+    acronym = "".join(w[0] for w in words)
+    return short == acronym or short == acronym[:len(short)]
 
 
 def _teams_match(a: str, b: str) -> bool:
     na, nb = _normalize(a), _normalize(b)
     if na == nb:
         return True
+    # Substring match (longer must contain shorter)
     if len(na) > 3 and nb.find(na) >= 0:
         return True
     if len(nb) > 3 and na.find(nb) >= 0:
         return True
+    # Acronym match (e.g. "PSG" vs "Paris Saint Germain")
+    if len(na) >= 2 and len(na) <= 5 and _acronym_matches(na, nb):
+        return True
+    if len(nb) >= 2 and len(nb) <= 5 and _acronym_matches(nb, na):
+        return True
+    # Word overlap — for tennis: last name is the key signal
     wa = [w for w in na.split() if len(w) > 2]
     wb = set(nb.split())
-    return bool(wa) and any(w in wb for w in wa)
+    if bool(wa) and any(w in wb for w in wa):
+        return True
+    # Tennis last-name match: compare last word of each name
+    a_parts = na.split()
+    b_parts = nb.split()
+    if a_parts and b_parts and a_parts[-1] == b_parts[-1] and len(a_parts[-1]) > 3:
+        return True
+    # Fuzzy fallback via SequenceMatcher (handles typos + minor differences)
+    from difflib import SequenceMatcher
+    ratio = SequenceMatcher(None, na, nb).ratio()
+    return ratio >= 0.82
 
 
 def fetch_sgo_events(league_id: str, client: httpx.Client) -> list[dict]:
@@ -228,6 +264,11 @@ def fetch_all(dry_run: bool = False) -> int:
                             break
 
                     if not best:
+                        log.debug(
+                            "[sgo_odds] NO MATCH for %s | %s vs %s (norm: %s vs %s)",
+                            league_id, sgo_home, sgo_away,
+                            _normalize(sgo_home), _normalize(sgo_away),
+                        )
                         continue
 
                     changed = (
