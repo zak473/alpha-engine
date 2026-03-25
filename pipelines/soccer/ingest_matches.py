@@ -163,7 +163,8 @@ def _upsert_match(session: Session, row: dict[str, Any], league_id: str, home_te
         match.status = status
         match.home_score = home_score
         match.away_score = away_score
-        match.outcome = outcome
+        if outcome is not None:  # don't overwrite a known outcome with null
+            match.outcome = outcome
         if odds_home is not None:
             match.odds_home = odds_home
         if odds_away is not None:

@@ -458,6 +458,19 @@ def admin_settle_tips(secret: str, db: Session = Depends(get_db)):
     return {"settled": n}
 
 
+@app.post("/api/v1/admin/refetch-hockey", tags=["Admin"])
+def admin_refetch_hockey(secret: str):
+    """Re-fetch NHL scores then settle tips."""
+    if secret != "nid-settle-2026":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from pipelines.hockey.fetch_live import fetch_all
+    from pipelines.tipsters.settle_tips import run as settle
+    fetched = fetch_all()
+    settled = settle(dry_run=False, all_users=False)
+    return {"fetched": fetched, "settled": settled}
+
+
 @app.get("/api/v1/sports/elo-movers", tags=["ELO"], dependencies=[Depends(get_current_user)])
 def get_elo_movers(limit: int = 10, db: Session = Depends(get_db)):
     """Return top ELO rating movers (by absolute change) across all sports."""

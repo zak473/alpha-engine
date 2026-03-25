@@ -97,8 +97,9 @@ def _build_rows(games: list[dict], game_date: date) -> list[dict]:
         away_score_str = str(int(away_score)) if away_score is not None else ""
 
         outcome = ""
-        if status == "finished" and home_score_str and away_score_str:
-            outcome = "H" if int(home_score_str) > int(away_score_str) else "A"
+        if status == "finished" and home_score_str != "" and away_score_str != "":
+            h, a = int(home_score_str), int(away_score_str)
+            outcome = "home_win" if h > a else "away_win"
 
         start_time = game.get("startTimeUTC") or f"{game_date.isoformat()}T00:00:00Z"
         venue = game.get("venue", {}).get("default", "") if isinstance(game.get("venue"), dict) else ""
