@@ -589,6 +589,12 @@ export interface TipsterProfile {
   total_picks: number;
   won_picks: number;
   active_tips_count: number;
+  lost_picks: number;
+  settled_picks: number;
+  overall_win_rate: number;
+  roi: number;
+  avg_odds: number;
+  profit_loss: number;
   recent_results: ("W" | "L")[];
 }
 
@@ -611,8 +617,11 @@ export async function getTipsters(): Promise<TipsterProfile[]> {
   return res.json();
 }
 
-export async function getTipsterTips(tipsterId: string): Promise<TipsterTip[]> {
-  const res = await fetch(`${BASE}/tipsters/${tipsterId}/tips`, { cache: "no-store" });
+export async function getTipsterTips(tipsterId: string, includeSettled = false): Promise<TipsterTip[]> {
+  const url = includeSettled
+    ? `${BASE}/tipsters/${tipsterId}/tips?include_settled=true`
+    : `${BASE}/tipsters/${tipsterId}/tips`;
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new ApiError(`API ${res.status}`, res.status, `/tipsters/${tipsterId}/tips`);
   return res.json();
 }

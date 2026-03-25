@@ -37,6 +37,12 @@ class TipsterProfile(BaseModel):
     total_picks: int
     won_picks: int
     active_tips_count: int
+    lost_picks: int
+    settled_picks: int
+    overall_win_rate: float   # won / (won + lost), all-time
+    roi: float                # net units / total settled (flat 1-unit staking)
+    avg_odds: float
+    profit_loss: float        # net units profit/loss
     recent_results: list[str]
 
 
@@ -90,13 +96,16 @@ def _bulk_stats(db: Session, user_ids: list[str]) -> dict:
                 ((TipsterTip.outcome == "won") & (TipsterTip.settled_at >= cutoff), 1),
                 else_=0,
             )).label("weekly_won"),
+            func.sum(case((TipsterTip.outcome == "lost", 1), else_=0)).label("lost"),
+            func.sum(case((TipsterTip.outcome.in_(["won", "lost"]), 1), else_=0)).label("settled"),
+            func.sum(case((TipsterTip.outcome == "won", TipsterTip.odds - 1), else_=0)).label("gross_return"),
         )
         .filter(TipsterTip.user_id.in_(user_ids))
         .group_by(TipsterTip.user_id)
         .all()
     )
 
-    stats: dict = {uid: {"total": 0, "won": 0, "active": 0, "weekly_settled": 0, "weekly_won": 0, "recent": []} for uid in user_ids}
+    stats: dict = {uid: {"total": 0, "won": 0, "active": 0, "weekly_settled": 0, "weekly_won": 0, "lost": 0, "settled": 0, "gross_return": 0.0, "recent": []} for uid in user_ids}
     for r in rows:
         stats[r.user_id] = {
             "total": r.total or 0,
@@ -104,6 +113,9 @@ def _bulk_stats(db: Session, user_ids: list[str]) -> dict:
             "active": r.active or 0,
             "weekly_settled": r.weekly_settled or 0,
             "weekly_won": r.weekly_won or 0,
+            "lost": r.lost or 0,
+            "settled": r.settled or 0,
+            "gross_return": float(r.gross_return or 0),
             "recent": [],
         }
 
@@ -144,17 +156,23 @@ def _build_profile(
 ) -> TipsterProfile:
     """Build a tipster profile — uses precomputed bulk stats when available."""
     if precomputed is not None:
-        s = precomputed.get(user.id, {"total": 0, "won": 0, "active": 0, "weekly_settled": 0, "weekly_won": 0, "recent": []})
+        s = precomputed.get(user.id, {"total": 0, "won": 0, "active": 0, "weekly_settled": 0, "weekly_won": 0, "lost": 0, "settled": 0, "gross_return": 0.0, "recent": []})
         followers = (followers_map or {}).get(user.id, 0)
     else:
         # Single-user fallback (used by get_tipster endpoint)
         cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+        won_count = db.query(func.count(TipsterTip.id)).filter(TipsterTip.user_id == user.id, TipsterTip.outcome == "won").scalar() or 0
+        lost_count = db.query(func.count(TipsterTip.id)).filter(TipsterTip.user_id == user.id, TipsterTip.outcome == "lost").scalar() or 0
+        gross_return_val = db.query(func.sum(TipsterTip.odds - 1)).filter(TipsterTip.user_id == user.id, TipsterTip.outcome == "won").scalar() or 0.0
         s = {
             "total": db.query(func.count(TipsterTip.id)).filter(TipsterTip.user_id == user.id).scalar() or 0,
-            "won": db.query(func.count(TipsterTip.id)).filter(TipsterTip.user_id == user.id, TipsterTip.outcome == "won").scalar() or 0,
+            "won": won_count,
             "active": db.query(func.count(TipsterTip.id)).filter(TipsterTip.user_id == user.id, TipsterTip.outcome.is_(None)).scalar() or 0,
             "weekly_settled": db.query(func.count(TipsterTip.id)).filter(TipsterTip.user_id == user.id, TipsterTip.settled_at >= cutoff, TipsterTip.outcome.in_(["won", "lost"])).scalar() or 0,
             "weekly_won": db.query(func.count(TipsterTip.id)).filter(TipsterTip.user_id == user.id, TipsterTip.settled_at >= cutoff, TipsterTip.outcome == "won").scalar() or 0,
+            "lost": lost_count,
+            "settled": won_count + lost_count,
+            "gross_return": float(gross_return_val),
             "recent": ["W" if t.outcome == "won" else "L" for t in db.query(TipsterTip).filter(TipsterTip.user_id == user.id, TipsterTip.outcome.in_(["won", "lost"])).order_by(TipsterTip.settled_at.desc()).limit(8).all()],
         }
         followers = db.query(func.count(TipsterFollow.id)).filter(TipsterFollow.tipster_id == user.id).scalar() or 0
@@ -167,6 +185,16 @@ def _build_profile(
 
     weekly_win_rate = (s["weekly_won"] / s["weekly_settled"]) if s["weekly_settled"] > 0 else 0.0
 
+    settled = s["settled"]
+    won = s["won"]
+    lost = s["lost"]
+    gross_return = s.get("gross_return", 0.0)
+
+    overall_win_rate = round(won / (won + lost), 4) if (won + lost) > 0 else 0.0
+    roi = round((gross_return - lost) / settled, 4) if settled > 0 else 0.0
+    avg_odds = 0.0  # Not computed in bulk yet
+    profit_loss = round(gross_return - lost, 2)
+
     return TipsterProfile(
         id=user.id,
         username=user.display_name or user.email.split("@")[0],
@@ -178,6 +206,12 @@ def _build_profile(
         total_picks=s["total"],
         won_picks=s["won"],
         active_tips_count=s["active"],
+        lost_picks=lost,
+        settled_picks=settled,
+        overall_win_rate=overall_win_rate,
+        roi=roi,
+        avg_odds=avg_odds,
+        profit_loss=profit_loss,
         recent_results=s["recent"],
     )
 

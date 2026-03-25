@@ -147,7 +147,29 @@ function TipsterModal({
   onFollow: () => void;
 }) {
   const color = avatarColor(tipster.username);
-  const winPct = Math.round(tipster.weekly_win_rate * 100);
+  const [activeTab, setActiveTab] = useState<"active" | "history">("active");
+  const [historyTips, setHistoryTips] = useState<TipsterTip[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  function handleHistoryTab() {
+    setActiveTab("history");
+    if (historyTips.length === 0) {
+      setLoadingHistory(true);
+      getTipsterTips(tipster.id, true)
+        .then(setHistoryTips)
+        .catch(() => {})
+        .finally(() => setLoadingHistory(false));
+    }
+  }
+
+  const overallWinPct = Math.round(tipster.overall_win_rate * 100);
+  const roiPct = (tipster.roi * 100).toFixed(1);
+  const roiPositive = tipster.roi >= 0;
+  const plStr = `${tipster.profit_loss >= 0 ? "+" : ""}${tipster.profit_loss.toFixed(1)}u`;
+  const weeklyWinPct = Math.round(tipster.weekly_win_rate * 100);
+
+  const activeTips = tips.filter(t => !t.outcome || t.outcome === "pending");
+  const settledHistory = historyTips.filter(t => t.outcome === "won" || t.outcome === "lost");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
@@ -166,7 +188,6 @@ function TipsterModal({
             {tipster.bio && <p className="text-xs text-text-muted mt-0.5 truncate">{tipster.bio}</p>}
             <div className="flex items-center gap-3 mt-1.5">
               <span className="text-[11px] text-text-muted"><span className="font-bold text-text-primary">{tipster.followers.toLocaleString()}</span> followers</span>
-              <span className="text-[11px] font-bold" style={{ color: winPct >= 60 ? "var(--positive)" : "var(--text0)" }}>{winPct}% weekly</span>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -187,16 +208,49 @@ function TipsterModal({
           </div>
         </div>
 
-        {/* Stats row */}
-        <div className="grid grid-cols-3 gap-px" style={{ background: "var(--border0)" }}>
-          {[
-            { label: "Total picks", value: String(tipster.total_picks) },
+        {/* Stats grid — row 1 */}
+        <div className="grid grid-cols-5 gap-px" style={{ background: "var(--border0)" }}>
+          {([
+            { label: "Active", value: String(tipster.active_tips_count) },
             { label: "Won", value: String(tipster.won_picks) },
-            { label: "Active tips", value: String(tipster.active_tips_count) },
-          ].map(({ label, value }) => (
+            { label: "Lost", value: String(tipster.lost_picks) },
+            { label: "Settled", value: String(tipster.settled_picks) },
+            {
+              label: "Win Rate",
+              value: `${overallWinPct}%`,
+              color: overallWinPct >= 60 ? "var(--positive)" : overallWinPct >= 50 ? "var(--warning)" : "var(--negative)",
+            },
+          ] as { label: string; value: string; color?: string }[]).map(({ label, value, color: c }) => (
             <div key={label} className="py-3 text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
               <p className="text-[9px] uppercase tracking-wider text-text-muted mb-0.5">{label}</p>
-              <p className="text-sm font-bold text-text-primary">{value}</p>
+              <p className="text-sm font-bold" style={{ color: c ?? "var(--text0)" }}>{value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Stats grid — row 2 */}
+        <div className="grid grid-cols-4 gap-px border-b" style={{ background: "var(--border0)", borderColor: "var(--border0)" }}>
+          {([
+            {
+              label: "ROI",
+              value: `${roiPositive ? "+" : ""}${roiPct}%`,
+              color: roiPositive ? "var(--positive)" : "var(--negative)",
+            },
+            {
+              label: "Profit/Loss",
+              value: plStr,
+              color: tipster.profit_loss >= 0 ? "var(--positive)" : "var(--negative)",
+            },
+            { label: "Avg Odds", value: tipster.avg_odds > 0 ? tipster.avg_odds.toFixed(2) : "—" },
+            {
+              label: "Weekly",
+              value: `${weeklyWinPct}%`,
+              color: weeklyWinPct >= 60 ? "var(--positive)" : weeklyWinPct >= 50 ? "var(--warning)" : "var(--negative)",
+            },
+          ] as { label: string; value: string; color?: string }[]).map(({ label, value, color: c }) => (
+            <div key={label} className="py-3 text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
+              <p className="text-[9px] uppercase tracking-wider text-text-muted mb-0.5">{label}</p>
+              <p className="text-sm font-bold" style={{ color: c ?? "var(--text0)" }}>{value}</p>
             </div>
           ))}
         </div>
@@ -207,13 +261,49 @@ function TipsterModal({
           {tipster.recent_results.map((r, i) => <ResultBadge key={i} result={r} />)}
         </div>
 
-        {/* Active tips */}
+        {/* Tab bar */}
+        <div className="flex items-center gap-0 border-b" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.02)" }}>
+          <button
+            onClick={() => setActiveTab("active")}
+            className={cn("px-5 py-2.5 text-[11px] font-semibold border-b-2 transition-all", activeTab === "active"
+              ? "border-[var(--accent)] text-text-primary"
+              : "border-transparent text-text-muted hover:text-text-primary"
+            )}
+          >
+            Active ({activeTips.length})
+          </button>
+          <button
+            onClick={handleHistoryTab}
+            className={cn("px-5 py-2.5 text-[11px] font-semibold border-b-2 transition-all", activeTab === "history"
+              ? "border-[var(--accent)] text-text-primary"
+              : "border-transparent text-text-muted hover:text-text-primary"
+            )}
+          >
+            History
+          </button>
+        </div>
+
+        {/* Tips list */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          <p className="text-[11px] uppercase tracking-wider text-text-muted mb-3">Active tips ({tips.filter(t => !t.outcome || t.outcome === "pending").length})</p>
-          {tips.length === 0 ? (
-            <p className="text-sm text-text-muted text-center py-8">No active tips right now</p>
-          ) : (
-            tips.map((t) => <TipRow key={t.id} tip={t} tipsterUsername={tipster.username} />)
+          {activeTab === "active" && (
+            <>
+              {activeTips.length === 0 ? (
+                <p className="text-sm text-text-muted text-center py-8">No active tips right now</p>
+              ) : (
+                activeTips.map((t) => <TipRow key={t.id} tip={t} tipsterUsername={tipster.username} />)
+              )}
+            </>
+          )}
+          {activeTab === "history" && (
+            <>
+              {loadingHistory ? (
+                <p className="text-sm text-text-muted text-center py-8">Loading history…</p>
+              ) : settledHistory.length === 0 ? (
+                <p className="text-sm text-text-muted text-center py-8">No settled tips yet</p>
+              ) : (
+                settledHistory.map((t) => <TipRow key={t.id} tip={t} tipsterUsername={tipster.username} />)
+              )}
+            </>
           )}
         </div>
       </div>
@@ -338,8 +428,9 @@ function TipsterCard({
   onFollow: () => void;
 }) {
   const color = avatarColor(tipster.username);
-  const winPct = Math.round(tipster.weekly_win_rate * 100);
-  const wonLabel = `${tipster.won_picks}/${tipster.total_picks}`;
+  const winPct = Math.round(tipster.overall_win_rate * 100);
+  const roiPct = (tipster.roi * 100).toFixed(1);
+  const roiPositive = tipster.roi >= 0;
 
   return (
     <div
@@ -366,19 +457,37 @@ function TipsterCard({
             <span className="text-[11px] text-text-muted">
               <span className="font-semibold text-text-primary">{tipster.followers.toLocaleString()}</span> followers
             </span>
-            <span className="text-text-subtle">·</span>
-            <span className="text-[11px] font-bold" style={{ color: winPct >= 60 ? "var(--positive)" : winPct >= 50 ? "var(--warning)" : "var(--negative)" }}>
-              {winPct}% weekly
-            </span>
           </div>
         </div>
       </div>
 
-      {/* Recent results */}
-      <div className="flex items-center gap-1 px-4 pb-3">
-        <span className="text-[9px] uppercase tracking-wider text-text-muted mr-1">{wonLabel} latest</span>
-        {tipster.recent_results.map((r, i) => <ResultBadge key={i} result={r} />)}
+      {/* Mini stats row */}
+      <div className="grid grid-cols-3 gap-px mx-4 mb-3 rounded-lg overflow-hidden" style={{ background: "var(--border0)" }}>
+        <div className="py-1.5 text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
+          <p className="text-[9px] uppercase tracking-wider text-text-muted">Win Rate</p>
+          <p className="text-xs font-bold" style={{ color: winPct >= 60 ? "var(--positive)" : winPct >= 50 ? "var(--warning)" : tipster.settled_picks > 0 ? "var(--negative)" : "var(--text1)" }}>
+            {tipster.settled_picks > 0 ? `${winPct}%` : "—"}
+          </p>
+        </div>
+        <div className="py-1.5 text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
+          <p className="text-[9px] uppercase tracking-wider text-text-muted">ROI</p>
+          <p className="text-xs font-bold" style={{ color: tipster.settled_picks > 0 ? (roiPositive ? "var(--positive)" : "var(--negative)") : "var(--text1)" }}>
+            {tipster.settled_picks > 0 ? `${roiPositive ? "+" : ""}${roiPct}%` : "—"}
+          </p>
+        </div>
+        <div className="py-1.5 text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
+          <p className="text-[9px] uppercase tracking-wider text-text-muted">Picks</p>
+          <p className="text-xs font-bold text-text-primary">{tipster.total_picks}</p>
+        </div>
       </div>
+
+      {/* Recent results */}
+      {tipster.recent_results.length > 0 && (
+        <div className="flex items-center gap-1 px-4 pb-3">
+          <span className="text-[9px] uppercase tracking-wider text-text-muted mr-1">Recent</span>
+          {tipster.recent_results.map((r, i) => <ResultBadge key={i} result={r} />)}
+        </div>
+      )}
 
       {/* Footer */}
       <div
@@ -422,23 +531,21 @@ type SortOpt = "followers" | "winrate" | "active";
 type Tab = "tipsters" | "leaderboard";
 
 function LeaderboardView({ tipsters }: { tipsters: TipsterProfile[] }) {
-  const ranked = [...tipsters].sort((a, b) => {
-    const roiA = a.total_picks > 0 ? a.won_picks / a.total_picks : 0;
-    const roiB = b.total_picks > 0 ? b.won_picks / b.total_picks : 0;
-    return roiB - roiA;
-  });
+  const ranked = [...tipsters].sort((a, b) => b.roi - a.roi);
   return (
     <div className="px-4 py-4 lg:px-6">
       <div className="rounded-2xl border overflow-hidden" style={{ borderColor: "var(--border0)", background: "var(--bg1)" }}>
-        <div className="grid grid-cols-[28px_1fr_80px_80px_80px] gap-3 px-4 py-2 border-b text-[10px] uppercase tracking-wider text-text-muted font-bold" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-          <span>#</span><span>Tipster</span><span className="text-right">Win rate</span><span className="text-right">Picks</span><span className="text-right">Followers</span>
+        <div className="grid grid-cols-[28px_1fr_72px_72px_64px_72px] gap-2 px-4 py-2 border-b text-[10px] uppercase tracking-wider text-text-muted font-bold" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
+          <span>#</span><span>Tipster</span><span className="text-right">Win rate</span><span className="text-right">ROI</span><span className="text-right">Picks</span><span className="text-right">Followers</span>
         </div>
         {ranked.map((t, i) => {
           const color = avatarColor(t.username);
-          const winPct = Math.round(t.weekly_win_rate * 100);
+          const winPct = Math.round(t.overall_win_rate * 100);
+          const roiPct = (t.roi * 100).toFixed(1);
+          const roiPositive = t.roi >= 0;
           const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
           return (
-            <div key={t.id} className="grid grid-cols-[28px_1fr_80px_80px_80px] gap-3 items-center px-4 py-3 border-b last:border-b-0 hover:bg-[var(--bg2)] transition-colors" style={{ borderColor: "var(--border0)" }}>
+            <div key={t.id} className="grid grid-cols-[28px_1fr_72px_72px_64px_72px] gap-2 items-center px-4 py-3 border-b last:border-b-0 hover:bg-[var(--bg2)] transition-colors" style={{ borderColor: "var(--border0)" }}>
               <span className="text-sm">{medal ?? <span className="text-[11px] text-text-muted font-bold">{i + 1}</span>}</span>
               <div className="flex items-center gap-2 min-w-0">
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0" style={{ background: color }}>
@@ -446,7 +553,12 @@ function LeaderboardView({ tipsters }: { tipsters: TipsterProfile[] }) {
                 </div>
                 <span className="text-sm font-semibold text-text-primary truncate">@{t.username}</span>
               </div>
-              <span className="text-right text-sm font-bold" style={{ color: winPct >= 65 ? "var(--positive)" : winPct >= 50 ? "var(--warning)" : "var(--negative)" }}>{winPct}%</span>
+              <span className="text-right text-sm font-bold" style={{ color: t.settled_picks > 0 ? (winPct >= 60 ? "var(--positive)" : winPct >= 50 ? "var(--warning)" : "var(--negative)") : "var(--text2)" }}>
+                {t.settled_picks > 0 ? `${winPct}%` : "—"}
+              </span>
+              <span className="text-right text-sm font-bold" style={{ color: t.settled_picks > 0 ? (roiPositive ? "var(--positive)" : "var(--negative)") : "var(--text2)" }}>
+                {t.settled_picks > 0 ? `${roiPositive ? "+" : ""}${roiPct}%` : "—"}
+              </span>
               <span className="text-right text-sm font-mono text-text-primary">{t.total_picks}</span>
               <span className="text-right text-sm font-mono text-text-muted">{t.followers.toLocaleString()}</span>
             </div>
@@ -490,7 +602,7 @@ export function TipstersView({ initialTipsters = [] }: { initialTipsters?: Tipst
   const filtered = tipsters
     .filter(t => !search || t.username.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
-      if (sort === "winrate") return b.weekly_win_rate - a.weekly_win_rate;
+      if (sort === "winrate") return b.overall_win_rate - a.overall_win_rate;
       if (sort === "active") return b.active_tips_count - a.active_tips_count;
       return b.followers - a.followers;
     });
