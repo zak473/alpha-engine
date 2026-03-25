@@ -444,19 +444,23 @@ def _job_settle_challenge_entries() -> None:
 
 
 def _job_settle_ai_tipster_tips() -> None:
-    """Settle pending TipsterTip rows for AI tipster accounts when matches finish."""
+    """Settle pending TipsterTip rows for AI tipster accounts when matches finish.
+
+    selection_label is always the team name (e.g. "Manchester City") or "Draw" —
+    never "home"/"away". We resolve it by comparing against CoreTeam names extracted
+    from the match's match_label (same format as auto_picks: "Home vs Away").
+    """
     from datetime import datetime, timezone
     from db.session import SessionLocal
-    from db.models.mvp import CoreMatch
+    from db.models.mvp import CoreMatch, CoreTeam
     from db.models.tipsters import TipsterTip
     from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
 
     ai_ids = set(AI_TIPSTER_IDS.values())
-    # Maps selection_label → expected outcome string in CoreMatch.outcome
-    outcome_map = {"home": "home_win", "away": "away_win", "draw": "draw"}
 
     db = SessionLocal()
     settled = 0
+    skipped = 0
     try:
         pending = (
             db.query(TipsterTip)
@@ -468,22 +472,47 @@ def _job_settle_ai_tipster_tips() -> None:
             .all()
         )
 
+        log.info("[scheduler] settle_ai_tipster_tips: %d pending tips to check.", len(pending))
+
         for tip in pending:
             match = db.query(CoreMatch).filter(CoreMatch.id == tip.match_id).first()
             if not match or match.status != "finished" or not match.outcome:
                 continue
 
-            expected = outcome_map.get(tip.selection_label)
-            if expected is None:
-                continue
+            label = tip.selection_label.lower().strip()
 
-            tip.outcome = "won" if match.outcome == expected else "lost"
+            # "Draw" is explicit
+            if label == "draw":
+                tip.outcome = "won" if match.outcome == "draw" else "lost"
+            else:
+                # Resolve via CoreTeam names on the match
+                home_team = db.get(CoreTeam, match.home_team_id)
+                away_team = db.get(CoreTeam, match.away_team_id)
+                home_name = (home_team.name or "").lower() if home_team else ""
+                away_name = (away_team.name or "").lower() if away_team else ""
+
+                if home_name and home_name in label or label in home_name:
+                    tip.outcome = "won" if match.outcome == "home_win" else "lost"
+                elif away_name and away_name in label or label in away_name:
+                    tip.outcome = "won" if match.outcome == "away_win" else "lost"
+                else:
+                    log.debug(
+                        "[scheduler] settle_ai_tipster_tips: can't match label '%s' "
+                        "to home='%s' away='%s' for tip %s",
+                        tip.selection_label, home_name, away_name, tip.id,
+                    )
+                    skipped += 1
+                    continue
+
             tip.settled_at = datetime.now(timezone.utc)
             settled += 1
 
         if settled:
             db.commit()
-            log.info("[scheduler] settle_ai_tipster_tips: settled %d tips.", settled)
+        log.info(
+            "[scheduler] settle_ai_tipster_tips: settled=%d skipped=%d.",
+            settled, skipped,
+        )
     except Exception as exc:
         db.rollback()
         log.error("[scheduler] settle_ai_tipster_tips failed: %s", exc)

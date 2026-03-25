@@ -20,9 +20,12 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from api.deps import get_db, get_current_user
+from api.services.scoring import compute_score
 from db.models.picks import TrackedPick
 from db.models.mvp import CoreMatch
 from db.models.bankroll import BankrollSnapshot
+from db.models.tipsters import TipsterTip
+from db.models.challenges import Challenge, ChallengeEntry, ChallengeEntryResult
 
 router = APIRouter(prefix="/picks", tags=["Picks"])
 
@@ -151,6 +154,7 @@ def _auto_settle(pick: TrackedPick, db: Session) -> None:
         if pick.outcome is not None:
             pick.settled_at = datetime.now(tz=timezone.utc)
             _create_bankroll_snapshot(pick, db)
+            _settle_related(pick, db)
 
 
 def _create_bankroll_snapshot(pick: TrackedPick, db: Session) -> None:
@@ -186,6 +190,80 @@ def _create_bankroll_snapshot(pick: TrackedPick, db: Session) -> None:
     except Exception as exc:
         log.warning("bankroll_snapshot_failed pick=%s err=%s", pick.id, exc)
         # settlement failure must never block pick persistence
+
+
+def _settle_related(pick: TrackedPick, db: Session) -> None:
+    """
+    Cascade settlement to TipsterTips and ChallengeEntries for the same
+    user + match whenever a pick settles. No extra commits — the caller's
+    db.commit() covers all changes atomically.
+    """
+    if not pick.match_id or pick.match_id.startswith("manual-"):
+        return
+    if pick.outcome not in ("won", "lost", "void"):
+        return
+
+    now = datetime.now(tz=timezone.utc)
+    correct = pick.outcome == "won"
+    outcome_payload = (
+        {"outcome": "void", "correct": False}
+        if pick.outcome == "void"
+        else {"outcome": pick.selection_label, "correct": correct}
+    )
+
+    # 1. Settle matching TipsterTips (same user, same match, still pending)
+    try:
+        tips = (
+            db.query(TipsterTip)
+            .filter(
+                TipsterTip.user_id == pick.user_id,
+                TipsterTip.match_id == pick.match_id,
+                TipsterTip.outcome.is_(None),
+            )
+            .all()
+        )
+        for tip in tips:
+            tip.outcome = pick.outcome
+            tip.settled_at = now
+        if tips:
+            log.info("auto_settled %d tipster_tip(s) for pick=%s", len(tips), pick.id)
+    except Exception as exc:
+        log.warning("tipster_settle_failed pick=%s err=%s", pick.id, exc)
+
+    # 2. Settle matching ChallengeEntries (same user, same match, open/locked)
+    try:
+        entries = (
+            db.query(ChallengeEntry)
+            .filter(
+                ChallengeEntry.user_id == pick.user_id,
+                ChallengeEntry.event_id == pick.match_id,
+                ChallengeEntry.status.in_(["open", "locked"]),
+            )
+            .all()
+        )
+        for entry in entries:
+            challenge = db.query(Challenge).filter(Challenge.id == entry.challenge_id).first()
+            if not challenge:
+                continue
+            try:
+                score = compute_score(
+                    scoring_type=challenge.scoring_type,
+                    pick_type=entry.pick_type,
+                    prediction_payload=entry.prediction_payload,
+                    outcome_payload=outcome_payload,
+                )
+                db.add(ChallengeEntryResult(
+                    entry_id=entry.id,
+                    outcome_payload=outcome_payload,
+                    score_value=score,
+                ))
+                entry.status = "settled"
+            except Exception as exc:
+                log.warning("challenge_entry_settle_failed entry=%s err=%s", entry.id, exc)
+        if entries:
+            log.info("auto_settled %d challenge_entry(s) for pick=%s", len(entries), pick.id)
+    except Exception as exc:
+        log.warning("challenge_settle_failed pick=%s err=%s", pick.id, exc)
 
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
@@ -407,6 +485,7 @@ def settle_pick(
     pick.settled_at = datetime.now(tz=timezone.utc)
     if body.outcome != "void":
         _create_bankroll_snapshot(pick, db)
+    _settle_related(pick, db)
     db.commit()
     db.refresh(pick)
     return _pick_out(pick)

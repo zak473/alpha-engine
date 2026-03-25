@@ -414,6 +414,17 @@ app.include_router(horseracing_sport.router,  prefix=settings.API_PREFIX)
 
 # ─── Shared endpoints ─────────────────────────────────────────────────────
 
+@app.post("/api/v1/admin/settle-tips", tags=["Admin"])
+def admin_settle_tips(secret: str, db: Session = Depends(get_db)):
+    """One-off: settle all pending AI tipster tips whose matches are finished."""
+    if secret != "nid-settle-2026":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from pipelines.tipsters.settle_tips import run as settle
+    n = settle(dry_run=False, all_users=False)
+    return {"settled": n}
+
+
 @app.get("/api/v1/sports/elo-movers", tags=["ELO"], dependencies=[Depends(get_current_user)])
 def get_elo_movers(limit: int = 10, db: Session = Depends(get_db)):
     """Return top ELO rating movers (by absolute change) across all sports."""
