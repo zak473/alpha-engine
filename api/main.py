@@ -503,6 +503,19 @@ def admin_refetch_hockey(secret: str, db: Session = Depends(get_db)):
     return {"outcomes_backfilled": updated, "tips_settled": settled, "still_null": len(by_teams)}
 
 
+@app.delete("/api/v1/admin/delete-tips", tags=["Admin"])
+def admin_delete_tips(secret: str, ids: str, db: Session = Depends(get_db)):
+    """Delete TipsterTip rows by comma-separated IDs."""
+    if secret != "nid-settle-2026":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from db.models.tipsters import TipsterTip
+    id_list = [i.strip() for i in ids.split(",") if i.strip()]
+    deleted = db.query(TipsterTip).filter(TipsterTip.id.in_(id_list)).delete(synchronize_session=False)
+    db.commit()
+    return {"deleted": deleted}
+
+
 @app.post("/api/v1/admin/fix-baseball-outcomes", tags=["Admin"])
 def admin_fix_baseball_outcomes(secret: str, db: Session = Depends(get_db)):
     """
