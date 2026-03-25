@@ -128,7 +128,7 @@ export default function LandingPage() {
             <a href="#features">About AI</a>
             <Link href="/login">Sign In</Link>
           </nav>
-          <Link href="/register" className="btn-cta">Get started free</Link>
+          <Link href="/pricing" className="btn-cta">Get started</Link>
           <button className="nav__burger" id="burger" aria-label="Menu">
             <span></span><span></span><span></span>
           </button>
@@ -161,10 +161,10 @@ export default function LandingPage() {
             </h1>
             <p className="hero__sub">Never In Doubt combines machine-learning predictions, live market odds, and a personal AI advisor across 6 sports — so every bet you place is backed by data.</p>
             <div className="hero__ctas">
-              <Link href="/register" className="btn-cta btn-cta--large">Get started free</Link>
+              <Link href="/pricing" className="btn-cta btn-cta--large">Start today — £24.99/mo</Link>
               <a href="#predictions" className="btn-ghost btn-ghost--large">See today&apos;s edges</a>
             </div>
-            <p className="hero__micro">No credit card required</p>
+            <p className="hero__micro">Cancel any time · No hidden fees</p>
           </div>
 
           <div className="hero__card-wrap">
@@ -266,7 +266,7 @@ export default function LandingPage() {
             </div>
             <div className="sp__content">
               <span className="sp__name">SOCCER</span>
-              <Link href="/register" className="btn-sport">Explore Edges</Link>
+              <Link href="/pricing" className="btn-sport">Explore Edges</Link>
             </div>
           </div>
 
@@ -286,7 +286,7 @@ export default function LandingPage() {
             </div>
             <div className="sp__content">
               <span className="sp__name">BASKETBALL</span>
-              <Link href="/register" className="btn-sport">Explore Edges</Link>
+              <Link href="/pricing" className="btn-sport">Explore Edges</Link>
             </div>
           </div>
 
@@ -295,7 +295,7 @@ export default function LandingPage() {
             <div className="sp__overlay"></div>
             <div className="sp__content">
               <span className="sp__name">TENNIS</span>
-              <Link href="/register" className="btn-sport">Explore</Link>
+              <Link href="/pricing" className="btn-sport">Explore</Link>
             </div>
           </div>
           <div className="sp sp--baseball">
@@ -303,7 +303,7 @@ export default function LandingPage() {
             <div className="sp__overlay"></div>
             <div className="sp__content">
               <span className="sp__name">BASEBALL</span>
-              <Link href="/register" className="btn-sport">Explore</Link>
+              <Link href="/pricing" className="btn-sport">Explore</Link>
             </div>
           </div>
           <div className="sp sp--hockey">
@@ -311,7 +311,7 @@ export default function LandingPage() {
             <div className="sp__overlay"></div>
             <div className="sp__content">
               <span className="sp__name">HOCKEY</span>
-              <Link href="/register" className="btn-sport">Explore</Link>
+              <Link href="/pricing" className="btn-sport">Explore</Link>
             </div>
           </div>
           <div className="sp sp--esports">
@@ -319,7 +319,7 @@ export default function LandingPage() {
             <div className="sp__overlay"></div>
             <div className="sp__content">
               <span className="sp__name">ESPORTS</span>
-              <Link href="/register" className="btn-sport">Explore</Link>
+              <Link href="/pricing" className="btn-sport">Explore</Link>
             </div>
           </div>
 
@@ -509,55 +509,29 @@ export default function LandingPage() {
       <section className="pricing" id="pricing">
         <div className="pricing__inner">
           <div className="section-label">SIMPLE PRICING</div>
-          <h2 className="section-title">SELECT YOUR<br /><span className="green">PLAN</span></h2>
-          <p className="section-sub">Start free. Upgrade when you&apos;re ready.</p>
-          <div className="pricing__grid">
-
-            <div className="plan reveal">
-              <div className="plan__tier">STARTER</div>
-              <div className="plan__price">£<span>0</span></div>
-              <div className="plan__period">/ forever</div>
-              <p className="plan__tagline">Best for getting started with predictions, tracking, and the AI advisor.</p>
-              <ul className="plan__feats">
-                <li><span className="chk">✓</span>10 AI advisor messages</li>
-                <li><span className="chk">✓</span>All predictions &amp; odds</li>
-                <li><span className="chk">✓</span>Pick tracking</li>
-                <li><span className="chk">✓</span>ROI analytics</li>
-              </ul>
-              <Link href="/register" className="plan__btn">Start free</Link>
-            </div>
+          <h2 className="section-title">ONE PLAN.<br /><span className="green">EVERYTHING INCLUDED.</span></h2>
+          <p className="section-sub">Full access to every feature — predictions, AI advisor, analytics, challenges, and live odds.</p>
+          <div className="pricing__grid pricing__grid--single">
 
             <div className="plan plan--featured reveal">
-              <div className="plan__popular">MOST POPULAR</div>
-              <div className="plan__tier">ELITE</div>
-              <div className="plan__price">£<span>9</span></div>
+              <div className="plan__popular">FULL ACCESS</div>
+              <div className="plan__tier">PRO</div>
+              <div className="plan__price">£<span>24</span><span style={{ fontSize: '2rem' }}>.99</span></div>
               <div className="plan__period">/ month</div>
-              <p className="plan__tagline">Best for regular bettors who want deeper analysis and more AI usage.</p>
+              <p className="plan__tagline">Everything you need to find edge, track performance, and bet smarter across 6 sports.</p>
               <ul className="plan__feats">
-                <li><span className="chk">✓</span>150 AI advisor messages/mo</li>
-                <li><span className="chk">✓</span>Priority model updates</li>
-                <li><span className="chk">✓</span>Advanced analytics</li>
-                <li><span className="chk">✓</span>Early access features</li>
-              </ul>
-              <Link href="/register" className="plan__btn plan__btn--green">Go Elite</Link>
-            </div>
-
-            <div className="plan reveal">
-              <div className="plan__tier">INSTITUTIONAL</div>
-              <div className="plan__price" style={{ fontSize: '2rem' }}>Custom</div>
-              <div className="plan__period">&nbsp;</div>
-              <p className="plan__tagline">For syndicates, tipster services, and serious professional bettors.</p>
-              <ul className="plan__feats">
-                <li><span className="chk">✓</span>Unlimited AI messages</li>
-                <li><span className="chk">✓</span>API access</li>
-                <li><span className="chk">✓</span>Dedicated model training</li>
+                <li><span className="chk">✓</span>AI predictions across all 6 sports</li>
+                <li><span className="chk">✓</span>150 AI advisor messages / month</li>
+                <li><span className="chk">✓</span>Live odds feed &amp; edge scoring</li>
+                <li><span className="chk">✓</span>Pick tracker with full ROI analytics</li>
+                <li><span className="chk">✓</span>Challenge leagues &amp; leaderboards</li>
                 <li><span className="chk">✓</span>Priority support</li>
               </ul>
-              <a href="mailto:hello@neverindoubt.co.uk" className="plan__btn">Contact us</a>
+              <Link href="/pricing" className="plan__btn plan__btn--green">Subscribe now</Link>
             </div>
 
           </div>
-          <p className="pricing__notes">No credit card required &nbsp;·&nbsp; Cancel anytime &nbsp;·&nbsp; Real ML models, not tips</p>
+          <p className="pricing__notes">Billed monthly &nbsp;·&nbsp; Cancel anytime &nbsp;·&nbsp; Real ML models, not tips</p>
         </div>
       </section>
 
@@ -584,15 +558,15 @@ export default function LandingPage() {
               </div>
               <div className="faq-item">
                 <button className="faq-q" aria-expanded="false">
-                  <span>Do I need a credit card to get started?</span><span className="faq-icon">+</span>
+                  <span>How much does it cost?</span><span className="faq-icon">+</span>
                 </button>
-                <div className="faq-a"><p>No. The Starter plan is completely free — no card required. You can start without payment details and upgrade to Elite anytime.</p></div>
+                <div className="faq-a"><p>£24.99 per month, billed monthly. One plan, full access to everything — no tiers, no hidden fees.</p></div>
               </div>
               <div className="faq-item">
                 <button className="faq-q" aria-expanded="false">
-                  <span>What&apos;s included in Elite?</span><span className="faq-icon">+</span>
+                  <span>What&apos;s included in the subscription?</span><span className="faq-icon">+</span>
                 </button>
-                <div className="faq-a"><p>Elite gives you 150 AI advisor messages per month, priority model updates, advanced analytics including Sharpe ratio and drawdown tracking, and early access to new features.</p></div>
+                <div className="faq-a"><p>Everything — AI predictions across all 6 sports, 150 AI advisor messages per month, live odds feed, pick tracking, full ROI analytics, challenge leagues, and priority support.</p></div>
               </div>
               <div className="faq-item">
                 <button className="faq-q" aria-expanded="false">
@@ -622,10 +596,10 @@ export default function LandingPage() {
           </h2>
           <p className="cta-body">Start every bet with the confidence of a professional analyst — powered by machine-learning predictions, live market odds, and AI-driven insight.</p>
           <div className="cta-btns">
-            <Link href="/register" className="btn-cta btn-cta--large">Start free</Link>
+            <Link href="/pricing" className="btn-cta btn-cta--large">Subscribe — £24.99/mo</Link>
             <a href="#predictions" className="btn-ghost btn-ghost--large">See today&apos;s edges</a>
           </div>
-          <p className="cta-micro">No credit card required</p>
+          <p className="cta-micro">Cancel any time · No hidden fees</p>
         </div>
       </section>
 

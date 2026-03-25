@@ -497,7 +497,7 @@ def _job_retrain_models() -> None:
 
     for sport, module_path, fn_name in [
         ("soccer",      "pipelines.soccer.train_soccer_lgb",           "main"),
-        ("baseball",    "pipelines.baseball.train_baseball_model",      "main"),
+        ("baseball",    "pipelines.baseball.train_baseball_lgb",         "main"),
         ("tennis",      "pipelines.tennis.train_tennis_model",          "main"),
         ("esports",     "pipelines.esports.train_esports_model",        "main"),
         ("hockey",      "pipelines.hockey.train_hockey_lgb",            "main"),

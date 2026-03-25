@@ -844,6 +844,11 @@ grid-template-columns: repeat(3, 1fr);
 gap: 16px;
 margin-bottom: 28px;
 }
+.nid-landing .pricing__grid--single {
+grid-template-columns: 1fr;
+max-width: 480px;
+margin-inline: auto;
+}
 
 .nid-landing .plan {
 background: var(--dark3);
