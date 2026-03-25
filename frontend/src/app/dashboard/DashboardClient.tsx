@@ -2,15 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { BettingDashboard } from "@/components/betting/BettingDashboard";
-import { getSportMatches, type SportSlug } from "@/lib/api";
-import { adaptToMatchCard } from "@/lib/betting-adapters";
-import type { BettingMatch } from "@/lib/betting-types";
-
-const SPORTS: SportSlug[] = ["soccer", "basketball", "tennis", "esports", "baseball", "hockey"];
+import { IntelligenceDashboard } from "./IntelligenceDashboard";
 
 export function DashboardClient() {
-  const [matches, setMatches] = useState<BettingMatch[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -18,37 +12,11 @@ export function DashboardClient() {
   useEffect(() => {
     if (searchParams.get("checkout") === "success") {
       setShowSuccess(true);
-      // Remove query param without re-render loop
       router.replace("/dashboard", { scroll: false });
       const t = setTimeout(() => setShowSuccess(false), 6000);
       return () => clearTimeout(t);
     }
   }, [searchParams, router]);
-
-  useEffect(() => {
-    Promise.allSettled(
-      SPORTS.map((sport) =>
-        getSportMatches(sport, { limit: 50 }).then((res) =>
-          res.items.flatMap((item) => {
-            try { return [adaptToMatchCard(item, sport)]; }
-            catch { return []; }
-          })
-        )
-      )
-    ).then((results) => {
-      const all = results
-        .filter((r): r is PromiseFulfilledResult<BettingMatch[]> => r.status === "fulfilled")
-        .flatMap((r) => r.value)
-        .sort((a, b) => {
-          if (a.status === "live" && b.status !== "live") return -1;
-          if (b.status === "live" && a.status !== "live") return 1;
-          const edgeDiff = (b.edgePercent ?? 0) - (a.edgePercent ?? 0);
-          if (Math.abs(edgeDiff) > 0.5) return edgeDiff;
-          return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
-        });
-      setMatches(all);
-    });
-  }, []);
 
   return (
     <>
@@ -61,7 +29,7 @@ export function DashboardClient() {
           </div>
         </div>
       )}
-      <BettingDashboard matches={matches} />
+      <IntelligenceDashboard />
     </>
   );
 }

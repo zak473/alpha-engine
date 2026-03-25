@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export default function DashboardPage() {
   return (
-    <AppShell title="Betting Board" subtitle="Never In Doubt live market view" compact>
+    <AppShell title="Dashboard" subtitle="Your intelligence hub" compact>
       <DashboardClient />
     </AppShell>
   );
