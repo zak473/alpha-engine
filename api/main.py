@@ -414,6 +414,49 @@ app.include_router(horseracing_sport.router,  prefix=settings.API_PREFIX)
 
 # ─── Shared endpoints ─────────────────────────────────────────────────────
 
+@app.get("/api/v1/admin/debug-tips", tags=["Admin"])
+def admin_debug_tips(secret: str, sport: str = "hockey", db: Session = Depends(get_db)):
+    if secret != "nid-settle-2026":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from db.models.tipsters import TipsterTip
+    from db.models.mvp import CoreMatch, CoreTeam
+    from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
+    ai_ids = set(AI_TIPSTER_IDS.values())
+    tips = (
+        db.query(TipsterTip)
+        .filter(TipsterTip.user_id.in_(ai_ids), TipsterTip.sport == sport)
+        .order_by(TipsterTip.start_time.desc())
+        .limit(20)
+        .all()
+    )
+    result = []
+    for t in tips:
+        match = db.query(CoreMatch).filter(CoreMatch.id == t.match_id).first() if t.match_id else None
+        home = db.get(CoreTeam, match.home_team_id) if match else None
+        away = db.get(CoreTeam, match.away_team_id) if match else None
+        result.append({
+            "tip_id": t.id,
+            "match_label": t.match_label,
+            "selection": t.selection_label,
+            "tip_outcome": t.outcome,
+            "match_status": match.status if match else "NO_MATCH",
+            "match_outcome": match.outcome if match else None,
+            "home_team": home.name if home else None,
+            "away_team": away.name if away else None,
+        })
+    return result
+
+
+@app.post("/api/v1/admin/settle-tips", tags=["Admin"])
+def admin_settle_tips(secret: str, db: Session = Depends(get_db)):
+    if secret != "nid-settle-2026":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from pipelines.tipsters.settle_tips import run as settle
+    n = settle(dry_run=False, all_users=False)
+    return {"settled": n}
+
 
 @app.get("/api/v1/sports/elo-movers", tags=["ELO"], dependencies=[Depends(get_current_user)])
 def get_elo_movers(limit: int = 10, db: Session = Depends(get_db)):
