@@ -557,7 +557,7 @@ def admin_debug_sgo_odds(secret: str, sport: str = "soccer", limit: int = 20):
     db2 = SessionLocal()
     try:
         now = datetime.now(timezone.utc)
-        soon = now + timedelta(days=5)
+        soon = now + timedelta(days=60)  # wide window to catch all SGO fixtures
         upcoming = db2.query(CoreMatch).filter(
             CoreMatch.sport == sport,
             CoreMatch.status.in_(["scheduled", "live"]),
@@ -568,35 +568,47 @@ def admin_debug_sgo_odds(secret: str, sport: str = "soccer", limit: int = 20):
         for m in upcoming:
             team_ids.update([m.home_team_id, m.away_team_id])
         teams = {t.id: t.name for t in db2.query(CoreTeam).filter(CoreTeam.id.in_(team_ids)).all()}
+        # Sample DB matches (first 10, sorted by date)
+        sample_db = sorted(
+            [{"date": m.kickoff_utc.isoformat(), "match": f"{teams.get(m.home_team_id,'')} vs {teams.get(m.away_team_id,'')}"}
+             for m in upcoming[:50]],
+            key=lambda x: x["date"]
+        )[:10]
     finally:
         db2.close()
 
     results = []
+    sgo_dates = []
     with httpx.Client() as client:
         for league_id in leagues[:3]:
             events = fetch_sgo_events(league_id, client)
             for ev in events[:limit]:
                 sgo_home = (ev.get("teams") or {}).get("home", {}).get("names", {}).get("long", "")
                 sgo_away = (ev.get("teams") or {}).get("away", {}).get("names", {}).get("long", "")
-                # Try to find a match
+                sgo_start = (ev.get("status") or {}).get("startsAt", "")
+                sgo_dates.append(str(sgo_start))
+                # Try to find a match (no time constraint in debug)
                 matched = None
                 for m in upcoming:
                     hn = teams.get(m.home_team_id, "")
                     an = teams.get(m.away_team_id, "")
                     if _teams_match(sgo_home, hn) and _teams_match(sgo_away, an):
-                        matched = f"{hn} vs {an}"
+                        matched = f"{hn} vs {an} ({m.kickoff_utc.date()})"
                         break
                 results.append({
                     "league": league_id,
                     "sgo": f"{sgo_home} vs {sgo_away}",
+                    "sgo_date": str(sgo_start),
                     "sgo_norm": f"{_normalize(sgo_home)} vs {_normalize(sgo_away)}",
                     "matched_to": matched,
                 })
 
     return {
         "sport": sport,
-        "db_upcoming": len(upcoming),
+        "db_upcoming_60d": len(upcoming),
+        "sample_db_matches": sample_db,
         "sgo_events_checked": len(results),
+        "sgo_date_range": f"{min(sgo_dates, default='?')} → {max(sgo_dates, default='?')}",
         "matched": sum(1 for r in results if r["matched_to"]),
         "unmatched": [r for r in results if not r["matched_to"]],
         "matched_list": [r for r in results if r["matched_to"]],
