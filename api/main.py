@@ -460,30 +460,39 @@ def admin_settle_tips(secret: str, db: Session = Depends(get_db)):
 
 @app.post("/api/v1/admin/refetch-hockey", tags=["Admin"])
 def admin_refetch_hockey(secret: str, db: Session = Depends(get_db)):
-    """Backfill outcomes for finished hockey matches with null outcome by re-fetching NHL scores API."""
+    """Backfill outcomes for finished hockey matches with null outcome, then settle tips.
+    Matches Highlightly (hl-hockey-*) matches to NHL API scores by home/away team name + date.
+    """
     if secret != "nid-settle-2026":
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
     import httpx
     from datetime import date, timedelta
-    from db.models.mvp import CoreMatch
+    from db.models.mvp import CoreMatch, CoreTeam
+
     from pipelines.tipsters.settle_tips import run as settle
 
-    # Build a lookup of all finished hockey matches with null outcome: game_id → CoreMatch
+    # All finished hockey matches with null outcome
     null_matches = (
         db.query(CoreMatch)
         .filter(CoreMatch.sport == "hockey", CoreMatch.status == "finished", CoreMatch.outcome.is_(None))
         .all()
     )
-    by_game_id = {}
+
+    # Build lookup by (date_str, home_name_lower, away_name_lower) → CoreMatch
+    by_teams: dict[tuple, CoreMatch] = {}
     for m in null_matches:
-        if m.provider_id and m.provider_id.startswith("nhl-"):
-            by_game_id[m.provider_id[4:]] = m
+        home_team = db.get(CoreTeam, m.home_team_id)
+        away_team = db.get(CoreTeam, m.away_team_id)
+        if not home_team or not away_team:
+            continue
+        d_str = m.kickoff_utc.strftime("%Y-%m-%d")
+        key = (d_str, home_team.name.lower(), away_team.name.lower())
+        by_teams[key] = m
 
     updated = 0
-    # Fetch scores for each of the past 14 days and update any matching matches
     today = date.today()
-    for delta in range(1, 15):
+    for delta in range(0, 14):
         d = today - timedelta(days=delta)
         try:
             r = httpx.get(f"https://api-web.nhle.com/v1/score/{d.isoformat()}", timeout=15)
@@ -491,21 +500,43 @@ def admin_refetch_hockey(secret: str, db: Session = Depends(get_db)):
                 continue
             games = r.json().get("games", [])
             for game in games:
-                game_id = str(game.get("id", ""))
-                if game_id not in by_game_id:
+                game_state = (game.get("gameState") or "").upper()
+                if game_state not in ("OFF", "FINAL"):
                     continue
-                home = game.get("homeTeam", {})
-                away = game.get("awayTeam", {})
-                h = home.get("score")
-                a = away.get("score")
-                if h is None or a is None:
+                home_d = game.get("homeTeam", {})
+                away_d = game.get("awayTeam", {})
+                h_score = home_d.get("score")
+                a_score = away_d.get("score")
+                if h_score is None or a_score is None:
                     continue
-                m = by_game_id[game_id]
-                m.outcome = "home_win" if int(h) > int(a) else "away_win"
-                m.home_score = int(h)
-                m.away_score = int(a)
+                # Get team names from NHL API
+                def _nhl_name(td: dict) -> str:
+                    name = td.get("name", {})
+                    if isinstance(name, dict):
+                        return (name.get("default") or "").lower().strip()
+                    place = td.get("placeName", {})
+                    common = td.get("commonName", {})
+                    p = (place.get("default") if isinstance(place, dict) else "").strip()
+                    c = (common.get("default") if isinstance(common, dict) else "").strip()
+                    return f"{p} {c}".lower().strip() if p else c.lower()
+                h_name = _nhl_name(home_d)
+                a_name = _nhl_name(away_d)
+                key = (d.isoformat(), h_name, a_name)
+                # Try exact match first, then fuzzy (team name contained in other)
+                m = by_teams.get(key)
+                if m is None:
+                    for (dk, hk, ak), candidate in list(by_teams.items()):
+                        if dk == d.isoformat() and (h_name in hk or hk in h_name) and (a_name in ak or ak in a_name):
+                            m = candidate
+                            key = (dk, hk, ak)
+                            break
+                if m is None:
+                    continue
+                m.outcome = "home_win" if int(h_score) > int(a_score) else "away_win"
+                m.home_score = int(h_score)
+                m.away_score = int(a_score)
                 updated += 1
-                del by_game_id[game_id]  # avoid double-update
+                by_teams.pop(key, None)
         except Exception:
             continue
 
@@ -513,7 +544,7 @@ def admin_refetch_hockey(secret: str, db: Session = Depends(get_db)):
         db.commit()
 
     settled = settle(dry_run=False, all_users=False)
-    return {"outcomes_backfilled": updated, "tips_settled": settled, "still_null": len(by_game_id)}
+    return {"outcomes_backfilled": updated, "tips_settled": settled, "still_null": len(by_teams)}
 
 
 @app.get("/api/v1/sports/elo-movers", tags=["ELO"], dependencies=[Depends(get_current_user)])

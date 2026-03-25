@@ -76,17 +76,17 @@ def _parse_score(current: str | None) -> tuple[str, str]:
 
 
 def _derive_outcome(home_score: str, away_score: str, sport: str) -> str:
-    """Derive H/D/A from scores. No draws in basketball, baseball, hockey."""
-    if not home_score or not away_score:
+    """Derive outcome from scores. No draws in basketball, baseball, hockey."""
+    if home_score == "" or away_score == "" or home_score is None or away_score is None:
         return ""
     try:
         h, a = int(home_score), int(away_score)
         if h > a:
-            return "H"
+            return "home_win"
         elif a > h:
-            return "A"
+            return "away_win"
         else:
-            return "D" if sport == "soccer" else ""
+            return "draw" if sport == "soccer" else ""
     except ValueError:
         return ""
 
