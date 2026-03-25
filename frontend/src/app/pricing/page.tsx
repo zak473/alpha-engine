@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { createCheckoutSession, getBillingStatus } from "@/lib/api";
@@ -13,7 +13,7 @@ const PRO_FEATURES = [
   "Priority support",
 ];
 
-export default function PricingPage() {
+function PricingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isLoggedIn } = useAuth();
@@ -163,5 +163,13 @@ export default function PricingPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function PricingPage() {
+  return (
+    <Suspense>
+      <PricingContent />
+    </Suspense>
   );
 }
