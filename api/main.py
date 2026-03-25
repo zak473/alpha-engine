@@ -460,50 +460,52 @@ def admin_settle_tips(secret: str, db: Session = Depends(get_db)):
 
 @app.post("/api/v1/admin/refetch-hockey", tags=["Admin"])
 def admin_refetch_hockey(secret: str, db: Session = Depends(get_db)):
-    """Backfill outcomes for finished hockey matches that have null outcome, then settle tips."""
+    """Backfill outcomes for finished hockey matches with null outcome by re-fetching NHL scores API."""
     if secret != "nid-settle-2026":
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
     import httpx
-    from datetime import datetime, timedelta, timezone
+    from datetime import date, timedelta
     from db.models.mvp import CoreMatch
     from pipelines.tipsters.settle_tips import run as settle
 
-    # Find all finished hockey matches with null outcome
-    matches = (
+    # Build a lookup of all finished hockey matches with null outcome: game_id → CoreMatch
+    null_matches = (
         db.query(CoreMatch)
         .filter(CoreMatch.sport == "hockey", CoreMatch.status == "finished", CoreMatch.outcome.is_(None))
         .all()
     )
+    by_game_id = {}
+    for m in null_matches:
+        if m.provider_id and m.provider_id.startswith("nhl-"):
+            by_game_id[m.provider_id[4:]] = m
 
     updated = 0
-    for m in matches:
-        # provider_id = "nhl-{game_id}"
-        if not m.provider_id or not m.provider_id.startswith("nhl-"):
-            continue
-        game_id = m.provider_id[4:]
+    # Fetch scores for each of the past 14 days and update any matching matches
+    today = date.today()
+    for delta in range(1, 15):
+        d = today - timedelta(days=delta)
         try:
-            r = httpx.get(f"https://api-web.nhle.com/v1/gamecenter/{game_id}/landing", timeout=15)
+            r = httpx.get(f"https://api-web.nhle.com/v1/score/{d.isoformat()}", timeout=15)
             if r.status_code != 200:
-                r = httpx.get(f"https://api-web.nhle.com/v1/score/{m.kickoff_utc.strftime('%Y-%m-%d')}", timeout=15)
-                if r.status_code != 200:
+                continue
+            games = r.json().get("games", [])
+            for game in games:
+                game_id = str(game.get("id", ""))
+                if game_id not in by_game_id:
                     continue
-                games = r.json().get("games", [])
-                game_data = next((g for g in games if str(g.get("id")) == game_id), None)
-            else:
-                game_data = r.json()
-            if not game_data:
-                continue
-            home = game_data.get("homeTeam", {})
-            away = game_data.get("awayTeam", {})
-            h_score = home.get("score")
-            a_score = away.get("score")
-            if h_score is None or a_score is None:
-                continue
-            m.outcome = "home_win" if int(h_score) > int(a_score) else "away_win"
-            m.home_score = int(h_score)
-            m.away_score = int(a_score)
-            updated += 1
+                home = game.get("homeTeam", {})
+                away = game.get("awayTeam", {})
+                h = home.get("score")
+                a = away.get("score")
+                if h is None or a is None:
+                    continue
+                m = by_game_id[game_id]
+                m.outcome = "home_win" if int(h) > int(a) else "away_win"
+                m.home_score = int(h)
+                m.away_score = int(a)
+                updated += 1
+                del by_game_id[game_id]  # avoid double-update
         except Exception:
             continue
 
@@ -511,7 +513,7 @@ def admin_refetch_hockey(secret: str, db: Session = Depends(get_db)):
         db.commit()
 
     settled = settle(dry_run=False, all_users=False)
-    return {"outcomes_backfilled": updated, "tips_settled": settled}
+    return {"outcomes_backfilled": updated, "tips_settled": settled, "still_null": len(by_game_id)}
 
 
 @app.get("/api/v1/sports/elo-movers", tags=["ELO"], dependencies=[Depends(get_current_user)])
