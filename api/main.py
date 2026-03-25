@@ -459,16 +459,59 @@ def admin_settle_tips(secret: str, db: Session = Depends(get_db)):
 
 
 @app.post("/api/v1/admin/refetch-hockey", tags=["Admin"])
-def admin_refetch_hockey(secret: str):
-    """Re-fetch NHL scores then settle tips."""
+def admin_refetch_hockey(secret: str, db: Session = Depends(get_db)):
+    """Backfill outcomes for finished hockey matches that have null outcome, then settle tips."""
     if secret != "nid-settle-2026":
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
-    from pipelines.hockey.fetch_live import fetch_all
+    import httpx
+    from datetime import datetime, timedelta, timezone
+    from db.models.mvp import CoreMatch
     from pipelines.tipsters.settle_tips import run as settle
-    fetched = fetch_all()
+
+    # Find all finished hockey matches with null outcome
+    matches = (
+        db.query(CoreMatch)
+        .filter(CoreMatch.sport == "hockey", CoreMatch.status == "finished", CoreMatch.outcome.is_(None))
+        .all()
+    )
+
+    updated = 0
+    for m in matches:
+        # provider_id = "nhl-{game_id}"
+        if not m.provider_id or not m.provider_id.startswith("nhl-"):
+            continue
+        game_id = m.provider_id[4:]
+        try:
+            r = httpx.get(f"https://api-web.nhle.com/v1/gamecenter/{game_id}/landing", timeout=15)
+            if r.status_code != 200:
+                r = httpx.get(f"https://api-web.nhle.com/v1/score/{m.kickoff_utc.strftime('%Y-%m-%d')}", timeout=15)
+                if r.status_code != 200:
+                    continue
+                games = r.json().get("games", [])
+                game_data = next((g for g in games if str(g.get("id")) == game_id), None)
+            else:
+                game_data = r.json()
+            if not game_data:
+                continue
+            home = game_data.get("homeTeam", {})
+            away = game_data.get("awayTeam", {})
+            h_score = home.get("score")
+            a_score = away.get("score")
+            if h_score is None or a_score is None:
+                continue
+            m.outcome = "home_win" if int(h_score) > int(a_score) else "away_win"
+            m.home_score = int(h_score)
+            m.away_score = int(a_score)
+            updated += 1
+        except Exception:
+            continue
+
+    if updated:
+        db.commit()
+
     settled = settle(dry_run=False, all_users=False)
-    return {"fetched": fetched, "settled": settled}
+    return {"outcomes_backfilled": updated, "tips_settled": settled}
 
 
 @app.get("/api/v1/sports/elo-movers", tags=["ELO"], dependencies=[Depends(get_current_user)])
