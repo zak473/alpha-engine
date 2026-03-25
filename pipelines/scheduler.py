@@ -491,10 +491,13 @@ def _job_settle_ai_tipster_tips() -> None:
                 home_name = (home_team.name or "").lower() if home_team else ""
                 away_name = (away_team.name or "").lower() if away_team else ""
 
-                if home_name and home_name in label or label in home_name:
-                    tip.outcome = "won" if match.outcome == "home_win" else "lost"
-                elif away_name and away_name in label or label in away_name:
-                    tip.outcome = "won" if match.outcome == "away_win" else "lost"
+                mo = match.outcome or ""
+                is_home_win = mo in ("home_win", "H")
+                is_away_win = mo in ("away_win", "A")
+                if home_name and (home_name in label or label in home_name):
+                    tip.outcome = "won" if is_home_win else "lost"
+                elif away_name and (away_name in label or label in away_name):
+                    tip.outcome = "won" if is_away_win else "lost"
                 else:
                     log.debug(
                         "[scheduler] settle_ai_tipster_tips: can't match label '%s' "

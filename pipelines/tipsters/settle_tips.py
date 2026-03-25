@@ -24,14 +24,15 @@ from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
 log = logging.getLogger(__name__)
 
 
-def run(dry_run: bool = False, all_users: bool = False) -> int:
+def run(dry_run: bool = False, all_users: bool = False, recheck: bool = False) -> int:
     """
     Settle pending TipsterTips whose match is finished.
 
     By default only settles AI tipster accounts. Pass all_users=True to also
     settle tips posted by human users that have a match_id set.
+    Pass recheck=True to re-evaluate already-settled tips (fixes wrong outcomes).
 
-    Returns number of tips settled.
+    Returns number of tips settled/corrected.
     """
     db = SessionLocal()
     settled = 0
@@ -40,9 +41,10 @@ def run(dry_run: bool = False, all_users: bool = False) -> int:
 
     try:
         q = db.query(TipsterTip).filter(
-            TipsterTip.outcome.is_(None),
             TipsterTip.match_id.isnot(None),
         )
+        if not recheck:
+            q = q.filter(TipsterTip.outcome.is_(None))
         if not all_users:
             ai_ids = set(AI_TIPSTER_IDS.values())
             q = q.filter(TipsterTip.user_id.in_(ai_ids))
@@ -65,10 +67,13 @@ def run(dry_run: bool = False, all_users: bool = False) -> int:
                 home_name = (home_team.name or "").lower() if home_team else ""
                 away_name = (away_team.name or "").lower() if away_team else ""
 
+                mo = match.outcome or ""
+                is_home_win = mo in ("home_win", "H")
+                is_away_win = mo in ("away_win", "A")
                 if home_name and (home_name in label or label in home_name):
-                    outcome = "won" if match.outcome == "home_win" else "lost"
+                    outcome = "won" if is_home_win else "lost"
                 elif away_name and (away_name in label or label in away_name):
-                    outcome = "won" if match.outcome == "away_win" else "lost"
+                    outcome = "won" if is_away_win else "lost"
                 else:
                     log.debug(
                         "  can't match label '%s' to home='%s' away='%s' (tip=%s)",
@@ -108,8 +113,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Settle pending AI tipster tips")
     parser.add_argument("--dry-run", action="store_true", help="Print results without writing")
     parser.add_argument("--all-users", action="store_true", help="Also settle human user tips with match_id")
+    parser.add_argument("--recheck", action="store_true", help="Re-evaluate already-settled tips to fix wrong outcomes")
     args = parser.parse_args()
-    n = run(dry_run=args.dry_run, all_users=args.all_users)
+    n = run(dry_run=args.dry_run, all_users=args.all_users, recheck=args.recheck)
     print(f"{'Would settle' if args.dry_run else 'Settled'} {n} tips.")
 
 

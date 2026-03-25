@@ -503,6 +503,37 @@ def admin_refetch_hockey(secret: str, db: Session = Depends(get_db)):
     return {"outcomes_backfilled": updated, "tips_settled": settled, "still_null": len(by_teams)}
 
 
+@app.post("/api/v1/admin/fix-baseball-outcomes", tags=["Admin"])
+def admin_fix_baseball_outcomes(secret: str, db: Session = Depends(get_db)):
+    """
+    One-off: normalize 'H'/'A' outcomes to 'home_win'/'away_win' for baseball matches,
+    then re-settle all AI tipster tips (including already-settled ones) to fix wrong results.
+    """
+    if secret != "nid-settle-2026":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from db.models.mvp import CoreMatch
+    from pipelines.tipsters.settle_tips import run as settle
+
+    # Fix stored 'H'/'A' outcomes
+    fixed = 0
+    bad_matches = (
+        db.query(CoreMatch)
+        .filter(CoreMatch.sport == "baseball", CoreMatch.outcome.in_(["H", "A"]))
+        .all()
+    )
+    for m in bad_matches:
+        m.outcome = "home_win" if m.outcome == "H" else "away_win"
+        fixed += 1
+    if fixed:
+        db.commit()
+
+    # Re-settle all tips (including already wrong ones)
+    resettled = settle(dry_run=False, all_users=True, recheck=True)
+    return {"outcomes_fixed": fixed, "tips_resettled": resettled}
+
+
 @app.get("/api/v1/sports/elo-movers", tags=["ELO"], dependencies=[Depends(get_current_user)])
 def get_elo_movers(limit: int = 10, db: Session = Depends(get_db)):
     """Return top ELO rating movers (by absolute change) across all sports."""

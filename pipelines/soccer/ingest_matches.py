@@ -79,7 +79,10 @@ def _upsert_match(session: Session, row: dict[str, Any], league_id: str, home_te
     kickoff = datetime.fromisoformat(row["kickoff_utc"].replace("Z", "+00:00"))
     home_score = int(row["home_score"]) if row.get("home_score") else None
     away_score = int(row["away_score"]) if row.get("away_score") else None
-    outcome = row.get("outcome") or None
+    _OUTCOME_NORM = {"H": "home_win", "A": "away_win", "D": "draw",
+                     "home": "home_win", "away": "away_win"}
+    _raw_outcome = row.get("outcome") or None
+    outcome = _OUTCOME_NORM.get(_raw_outcome, _raw_outcome) if _raw_outcome else None
     status = row.get("status", "scheduled")
     odds_home = float(row["odds_home"]) if row.get("odds_home") else None
     odds_away = float(row["odds_away"]) if row.get("odds_away") else None
