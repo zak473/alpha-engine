@@ -162,10 +162,13 @@ function TipsterModal({
     }
   }
 
-  const overallWinPct = Math.round(tipster.overall_win_rate * 100);
-  const roiPct = (tipster.roi * 100).toFixed(1);
-  const roiPositive = tipster.roi >= 0;
-  const plStr = `${tipster.profit_loss >= 0 ? "+" : ""}${tipster.profit_loss.toFixed(1)}u`;
+  const overallWinRate = tipster.overall_win_rate ?? 0;
+  const roi = tipster.roi ?? 0;
+  const profitLoss = tipster.profit_loss ?? 0;
+  const overallWinPct = Math.round(overallWinRate * 100);
+  const roiPct = (roi * 100).toFixed(1);
+  const roiPositive = roi >= 0;
+  const plStr = `${profitLoss >= 0 ? "+" : ""}${profitLoss.toFixed(1)}u`;
   const weeklyWinPct = Math.round(tipster.weekly_win_rate * 100);
 
   const activeTips = tips.filter(t => !t.outcome || t.outcome === "pending");
@@ -239,9 +242,9 @@ function TipsterModal({
             {
               label: "Profit/Loss",
               value: plStr,
-              color: tipster.profit_loss >= 0 ? "var(--positive)" : "var(--negative)",
+              color: profitLoss >= 0 ? "var(--positive)" : "var(--negative)",
             },
-            { label: "Avg Odds", value: tipster.avg_odds > 0 ? tipster.avg_odds.toFixed(2) : "—" },
+            { label: "Avg Odds", value: (tipster.avg_odds ?? 0) > 0 ? (tipster.avg_odds ?? 0).toFixed(2) : "—" },
             {
               label: "Weekly",
               value: `${weeklyWinPct}%`,
@@ -428,9 +431,9 @@ function TipsterCard({
   onFollow: () => void;
 }) {
   const color = avatarColor(tipster.username);
-  const winPct = Math.round(tipster.overall_win_rate * 100);
-  const roiPct = (tipster.roi * 100).toFixed(1);
-  const roiPositive = tipster.roi >= 0;
+  const winPct = Math.round((tipster.overall_win_rate ?? 0) * 100);
+  const roiPct = ((tipster.roi ?? 0) * 100).toFixed(1);
+  const roiPositive = (tipster.roi ?? 0) >= 0;
 
   return (
     <div
