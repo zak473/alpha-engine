@@ -191,7 +191,7 @@ def fetch_all(dry_run: bool = False) -> int:
     db = SessionLocal()
     updated = 0
     now = datetime.now(timezone.utc)
-    window_end = now + timedelta(days=7)
+    window_end = now + timedelta(days=60)  # cover full fixture schedule; SGO has no date filter
 
     try:
         # Pre-load all upcoming/live CoreMatch rows with their team names
