@@ -615,6 +615,17 @@ def admin_debug_sgo_odds(secret: str, sport: str = "soccer", limit: int = 20):
     }
 
 
+@app.post("/api/v1/admin/force-settle-tips", tags=["Admin"])
+def admin_force_settle_tips(secret: str):
+    """Force-run tip settlement immediately (all_users + recheck)."""
+    if secret != "nid-settle-2026":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from pipelines.tipsters.settle_tips import run as settle
+    n = settle(dry_run=False, all_users=True, recheck=True)
+    return {"settled": n}
+
+
 @app.get("/api/v1/admin/pending-tips", tags=["Admin"])
 def admin_pending_tips(secret: str, db: Session = Depends(get_db)):
     """Show all pending AI tips and their match status, to diagnose settlement failures."""

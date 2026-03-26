@@ -298,17 +298,19 @@ def fetch_today(dry_run: bool = False) -> int:
     if not settings.HIGHLIGHTLY_API_KEY:
         return 0
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now = datetime.now(timezone.utc)
+    dates = [(now - timedelta(days=1)).strftime("%Y-%m-%d"), now.strftime("%Y-%m-%d")]
     all_rows: list[dict] = []
 
     for sport in SPORTS:
-        try:
-            matches = get_matches(sport, today)
-            rows = [r for m in matches if (r := _transform(m, sport))]
-            all_rows.extend(rows)
-            time.sleep(0.3)
-        except Exception as exc:
-            log.warning("[highlightly:live] %s %s failed: %s", sport, today, exc)
+        for date_str in dates:
+            try:
+                matches = get_matches(sport, date_str)
+                rows = [r for m in matches if (r := _transform(m, sport))]
+                all_rows.extend(rows)
+                time.sleep(0.3)
+            except Exception as exc:
+                log.warning("[highlightly:live] %s %s failed: %s", sport, date_str, exc)
 
     if not all_rows or dry_run:
         return len(all_rows)

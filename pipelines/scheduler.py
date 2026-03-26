@@ -481,19 +481,51 @@ def _job_settle_ai_tipster_tips() -> None:
                 log.warning("[scheduler] settle_ai_tipster_tips: tip %s has no match (match_id=%s)", tip.id, tip.match_id)
                 skipped += 1
                 continue
-            if match.status != "finished" or not match.outcome:
+            if match.status != "finished":
+                not_finished += 1
+                continue
+
+            # If match is finished but outcome is missing, try to derive it from stored scores
+            if not match.outcome:
+                hs = match.home_score
+                as_ = match.away_score
+                if hs is not None and as_ is not None:
+                    try:
+                        h_int, a_int = int(hs), int(as_)
+                        if h_int > a_int:
+                            match.outcome = "home_win"
+                        elif a_int > h_int:
+                            match.outcome = "away_win"
+                        elif match.sport == "soccer":
+                            match.outcome = "draw"
+                        log.info(
+                            "[scheduler] settle_ai_tipster_tips: derived outcome %s from scores %s-%s for match %s",
+                            match.outcome, hs, as_, match.id,
+                        )
+                    except (ValueError, TypeError):
+                        pass
+
+            if not match.outcome:
                 not_finished += 1
                 log.debug(
-                    "[scheduler] settle_ai_tipster_tips: tip %s match %s still %s outcome=%s",
-                    tip.id, tip.match_id, match.status, match.outcome,
+                    "[scheduler] settle_ai_tipster_tips: tip %s match %s finished but no outcome (scores: %s-%s)",
+                    tip.id, tip.match_id, match.home_score, match.away_score,
                 )
                 continue
 
             label = tip.selection_label.lower().strip()
+            mo = match.outcome or ""
+            is_home_win = mo in ("home_win", "H")
+            is_away_win = mo in ("away_win", "A")
 
             # "Draw" is explicit
             if label == "draw":
                 tip.outcome = "won" if match.outcome == "draw" else "lost"
+            # Legacy "home"/"away" labels from old tip format
+            elif label == "home":
+                tip.outcome = "won" if is_home_win else "lost"
+            elif label == "away":
+                tip.outcome = "won" if is_away_win else "lost"
             else:
                 # Resolve via CoreTeam names on the match
                 home_team = db.get(CoreTeam, match.home_team_id)
@@ -501,9 +533,6 @@ def _job_settle_ai_tipster_tips() -> None:
                 home_name = (home_team.name or "").lower() if home_team else ""
                 away_name = (away_team.name or "").lower() if away_team else ""
 
-                mo = match.outcome or ""
-                is_home_win = mo in ("home_win", "H")
-                is_away_win = mo in ("away_win", "A")
                 if home_name and (home_name in label or label in home_name):
                     tip.outcome = "won" if is_home_win else "lost"
                 elif away_name and (away_name in label or label in away_name):
