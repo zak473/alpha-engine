@@ -163,11 +163,8 @@ function TipsterModal({
   }
 
   const overallWinRate = tipster.overall_win_rate ?? 0;
-  const roi = tipster.roi ?? 0;
   const profitLoss = tipster.profit_loss ?? 0;
   const overallWinPct = Math.round(overallWinRate * 100);
-  const roiPct = (roi * 100).toFixed(1);
-  const roiPositive = roi >= 0;
   const plStr = `${profitLoss >= 0 ? "+" : ""}${profitLoss.toFixed(1)}u`;
   const weeklyWinPct = Math.round(tipster.weekly_win_rate * 100);
 
@@ -232,16 +229,11 @@ function TipsterModal({
         </div>
 
         {/* Stats grid — row 2 */}
-        <div className="grid grid-cols-4 gap-px border-b" style={{ background: "var(--border0)", borderColor: "var(--border0)" }}>
+        <div className="grid grid-cols-3 gap-px border-b" style={{ background: "var(--border0)", borderColor: "var(--border0)" }}>
           {([
             {
-              label: "ROI",
-              value: `${roiPositive ? "+" : ""}${roiPct}%`,
-              color: roiPositive ? "var(--positive)" : "var(--negative)",
-            },
-            {
-              label: "Profit/Loss",
-              value: plStr,
+              label: "Units",
+              value: tipster.settled_picks > 0 ? plStr : "—",
               color: profitLoss >= 0 ? "var(--positive)" : "var(--negative)",
             },
             { label: "Avg Odds", value: (tipster.avg_odds ?? 0) > 0 ? (tipster.avg_odds ?? 0).toFixed(2) : "—" },
@@ -432,8 +424,8 @@ function TipsterCard({
 }) {
   const color = avatarColor(tipster.username);
   const winPct = Math.round((tipster.overall_win_rate ?? 0) * 100);
-  const roiPct = ((tipster.roi ?? 0) * 100).toFixed(1);
-  const roiPositive = (tipster.roi ?? 0) >= 0;
+  const pl = tipster.profit_loss ?? 0;
+  const plStr = `${pl >= 0 ? "+" : ""}${pl.toFixed(1)}u`;
 
   return (
     <div
@@ -473,9 +465,9 @@ function TipsterCard({
           </p>
         </div>
         <div className="py-1.5 text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
-          <p className="text-[9px] uppercase tracking-wider text-text-muted">ROI</p>
-          <p className="text-xs font-bold" style={{ color: tipster.settled_picks > 0 ? (roiPositive ? "var(--positive)" : "var(--negative)") : "var(--text1)" }}>
-            {tipster.settled_picks > 0 ? `${roiPositive ? "+" : ""}${roiPct}%` : "—"}
+          <p className="text-[9px] uppercase tracking-wider text-text-muted">Units</p>
+          <p className="text-xs font-bold" style={{ color: tipster.settled_picks > 0 ? (pl >= 0 ? "var(--positive)" : "var(--negative)") : "var(--text1)" }}>
+            {tipster.settled_picks > 0 ? plStr : "—"}
           </p>
         </div>
         <div className="py-1.5 text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
@@ -534,18 +526,18 @@ type SortOpt = "followers" | "winrate" | "active";
 type Tab = "tipsters" | "leaderboard";
 
 function LeaderboardView({ tipsters }: { tipsters: TipsterProfile[] }) {
-  const ranked = [...tipsters].sort((a, b) => b.roi - a.roi);
+  const ranked = [...tipsters].sort((a, b) => (b.profit_loss ?? 0) - (a.profit_loss ?? 0));
   return (
     <div className="px-4 py-4 lg:px-6">
       <div className="rounded-2xl border overflow-hidden" style={{ borderColor: "var(--border0)", background: "var(--bg1)" }}>
         <div className="grid grid-cols-[28px_1fr_72px_72px_64px_72px] gap-2 px-4 py-2 border-b text-[10px] uppercase tracking-wider text-text-muted font-bold" style={{ borderColor: "var(--border0)", background: "var(--bg2)" }}>
-          <span>#</span><span>Tipster</span><span className="text-right">Win rate</span><span className="text-right">ROI</span><span className="text-right">Picks</span><span className="text-right">Followers</span>
+          <span>#</span><span>Tipster</span><span className="text-right">Win rate</span><span className="text-right">Units</span><span className="text-right">Picks</span><span className="text-right">Followers</span>
         </div>
         {ranked.map((t, i) => {
           const color = avatarColor(t.username);
           const winPct = Math.round(t.overall_win_rate * 100);
-          const roiPct = (t.roi * 100).toFixed(1);
-          const roiPositive = t.roi >= 0;
+          const pl = t.profit_loss ?? 0;
+          const plStr = `${pl >= 0 ? "+" : ""}${pl.toFixed(1)}u`;
           const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
           return (
             <div key={t.id} className="grid grid-cols-[28px_1fr_72px_72px_64px_72px] gap-2 items-center px-4 py-3 border-b last:border-b-0 hover:bg-[var(--bg2)] transition-colors" style={{ borderColor: "var(--border0)" }}>
@@ -559,8 +551,8 @@ function LeaderboardView({ tipsters }: { tipsters: TipsterProfile[] }) {
               <span className="text-right text-sm font-bold" style={{ color: t.settled_picks > 0 ? (winPct >= 60 ? "var(--positive)" : winPct >= 50 ? "var(--warning)" : "var(--negative)") : "var(--text2)" }}>
                 {t.settled_picks > 0 ? `${winPct}%` : "—"}
               </span>
-              <span className="text-right text-sm font-bold" style={{ color: t.settled_picks > 0 ? (roiPositive ? "var(--positive)" : "var(--negative)") : "var(--text2)" }}>
-                {t.settled_picks > 0 ? `${roiPositive ? "+" : ""}${roiPct}%` : "—"}
+              <span className="text-right text-sm font-bold" style={{ color: t.settled_picks > 0 ? (pl >= 0 ? "var(--positive)" : "var(--negative)") : "var(--text2)" }}>
+                {t.settled_picks > 0 ? plStr : "—"}
               </span>
               <span className="text-right text-sm font-mono text-text-primary">{t.total_picks}</span>
               <span className="text-right text-sm font-mono text-text-muted">{t.followers.toLocaleString()}</span>
