@@ -616,14 +616,44 @@ def admin_debug_sgo_odds(secret: str, sport: str = "soccer", limit: int = 20):
 
 
 @app.post("/api/v1/admin/force-settle-tips", tags=["Admin"])
-def admin_force_settle_tips(secret: str):
-    """Force-run tip settlement immediately (all_users + recheck)."""
+def admin_force_settle_tips(secret: str, recheck: bool = False):
+    """Force-run tip settlement immediately."""
     if secret != "nid-settle-2026":
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
     from pipelines.tipsters.settle_tips import run as settle
-    n = settle(dry_run=False, all_users=True, recheck=True)
+    n = settle(dry_run=False, all_users=True, recheck=recheck)
     return {"settled": n}
+
+
+@app.post("/api/v1/admin/fetch-recent-results", tags=["Admin"])
+def admin_fetch_recent_results(secret: str):
+    """Fetch recent MLB + NHL + Highlightly results to fill in missing outcomes, then re-settle."""
+    if secret != "nid-settle-2026":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    results = {}
+    try:
+        from pipelines.baseball.fetch_live import fetch_all as fetch_baseball
+        results["baseball"] = fetch_baseball()
+    except Exception as exc:
+        results["baseball_error"] = str(exc)
+    try:
+        from pipelines.hockey.fetch_live import fetch_all as fetch_hockey
+        results["hockey"] = fetch_hockey()
+    except Exception as exc:
+        results["hockey_error"] = str(exc)
+    try:
+        from pipelines.highlightly.fetch_all import fetch_today
+        results["highlightly"] = fetch_today()
+    except Exception as exc:
+        results["highlightly_error"] = str(exc)
+
+    # Re-settle
+    from pipelines.tipsters.settle_tips import run as settle
+    results["newly_settled"] = settle(dry_run=False, all_users=True, recheck=False)
+    return results
 
 
 @app.get("/api/v1/admin/pending-tips", tags=["Admin"])
