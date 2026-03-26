@@ -353,10 +353,11 @@ function avatarColor(name: string): string {
 }
 
 function TipsterCard({ tipster }: { tipster: TipsterProfile }) {
-  const winPct = Math.round(tipster.weekly_win_rate * 100);
+  const pl = tipster.profit_loss ?? 0;
+  const plStr = `${pl >= 0 ? "+" : ""}${pl.toFixed(1)}u`;
   const col = avatarColor(tipster.username);
-  const isHot = winPct >= 65;
-  const winColor = winPct >= 65 ? "text-emerald-300" : winPct >= 55 ? "text-amber-300" : "text-white/50";
+  const isHot = pl >= 5;
+  const plColor = pl >= 5 ? "text-emerald-300" : pl >= 0 ? "text-amber-300" : "text-white/50";
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3 transition-colors hover:border-white/[0.12]">
@@ -398,10 +399,10 @@ function TipsterCard({ tipster }: { tipster: TipsterProfile }) {
       </div>
 
       <div className="shrink-0 text-right">
-        <div className={cn("font-mono text-[20px] font-bold tabular-nums leading-none", winColor)}>
-          {winPct}%
+        <div className={cn("font-mono text-[20px] font-bold tabular-nums leading-none", plColor)}>
+          {tipster.settled_picks > 0 ? plStr : "—"}
         </div>
-        <div className="mt-0.5 text-[9px] uppercase tracking-[0.10em] text-white/28">win rate</div>
+        <div className="mt-0.5 text-[9px] uppercase tracking-[0.10em] text-white/28">units</div>
       </div>
     </div>
   );
@@ -840,7 +841,7 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
       .then((data) => {
         setTipsters(
           [...data]
-            .sort((a, b) => b.weekly_win_rate - a.weekly_win_rate)
+            .sort((a, b) => (b.profit_loss ?? 0) - (a.profit_loss ?? 0))
             .slice(0, 5)
         );
       })

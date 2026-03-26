@@ -598,7 +598,6 @@ function EmptyPicks() {
 
 export function IntelligenceDashboard() {
   const [predictions, setPredictions] = useState<MvpPrediction[]>([]);
-  const [liveMatches, setLiveMatches] = useState<LiveMatchOut[]>([]);
   const [pickStats, setPickStats] = useState<PicksStatsOut | null>(null);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [tipsters, setTipsters] = useState<TipsterProfile[]>([]);
@@ -611,14 +610,12 @@ export function IntelligenceDashboard() {
     setLoading(true);
     Promise.allSettled([
       getPredictions({ date_from: today, date_to: inTwoDays, limit: 12 }),
-      getLiveMatches(),
       getPicksStats().catch(() => null),
       getChallenges({ mine: true }).catch(() => []),
       getTipsters(),
       getPerformance().catch(() => null),
-    ]).then(([predsR, liveR, statsR, chalR, tipsR, perfR]) => {
+    ]).then(([predsR, statsR, chalR, tipsR, perfR]) => {
       if (predsR.status === "fulfilled") setPredictions(predsR.value.items);
-      if (liveR.status === "fulfilled") setLiveMatches(liveR.value);
       if (statsR.status === "fulfilled") setPickStats(statsR.value);
       if (chalR.status === "fulfilled") setChallenges(chalR.value as Challenge[]);
       if (tipsR.status === "fulfilled") setTipsters(tipsR.value);
@@ -642,14 +639,12 @@ export function IntelligenceDashboard() {
 
   return (
     <div className="pb-8">
-      <LiveNowStrip matches={liveMatches} />
-
       <div className="px-4 lg:px-6 pt-4 pb-6 space-y-5">
         {/* Status line */}
         <StatusLine
           predsCount={sorted.length}
           pendingCount={pickStats?.pending ?? 0}
-          liveCount={liveMatches.length}
+          liveCount={0}
         />
 
         {/* Hero pick */}
