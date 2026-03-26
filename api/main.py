@@ -535,6 +535,39 @@ def admin_fix_baseball_outcomes(secret: str, db: Session = Depends(get_db)):
     return {"outcomes_fixed": fixed, "tips_resettled": resettled}
 
 
+@app.delete("/api/v1/admin/purge-unsettleable-tips", tags=["Admin"])
+def admin_purge_unsettleable_tips(secret: str):
+    """Delete AI tipster tips where the match is finished but has no outcome and no scores (orphaned)."""
+    if secret != "nid-settle-2026":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from db.models.mvp import CoreMatch
+    from db.models.tipsters import TipsterTip
+    from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
+
+    ai_ids = set(AI_TIPSTER_IDS.values())
+    pending = db.query(TipsterTip).filter(
+        TipsterTip.user_id.in_(ai_ids),
+        TipsterTip.outcome.is_(None),
+        TipsterTip.match_id.isnot(None),
+    ).all()
+
+    deleted = 0
+    for tip in pending:
+        match = db.query(CoreMatch).filter(CoreMatch.id == tip.match_id).first()
+        if (match and match.status == "finished"
+                and not match.outcome
+                and match.home_score in (None, "", "None")
+                and match.away_score in (None, "", "None")):
+            db.delete(tip)
+            deleted += 1
+
+    if deleted:
+        db.commit()
+    return {"deleted": deleted}
+
+
 @app.get("/api/v1/admin/debug-sgo-odds", tags=["Admin"])
 def admin_debug_sgo_odds(secret: str, sport: str = "soccer", limit: int = 20):
     """
