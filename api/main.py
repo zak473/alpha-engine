@@ -615,6 +615,42 @@ def admin_debug_sgo_odds(secret: str, sport: str = "soccer", limit: int = 20):
     }
 
 
+@app.get("/api/v1/admin/pending-tips", tags=["Admin"])
+def admin_pending_tips(secret: str, db: Session = Depends(get_db)):
+    """Show all pending AI tips and their match status, to diagnose settlement failures."""
+    if secret != "nid-settle-2026":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from db.models.mvp import CoreMatch
+    from db.models.tipsters import TipsterTip
+    from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
+
+    ai_ids = set(AI_TIPSTER_IDS.values())
+    pending = db.query(TipsterTip).filter(
+        TipsterTip.user_id.in_(ai_ids),
+        TipsterTip.outcome.is_(None),
+        TipsterTip.match_id.isnot(None),
+    ).all()
+
+    rows = []
+    for tip in pending:
+        match = db.query(CoreMatch).filter(CoreMatch.id == tip.match_id).first()
+        rows.append({
+            "tip_id": str(tip.id),
+            "sport": tip.sport,
+            "match_label": tip.match_label,
+            "selection": tip.selection_label,
+            "start_time": tip.start_time.isoformat() if tip.start_time else None,
+            "match_status": match.status if match else "NO_MATCH",
+            "match_outcome": match.outcome if match else None,
+            "match_kickoff": match.kickoff_utc.isoformat() if match and match.kickoff_utc else None,
+        })
+
+    rows.sort(key=lambda r: r["start_time"] or "")
+    return {"pending_count": len(rows), "tips": rows}
+
+
 @app.get("/api/v1/sports/elo-movers", tags=["ELO"], dependencies=[Depends(get_current_user)])
 def get_elo_movers(limit: int = 10, db: Session = Depends(get_db)):
     """Return top ELO rating movers (by absolute change) across all sports."""

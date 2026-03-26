@@ -474,9 +474,19 @@ def _job_settle_ai_tipster_tips() -> None:
 
         log.info("[scheduler] settle_ai_tipster_tips: %d pending tips to check.", len(pending))
 
+        not_finished = 0
         for tip in pending:
             match = db.query(CoreMatch).filter(CoreMatch.id == tip.match_id).first()
-            if not match or match.status != "finished" or not match.outcome:
+            if not match:
+                log.warning("[scheduler] settle_ai_tipster_tips: tip %s has no match (match_id=%s)", tip.id, tip.match_id)
+                skipped += 1
+                continue
+            if match.status != "finished" or not match.outcome:
+                not_finished += 1
+                log.debug(
+                    "[scheduler] settle_ai_tipster_tips: tip %s match %s still %s outcome=%s",
+                    tip.id, tip.match_id, match.status, match.outcome,
+                )
                 continue
 
             label = tip.selection_label.lower().strip()
@@ -499,22 +509,26 @@ def _job_settle_ai_tipster_tips() -> None:
                 elif away_name and (away_name in label or label in away_name):
                     tip.outcome = "won" if is_away_win else "lost"
                 else:
-                    log.debug(
+                    log.warning(
                         "[scheduler] settle_ai_tipster_tips: can't match label '%s' "
-                        "to home='%s' away='%s' for tip %s",
-                        tip.selection_label, home_name, away_name, tip.id,
+                        "to home='%s' away='%s' for tip %s (match=%s outcome=%s)",
+                        tip.selection_label, home_name, away_name, tip.id, tip.match_label, match.outcome,
                     )
                     skipped += 1
                     continue
 
+            log.info(
+                "[scheduler] settle_ai_tipster_tips: settled tip %s [%s] %s → %s",
+                tip.id, tip.sport, tip.selection_label, tip.outcome,
+            )
             tip.settled_at = datetime.now(timezone.utc)
             settled += 1
 
         if settled:
             db.commit()
         log.info(
-            "[scheduler] settle_ai_tipster_tips: settled=%d skipped=%d.",
-            settled, skipped,
+            "[scheduler] settle_ai_tipster_tips: settled=%d skipped=%d not_yet_finished=%d.",
+            settled, skipped, not_finished,
         )
     except Exception as exc:
         db.rollback()
