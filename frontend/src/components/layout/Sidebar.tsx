@@ -3,10 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, BrainCircuit, Circle, ClipboardList, MessageSquare, ShieldCheck, TrendingUp, Trophy, Users } from "lucide-react";
+import { Activity, BrainCircuit, Circle, ClipboardList, LayoutDashboard, MessageSquare, ShieldCheck, TrendingUp, Trophy, Users } from "lucide-react";
 import { useSidebar } from "./SidebarContext";
 
 const NAV = [
+  { label: "Dashboard",   href: "/dashboard",   icon: LayoutDashboard },
   { label: "Predictions", href: "/predictions", icon: BrainCircuit },
   { label: "Tipsters",   href: "/tipsters",    icon: Users },
   { label: "Challenges", href: "/challenges",  icon: Trophy },
