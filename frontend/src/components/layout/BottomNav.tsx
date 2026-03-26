@@ -4,20 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ClipboardList, TrendingUp, MoreHorizontal,
-  Trophy, ShieldCheck, BrainCircuit, Users, Radio, MessageSquare,
+  Trophy, ShieldCheck, BrainCircuit, Users, MessageSquare,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const PRIMARY_NAV = [
   { label: "Dashboard",   href: "/dashboard",    icon: LayoutDashboard },
-  { label: "Live",        href: "/live",          icon: Radio           },
   { label: "Predictions", href: "/predictions",   icon: BrainCircuit    },
+  { label: "Tipsters",    href: "/tipsters",      icon: Users           },
   { label: "Record",      href: "/record",        icon: ClipboardList   },
 ];
 
 const MORE_NAV = [
-  { label: "Tipsters",    href: "/tipsters",    icon: Users       },
   { label: "Challenges",  href: "/challenges",  icon: Trophy      },
   { label: "Performance", href: "/performance", icon: TrendingUp  },
   { label: "Admin",       href: "/admin",        icon: ShieldCheck },
