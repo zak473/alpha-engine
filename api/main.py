@@ -536,7 +536,7 @@ def admin_fix_baseball_outcomes(secret: str, db: Session = Depends(get_db)):
 
 
 @app.delete("/api/v1/admin/purge-unsettleable-tips", tags=["Admin"])
-def admin_purge_unsettleable_tips(secret: str):
+def admin_purge_unsettleable_tips(secret: str, db: Session = Depends(get_db)):
     """Delete AI tipster tips where the match is finished but has no outcome and no scores (orphaned)."""
     if secret != "nid-settle-2026":
         from fastapi import HTTPException
