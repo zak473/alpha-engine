@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { createCheckoutSession, getBillingStatus } from "@/lib/api";
+import { Loader2, Check, Zap } from "lucide-react";
 
 const PRO_FEATURES = [
   "AI match predictions across all sports",
@@ -52,7 +53,10 @@ function PricingContent() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/v1/billing/portal", { method: "POST", headers: { Authorization: `Bearer ${localStorage.getItem("alpha_engine_token")}` } });
+      const res = await fetch("/api/v1/billing/portal", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("alpha_engine_token")}` },
+      });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
       else throw new Error(data.detail ?? "Portal unavailable");
@@ -63,38 +67,55 @@ function PricingContent() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0d0d0d] flex flex-col items-center justify-center px-4 py-16">
+    <main
+      className="min-h-screen flex flex-col items-center justify-center px-4 py-16"
+      style={{ background: "var(--bg0)" }}
+    >
       {/* Header */}
-      <div className="text-center mb-12 max-w-xl">
-        <h1 className="text-4xl font-bold text-white tracking-tight mb-3">
+      <div className="text-center mb-12 max-w-lg">
+        <div className="inline-flex items-center gap-2 mb-4 px-3 py-1.5 rounded-full text-xs font-700 uppercase tracking-widest"
+          style={{ background: "var(--accent-muted)", border: "1px solid var(--accent-ring)", color: "var(--accent)" }}>
+          <Zap size={11} />
+          Never In Doubt Pro
+        </div>
+        <h1 className="text-4xl font-extrabold tracking-tight mb-3" style={{ color: "var(--text0)", letterSpacing: "-0.04em" }}>
           Simple, transparent pricing
         </h1>
-        <p className="text-[#8a8a8a] text-lg">
+        <p className="text-base leading-relaxed" style={{ color: "var(--text1)" }}>
           One plan. Everything included. Cancel any time.
         </p>
       </div>
 
       {/* Cancelled notice */}
       {cancelled && (
-        <div className="mb-6 w-full max-w-sm rounded-xl border border-yellow-500/20 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-300">
+        <div className="mb-6 w-full max-w-sm rounded-xl px-4 py-3 text-sm"
+          style={{ background: "var(--warning-dim)", border: "1px solid rgba(251,191,36,0.20)", color: "var(--warning)" }}>
           Checkout cancelled — no charge was made.
         </div>
       )}
 
       {/* Pricing card */}
-      <div className="relative w-full max-w-sm rounded-2xl border border-[#1f1f1f] bg-[#111111] p-8 shadow-2xl">
-        {/* Green top accent bar */}
-        <div className="absolute inset-x-0 top-0 h-1 rounded-t-2xl bg-[#00c853]" />
+      <div className="relative w-full max-w-sm rounded-[var(--radius-xl)] p-8"
+        style={{
+          background: "var(--glass-bg)",
+          border: "1px solid var(--border0)",
+          boxShadow: "var(--shadow-2), var(--glass-inset)",
+        }}>
+        {/* Accent bar */}
+        <div className="absolute inset-x-0 top-0 h-[3px] rounded-t-[var(--radius-xl)]"
+          style={{ background: "var(--accent)" }} />
 
         {/* Plan name + badge */}
-        <div className="flex items-center justify-between mb-6">
-          <span className="text-xl font-semibold text-white">Pro</span>
+        <div className="flex items-center justify-between mb-6 pt-1">
+          <span className="text-xl font-bold" style={{ color: "var(--text0)" }}>Pro</span>
           {isActive ? (
-            <span className="rounded-full bg-emerald-500/10 px-3 py-0.5 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/30">
+            <span className="rounded-full px-3 py-0.5 text-xs font-semibold"
+              style={{ background: "var(--positive-dim)", color: "var(--positive)", border: "1px solid rgba(74,222,128,0.25)" }}>
               Active
             </span>
           ) : (
-            <span className="rounded-full bg-[#00c853]/10 px-3 py-0.5 text-xs font-medium text-[#00c853] ring-1 ring-[#00c853]/30">
+            <span className="rounded-full px-3 py-0.5 text-xs font-semibold"
+              style={{ background: "var(--accent-muted)", color: "var(--accent)", border: "1px solid var(--accent-ring)" }}>
               Most popular
             </span>
           )}
@@ -103,21 +124,20 @@ function PricingContent() {
         {/* Price */}
         <div className="mb-8">
           <div className="flex items-end gap-1">
-            <span className="text-5xl font-bold text-white">£24</span>
-            <span className="mb-1 text-2xl font-semibold text-white">.99</span>
-            <span className="mb-2 ml-1 text-[#8a8a8a] text-sm">/ month</span>
+            <span className="text-5xl font-extrabold" style={{ color: "var(--text0)", letterSpacing: "-0.04em" }}>£24</span>
+            <span className="mb-1 text-2xl font-bold" style={{ color: "var(--text0)" }}>.99</span>
+            <span className="mb-2 ml-1 text-sm" style={{ color: "var(--text2)" }}>/ month</span>
           </div>
-          <p className="mt-1 text-[#8a8a8a] text-sm">Billed monthly. No hidden fees.</p>
+          <p className="mt-1 text-sm" style={{ color: "var(--text2)" }}>Billed monthly. No hidden fees.</p>
         </div>
 
         {/* Feature list */}
         <ul className="mb-8 space-y-3">
           {PRO_FEATURES.map((feature) => (
-            <li key={feature} className="flex items-start gap-3 text-sm text-[#cccccc]">
-              <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#00c853]/15 text-[#00c853]">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="none" className="h-2.5 w-2.5">
-                  <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+            <li key={feature} className="flex items-start gap-3 text-sm" style={{ color: "var(--text1)" }}>
+              <span className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full"
+                style={{ background: "var(--accent-muted)", border: "1px solid var(--accent-ring)" }}>
+                <Check size={10} style={{ color: "var(--accent)" }} strokeWidth={2.5} />
               </span>
               {feature}
             </li>
@@ -126,7 +146,8 @@ function PricingContent() {
 
         {/* Error message */}
         {error && (
-          <p className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400 ring-1 ring-red-500/20">
+          <p className="mb-4 rounded-[var(--radius-md)] px-3 py-2 text-xs"
+            style={{ background: "var(--negative-dim)", border: "1px solid rgba(251,113,133,0.20)", color: "var(--negative)" }}>
             {error}
           </p>
         )}
@@ -136,7 +157,14 @@ function PricingContent() {
           <button
             onClick={handleManage}
             disabled={loading}
-            className="w-full rounded-xl border border-white/10 bg-white/[0.05] py-3 text-sm font-semibold text-white transition-all hover:bg-white/[0.08] disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full rounded-[var(--radius-md)] py-3 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: "var(--bg2)",
+              border: "1px solid var(--border0)",
+              color: "var(--text0)",
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--bg3)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--bg2)"; }}
           >
             {loading ? "Opening portal…" : "Manage subscription"}
           </button>
@@ -144,21 +172,23 @@ function PricingContent() {
           <button
             onClick={handleSubscribe}
             disabled={loading || checkingStatus}
-            className="w-full rounded-xl bg-[#00c853] py-3 text-sm font-semibold text-black transition-all hover:bg-[#00e65b] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full rounded-[var(--radius-md)] py-3 text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: "var(--accent)",
+              color: "#0a1510",
+              boxShadow: "0 4px 20px rgba(54,242,143,0.20)",
+            }}
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
-                <svg className="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                </svg>
+                <Loader2 size={14} className="animate-spin" />
                 Redirecting to checkout…
               </span>
-            ) : !isLoggedIn ? "Sign in to subscribe" : "Start subscription"}
+            ) : !isLoggedIn ? "Sign in to subscribe" : checkingStatus ? "Loading…" : "Start subscription"}
           </button>
         )}
 
-        <p className="mt-4 text-center text-xs text-[#555555]">
+        <p className="mt-4 text-center text-xs" style={{ color: "var(--text2)" }}>
           Secured by Stripe · Cancel any time from your account
         </p>
       </div>

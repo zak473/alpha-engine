@@ -51,7 +51,7 @@ function SearchBox({ onClose }: { onClose?: () => void }) {
 
   return (
     <div ref={wrapRef} className="relative w-full max-w-[32rem]">
-      <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-3 py-2.5 backdrop-blur transition focus-within:border-emerald-300/25 focus-within:bg-white/[0.07]">
+      <div className="flex items-center gap-2 rounded-full border border-b0 bg-white/[0.045] px-3 py-2.5 backdrop-blur transition focus-within:border-accent/25 focus-within:bg-white/[0.07]">
         <Search size={15} className="text-white/45" />
         <input
           value={query}
@@ -79,7 +79,7 @@ function SearchBox({ onClose }: { onClose?: () => void }) {
       </div>
 
       {open && (
-        <div className="absolute left-0 right-0 top-[calc(100%+10px)] z-50 overflow-hidden rounded-[24px] border border-white/10 bg-[#0a1410] shadow-[0_24px_50px_rgba(0,0,0,0.35)]">
+        <div className="absolute left-0 right-0 top-[calc(100%+10px)] z-50 overflow-hidden rounded-lg border border-b0 bg-bg0 shadow-[0_24px_50px_rgba(0,0,0,0.40)]">
           {loading ? (
             <div className="px-4 py-4 text-sm text-white/54">Searching…</div>
           ) : (
@@ -93,7 +93,7 @@ function SearchBox({ onClose }: { onClose?: () => void }) {
                     setQuery("");
                     onClose?.();
                   }}
-                  className="flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left transition hover:bg-white/[0.05]"
+                  className="flex w-full items-center justify-between rounded-md px-3 py-3 text-left transition hover:bg-white/[0.05]"
                 >
                   <div>
                     <div className="text-sm font-semibold text-white">{result.title}</div>
@@ -148,11 +148,11 @@ function NotificationsMenu() {
         aria-label="Notifications"
       >
         <Bell size={16} />
-        {count > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,255,178,0.8)]" />}
+        {count > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-accent shadow-[0_0_10px_rgba(54,242,143,0.7)]" />}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-[320px] overflow-hidden rounded-[24px] border border-white/10 bg-[#0a1410] shadow-[0_24px_50px_rgba(0,0,0,0.35)]">
+        <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-[320px] overflow-hidden rounded-lg border border-b0 bg-bg0 shadow-[0_24px_50px_rgba(0,0,0,0.40)]">
           <div className="border-b border-white/8 px-4 py-3">
             <div className="text-sm font-semibold text-white">Notifications</div>
             <div className="text-xs text-white/42">Recent system and betting activity</div>
@@ -162,7 +162,7 @@ function NotificationsMenu() {
               <div className="px-3 py-4 text-sm text-white/48">Nothing new yet.</div>
             ) : (
               items.map((n, idx) => (
-                <div key={`${n.title}-${idx}`} className="rounded-2xl px-3 py-3 hover:bg-white/[0.04]">
+                <div key={`${n.title}-${idx}`} className="rounded-md px-3 py-3 hover:bg-white/[0.04]">
                   <div className="text-sm font-semibold text-white">{n.title}</div>
                   {n.message && <div className="mt-1 text-xs text-white/48">{n.message}</div>}
                   <div className="mt-2 text-[11px] text-white/34">
@@ -233,7 +233,7 @@ export function TopBar({ title, subtitle }: TopBarProps) {
             {user ? `Logout · ${user.displayName ?? user.email}` : "Logout"}
           </button>
         ) : (
-          <Link href="/login" className="hidden items-center gap-2 rounded-full bg-emerald-400 px-4 py-2.5 text-sm font-semibold text-[#08120e] sm:inline-flex">
+          <Link href="/login" className="hidden items-center gap-2 rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-[#0a1510] sm:inline-flex">
             <LogIn size={15} />
             Login
           </Link>
@@ -241,7 +241,7 @@ export function TopBar({ title, subtitle }: TopBarProps) {
       </div>
 
       {showMobileSearch && (
-        <div className="absolute left-0 right-0 top-[72px] z-40 border-b border-white/8 bg-[#0a1510]/92 px-4 py-3 backdrop-blur-xl lg:hidden">
+        <div className="absolute left-0 right-0 top-[72px] z-40 border-b border-b0 bg-bg0/95 px-4 py-3 backdrop-blur-xl lg:hidden">
           <SearchBox onClose={() => setShowMobileSearch(false)} />
         </div>
       )}

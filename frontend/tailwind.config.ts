@@ -64,10 +64,10 @@ const config: Config = {
         "3xs": ["0.5625rem", { lineHeight: "0.875rem" }], // 9px
       },
       borderRadius: {
-        sm: "var(--radius-sm)",   // 4px
-        md: "var(--radius-md)",   // 8px
-        lg: "var(--radius-lg)",   // 12px
-        xl: "var(--radius-xl)",   // 16px
+        sm: "var(--radius-sm)",   // 8px
+        md: "var(--radius-md)",   // 12px
+        lg: "var(--radius-lg)",   // 20px
+        xl: "var(--radius-xl)",   // 28px
       },
       spacing: {
         "8":  "8px",

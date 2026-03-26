@@ -6,31 +6,35 @@ Dark cinematic sports-editorial — Nike campaign aesthetic
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
 
 /* ============================================================
-TOKENS
+TOKENS — mapped to globals.css design system
 ============================================================ */
 :root {
---green:        #00FF41;
---green-dim:    rgba(0,255,65,0.18);
---green-glow:   rgba(0,255,65,0.35);
---dark:         #080808;
---dark2:        #0e0e0e;
---dark3:        #141414;
---dark4:        #1c1c1c;
---border:       rgba(255,255,255,0.07);
---border-green: rgba(0,255,65,0.25);
---text-dim:     #9a9a9a;
---text-mute:    #555;
+/* Green now points to the single brand accent from globals.css */
+--green:        var(--accent);         /* #36f28f */
+--green-dim:    var(--accent-dim);     /* rgba(54,242,143,0.12) */
+--green-glow:   var(--accent-ring);    /* rgba(54,242,143,0.24) */
+/* Surfaces aligned with globals */
+--dark:         var(--bg0);            /* #08120e */
+--dark2:        #0e1410;
+--dark3:        #121a14;
+--dark4:        #1a2418;
+--border:       var(--border0);        /* rgba(255,255,255,0.08) */
+--border-green: var(--accent-ring);    /* rgba(54,242,143,0.24) */
+/* Text */
+--text-dim:     var(--text1);          /* rgba(237,247,240,0.70) */
+--text-mute:    var(--text2);          /* rgba(237,247,240,0.42) */
+/* Radii aligned with globals */
 --r-pill:       9999px;
---r-card:       20px;
---r-sm:         10px;
+--r-card:       var(--radius-lg);      /* 20px */
+--r-sm:         var(--radius-sm);      /* 8px */
 }
 
 /* ============================================================
 LANDING PAGE BASE
 ============================================================ */
 .nid-landing {
-background: #080808;
-color: #fff;
+background: var(--bg0);
+color: var(--text0);
 font-family: 'Inter', system-ui, sans-serif;
 -webkit-font-smoothing: antialiased;
 overflow-x: hidden;

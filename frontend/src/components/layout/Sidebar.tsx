@@ -17,9 +17,9 @@ const NAV = [
 ];
 
 const SPORTS = [
-  { label: "Soccer",       href: "/sports/soccer/matches",      color: "#60a5fa" },
-  { label: "Tennis",       href: "/sports/tennis/matches",      color: "#2edb6c" },
-  { label: "Esports",      href: "/sports/esports/matches",     color: "#a855f7" },
+  { label: "Soccer",       href: "/sports/soccer/matches",      color: "#2edb6c" },
+  { label: "Tennis",       href: "/sports/tennis/matches",      color: "#22c55e" },
+  { label: "Esports",      href: "/sports/esports/matches",     color: "#8b5cf6" },
   { label: "Basketball",   href: "/sports/basketball/matches",  color: "#f59e0b" },
   { label: "Baseball",     href: "/sports/baseball/matches",    color: "#ef4444" },
   { label: "Hockey",       href: "/sports/hockey/matches",      color: "#06b6d4" },
@@ -48,8 +48,8 @@ export function Sidebar() {
           width: "var(--sidebar-width)",
           display: "flex",
           flexDirection: "column",
-          background: "linear-gradient(180deg,#08120e 0%,#0a1510 100%)",
-          borderRight: "1px solid rgba(255,255,255,0.08)",
+          background: "linear-gradient(180deg, var(--bg0) 0%, #0a1510 100%)",
+          borderRight: "1px solid var(--border0)",
           zIndex: 40,
           boxShadow: "24px 0 60px rgba(0,0,0,0.28)",
         }}
@@ -117,9 +117,9 @@ export function Sidebar() {
           </div>
         </nav>
 
-        <div className="border-t border-white/8 px-4 py-3 text-[11px] text-white/52">
+        <div className="border-t border-b0 px-4 py-3 text-[11px] text-t2">
           <div className="flex items-center gap-2">
-            <Activity size={12} className="text-emerald-300" />
+            <Activity size={12} className="text-accent" />
             Synced live board experience
           </div>
         </div>
