@@ -749,6 +749,21 @@ def _job_fetch_highlightly() -> None:
     except Exception as exc:
         log.error("[scheduler] highlightly_fetch failed: %s", exc, exc_info=True)
 
+    # Run basketball + baseball predictions immediately so PredMatch rows exist for auto_picks
+    try:
+        from pipelines.basketball.predict_basketball import run as run_basketball_pred
+        run_basketball_pred()
+        log.info("[scheduler] basketball predict done (post-highlightly).")
+    except Exception as exc:
+        log.error("[scheduler] basketball predict failed: %s", exc, exc_info=True)
+
+    try:
+        from pipelines.baseball.predict_baseball import run as run_baseball_pred
+        run_baseball_pred()
+        log.info("[scheduler] baseball predict done (post-highlightly).")
+    except Exception as exc:
+        log.error("[scheduler] baseball predict failed: %s", exc, exc_info=True)
+
 
 def _job_fetch_highlightly_historical() -> None:
     """

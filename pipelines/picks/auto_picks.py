@@ -84,7 +84,8 @@ SPORT_MIN_EDGE: dict[str, float] = {
     "basketball":  0.01,  # NBA books are efficient; accept any genuine edge ≥1%
 }
 SPORT_MIN_CONFIDENCE: dict[str, float] = {
-    "baseball": 0.50,
+    "baseball":    0.10,  # model is 55.5% acc — 10% conf = ~55% win prob
+    "basketball":  0.10,  # model is 60.3% acc — 10% conf = ~55% win prob
 }
 # Tennis/esports naturally have wider odds spreads — widen accepted range
 SPORT_MIN_ODDS: dict[str, float] = {
