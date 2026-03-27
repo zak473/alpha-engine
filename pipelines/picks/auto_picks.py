@@ -86,8 +86,10 @@ SPORT_MIN_EDGE: dict[str, float] = {
 SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "baseball":    0.30,
     "basketball":  0.25,
+    "hockey":      0.25,
     "tennis":      0.35,
     "esports":     0.35,
+    "soccer":      0.30,
 }
 
 # Per-sport lookahead window — prevents bulk-tipping the entire fixture calendar
