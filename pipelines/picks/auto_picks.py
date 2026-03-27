@@ -86,12 +86,14 @@ SPORT_MIN_EDGE: dict[str, float] = {
 SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "baseball": 0.50,
 }
-# Tennis naturally has wider odds spreads (heavy favourites common) — widen accepted range
+# Tennis/esports naturally have wider odds spreads — widen accepted range
 SPORT_MIN_ODDS: dict[str, float] = {
-    "tennis": 1.15,
+    "tennis":  1.15,
+    "esports": 1.15,
 }
 SPORT_MAX_ODDS: dict[str, float] = {
-    "tennis": 8.0,
+    "tennis":  8.0,
+    "esports": 8.0,
 }
 
 
