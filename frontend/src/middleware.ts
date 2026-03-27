@@ -30,12 +30,12 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  // Unauthenticated user hitting any other page → send to login
-  if (!isAuthPage && !token) {
-    const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
+  // TEMP: auth disabled for site review
+  // if (!isAuthPage && !token) {
+  //   const loginUrl = new URL("/login", req.url);
+  //   loginUrl.searchParams.set("next", pathname);
+  //   return NextResponse.redirect(loginUrl);
+  // }
 
   return NextResponse.next();
 }

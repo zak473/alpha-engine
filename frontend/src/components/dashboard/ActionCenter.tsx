@@ -5,8 +5,6 @@ import {
   X,
   AlertTriangle,
   AlertCircle,
-  Zap,
-  RefreshCw,
   BarChart2,
   Brain,
   CheckCircle,
@@ -81,38 +79,6 @@ function AlertRow({ alert }: { alert: Alert }) {
   );
 }
 
-// ── Command button (stub) ─────────────────────────────────────────────────────
-
-function CommandBtn({
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  icon: LucideIcon;
-  label: string;
-  onClick: () => void;
-}) {
-  const [ran, setRan] = useState(false);
-  function handle() {
-    onClick();
-    setRan(true);
-    setTimeout(() => setRan(false), 2000);
-  }
-  return (
-    <button
-      onClick={handle}
-      className={cn(
-        "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border text-left transition-all",
-        ran
-          ? "bg-accent-green/10 border-accent-green/20 text-accent-green"
-          : "bg-white/[0.025] border-white/8 text-text-muted hover:text-text-primary hover:border-zinc-600"
-      )}
-    >
-      <Icon size={13} className="shrink-0" />
-      <span className="text-xs">{ran ? "Done ✓" : label}</span>
-    </button>
-  );
-}
 
 // ── Main ActionCenter ─────────────────────────────────────────────────────────
 
@@ -253,15 +219,6 @@ export function ActionCenter({
             </section>
           )}
 
-          {/* Quick commands */}
-          <section>
-            <p className="label mb-2">Quick Commands</p>
-            <div className="space-y-1.5">
-              <CommandBtn icon={RefreshCw}  label="Retry pipeline"    onClick={() => {}} />
-              <CommandBtn icon={Zap}        label="Refresh data feeds" onClick={() => {}} />
-              <CommandBtn icon={BarChart2}  label="Recompute ELO"     onClick={() => {}} />
-            </div>
-          </section>
 
           {/* Keyboard shortcuts hint */}
           <section>

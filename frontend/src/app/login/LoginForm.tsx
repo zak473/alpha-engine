@@ -1,10 +1,22 @@
 "use client";
 
-import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { useAuth } from "@/lib/auth";
+import {
+  AuthDivider,
+  AuthError,
+  AuthField,
+  AuthFormPanel,
+  AuthGoogleButton,
+  AuthGrid,
+  AuthMarketingPanel,
+  AuthPageShell,
+  AuthPrimaryButton,
+  AuthSwitchCard,
+  AuthTrustNote,
+} from "@/app/auth/AuthExperience";
+import { useAuth, getStoredToken } from "@/lib/auth";
 
 export function LoginForm() {
   const { login } = useAuth();
@@ -14,20 +26,35 @@ export function LoginForm() {
   const googleError = searchParams.get("error");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberDevice, setRememberDevice] = useState(true);
   const [error, setError] = useState<string | null>(
-    googleError === "google_cancelled" ? "Google sign-in was cancelled." :
-    googleError === "google_failed"    ? "Google sign-in failed. Please try again." :
-    googleError === "google_no_email"  ? "No email returned from Google." :
-    null
+    googleError === "google_cancelled"
+      ? "Google sign-in was cancelled."
+      : googleError === "google_failed"
+        ? "Google sign-in failed. Please try again."
+        : googleError === "google_no_email"
+          ? "No email returned from Google."
+          : null
   );
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setError(null);
     setLoading(true);
     try {
       await login(email, password);
+      const token = getStoredToken();
+      const statusRes = await fetch("/api/v1/billing/status", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (statusRes.ok) {
+        const { is_active } = await statusRes.json();
+        if (!is_active) {
+          router.push("/subscribe");
+          return;
+        }
+      }
       router.push(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -37,233 +64,111 @@ export function LoginForm() {
   }
 
   return (
-    <div className="px-4 py-8 lg:px-6 lg:py-10">
-      <div className="mx-auto grid w-full max-w-7xl gap-6 lg:grid-cols-[1.12fr_0.88fr]">
-        {/* Marketing panel */}
-        <section className="relative overflow-hidden rounded-[36px] border border-white/8 bg-[radial-gradient(circle_at_top_right,rgba(46,219,108,0.12),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-6 text-white shadow-[0_25px_80px_rgba(0,0,0,0.28)] backdrop-blur lg:p-8">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(46,219,108,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(46,219,108,0.08),transparent_28%)]" />
-          <div className="relative z-10 flex h-full flex-col">
-            <div className="inline-flex w-fit items-center rounded-full border border-[rgba(46,219,108,0.22)] bg-[rgba(46,219,108,0.08)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#2edb6c]">
-              Never In Doubt
-            </div>
-
-            <div className="mt-6 max-w-2xl">
-              <h2 className="text-4xl font-semibold leading-[0.98] text-white lg:text-6xl">
-                Follow sharper tipsters.
-                <br />
-                Track better value.
-              </h2>
-              <p className="mt-5 max-w-xl text-[15px] leading-7 text-white/72">
-                Sign in to access your betting board, in-play edges, live market movement,
-                and the tipsters driving the strongest picks across every sport.
-              </p>
-            </div>
-
-            <div className="mt-7 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-              <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.04] p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#2edb6c]">
-                      Platform access
-                    </div>
-                    <div className="mt-2 text-2xl font-semibold text-white">
-                      Betting board live
-                    </div>
-                    <div className="mt-1 text-sm text-white/65">
-                      Premium access to picks, stats, and in-play movement
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-right">
-                    <div className="text-[11px] uppercase tracking-[0.16em] text-white/45">
-                      Status
-                    </div>
-                    <div className="mt-1 text-sm font-semibold text-[#2edb6c]">
-                      Online now
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 overflow-hidden rounded-[22px] border border-white/10 bg-black/20 p-3">
-                  <Image
-                    src="/never-in-doubt-logo.png"
-                    alt="Never In Doubt logo"
-                    width={900}
-                    height={600}
-                    className="h-auto w-full"
-                    priority
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-4">
-                <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
-                    Tipster focus
-                  </div>
-                  <div className="mt-3 text-3xl font-semibold text-white">4 top analysts</div>
-                  <div className="mt-1 text-sm text-white/65">
-                    Follow form, ROI, and live picks
-                  </div>
-                </div>
-
-                <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
-                    Today&apos;s board
-                  </div>
-                  <div className="mt-3 text-3xl font-semibold text-white">54 live markets</div>
-                  <div className="mt-1 text-sm text-white/65">
-                    Soccer, tennis, basketball, baseball, esports
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              {[
-                { label: "Live value", value: "Odds, momentum, edges" },
-                { label: "Tipster feed", value: "Track who is in form" },
-                { label: "Multi-sport", value: "One board across all sports" },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className="rounded-[22px] border border-white/10 bg-white/[0.04] px-4 py-4"
-                >
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#2edb6c]">
-                    {item.label}
-                  </div>
-                  <div className="mt-2 text-sm text-white/72">{item.value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Form panel */}
-        <section className="rounded-[36px] border border-white/8 bg-white/[0.04] p-6 text-white shadow-[0_25px_80px_rgba(0,0,0,0.28)] backdrop-blur lg:p-8">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="inline-flex items-center rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400">
-                Account Access
-              </div>
-              <h3 className="mt-4 text-[30px] font-semibold leading-tight text-white">
-                Welcome back
-              </h3>
-              <p className="mt-2 max-w-md text-sm leading-6 text-white/55">
-                Access your dashboard, follow our tipsters, and scan live opportunities in seconds.
-              </p>
-            </div>
-
-            <div className="hidden rounded-[20px] border border-white/10 bg-white/[0.05] px-4 py-3 sm:block">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">
-                Board status
-              </div>
-              <div className="mt-2 text-sm font-semibold text-white">Live data synced</div>
-              <div className="mt-1 text-xs text-emerald-400">Ready to go</div>
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            {["Follow tipsters", "Track edges", "View in-play"].map((item) => (
-              <div
-                key={item}
-                className="rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-white/60"
-              >
-                {item}
-              </div>
-            ))}
-          </div>
-
-          <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
-            <div className="flex flex-col gap-2">
-              <label className="text-[12px] font-semibold uppercase tracking-[0.16em] text-white/50">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="h-14 rounded-2xl border border-white/10 bg-white/[0.06] px-4 text-[15px] text-white placeholder:text-white/30 outline-none transition focus:border-emerald-500/50 focus:bg-white/[0.09]"
-                required
-                autoComplete="email"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-3">
-                <label className="text-[12px] font-semibold uppercase tracking-[0.16em] text-white/50">
-                  Password
-                </label>
-              </div>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="h-14 rounded-2xl border border-white/10 bg-white/[0.06] px-4 text-[15px] text-white placeholder:text-white/30 outline-none transition focus:border-emerald-500/50 focus:bg-white/[0.09]"
-                required
-                autoComplete="current-password"
-              />
-            </div>
-
-            {error && (
-              <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="inline-flex h-14 items-center justify-center rounded-2xl bg-[#2edb6c] px-5 text-[15px] font-semibold text-[#0f1a12] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-70"
-              disabled={loading}
-            >
-              {loading ? "Signing in…" : "Enter platform"}
-            </button>
-
-            <div className="flex items-center gap-3">
-              <div className="h-px flex-1 bg-white/10" />
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/30">or</span>
-              <div className="h-px flex-1 bg-white/10" />
-            </div>
-
-            <a
-              href="/api/v1/auth/google"
-              className="inline-flex h-14 items-center justify-center gap-3 rounded-2xl border border-white/12 bg-white/[0.05] px-5 text-[15px] font-medium text-white transition hover:bg-white/[0.09]"
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
-                <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
-                <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
-                <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
-              </svg>
-              Continue with Google
-            </a>
-          </form>
-
-          <div className="mt-6 rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="text-[12px] font-semibold uppercase tracking-[0.16em] text-white/50">
-                  New here?
-                </div>
-                <div className="mt-1 text-sm text-white/60">
-                  Create an account and start following picks and tipsters.
-                </div>
-              </div>
-              <Link
+    <AuthPageShell>
+      <AuthGrid>
+        <AuthFormPanel
+          badge="Sign in"
+          title="Welcome back"
+          subtitle="Get straight to your board, saved context, and latest reads without the extra clutter."
+          statusTitle="Access"
+          statusValue="Ready"
+          statusHint="Secure sign-in"
+          quickItems={["Dashboard", "Predictions", "Live board"]}
+          support={
+            <>
+              <AuthSwitchCard
+                eyebrow="New here?"
+                copy="Create an account to unlock the dashboard, tipsters, and live board from the same workspace."
                 href="/register"
-                className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 text-sm font-semibold text-emerald-400 transition hover:bg-emerald-500/20"
-              >
-                Create account
+                cta="Create account"
+              />
+              <AuthTrustNote>Secure access keeps your picks, subscriptions, and account settings in one place.</AuthTrustNote>
+            </>
+          }
+        >
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            <AuthField
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@example.com"
+              required
+              autoComplete="email"
+            />
+
+            <AuthField
+              label="Password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="••••••••"
+              required
+              autoComplete="current-password"
+            />
+
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-white/62">
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={rememberDevice}
+                  onChange={(event) => setRememberDevice(event.target.checked)}
+                  className="h-4 w-4 rounded border-white/20 bg-transparent accent-[#00f884]"
+                />
+                Keep this device signed in
+              </label>
+              <Link href="/forgot-password" className="font-semibold text-[#95ffca] transition-opacity hover:opacity-80">
+                Password help
               </Link>
             </div>
-          </div>
 
-          <p className="mt-6 text-center text-xs text-white/35">
-            By continuing, you&apos;re accessing the Never In Doubt betting board.
-          </p>
-        </section>
-      </div>
-    </div>
+            {error ? <AuthError>{error}</AuthError> : null}
+
+            <AuthPrimaryButton type="submit" disabled={loading}>
+              {loading ? "Signing in…" : "Enter workspace"}
+            </AuthPrimaryButton>
+
+            <div className="rounded-[18px] border border-white/10 bg-white/[0.035] px-4 py-3 text-sm leading-6 text-white/60">
+              If you still have access on another device, you can change your password later from <span className="font-semibold text-white/78">Profile &amp; Security</span> inside the workspace.
+            </div>
+
+            <AuthDivider />
+            <AuthGoogleButton />
+          </form>
+        </AuthFormPanel>
+
+        <AuthMarketingPanel
+          eyebrow="Account access"
+          title={
+            <>
+              Sign in and pick up
+              <br />
+              where you left off.
+            </>
+          }
+          subtitle="A cleaner sign-in flow built to get returning users back into the product quickly and confidently."
+          primaryLabel="Return"
+          primaryValue="Everything in one place"
+          primaryCopy="Open the same workspace for predictions, performance, tipsters, and live opportunities without jumping between disconnected screens."
+          secondaryCards={[
+            {
+              label: "Predictions",
+              value: "Start with the board",
+              copy: "Open the strongest signals first and move into match-level context only when you need it.",
+            },
+            {
+              label: "Tipsters",
+              value: "Follow form quickly",
+              copy: "See who is hot, what they are backing, and whether their recent results still hold up.",
+            },
+          ]}
+          bottomNotes={[
+            { label: "Dashboard", value: "A cleaner starting point for your daily workflow." },
+            { label: "Performance", value: "Review what is working before you make the next decision." },
+            { label: "Live board", value: "Stay close to active markets without losing context." },
+          ]}
+        />
+      </AuthGrid>
+    </AuthPageShell>
   );
 }

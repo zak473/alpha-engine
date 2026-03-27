@@ -1,195 +1,190 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
-import { StatCard } from "@/components/ui/StatCard";
-import { SectionHeader } from "@/components/ui/SectionHeader";
-import { Badge } from "@/components/ui/Badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table";
-import { getHealth, getReady, getPerformance, runBacktest, type BacktestRunResult } from "@/lib/api";
-import type { MvpModelMetrics } from "@/lib/types";
-import { formatDate } from "@/lib/utils";
+import { getStoredToken } from "@/lib/auth";
+import {
+  Users,
+  CreditCard,
+  TrendingUp,
+  UserPlus,
+  CheckCircle,
+  XCircle,
+  Clock,
+  RefreshCw,
+} from "lucide-react";
 
-export const dynamic = "force-dynamic";
+interface AdminStats {
+  total_users: number;
+  active_subscribers: number;
+  trialing: number;
+  canceled: number;
+  no_subscription: number;
+  mrr_gbp: number;
+  new_users_30d: number;
+}
 
-const API_ENDPOINTS = [
-  "GET /soccer/predictions/:id",
-  "GET /tennis/predictions/:id",
-  "GET /esports/predictions/:id",
-  "GET /soccer/ratings/:id",
-  "GET /tennis/ratings/:id",
-  "GET /esports/ratings/:id",
-  "GET /soccer/h2h/:a/:b",
-  "GET /health",
-  "GET /ready",
-  "GET /predictions",
-];
+interface UserRow {
+  id: string;
+  email: string;
+  display_name: string | null;
+  created_at: string;
+  subscription_status: string | null;
+  subscription_current_period_end: string | null;
+  stripe_customer_id: string | null;
+  ai_tokens: number;
+}
 
-export default async function AdminPage() {
+function statusBadge(status: string | null) {
+  if (status === "active")
+    return <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-green-400"><CheckCircle className="h-3 w-3" />Active</span>;
+  if (status === "trialing")
+    return <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-blue-400"><Clock className="h-3 w-3" />Trial</span>;
+  if (status === "canceled")
+    return <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-red-400"><XCircle className="h-3 w-3" />Cancelled</span>;
+  return <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-0.5 text-[11px] font-semibold text-white/40">No sub</span>;
+}
 
-  let apiOk = false;
-  let dbOk = false;
-  let apiEnv = "unknown";
-  let liveModels: MvpModelMetrics[] = [];
-  let backtestResults: BacktestRunResult[] = [];
+function fmt(iso: string | null) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
 
-  const [health, ready, perfData, ...btResults] = await Promise.allSettled([
-    getHealth(),
-    getReady(),
-    getPerformance(),
-    runBacktest({ sport: "soccer",     staking: "kelly" }),
-    runBacktest({ sport: "tennis",     staking: "kelly" }),
-    runBacktest({ sport: "esports",    staking: "kelly" }),
-    runBacktest({ sport: "basketball", staking: "kelly" }),
-    runBacktest({ sport: "baseball",   staking: "kelly" }),
-    runBacktest({ sport: "hockey",     staking: "kelly" }),
-  ]);
+export default function AdminPage() {
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
-  if (health.status === "fulfilled") {
-    apiOk  = health.value.status === "ok";
-    apiEnv = health.value.env;
-  }
-  if (ready.status === "fulfilled") {
-    dbOk = ready.value.db === true;
-  }
-  if (perfData.status === "fulfilled") {
-    liveModels = perfData.value.models;
-  }
-  for (const r of btResults) {
-    if (r.status === "fulfilled" && r.value.n_predictions > 0) {
-      backtestResults.push(r.value);
+  async function load() {
+    setLoading(true);
+    setError(null);
+    const token = getStoredToken();
+    const headers = { Authorization: `Bearer ${token}` };
+    try {
+      const [statsRes, usersRes] = await Promise.all([
+        fetch("/api/v1/admin/stats", { headers }),
+        fetch("/api/v1/admin/users", { headers }),
+      ]);
+      if (statsRes.status === 403 || usersRes.status === 403) {
+        setError("You don't have admin access.");
+        return;
+      }
+      if (!statsRes.ok || !usersRes.ok) throw new Error("Failed to load admin data");
+      setStats(await statsRes.json());
+      setUsers(await usersRes.json());
+    } catch {
+      setError("Failed to load admin data. Make sure the API is reachable.");
+    } finally {
+      setLoading(false);
     }
   }
 
-  const liveCount = liveModels.filter((m) => m.is_live).length;
+  useEffect(() => { load(); }, []);
 
-  const kpis = [
-    { label: "Live Models",    value: String(liveCount) },
-    { label: "Total Backtests", value: String(backtestResults.length) },
-    { label: "API",            value: apiOk ? "OK" : "—", delta: apiOk ? 1 : -1 },
-    { label: "Database",       value: dbOk ? "OK" : "—",  delta: dbOk ? 1 : -1  },
-  ];
+  const filtered = users.filter(
+    (u) =>
+      u.email.toLowerCase().includes(search.toLowerCase()) ||
+      (u.display_name ?? "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  const kpis = stats
+    ? [
+        { label: "Total Users", value: stats.total_users.toString(), icon: Users, color: "text-blue-400" },
+        { label: "Active Subs", value: stats.active_subscribers.toString(), icon: CheckCircle, color: "text-green-400" },
+        { label: "MRR", value: `£${stats.mrr_gbp.toFixed(2)}`, icon: CreditCard, color: "text-nid-accent" },
+        { label: "New (30d)", value: stats.new_users_30d.toString(), icon: UserPlus, color: "text-purple-400" },
+        { label: "Trialing", value: stats.trialing.toString(), icon: Clock, color: "text-blue-300" },
+        { label: "Cancelled", value: stats.canceled.toString(), icon: XCircle, color: "text-red-400" },
+        { label: "No Sub", value: stats.no_subscription.toString(), icon: TrendingUp, color: "text-white/40" },
+        { label: "Annual Run Rate", value: `£${(stats.mrr_gbp * 12).toFixed(0)}`, icon: TrendingUp, color: "text-nid-accent" },
+      ]
+    : [];
 
   return (
-    <AppShell title="Trading Desk Admin" subtitle={`System status, model stack, and deployment health · ${apiEnv.toUpperCase()}`}>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        {kpis.map((k) => (
-          <StatCard key={k.label} {...k} />
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Model registry */}
-        <div className="card">
-          <div className="px-4 pt-4 pb-1">
-            <SectionHeader title="Model Registry" subtitle={`${liveCount} live`} />
-          </div>
-          <Table>
-            <TableHead>
-              <tr>
-                <TableHeader>Model</TableHeader>
-                <TableHeader>Sport</TableHeader>
-                <TableHeader>Algorithm</TableHeader>
-                <TableHeader>Accuracy</TableHeader>
-                <TableHeader>Status</TableHeader>
-              </tr>
-            </TableHead>
-            <TableBody>
-              {liveModels.map((m) => (
-                <TableRow key={`${m.model_name}-${m.version}`}>
-                  <TableCell>
-                    <span className="font-mono text-xs">{m.model_name}</span>
-                    <span className="text-text-subtle text-xs ml-1">{m.version}</span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge sport={m.sport }>{m.sport}</Badge>
-                  </TableCell>
-                  <TableCell className="text-text-muted">{m.algorithm}</TableCell>
-                  <TableCell mono>
-                    {m.accuracy != null ? `${(m.accuracy * 100).toFixed(1)}%` : "—"}
-                  </TableCell>
-                  <TableCell>
-                    {m.is_live ? (
-                      <span className="flex items-center gap-1.5 text-accent-green text-xs">
-                        <span className="h-1.5 w-1.5 rounded-full bg-accent-green" />
-                        Live
-                      </span>
-                    ) : (
-                      <span className="text-text-muted text-xs">Archived</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-
-        {/* Backtest results */}
-        <div className="card">
-          <div className="px-4 pt-4 pb-1">
-            <SectionHeader title="Backtest Results" subtitle="Kelly staking, all-time" />
-          </div>
-          <Table>
-            <TableHead>
-              <tr>
-                <TableHeader>Sport</TableHeader>
-                <TableHeader>Accuracy</TableHeader>
-                <TableHeader>ROI</TableHeader>
-                <TableHeader>Sharpe</TableHeader>
-                <TableHeader>Brier</TableHeader>
-                <TableHeader>N</TableHeader>
-              </tr>
-            </TableHead>
-            <TableBody>
-              {backtestResults.length === 0 ? (
-                <TableRow>
-                  <TableCell className="text-text-muted text-xs" colSpan={6}>
-                    No finished predictions yet
-                  </TableCell>
-                </TableRow>
-              ) : (
-                backtestResults.map((b) => {
-                  const roi = `${b.roi >= 0 ? "+" : ""}${(b.roi * 100).toFixed(1)}%`;
-                  return (
-                    <TableRow key={b.sport}>
-                      <TableCell>
-                        <Badge sport={b.sport }>{b.sport}</Badge>
-                      </TableCell>
-                      <TableCell mono>{(b.accuracy * 100).toFixed(1)}%</TableCell>
-                      <TableCell mono className={b.roi >= 0 ? "text-accent-green font-medium" : "text-accent-red font-medium"}>
-                        {roi}
-                      </TableCell>
-                      <TableCell mono>{b.sharpe_ratio.toFixed(2)}</TableCell>
-                      <TableCell mono>{b.brier_score.toFixed(3)}</TableCell>
-                      <TableCell mono className="text-text-muted">{b.n_predictions}</TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
-
-        {/* API endpoint status */}
-        <div className="card px-4 py-4 lg:col-span-2">
-          <SectionHeader
-            title="API Endpoints"
-            subtitle={apiOk ? "All systems operational" : "API unreachable"}
-          />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {API_ENDPOINTS.map((path) => (
-              <div
-                key={path}
-                className="flex items-start gap-2 p-2 rounded bg-surface-overlay border border-surface-border"
-              >
-                <span
-                  className={`mt-0.5 h-1.5 w-1.5 rounded-full shrink-0 ${
-                    apiOk ? "bg-accent-green" : "bg-text-subtle"
-                  }`}
-                />
-                <span className="font-mono text-[11px] text-text-muted leading-relaxed">{path}</span>
+    <AppShell title="Admin" subtitle="Users, subscriptions, and platform health">
+      {loading ? (
+        <div className="flex items-center justify-center py-24 text-sm text-nid-textMute">Loading…</div>
+      ) : error ? (
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-6 text-sm text-red-300">{error}</div>
+      ) : (
+        <div className="space-y-6">
+          {/* KPI grid */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {kpis.map((k) => (
+              <div key={k.label} className="rounded-2xl border border-nid-border bg-white/[0.03] p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-nid-textMute">{k.label}</span>
+                  <k.icon className={`h-4 w-4 shrink-0 ${k.color}`} />
+                </div>
+                <div className="mt-3 font-display text-[28px] font-black tracking-[-0.04em] text-nid-text">{k.value}</div>
               </div>
             ))}
           </div>
+
+          {/* Users table */}
+          <div className="rounded-2xl border border-nid-border bg-white/[0.02] overflow-hidden">
+            <div className="flex flex-col gap-3 border-b border-nid-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-[15px] font-semibold text-nid-text">All Users</div>
+                <div className="mt-0.5 text-[12px] text-nid-textMute">{users.length} total</div>
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  placeholder="Search by email or name…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-9 w-64 rounded-xl border border-nid-border bg-white/[0.05] px-3 text-[13px] text-nid-text placeholder:text-nid-textMute outline-none focus:border-nid-accentRing"
+                />
+                <button
+                  onClick={load}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-nid-border bg-white/[0.04] text-nid-textMute hover:text-nid-text transition-colors"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px] text-[13px]">
+                <thead>
+                  <tr className="border-b border-nid-border">
+                    {["Name / Email", "Status", "Joined", "Period End", "AI Tokens", "Stripe ID"].map((h) => (
+                      <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.10em] text-nid-textMute">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((u) => (
+                    <tr key={u.id} className="border-b border-nid-border/50 hover:bg-white/[0.02] transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-nid-text">{u.display_name ?? "—"}</div>
+                        <div className="text-nid-textMute">{u.email}</div>
+                      </td>
+                      <td className="px-4 py-3">{statusBadge(u.subscription_status)}</td>
+                      <td className="px-4 py-3 text-nid-textSoft">{fmt(u.created_at)}</td>
+                      <td className="px-4 py-3 text-nid-textSoft">{fmt(u.subscription_current_period_end)}</td>
+                      <td className="px-4 py-3 font-mono text-nid-textSoft">{u.ai_tokens}</td>
+                      <td className="px-4 py-3 font-mono text-[11px] text-nid-textMute">
+                        {u.stripe_customer_id ? u.stripe_customer_id.slice(0, 18) + "…" : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                  {filtered.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-nid-textMute">No users found</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </AppShell>
   );
 }

@@ -948,9 +948,6 @@ function InningsTab({ match }: { match: TMatch }) {
           ) : <Empty msg="No scoring events" />}
         </Panel>
       </Main>
-      <Side>
-        <Panel title="Win Probability"><Empty msg="Win probability chart coming soon" /></Panel>
-      </Side>
     </Grid>
   );
 }

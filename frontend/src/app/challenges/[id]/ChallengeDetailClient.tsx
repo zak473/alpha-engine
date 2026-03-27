@@ -2,57 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft, Globe, Lock, LogIn, LogOut, Plus, Trophy, Users, X } from "lucide-react";
 import { LeaderboardTable } from "@/components/challenges/LeaderboardTable";
 import { EntryFeed } from "@/components/challenges/EntryFeed";
 import { joinChallenge, leaveChallenge, submitChallengeEntry } from "@/lib/api";
 import type { Challenge, EntryFeedPage, LeaderboardOut } from "@/lib/types";
-import {
-  Users, Trophy, Lock, Globe,
-  ArrowLeft, LogIn, LogOut, Plus, X,
-} from "lucide-react";
-import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 type Tab = "overview" | "leaderboard" | "feed" | "rules";
 type PickScope = "feed" | "mine";
-
-function PicksTab({ challengeId, feedData }: { challengeId: string; feedData: EntryFeedPage }) {
-  const [scope, setScope] = useState<PickScope>("feed");
-
-  return (
-    <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-      <div className="panel-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div className="panel-title">Picks</div>
-        <div style={{ display: "flex", gap: 4, padding: "2px 4px", borderRadius: 8, background: "rgba(255,255,255,0.05)" }}>
-          {(["feed", "mine"] as PickScope[]).map((s) => (
-            <button
-              key={s}
-              onClick={() => setScope(s)}
-              style={{
-                padding: "3px 10px",
-                borderRadius: 6,
-                fontSize: 11,
-                fontWeight: 600,
-                background: scope === s ? "rgba(255,255,255,0.1)" : "transparent",
-                color: scope === s ? "var(--text0)" : "var(--text2)",
-                border: "none",
-                cursor: "pointer",
-                transition: "all 0.15s",
-              }}
-            >
-              {s === "feed" ? "Everyone" : "Mine"}
-            </button>
-          ))}
-        </div>
-      </div>
-      <EntryFeed
-        challengeId={challengeId}
-        scope={scope}
-        initialData={scope === "feed" ? feedData : { items: [], total: 0, page: 1, page_size: 20, has_next: false }}
-        key={scope}
-      />
-    </div>
-  );
-}
 
 interface Props {
   challenge: Challenge;
@@ -71,181 +30,258 @@ function formatDate(iso: string) {
   });
 }
 
+function formatShortDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 function challengeStatus(c: Challenge) {
   const now = Date.now();
   const start = new Date(c.start_at).getTime();
   const end = new Date(c.end_at).getTime();
-  if (now < start) return { label: "Upcoming", color: "var(--info)",     badgeClass: "badge badge-accent" };
-  if (now > end)   return { label: "Ended",    color: "var(--text2)",    badgeClass: "badge badge-muted" };
-  return             { label: "Active",   color: "var(--positive)", badgeClass: "badge badge-positive" };
+
+  if (now < start) {
+    return {
+      label: "Upcoming",
+      tone: "rgba(125,183,255,0.16)",
+      color: "var(--info)",
+    };
+  }
+
+  if (now > end) {
+    return {
+      label: "Ended",
+      tone: "rgba(255,255,255,0.08)",
+      color: "var(--text2)",
+    };
+  }
+
+  return {
+    label: "Active",
+    tone: "rgba(53,230,160,0.16)",
+    color: "var(--positive)",
+  };
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function scoringCopy(type: string) {
+  return type === "points" ? "+1 per correct pick" : "Brier accuracy scoring";
+}
+
+function SectionCard({
+  title,
+  children,
+  action,
+}: {
+  title: string;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
   return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: 8, paddingTop: 8, paddingBottom: 8, borderBottom: "1px solid var(--border0)" }}>
-      <dt className="label" style={{ width: 110, flexShrink: 0 }}>{label}</dt>
-      <dd style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", margin: 0 }}>{children}</dd>
+    <section
+      className="overflow-hidden rounded-[24px] border"
+      style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.035)" }}
+    >
+      <div
+        className="flex items-center justify-between gap-4 border-b px-5 py-4"
+        style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)" }}
+      >
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--text0)" }}>{title}</h3>
+        {action}
+      </div>
+      <div className="p-5">{children}</div>
+    </section>
+  );
+}
+
+function SummaryTile({ label, value, caption }: { label: string; value: string; caption?: string }) {
+  return (
+    <div
+      className="rounded-[20px] border px-4 py-4"
+      style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)" }}
+    >
+      <p className="section-kicker" style={{ margin: 0 }}>{label}</p>
+      <p style={{ margin: "8px 0 0", fontSize: 20, fontWeight: 700, color: "var(--text0)", letterSpacing: "-0.03em" }}>{value}</p>
+      {caption ? <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text2)", lineHeight: 1.6 }}>{caption}</p> : null}
     </div>
   );
 }
 
-const RANK_MEDALS = ["", "🥇", "🥈", "🥉"] as const;
-const RANK_COLORS = ["", "var(--accent)", "var(--positive)", "var(--warning)"] as const;
+function DetailRow({ label, value, children }: { label: string; value?: React.ReactNode; children?: React.ReactNode }) {
+  const content = children ?? value;
+  return (
+    <div
+      className="flex flex-col gap-2 border-b py-3 sm:flex-row sm:items-start sm:justify-between"
+      style={{ borderColor: "var(--border0)" }}
+    >
+      <dt style={{ fontSize: 12, color: "var(--text2)", minWidth: 120 }}>{label}</dt>
+      <dd style={{ margin: 0, fontSize: 13, color: "var(--text0)", textAlign: "left" }}>{content}</dd>
+    </div>
+  );
+}
 
-function OverviewTab({ challenge, leaderboard }: { challenge: Challenge; leaderboard: LeaderboardOut }) {
+function TopThree({ challenge, leaderboard }: { challenge: Challenge; leaderboard: LeaderboardOut }) {
   const topThree = leaderboard.rows.slice(0, 3);
-  const status = challengeStatus(challenge);
 
   return (
-    <div style={{
-      display: "grid",
-      gridTemplateColumns: "1fr",
-      gap: 16,
-    }}>
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr)", gap: 16, alignItems: "start" }}>
-        {/* Details card */}
-        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-          <div className="panel-header">
-            <div className="panel-title">Details</div>
+    <div className="space-y-3">
+      {topThree.length === 0 ? (
+        <p style={{ margin: 0, fontSize: 13, color: "var(--text2)" }}>No scores yet.</p>
+      ) : (
+        topThree.map((row) => (
+          <div
+            key={row.user_id}
+            className="flex items-center gap-3 rounded-[18px] border px-4 py-3"
+            style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.025)" }}
+          >
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-full"
+              style={{ background: row.rank === 1 ? "rgba(0,255,132,0.14)" : "rgba(255,255,255,0.06)", color: row.rank === 1 ? "var(--accent)" : "var(--text1)" }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 700 }}>#{row.rank}</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--text0)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {row.user_id.startsWith("user-") ? row.user_id.slice(5) : row.user_id}
+              </p>
+              <p style={{ margin: "3px 0 0", fontSize: 11, color: "var(--text2)" }}>{row.entry_count} entries</p>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <p className="mono-stat" style={{ margin: 0, fontSize: 14, fontWeight: 700, color: row.rank === 1 ? "var(--accent)" : "var(--text0)" }}>
+                {challenge.scoring_type === "brier" ? row.score.toFixed(4) : row.score.toFixed(0)}
+              </p>
+            </div>
           </div>
-          <div style={{ padding: "4px 20px 16px" }}>
-            <dl style={{ margin: 0 }}>
-              <Row label="Status">
-                <span className={status.badgeClass}>{status.label}</span>
-              </Row>
-              <Row label="Scoring">
-                <span style={{ fontSize: 12, color: "var(--text0)", textTransform: "capitalize" }}>{challenge.scoring_type}</span>
-                <span style={{ fontSize: 11, color: "var(--text2)" }}>
-                  {challenge.scoring_type === "points"
-                    ? "+1 per correct pick"
-                    : "Brier score (probability accuracy)"}
-                </span>
-              </Row>
-              <Row label="Sports">
-                <span style={{ fontSize: 12, color: "var(--text0)" }}>
-                  {challenge.sport_scope.length === 0
-                    ? "All sports"
-                    : challenge.sport_scope.map((s) => (
-                        <span key={s} className="badge badge-muted" style={{ marginRight: 4, textTransform: "capitalize" }}>{s}</span>
-                      ))}
-                </span>
-              </Row>
-              <Row label="Members">
-                <span className="num" style={{ fontSize: 12, color: "var(--text0)" }}>
-                  {challenge.member_count}
-                  {challenge.max_members ? ` / ${challenge.max_members}` : ""}
-                </span>
-              </Row>
-              {challenge.entry_limit_per_day && (
-                <Row label="Entry limit">
-                  <span style={{ fontSize: 12, color: "var(--text0)" }}>{challenge.entry_limit_per_day} picks/day</span>
-                </Row>
-              )}
-              <Row label="Starts">
-                <span style={{ fontSize: 11, color: "var(--text2)" }}>{formatDate(challenge.start_at)}</span>
-              </Row>
-              <Row label="Ends">
-                <span style={{ fontSize: 11, color: "var(--text2)" }}>{formatDate(challenge.end_at)}</span>
-              </Row>
-            </dl>
-          </div>
-        </div>
-
-        {/* Top 3 mini leaderboard */}
-        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-          <div className="panel-header">
-            <div className="panel-title">Top 3</div>
-          </div>
-          <div style={{ padding: "8px 16px 16px" }}>
-            {topThree.length === 0 ? (
-              <p style={{ fontSize: 11, color: "var(--text2)", textAlign: "center", padding: "16px 0" }}>No scores yet</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {topThree.map((row) => (
-                  <div key={row.user_id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontSize: 18, width: 24, textAlign: "center", flexShrink: 0 }}>
-                      {RANK_MEDALS[row.rank] ?? row.rank}
-                    </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text0)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {row.user_id.startsWith("user-") ? row.user_id.slice(5) : row.user_id}
-                      </p>
-                      <p style={{ fontSize: 10, color: "var(--text2)", margin: "2px 0 0" }}>{row.entry_count} entries</p>
-                    </div>
-                    <span className="num" style={{
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: RANK_COLORS[row.rank] ?? "var(--text1)",
-                    }}>
-                      {challenge.scoring_type === "brier"
-                        ? row.score.toFixed(4)
-                        : row.score.toFixed(0)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Description */}
-      {challenge.description && (
-        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-          <div className="panel-header">
-            <div className="panel-title">About</div>
-          </div>
-          <div style={{ padding: "4px 20px 16px" }}>
-            <p style={{ fontSize: 12, color: "var(--text2)", lineHeight: 1.65, margin: 0 }}>{challenge.description}</p>
-          </div>
-        </div>
+        ))
       )}
     </div>
   );
 }
 
-function RulesTab({ challenge }: { challenge: Challenge }) {
+function PicksTab({ challengeId, feedData }: { challengeId: string; feedData: EntryFeedPage }) {
+  const [scope, setScope] = useState<PickScope>("feed");
+
   return (
-    <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-      <div className="panel-header">
-        <div className="panel-title">Challenge Rules</div>
+    <SectionCard
+      title="Picks"
+      action={
+        <div className="flex items-center gap-2">
+          {([
+            { label: "Everyone", value: "feed" },
+            { label: "Mine", value: "mine" },
+          ] as { label: string; value: PickScope }[]).map((item) => (
+            <button
+              key={item.value}
+              onClick={() => setScope(item.value)}
+              className="rounded-full px-3 py-1.5 text-xs font-semibold transition-all"
+              style={
+                scope === item.value
+                  ? { background: "var(--accent)", color: "#07110d" }
+                  : { background: "rgba(255,255,255,0.04)", color: "var(--text2)" }
+              }
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      }
+    >
+      <EntryFeed
+        challengeId={challengeId}
+        scope={scope}
+        initialData={scope === "feed" ? feedData : { items: [], total: 0, page: 1, page_size: 20, has_next: false }}
+        key={scope}
+      />
+    </SectionCard>
+  );
+}
+
+function OverviewTab({ challenge, leaderboard, memberCount }: { challenge: Challenge; leaderboard: LeaderboardOut; memberCount: number }) {
+  const status = challengeStatus(challenge);
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <SummaryTile label="Status" value={status.label} caption={challenge.visibility === "private" ? "Private challenge" : "Public challenge"} />
+        <SummaryTile label="Members" value={`${memberCount}${challenge.max_members ? ` / ${challenge.max_members}` : ""}`} caption={challenge.max_members ? "Capacity shown" : "No fixed member cap"} />
+        <SummaryTile label="Scoring" value={challenge.scoring_type === "points" ? "Points" : "Brier"} caption={scoringCopy(challenge.scoring_type)} />
+        <SummaryTile label="Window" value={`${formatShortDate(challenge.start_at)} → ${formatShortDate(challenge.end_at)}`} caption={challenge.entry_limit_per_day ? `${challenge.entry_limit_per_day} picks per day` : "No daily entry limit"} />
       </div>
-      <div style={{ padding: "8px 20px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-        {[
-          {
-            heading: "Eligibility",
-            body: "You must be a member of this challenge to submit picks.",
-          },
-          {
-            heading: "Submission window",
-            body: "Picks must be submitted before the event starts. Once an event kicks off, entries are locked.",
-          },
-          ...(challenge.entry_limit_per_day ? [{
-            heading: "Daily limit",
-            body: `A maximum of ${challenge.entry_limit_per_day} pick${challenge.entry_limit_per_day > 1 ? "s" : ""} per day.`,
-          }] : []),
-          ...(challenge.max_members ? [{
-            heading: "Capacity",
-            body: `This challenge is capped at ${challenge.max_members} members. First come, first served.`,
-          }] : []),
-          {
-            heading: `Scoring (${challenge.scoring_type})`,
-            body: challenge.scoring_type === "points"
-              ? "Each correct pick earns 1 point. The member with the most points at the end wins."
-              : "Each pick is scored using the Brier metric: score = 1 − (p − outcome)². A perfect prediction scores 1.0. The leaderboard ranks by average score (higher is better).",
-          },
-          {
-            heading: "Settlement",
-            body: "Picks are settled automatically once the event outcome is recorded. Scores update on the leaderboard in real time.",
-          },
-        ].map(({ heading, body }) => (
-          <p key={heading} style={{ fontSize: 12, color: "var(--text2)", lineHeight: 1.65, margin: 0 }}>
-            <strong style={{ color: "var(--text0)", fontWeight: 600 }}>{heading}: </strong>
-            {body}
-          </p>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
+        <SectionCard title="Challenge details">
+          <dl style={{ margin: 0 }}>
+            <DetailRow label="Status">
+              <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ background: status.tone, color: status.color }}>
+                {status.label}
+              </span>
+            </DetailRow>
+            <DetailRow label="Scoring">{challenge.scoring_type} · {scoringCopy(challenge.scoring_type)}</DetailRow>
+            <DetailRow label="Sports">
+              {challenge.sport_scope.length === 0 ? (
+                "All sports"
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {challenge.sport_scope.map((sport) => (
+                    <span key={sport} className="rounded-full px-2.5 py-1 text-[11px] font-medium capitalize" style={{ background: "rgba(255,255,255,0.05)", color: "var(--text1)" }}>
+                      {sport}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </DetailRow>
+            <DetailRow label="Members">{memberCount}{challenge.max_members ? ` / ${challenge.max_members}` : ""}</DetailRow>
+            {challenge.entry_limit_per_day ? <DetailRow label="Daily limit">{challenge.entry_limit_per_day} picks per day</DetailRow> : null}
+            <DetailRow label="Starts">{formatDate(challenge.start_at)}</DetailRow>
+            <DetailRow label="Ends">{formatDate(challenge.end_at)}</DetailRow>
+          </dl>
+        </SectionCard>
+
+        <SectionCard title="Top performers">
+          <TopThree challenge={challenge} leaderboard={leaderboard} />
+        </SectionCard>
+      </div>
+
+      {challenge.description ? (
+        <SectionCard title="About this challenge">
+          <p style={{ margin: 0, fontSize: 14, color: "var(--text1)", lineHeight: 1.8 }}>{challenge.description}</p>
+        </SectionCard>
+      ) : null}
+    </div>
+  );
+}
+
+function RulesTab({ challenge }: { challenge: Challenge }) {
+  const rules = [
+    "You must be a member of the challenge to submit picks.",
+    "Picks must be entered before the event starts.",
+    challenge.entry_limit_per_day ? `You can submit up to ${challenge.entry_limit_per_day} pick${challenge.entry_limit_per_day > 1 ? "s" : ""} per day.` : null,
+    challenge.max_members ? `This challenge is capped at ${challenge.max_members} members.` : null,
+    challenge.scoring_type === "points"
+      ? "Each correct pick earns one point. Highest total wins."
+      : "Each pick is scored on Brier accuracy. Higher average score ranks better.",
+    "Scores update automatically once results are settled.",
+  ].filter(Boolean) as string[];
+
+  return (
+    <SectionCard title="Rules">
+      <div className="space-y-3">
+        {rules.map((rule, index) => (
+          <div
+            key={index}
+            className="flex gap-3 rounded-[18px] border px-4 py-4"
+            style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.025)" }}
+          >
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full" style={{ background: "rgba(255,255,255,0.06)", color: "var(--text1)", fontSize: 11, fontWeight: 700 }}>
+              {index + 1}
+            </div>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--text1)", lineHeight: 1.7 }}>{rule}</p>
+          </div>
         ))}
       </div>
-    </div>
+    </SectionCard>
   );
 }
 
@@ -265,11 +301,10 @@ function SubmitEntryModal({
   const [sport, setSport] = useState(availableSports[0] ?? "soccer");
   const [matchLabel, setMatchLabel] = useState("");
   const [eventStartAt, setEventStartAt] = useState(() => {
-    // Default to tomorrow at noon
     const d = new Date();
     d.setDate(d.getDate() + 1);
     d.setHours(12, 0, 0, 0);
-    return d.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:mm"
+    return d.toISOString().slice(0, 16);
   });
   const [pickType, setPickType] = useState("moneyline");
   const [selection, setSelection] = useState("");
@@ -279,13 +314,28 @@ function SubmitEntryModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!matchLabel.trim()) { setError("Enter a match or event"); return; }
-    if (!eventStartAt) { setError("Enter the event date/time"); return; }
-    if (!selection.trim()) { setError("Enter your selection"); return; }
+    if (!matchLabel.trim()) {
+      setError("Enter a match or event");
+      return;
+    }
+    if (!eventStartAt) {
+      setError("Enter the event date/time");
+      return;
+    }
+    if (!selection.trim()) {
+      setError("Enter your selection");
+      return;
+    }
+
     const oddsNum = Number(odds);
-    if (!odds || isNaN(oddsNum) || oddsNum < 1.01) { setError("Enter valid decimal odds (≥ 1.01)"); return; }
+    if (!odds || Number.isNaN(oddsNum) || oddsNum < 1.01) {
+      setError("Enter valid decimal odds (≥ 1.01)");
+      return;
+    }
+
     setSaving(true);
     setError(null);
+
     try {
       await submitChallengeEntry(challengeId, {
         event_id: matchLabel.trim().toLowerCase().replace(/\s+/g, "-"),
@@ -305,61 +355,77 @@ function SubmitEntryModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
-      <div className="w-full max-w-md rounded-[28px] p-6 flex flex-col gap-4" style={{ background: "linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))", border: "1px solid rgba(255,255,255,0.10)" }}>
-        <div className="flex items-center justify-between">
-          <h2 style={{ fontSize: 15, fontWeight: 700 }}>Submit a Pick</h2>
-          <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-text-primary"><X size={16} /></button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.64)", backdropFilter: "blur(6px)" }}>
+      <div className="w-full max-w-xl rounded-[26px] border p-6" style={{ borderColor: "var(--border0)", background: "#08111a" }}>
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text0)" }}>Submit pick</h2>
+            <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--text2)" }}>Add one pick to this challenge.</p>
+          </div>
+          <button onClick={onClose} className="rounded-xl p-2 text-text-muted transition-colors hover:bg-white/[0.04] hover:text-text-primary">
+            <X size={16} />
+          </button>
         </div>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
             <label className="label">Sport</label>
-            <div className="flex gap-1 flex-wrap">
-              {availableSports.map(s => (
-                <button key={s} type="button" onClick={() => setSport(s)}
-                  className="text-xs px-3 py-1 rounded-full border transition-all capitalize"
-                  style={sport === s
-                    ? { background: "var(--accent-dim)", borderColor: "rgba(34,226,131,0.35)", color: "var(--accent)" }
-                    : { background: "transparent", borderColor: "var(--border0)", color: "var(--text1)" }
-                  }>{s}</button>
+            <div className="flex flex-wrap gap-2">
+              {availableSports.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSport(s)}
+                  className="rounded-full border px-3 py-1.5 text-xs font-medium capitalize transition-all"
+                  style={
+                    sport === s
+                      ? { background: "rgba(0,255,132,0.12)", borderColor: "rgba(0,255,132,0.28)", color: "var(--accent)" }
+                      : { background: "transparent", borderColor: "var(--border0)", color: "var(--text1)" }
+                  }
+                >
+                  {s}
+                </button>
               ))}
             </div>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="label">Match / Event</label>
-            <input value={matchLabel} onChange={e => setMatchLabel(e.target.value)} placeholder="e.g. Arsenal vs Chelsea" className="input-field" />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="label">Event date &amp; time</label>
-            <input
-              type="datetime-local"
-              value={eventStartAt}
-              onChange={e => setEventStartAt(e.target.value)}
-              className="input-field"
-            />
-          </div>
-          <div className="flex gap-3">
-            <div className="flex flex-col gap-1.5 flex-shrink-0">
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <label className="label">Match / event</label>
+              <input value={matchLabel} onChange={(e) => setMatchLabel(e.target.value)} placeholder="e.g. Arsenal vs Chelsea" className="input-field" />
+            </div>
+            <div className="space-y-2">
+              <label className="label">Event date & time</label>
+              <input type="datetime-local" value={eventStartAt} onChange={(e) => setEventStartAt(e.target.value)} className="input-field" />
+            </div>
+            <div className="space-y-2">
               <label className="label">Pick type</label>
-              <select value={pickType} onChange={e => setPickType(e.target.value)} className="input-field">
+              <select value={pickType} onChange={(e) => setPickType(e.target.value)} className="input-field">
                 <option value="moneyline">Moneyline</option>
                 <option value="spread">Spread</option>
-                <option value="over_under">Over/Under</option>
+                <option value="over_under">Over / Under</option>
               </select>
             </div>
-            <div className="flex flex-col gap-1.5 flex-1">
+            <div className="space-y-2">
               <label className="label">Selection</label>
-              <input value={selection} onChange={e => setSelection(e.target.value)} placeholder="Home win, Over 2.5…" className="input-field" />
+              <input value={selection} onChange={(e) => setSelection(e.target.value)} placeholder="Home win, Over 2.5…" className="input-field" />
+            </div>
+            <div className="space-y-2">
+              <label className="label">Odds</label>
+              <input type="number" step="0.01" min="1.01" value={odds} onChange={(e) => setOdds(e.target.value)} placeholder="1.85" className="input-field" />
             </div>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="label">Odds (decimal)</label>
-            <input type="number" step="0.01" min="1.01" value={odds} onChange={e => setOdds(e.target.value)} placeholder="e.g. 1.85" className="input-field" />
+
+          {error ? <p style={{ margin: 0, fontSize: 12, color: "var(--negative)" }}>{error}</p> : null}
+
+          <div className="flex items-center justify-end gap-3">
+            <button type="button" className="btn btn-ghost h-10 px-4" onClick={onClose} disabled={saving}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary h-10 px-4" disabled={saving}>
+              {saving ? "Submitting…" : "Submit pick"}
+            </button>
           </div>
-          {error && <p style={{ fontSize: 12, color: "var(--negative)" }}>{error}</p>}
-          <button type="submit" className="btn btn-primary h-10" disabled={saving}>
-            {saving ? "Submitting…" : "Submit Pick"}
-          </button>
         </form>
       </div>
     </div>
@@ -367,13 +433,13 @@ function SubmitEntryModal({
 }
 
 export function ChallengeDetailClient({ challenge, leaderboard, feedData, initialTab = "overview" }: Props) {
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>(initialTab as Tab);
   const [isMember, setIsMember] = useState(challenge.is_member);
   const [memberCount, setMemberCount] = useState(challenge.member_count);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
-  const router = useRouter();
 
   async function handleJoin() {
     setActionLoading(true);
@@ -403,142 +469,126 @@ export function ChallengeDetailClient({ challenge, leaderboard, feedData, initia
     }
   }
 
-  const isFull = !!challenge.max_members && memberCount >= challenge.max_members;
-
   const status = challengeStatus(challenge);
   const isOwner = challenge.user_role === "owner";
+  const isFull = !!challenge.max_members && memberCount >= challenge.max_members;
 
-  const TABS: { label: string; value: Tab }[] = [
-    { label: "Overview",    value: "overview" },
+  const tabs: { label: string; value: Tab }[] = [
+    { label: "Overview", value: "overview" },
     { label: "Leaderboard", value: "leaderboard" },
-    { label: "Picks",       value: "feed" },
-    { label: "Rules",       value: "rules" },
+    { label: "Picks", value: "feed" },
+    { label: "Rules", value: "rules" },
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-
-      {/* Page header */}
-      <div>
-        <Link href="/challenges" style={{
-          display: "inline-flex", alignItems: "center", gap: 5,
-          fontSize: 11, color: "var(--text2)", textDecoration: "none",
-          marginBottom: 12,
-        }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text1)")}
-          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text2)")}
-        >
-          <ArrowLeft size={12} /> Challenges
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <Link href="/challenges" className="inline-flex items-center gap-2 text-sm font-medium text-white/56 transition hover:text-white/82">
+          <ArrowLeft size={14} />
+          Back to challenges
         </Link>
 
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-              <span className={status.badgeClass} style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                {status.label}
-              </span>
-              {challenge.visibility === "private" ? (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--text2)" }}>
-                  <Lock size={11} /> Private
+        <section
+          className="rounded-[28px] border p-5 sm:p-6"
+          style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.035)" }}
+        >
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ background: status.tone, color: status.color }}>
+                  {status.label}
                 </span>
-              ) : (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--text2)" }}>
-                  <Globe size={11} /> Public
+                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ background: "rgba(255,255,255,0.04)", color: "var(--text2)" }}>
+                  {challenge.visibility === "private" ? <Lock size={12} /> : <Globe size={12} />}
+                  {challenge.visibility === "private" ? "Private" : "Public"}
                 </span>
-              )}
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--text2)" }}>
-                <Users size={11} />
-                <span className="num">{memberCount}{challenge.max_members ? `/${challenge.max_members}` : ""}</span>
-              </span>
-            </div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: "var(--text0)", margin: 0 }}>{challenge.name}</h1>
-          </div>
-
-          {/* Join / Leave */}
-          {!isOwner && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {isMember && status.label === "Active" && (
-                  <button
-                    className="btn btn-md btn-primary"
-                    onClick={() => setShowSubmitModal(true)}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, background: "var(--positive)", borderColor: "var(--positive)" }}
-                  >
-                    <Plus size={13} /> Submit Pick
-                  </button>
-                )}
-                {isMember ? (
-                  <button
-                    className="btn btn-md btn-ghost"
-                    onClick={handleLeave}
-                    disabled={actionLoading}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}
-                  >
-                    <LogOut size={13} /> Leave
-                  </button>
-                ) : (
-                  <button
-                    className="btn btn-md btn-primary"
-                    onClick={handleJoin}
-                    disabled={actionLoading || isFull}
-                    title={isFull ? "Challenge is full" : undefined}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                  >
-                    <LogIn size={14} /> {actionLoading ? "Joining…" : isFull ? "Challenge full" : "Join challenge"}
-                  </button>
-                )}
+                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ background: "rgba(255,255,255,0.04)", color: "var(--text2)" }}>
+                  <Users size={12} />
+                  {memberCount}{challenge.max_members ? `/${challenge.max_members}` : ""} members
+                </span>
               </div>
-              {actionError && (
-                <p style={{ fontSize: 11, color: "var(--negative)", margin: 0 }}>{actionError}</p>
-              )}
+
+              <h1 style={{ margin: 0, fontSize: 30, fontWeight: 700, color: "var(--text0)", letterSpacing: "-0.04em" }}>{challenge.name}</h1>
+              <p style={{ margin: "10px 0 0", maxWidth: 760, fontSize: 14, color: "var(--text2)", lineHeight: 1.8 }}>
+                {challenge.description || "Track the leaderboard, submit picks, and see how members are performing in one place."}
+              </p>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <SummaryTile label="Scoring" value={challenge.scoring_type === "points" ? "Points" : "Brier"} caption={scoringCopy(challenge.scoring_type)} />
+                <SummaryTile label="Starts" value={formatShortDate(challenge.start_at)} caption={formatDate(challenge.start_at)} />
+                <SummaryTile label="Ends" value={formatShortDate(challenge.end_at)} caption={formatDate(challenge.end_at)} />
+              </div>
             </div>
-          )}
-        </div>
+
+            {!isOwner ? (
+              <div className="flex min-w-[220px] flex-col gap-3 lg:items-end">
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                  {isMember && status.label === "Active" ? (
+                    <button className="btn btn-primary h-10 px-4" onClick={() => setShowSubmitModal(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <Plus size={14} />
+                      Submit pick
+                    </button>
+                  ) : null}
+
+                  {isMember ? (
+                    <button className="btn btn-ghost h-10 px-4" onClick={handleLeave} disabled={actionLoading} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <LogOut size={14} />
+                      {actionLoading ? "Leaving…" : "Leave"}
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-primary h-10 px-4"
+                      onClick={handleJoin}
+                      disabled={actionLoading || isFull}
+                      title={isFull ? "Challenge is full" : undefined}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                    >
+                      <LogIn size={14} />
+                      {actionLoading ? "Joining…" : isFull ? "Challenge full" : "Join challenge"}
+                    </button>
+                  )}
+                </div>
+
+                {actionError ? <p style={{ margin: 0, fontSize: 12, color: "var(--negative)" }}>{actionError}</p> : null}
+              </div>
+            ) : null}
+          </div>
+        </section>
       </div>
 
-      {/* Underline tabs */}
-      <div className="tabs-underline">
-        {TABS.map((t) => (
+      <div className="flex flex-wrap gap-2">
+        {tabs.map((item) => (
           <button
-            key={t.value}
-            className={`tab-item${tab === t.value ? " active" : ""}`}
-            onClick={() => setTab(t.value)}
+            key={item.value}
+            onClick={() => setTab(item.value)}
+            className={cn("rounded-full px-4 py-2 text-sm font-semibold transition-all", tab === item.value ? "text-[#07110d]" : "text-text-muted")}
+            style={tab === item.value ? { background: "var(--accent)" } : { background: "rgba(255,255,255,0.04)" }}
           >
-            {t.label}
+            {item.label}
           </button>
         ))}
       </div>
 
-      {/* Tab content */}
-      <div>
-        {tab === "overview" && (
-          <OverviewTab challenge={challenge} leaderboard={leaderboard} />
-        )}
+      {tab === "overview" ? <OverviewTab challenge={challenge} leaderboard={leaderboard} memberCount={memberCount} /> : null}
 
-        {tab === "leaderboard" && (
-          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-            <div className="panel-header">
-              <div className="panel-title">Leaderboard</div>
-            </div>
-            <LeaderboardTable data={leaderboard} />
-          </div>
-        )}
+      {tab === "leaderboard" ? (
+        <SectionCard title="Leaderboard" action={<div className="inline-flex items-center gap-2 text-[12px] text-text-muted"><Trophy size={14} />Live standings</div>}>
+          <LeaderboardTable data={leaderboard} />
+        </SectionCard>
+      ) : null}
 
-        {tab === "feed" && (
-          <PicksTab challengeId={challenge.id} feedData={feedData} />
-        )}
+      {tab === "feed" ? <PicksTab challengeId={challenge.id} feedData={feedData} /> : null}
 
-        {tab === "rules" && <RulesTab challenge={challenge} />}
-      </div>
+      {tab === "rules" ? <RulesTab challenge={challenge} /> : null}
 
-      {showSubmitModal && (
+      {showSubmitModal ? (
         <SubmitEntryModal
           challengeId={challenge.id}
           sportScope={challenge.sport_scope}
           onClose={() => setShowSubmitModal(false)}
           onSubmitted={() => router.refresh()}
         />
-      )}
+      ) : null}
     </div>
   );
 }

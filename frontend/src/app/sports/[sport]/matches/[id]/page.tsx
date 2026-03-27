@@ -3,10 +3,9 @@ import { notFound } from "next/navigation";
 import type { SportSlug } from "@/lib/api";
 import { SGOMatchDetail } from "./SGOMatchDetail";
 import { fetchMatchPageData } from "@/app/sports/_lib/fetchMatchPageData";
+import { VALID_SPORTS, getSportDetailShell } from "@/app/sports/_lib/display";
 
 export const dynamic = "force-dynamic";
-
-const VALID_SPORTS: SportSlug[] = ["soccer", "tennis", "esports", "basketball", "baseball", "hockey"];
 
 interface PageProps {
   params: { sport: string; id: string };
@@ -20,11 +19,10 @@ export default async function SportMatchDetailPage({ params }: PageProps) {
   if (!data) notFound();
 
   const { event, backendMatch, eloHome, eloAway } = data;
-  const homeName = event.teams.home.names.long;
-  const awayName = event.teams.away.names.long;
+  const shell = getSportDetailShell(sport, event);
 
   return (
-    <AppShell title={`${homeName} vs ${awayName}`} subtitle={String(event.leagueID)}>
+    <AppShell title={shell.title} subtitle={shell.subtitle} eyebrow={shell.eyebrow} stats={shell.stats}>
       <SGOMatchDetail event={event} sport={sport} backendMatch={backendMatch} eloHome={eloHome} eloAway={eloAway} />
     </AppShell>
   );

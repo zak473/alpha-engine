@@ -1,44 +1,101 @@
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
+import { Activity, ArrowUpRight } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { BottomNav } from "./BottomNav";
 import { SidebarProvider } from "./SidebarContext";
+
+interface ShellStat {
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: "accent" | "positive" | "warning" | "neutral" | (string & {});
+}
 
 interface AppShellProps {
   children: ReactNode;
   title: string;
   subtitle?: string;
   compact?: boolean;
+  eyebrow?: string;
+  stats?: ShellStat[];
+  hideHero?: boolean;
 }
 
-export function AppShell({ children, title, subtitle, compact }: AppShellProps) {
+function toneClass(tone?: ShellStat["tone"]) {
+  switch (tone) {
+    case "positive":
+      return "shell-stat--positive";
+    case "warning":
+      return "shell-stat--warning";
+    case "neutral":
+      return "shell-stat--neutral";
+    default:
+      return "shell-stat--accent";
+  }
+}
+
+export function AppShell({ children, title, subtitle, compact, eyebrow, stats, hideHero }: AppShellProps) {
+  const hasStats = Boolean(stats?.length);
+
   return (
     <SidebarProvider>
-      <div className="brand-shell relative min-h-screen bg-[radial-gradient(circle_at_top,rgba(53,242,143,0.10),transparent_18%),linear-gradient(180deg,#08120e_0%,#0a1510_100%)] text-text-primary">
+      <div className="relative min-h-screen bg-surface-base text-text-primary">
+        <div className="app-shell__ambient" aria-hidden="true" />
         <Sidebar />
-        <div className={compact ? "relative z-[1] flex h-screen flex-col overflow-hidden lg:pl-56" : "relative z-[1] flex min-h-screen flex-col lg:pl-56"}>
+        <div className={compact ? "app-shell__frame app-shell__frame--compact" : "app-shell__frame"}>
           <TopBar title={title} subtitle={subtitle} />
-          <main className={compact ? "flex flex-1 flex-col overflow-y-auto pb-14 lg:pb-0" : "flex-1 px-4 pb-20 pt-4 lg:px-6 lg:pb-6 lg:pt-6"}>
-            {!compact && (
-              <div className="mb-6 flex flex-col gap-3 rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))] px-5 py-4 shadow-[0_24px_60px_rgba(0,0,0,0.22)] backdrop-blur xl:flex-row xl:items-center xl:justify-between">
-                <div className="min-w-0">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/14 bg-emerald-300/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-200">
-                    <span className="inline-flex h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,255,178,0.8)]" />
-                    Never In Doubt workspace
+          <main className={compact ? "app-shell__main app-shell__main--compact" : "app-shell__main"}>
+            <div className="app-shell__page">
+              {!hideHero ? (
+                <section className="shell-hero shell-panel">
+                  <div className="shell-hero__copy">
+                    <div className="shell-hero__kicker-row">
+                      <span className="eyebrow">{eyebrow ?? "Workspace"}</span>
+                      <span className="shell-indicator">
+                        <Activity size={12} />
+                        Live workspace
+                      </span>
+                    </div>
+
+                    <div>
+                      <h1 className="shell-hero__title">{title}</h1>
+                      {subtitle ? <p className="shell-hero__subtitle">{subtitle}</p> : null}
+                    </div>
                   </div>
-                  <h1 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white sm:text-[2rem]">{title}</h1>
-                  {subtitle && <p className="mt-1 max-w-3xl text-sm text-white/58">{subtitle}</p>}
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs text-white/60">
-                  {['Premium board', 'Faster scanning', 'Live-first workflow'].map((item) => (
-                    <span key={item} className="rounded-full border border-white/8 bg-white/[0.03] px-3 py-2">
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {children}
+
+                  <div className="shell-hero__status glass-card">
+                    <div>
+                      <div className="section-kicker">Focus</div>
+                      <div className="shell-hero__status-title">Less noise. Faster decisions.</div>
+                    </div>
+                    <p className="shell-hero__status-copy">
+                      The shell is tuned to surface the next action quickly: calmer cards, cleaner hierarchy, and shorter paths from overview to detail.
+                    </p>
+                    <div className="shell-hero__status-foot">
+                      <span>Scan the board, open the detail, act with context</span>
+                      <ArrowUpRight size={14} />
+                    </div>
+                  </div>
+
+                  {hasStats ? (
+                    <div className="shell-hero__stats">
+                      {stats!.map((stat) => (
+                        <div key={`${stat.label}-${stat.value}`} className={`shell-stat ${toneClass(stat.tone)}`}>
+                          <div className="shell-stat__label">{stat.label}</div>
+                          <div className="shell-stat__value">{stat.value}</div>
+                          {stat.hint ? <div className="shell-stat__hint">{stat.hint}</div> : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
+
+              <section className={`app-shell__content ${compact ? "app-shell__content--compact" : ""}`.trim()}>
+                {children}
+              </section>
+            </div>
           </main>
         </div>
         <BottomNav />

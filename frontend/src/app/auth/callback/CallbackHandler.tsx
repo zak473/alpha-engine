@@ -12,22 +12,41 @@ export function CallbackHandler() {
   const params = useSearchParams();
 
   useEffect(() => {
-    const token       = params.get("token");
-    const userId      = params.get("user_id");
-    const email       = params.get("email");
-    const displayName = params.get("display_name") ?? null;
+    async function handle() {
+      const token       = params.get("token");
+      const userId      = params.get("user_id");
+      const email       = params.get("email");
+      const displayName = params.get("display_name") ?? null;
 
-    if (!token || !userId || !email) {
-      router.replace("/login?error=google_failed");
-      return;
+      if (!token || !userId || !email) {
+        router.replace("/login?error=google_failed");
+        return;
+      }
+
+      // Store exactly the same way as a normal login
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(USER_KEY, JSON.stringify({ userId, email, displayName, token }));
+      document.cookie = `${COOKIE_KEY}=${token}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+
+      // Check subscription — redirect to payment if not active
+      try {
+        const statusRes = await fetch("/api/v1/billing/status", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (statusRes.ok) {
+          const { is_active } = await statusRes.json();
+          if (!is_active) {
+            router.replace("/subscribe");
+            return;
+          }
+        }
+      } catch {
+        // If the check fails, let them through
+      }
+
+      router.replace("/dashboard");
     }
-
-    // Store exactly the same way as a normal login
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(USER_KEY, JSON.stringify({ userId, email, displayName, token }));
-    document.cookie = `${COOKIE_KEY}=${token}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
-
-    router.replace("/dashboard");
+    handle();
   }, [params, router]);
 
   return (

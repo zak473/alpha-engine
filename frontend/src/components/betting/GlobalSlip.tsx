@@ -1,66 +1,67 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { TrendingUp } from "lucide-react";
 import { useBetting } from "./BettingContext";
 import { MobileQueueDrawer } from "./MobileQueueDrawer";
 
-/**
- * Global floating slip button — visible on every page when the queue has picks.
- * User taps the button to open the drawer; no auto-open to avoid blocking odds clicks.
- */
+const HIDDEN_ROUTES = ["/", "/login", "/register", "/forgot-password", "/pricing", "/subscribe"];
+
 export function GlobalSlip() {
+  const pathname = usePathname();
   const { queue } = useBetting();
   const [open, setOpen] = useState(false);
+  const hasQueue = queue.length > 0;
+  const shouldHide = HIDDEN_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+
+  if (shouldHide || !hasQueue) {
+    return null;
+  }
 
   return (
     <>
-      {/* Floating button — mobile center bottom */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 lg:hidden flex items-center gap-2.5 px-5 py-3 rounded-full text-sm font-bold shadow-xl transition-all"
+          className="fixed left-1/2 z-30 flex -translate-x-1/2 items-center gap-2.5 rounded-full px-5 py-3 text-sm font-bold shadow-xl transition-all hover:scale-[1.01] lg:hidden"
           style={{
-            background: queue.length > 0 ? "#22e283" : "rgba(255,255,255,0.08)",
-            color: queue.length > 0 ? "#07110d" : "rgba(255,255,255,0.5)",
-            boxShadow: queue.length > 0 ? "0 8px 24px rgba(34,226,131,0.35)" : "none",
-            border: queue.length > 0 ? "none" : "1px solid rgba(255,255,255,0.12)",
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 5.4rem)",
+            background: "#22e283",
+            color: "#07110d",
+            boxShadow: "0 12px 28px rgba(34,226,131,0.35)",
           }}
+          aria-label={`Open betting slip with ${queue.length} pick${queue.length === 1 ? "" : "s"}`}
         >
-          {queue.length > 0 && (
-            <span
-              className="flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-black"
-              style={{ background: "rgba(0,0,0,0.18)" }}
-            >
-              {queue.length}
-            </span>
-          )}
-          Slip
+          <span
+            className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-black"
+            style={{ background: "rgba(0,0,0,0.18)" }}
+          >
+            {queue.length}
+          </span>
+          Open slip
         </button>
       )}
 
-      {/* Desktop slip button — always visible in bottom-right corner */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="hidden lg:flex fixed bottom-6 right-6 z-30 items-center gap-2.5 px-4 py-2.5 rounded-full text-sm font-bold shadow-xl transition-all"
+          className="fixed bottom-6 right-6 z-30 hidden items-center gap-2.5 rounded-full px-4 py-3 text-sm font-bold shadow-xl transition-all hover:-translate-y-0.5 lg:flex"
           style={{
-            background: queue.length > 0 ? "#22e283" : "rgba(255,255,255,0.08)",
-            color: queue.length > 0 ? "#07110d" : "rgba(255,255,255,0.5)",
-            boxShadow: queue.length > 0 ? "0 8px 24px rgba(34,226,131,0.35)" : "none",
-            border: queue.length > 0 ? "none" : "1px solid rgba(255,255,255,0.12)",
+            background: "#22e283",
+            color: "#07110d",
+            boxShadow: "0 12px 28px rgba(34,226,131,0.35)",
           }}
+          aria-label={`Open betting slip with ${queue.length} pick${queue.length === 1 ? "" : "s"}`}
         >
           <TrendingUp size={15} />
           <span>Slip</span>
-          {queue.length > 0 && (
-            <span
-              className="flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-black"
-              style={{ background: "rgba(0,0,0,0.18)" }}
-            >
-              {queue.length}
-            </span>
-          )}
+          <span
+            className="flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[11px] font-black"
+            style={{ background: "rgba(0,0,0,0.18)" }}
+          >
+            {queue.length}
+          </span>
         </button>
       )}
 

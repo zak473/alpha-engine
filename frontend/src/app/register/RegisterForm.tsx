@@ -1,36 +1,76 @@
 "use client";
 
-import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { useAuth } from "@/lib/auth";
+import {
+  AuthDivider,
+  AuthError,
+  AuthField,
+  AuthFormPanel,
+  AuthGoogleButton,
+  AuthGrid,
+  AuthMarketingPanel,
+  AuthPageShell,
+  AuthPrimaryButton,
+  AuthSwitchCard,
+  AuthTrustNote,
+} from "@/app/auth/AuthExperience";
+import { useAuth, getStoredToken } from "@/lib/auth";
 
 export function RegisterForm() {
   const { login } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [acceptedSetup, setAcceptedSetup] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setError(null);
+
+    if (password.length < 6) {
+      setError("Use at least 6 characters for your password.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Password and confirmation do not match.");
+      return;
+    }
+
+    if (!acceptedSetup) {
+      setError("Please confirm that you understand setup continues to plan activation.");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch("/api/v1/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, display_name: displayName || null }),
+        body: JSON.stringify({ email, password, display_name: displayName.trim() || null }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: "Registration failed" }));
         throw new Error(err.detail ?? "Registration failed");
       }
       await login(email, password);
-      router.push("/dashboard");
+      const token = getStoredToken();
+      const checkoutRes = await fetch("/api/v1/billing/checkout", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (checkoutRes.ok) {
+        const { url } = await checkoutRes.json();
+        window.location.href = url;
+      } else {
+        router.push("/subscribe");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
@@ -39,250 +79,131 @@ export function RegisterForm() {
   }
 
   return (
-    <div className="px-4 py-8 lg:px-6 lg:py-10">
-      <div className="mx-auto grid w-full max-w-7xl gap-6 lg:grid-cols-[0.88fr_1.12fr]">
-        {/* Form panel */}
-        <section className="rounded-[36px] border border-white/8 bg-white/[0.04] p-6 text-white shadow-[0_25px_80px_rgba(0,0,0,0.28)] backdrop-blur lg:p-8">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="inline-flex items-center rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400">
-                Create Account
-              </div>
-              <h2 className="mt-4 text-[30px] font-semibold leading-tight text-white">
-                Join Never In Doubt
-              </h2>
-              <p className="mt-2 max-w-md text-sm leading-6 text-white/55">
-                Set up your account, follow top tipsters, and get straight into your
-                dashboard, live markets, and multi-sport picks.
-              </p>
-            </div>
-
-            <div className="hidden rounded-[20px] border border-white/10 bg-white/[0.05] px-4 py-3 sm:block">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">
-                Platform access
-              </div>
-              <div className="mt-2 text-sm font-semibold text-white">Instant setup</div>
-              <div className="mt-1 text-xs text-emerald-400">Ready in minutes</div>
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            {["Follow tipsters", "Track edges", "Access in-play"].map((item) => (
-              <div
-                key={item}
-                className="rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-white/60"
-              >
-                {item}
-              </div>
-            ))}
-          </div>
-
-          <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5">
-            <div className="flex flex-col gap-2">
-              <label className="text-[12px] font-semibold uppercase tracking-[0.16em] text-white/50">
-                Display name
-              </label>
-              <input
-                type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Your name"
-                className="h-14 rounded-2xl border border-white/10 bg-white/[0.06] px-4 text-[15px] text-white placeholder:text-white/30 outline-none transition focus:border-emerald-500/50 focus:bg-white/[0.09]"
-                autoComplete="name"
+    <AuthPageShell>
+      <AuthGrid>
+        <AuthFormPanel
+          badge="Create account"
+          title="Create your account"
+          subtitle="A simpler setup flow that gets you into the workspace quickly, then moves you into billing only when your account is ready."
+          statusTitle="Setup"
+          statusValue="Guided"
+          statusHint="Ready in minutes"
+          quickItems={["Create profile", "Open workspace", "Activate plan"]}
+          support={
+            <>
+              <AuthSwitchCard
+                eyebrow="Already have an account?"
+                copy="Sign in and jump straight back to your dashboard, predictions, and live board."
+                href="/login"
+                cta="Sign in"
               />
-            </div>
+              <AuthTrustNote>You will create your account first, then continue to plan activation. Nothing feels hidden or abrupt.</AuthTrustNote>
+            </>
+          }
+        >
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            <AuthField
+              label="Display name"
+              type="text"
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              placeholder="Your name"
+              autoComplete="name"
+            />
 
-            <div className="flex flex-col gap-2">
-              <label className="text-[12px] font-semibold uppercase tracking-[0.16em] text-white/50">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="h-14 rounded-2xl border border-white/10 bg-white/[0.06] px-4 text-[15px] text-white placeholder:text-white/30 outline-none transition focus:border-emerald-500/50 focus:bg-white/[0.09]"
-                required
-                autoComplete="email"
-              />
-            </div>
+            <AuthField
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@example.com"
+              required
+              autoComplete="email"
+            />
 
-            <div className="flex flex-col gap-2">
-              <label className="text-[12px] font-semibold uppercase tracking-[0.16em] text-white/50">
-                Password
-              </label>
-              <input
+            <div className="grid gap-5 md:grid-cols-2">
+              <AuthField
+                label="Password"
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(event) => setPassword(event.target.value)}
                 placeholder="••••••••"
-                className="h-14 rounded-2xl border border-white/10 bg-white/[0.06] px-4 text-[15px] text-white placeholder:text-white/30 outline-none transition focus:border-emerald-500/50 focus:bg-white/[0.09]"
                 required
                 autoComplete="new-password"
                 minLength={6}
+                note="Use at least 6 characters to secure your account."
               />
-              <p className="text-xs text-white/35">
-                Use at least 6 characters to secure your account.
-              </p>
+
+              <AuthField
+                label="Confirm password"
+                type="password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="••••••••"
+                required
+                autoComplete="new-password"
+                minLength={6}
+                note="Re-enter the same password once more."
+              />
             </div>
 
-            {error && (
-              <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="inline-flex h-14 items-center justify-center rounded-2xl bg-[#2edb6c] px-5 text-[15px] font-semibold text-[#0f1a12] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-70"
-              disabled={loading}
-            >
-              {loading ? "Creating account…" : "Join platform"}
-            </button>
-
-            <div className="flex items-center gap-3">
-              <div className="h-px flex-1 bg-white/10" />
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/30">or</span>
-              <div className="h-px flex-1 bg-white/10" />
+            <div className="rounded-[18px] border border-white/10 bg-white/[0.035] px-4 py-3 text-sm leading-6 text-white/60">
+              After signup, you will continue to plan activation before entering the full product. <Link href="/pricing" className="font-semibold text-[#95ffca] transition-opacity hover:opacity-80">Review plan framing</Link>
             </div>
 
-            <a
-              href="/api/v1/auth/google"
-              className="inline-flex h-14 items-center justify-center gap-3 rounded-2xl border border-white/12 bg-white/[0.05] px-5 text-[15px] font-medium text-white transition hover:bg-white/[0.09]"
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
-                <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
-                <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
-                <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
-              </svg>
-              Continue with Google
-            </a>
+            <label className="flex items-start gap-3 rounded-[18px] border border-white/10 bg-white/[0.035] px-4 py-3 text-sm leading-6 text-white/62">
+              <input
+                type="checkbox"
+                checked={acceptedSetup}
+                onChange={(event) => setAcceptedSetup(event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-white/20 bg-transparent accent-[#00f884]"
+              />
+              <span>I understand account creation comes first and plan activation happens next.</span>
+            </label>
+
+            {error ? <AuthError>{error}</AuthError> : null}
+
+            <AuthPrimaryButton type="submit" disabled={loading}>
+              {loading ? "Setting up…" : "Create account"}
+            </AuthPrimaryButton>
+
+            <AuthDivider />
+            <AuthGoogleButton />
           </form>
+        </AuthFormPanel>
 
-          <div className="mt-6 rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="text-[12px] font-semibold uppercase tracking-[0.16em] text-white/50">
-                  Already have an account?
-                </div>
-                <div className="mt-1 text-sm text-white/60">
-                  Sign in and get back to your betting board.
-                </div>
-              </div>
-              <Link
-                href="/login"
-                className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 text-sm font-semibold text-emerald-400 transition hover:bg-emerald-500/20"
-              >
-                Sign in
-              </Link>
-            </div>
-          </div>
-
-          <p className="mt-6 text-center text-xs text-white/35">
-            By creating an account, you&apos;re joining the Never In Doubt betting board.
-          </p>
-        </section>
-
-        {/* Marketing panel */}
-        <section className="relative overflow-hidden rounded-[36px] border border-white/8 bg-[radial-gradient(circle_at_top_right,rgba(46,219,108,0.12),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-6 text-white shadow-[0_25px_80px_rgba(0,0,0,0.28)] backdrop-blur lg:p-8">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(46,219,108,0.18),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(46,219,108,0.08),transparent_28%)]" />
-          <div className="relative z-10 flex h-full flex-col">
-            <div className="inline-flex w-fit items-center rounded-full border border-[rgba(46,219,108,0.22)] bg-[rgba(46,219,108,0.08)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#2edb6c]">
-              Never In Doubt
-            </div>
-
-            <div className="mt-6 max-w-2xl">
-              <h3 className="text-4xl font-semibold leading-[0.98] text-white lg:text-6xl">
-                Build your account.
-                <br />
-                Follow better picks.
-              </h3>
-              <p className="mt-5 max-w-xl text-[15px] leading-7 text-white/72">
-                Join the platform to access premium match boards, live edges,
-                tipster performance, and cleaner multi-sport decision flow from day one.
-              </p>
-            </div>
-
-            <div className="mt-7 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-              <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.04] p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#2edb6c]">
-                      Member access
-                    </div>
-                    <div className="mt-2 text-2xl font-semibold text-white">
-                      Your board starts here
-                    </div>
-                    <div className="mt-1 text-sm text-white/65">
-                      Get picks, stats, live movement, and tipster tracking in one place
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-right">
-                    <div className="text-[11px] uppercase tracking-[0.16em] text-white/45">
-                      Access
-                    </div>
-                    <div className="mt-1 text-sm font-semibold text-[#2edb6c]">
-                      Ready now
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 overflow-hidden rounded-[22px] border border-white/10 bg-black/20 p-3">
-                  <Image
-                    src="/never-in-doubt-logo.png"
-                    alt="Never In Doubt logo"
-                    width={900}
-                    height={600}
-                    className="h-auto w-full"
-                    priority
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-4">
-                <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
-                    Tipster focus
-                  </div>
-                  <div className="mt-3 text-3xl font-semibold text-white">Follow the form</div>
-                  <div className="mt-1 text-sm text-white/65">
-                    Track ROI, streaks, and best-performing analysts
-                  </div>
-                </div>
-
-                <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
-                    Multi-sport board
-                  </div>
-                  <div className="mt-3 text-3xl font-semibold text-white">All markets</div>
-                  <div className="mt-1 text-sm text-white/65">
-                    Soccer, tennis, basketball, baseball, and esports
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              {[
-                { label: "Live value", value: "Scan sharper opportunities" },
-                { label: "Tipster feed", value: "Follow who is in form" },
-                { label: "Premium flow", value: "Cleaner board experience" },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className="rounded-[22px] border border-white/10 bg-white/[0.04] px-4 py-4"
-                >
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#2edb6c]">
-                    {item.label}
-                  </div>
-                  <div className="mt-2 text-sm text-white/72">{item.value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
+        <AuthMarketingPanel
+          eyebrow="Member setup"
+          title={
+            <>
+              Start clean,
+              <br />
+              then activate access.
+            </>
+          }
+          subtitle="The signup flow now explains the handoff into billing more clearly, so the product feels premium instead of abrupt."
+          primaryLabel="Setup"
+          primaryValue="One account for the full platform"
+          primaryCopy="Create one account, keep one workspace, and use the same product flow for predictions, performance, tipsters, and live market tracking."
+          secondaryCards={[
+            {
+              label: "Predictions",
+              value: "Start with conviction",
+              copy: "Open the strongest reads first instead of wading through filler and empty framing.",
+            },
+            {
+              label: "Performance",
+              value: "Track what works",
+              copy: "Move from picks to ROI, bankroll movement, and model quality in a cleaner analytics flow.",
+            },
+          ]}
+          bottomNotes={[
+            { label: "Tipsters", value: "Compare recent form and tracked performance without the visual clutter." },
+            { label: "Live board", value: "Stay close to active markets while keeping the rest of the workspace coherent." },
+            { label: "Billing", value: "Account creation comes first, then plan activation with clearer expectations." },
+          ]}
+        />
+      </AuthGrid>
+    </AuthPageShell>
   );
 }

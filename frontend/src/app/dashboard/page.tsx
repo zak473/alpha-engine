@@ -5,7 +5,12 @@ export const dynamic = "force-dynamic";
 
 export default function DashboardPage() {
   return (
-    <AppShell title="Dashboard" subtitle="Your intelligence hub" compact>
+    <AppShell
+      title="Dashboard"
+      subtitle="Your intelligence hub"
+      compact
+      hideHero
+    >
       <DashboardClient />
     </AppShell>
   );

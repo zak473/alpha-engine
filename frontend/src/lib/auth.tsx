@@ -19,6 +19,7 @@ interface AuthUser {
 interface AuthContextValue {
   user: AuthUser | null;
   isLoggedIn: boolean;
+  isReady: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -39,6 +40,7 @@ function clearCookie() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     try {
@@ -46,6 +48,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (stored) setUser(JSON.parse(stored));
     } catch {
       // ignore
+    } finally {
+      setIsReady(true);
     }
   }, []);
 
@@ -80,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isLoggedIn: !!user, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoggedIn: !!user, isReady, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

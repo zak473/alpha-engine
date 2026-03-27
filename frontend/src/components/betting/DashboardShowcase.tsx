@@ -121,10 +121,10 @@ function TipsterRow({ tipster, rank }: { tipster: TipsterProfile; rank: number }
       <div className="hidden w-10 shrink-0 text-right lg:block">
         <div className="text-sm font-semibold text-[#9a6700]">{streak}</div>
       </div>
-      {/* Follow */}
-      <button className="w-16 shrink-0 rounded-full bg-[#1fd06a] py-1.5 text-xs font-semibold text-[#0e2e1a] transition hover:brightness-95">
-        Follow
-      </button>
+      {/* View */}
+      <Link href="/tipsters" className="w-16 shrink-0 rounded-full bg-[#1fd06a] py-1.5 text-center text-xs font-semibold text-[#0e2e1a] transition hover:brightness-95">
+        View
+      </Link>
     </div>
   );
 }

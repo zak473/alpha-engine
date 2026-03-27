@@ -1936,9 +1936,12 @@ export function SGOMatchDetail({ event, sport, backendMatch: backendMatchProp, e
   const orderedCats = CATEGORY_ORDER.filter((c) => grouped[c]?.length);
 
   const hasInfoData = !!(backendMatch || event.results?.game || event.info?.venue);
+  const confidencePct = backendMatch?.confidence ?? null;
+  const marketCount = match.allMarkets.length;
+  const venueName = event.info?.venue?.name ?? backendMatch?.context?.venue_name ?? "Venue pending";
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-4 lg:px-6 space-y-4">
+    <div className="mx-auto max-w-[1280px] px-4 py-4 lg:px-6 space-y-4">
 
       {/* Hero — full width */}
       <div className="sportsbook-card overflow-hidden">
@@ -1996,6 +1999,29 @@ export function SGOMatchDetail({ event, sport, backendMatch: backendMatchProp, e
             </span>
           </div>
         )}
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+          <div className="section-kicker">Status</div>
+          <div className="mt-3 text-[20px] font-bold text-text-primary">{isLive ? "Live market" : isFinished ? "Final result" : "Pre-match"}</div>
+          <div className="mt-2 text-[12px] text-text-subtle">{event.status?.displayLong || "Board synced to current event state"}</div>
+        </div>
+        <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+          <div className="section-kicker">Confidence</div>
+          <div className="mt-3 font-mono text-[28px] font-bold leading-none text-text-primary">{confidencePct != null ? `${confidencePct}%` : "—"}</div>
+          <div className="mt-2 text-[12px] text-text-subtle">Model conviction for the current recommendation</div>
+        </div>
+        <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+          <div className="section-kicker">Markets</div>
+          <div className="mt-3 font-mono text-[28px] font-bold leading-none text-text-primary">{marketCount}</div>
+          <div className="mt-2 text-[12px] text-text-subtle">Tracked betting market groups on this event</div>
+        </div>
+        <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+          <div className="section-kicker">Venue</div>
+          <div className="mt-3 text-[18px] font-bold leading-tight text-text-primary">{venueName}</div>
+          <div className="mt-2 text-[12px] text-text-subtle">Context layer for pre-match and live read quality</div>
+        </div>
       </div>
 
       {/* Analytics */}

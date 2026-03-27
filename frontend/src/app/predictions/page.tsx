@@ -9,8 +9,9 @@ export default async function PredictionsPage({
   searchParams: Promise<{ sport?: string }>;
 }) {
   const params = await searchParams;
+
   return (
-    <AppShell title="Intelligence" subtitle="Today's best picks · top tipsters · strongest edges">
+    <AppShell title="Predictions" subtitle="High-conviction picks, clearer filters, and faster match-level decisions" compact hideHero>
       <PredictionsShell initialSport={params.sport ?? "all"} />
     </AppShell>
   );

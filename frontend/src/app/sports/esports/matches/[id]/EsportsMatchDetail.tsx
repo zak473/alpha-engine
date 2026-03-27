@@ -1269,9 +1269,6 @@ function H2HTab({ match }: { match: EsportsMatch }) {
         </Panel>
       </MainCol>
       <SideCol>
-        <Panel title="Notes">
-          <EmptyState icon={Info} title="Style matchup analysis" desc="Model-generated notes on head-to-head tendencies coming soon." />
-        </Panel>
       </SideCol>
     </SideGrid>
   );
@@ -1482,9 +1479,6 @@ function ModelTab({ match }: { match: EsportsMatch }) {
             </div>
           </Panel>
         )}
-        <Panel title="Sensitivity">
-          <EmptyState icon={Activity} title="Sensitivity analysis" desc="What-if analysis coming soon." />
-        </Panel>
       </SideCol>
     </SideGrid>
   );
@@ -1530,12 +1524,6 @@ function ContextTab({ match }: { match: EsportsMatch }) {
           {info?.patch_version && <MetricRow label="Patch" value={`v${info.patch_version}`} />}
           {info?.tournament_tier && <MetricRow label="Tournament tier" value={info.tournament_tier} />}
         </Panel>
-
-        {info?.game_type === "lol" && (
-          <Panel title="Patch Notes Placeholder">
-            <EmptyState icon={Layers} title="Patch impact analysis" desc="Patch-specific champion/meta shift analysis coming soon." />
-          </Panel>
-        )}
 
         {flags.length > 0 && (
           <Panel title="Data Flags">

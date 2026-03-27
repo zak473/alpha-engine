@@ -1,42 +1,47 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  BrainCircuit, Zap, ChevronRight, Eye, EyeOff, Users, Sparkles, Loader2,
+  Activity,
+  BrainCircuit,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  Flame,
+  Loader2,
+  ShieldCheck,
+  Sparkles,
+  Target,
+  Users,
+  Zap,
 } from "lucide-react";
 import { SPORT_LEAGUES, fetchSGOEvents, sgoEventToMatch, LEAGUE_LABELS } from "@/lib/sgo";
 import type { BettingMatch } from "@/lib/betting-types";
 import type { SportSlug, TipsterProfile } from "@/lib/api";
-import { getTipsters, getMatchReasoning } from "@/lib/api";
+import { getMatchReasoning, getTipsters } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-// ── Constants ────────────────────────────────────────────────────────────────
-
 const SPORT_META: { value: string; label: string; icon: string }[] = [
-  { value: "all",        label: "All",        icon: "🏆" },
-  { value: "soccer",     label: "Soccer",     icon: "⚽" },
-  { value: "tennis",     label: "Tennis",     icon: "🎾" },
+  { value: "all", label: "All", icon: "🏆" },
+  { value: "soccer", label: "Soccer", icon: "⚽" },
+  { value: "tennis", label: "Tennis", icon: "🎾" },
   { value: "basketball", label: "Basketball", icon: "🏀" },
-  { value: "baseball",   label: "Baseball",   icon: "⚾" },
-  { value: "hockey",     label: "Hockey",     icon: "🏒" },
-  { value: "esports",    label: "Esports",    icon: "🎮" },
+  { value: "baseball", label: "Baseball", icon: "⚾" },
+  { value: "hockey", label: "Hockey", icon: "🏒" },
+  { value: "esports", label: "Esports", icon: "🎮" },
 ];
 
-const SPORT_ICONS: Record<string, string> = Object.fromEntries(
-  SPORT_META.map(({ value, icon }) => [value, icon])
-);
+const SPORT_ICONS: Record<string, string> = Object.fromEntries(SPORT_META.map(({ value, icon }) => [value, icon]));
 
 const CONF_THRESHOLDS = [
-  { value: "0",   label: "All"  },
+  { value: "0", label: "All" },
   { value: "0.5", label: "50%+" },
   { value: "0.6", label: "60%+" },
   { value: "0.7", label: "70%+" },
   { value: "0.8", label: "80%+" },
 ];
-
-// ── Backend merge ────────────────────────────────────────────────────────────
 
 interface BackendItem {
   id?: string;
@@ -56,6 +61,12 @@ interface BackendItem {
   elo_home?: number | null;
   elo_away?: number | null;
 }
+
+type MatchWithSport = BettingMatch & { sport: SportSlug; backendId?: string };
+
+const ALL_SPORT_LEAGUES: { sport: SportSlug; leagueID: string }[] = Object.entries(SPORT_LEAGUES).flatMap(([sport, leagues]) =>
+  (leagues as string[]).map((leagueID) => ({ sport: sport as SportSlug, leagueID }))
+);
 
 function normalizeName(name: string): string {
   return name
@@ -125,7 +136,7 @@ function eloProb(eloHome: number, eloAway: number): { pHome: number; pAway: numb
   return { pHome: Math.round(p * 10000) / 10000, pAway: Math.round((1 - p) * 10000) / 10000 };
 }
 
-function backendItemToMatch(item: BackendItem, sport: SportSlug): BettingMatch & { sport: SportSlug; backendId?: string } {
+function backendItemToMatch(item: BackendItem, sport: SportSlug): MatchWithSport {
   const homeName = item.home_name;
   const awayName = item.away_name;
   return {
@@ -159,7 +170,6 @@ function mergeBackend(match: BettingMatch, items: BackendItem[]): BettingMatch {
 
   const backendId = found.id;
 
-  // ML prediction exists — use it directly
   if (found.p_home != null) {
     return {
       ...match,
@@ -171,7 +181,6 @@ function mergeBackend(match: BettingMatch, items: BackendItem[]): BettingMatch {
     };
   }
 
-  // No ML prediction but ELO data available — compute ELO probability
   if (found.elo_home != null && found.elo_away != null) {
     const { pHome, pAway } = eloProb(found.elo_home, found.elo_away);
     return { ...match, backendId, pHome, pAway };
@@ -179,8 +188,6 @@ function mergeBackend(match: BettingMatch, items: BackendItem[]): BettingMatch {
 
   return { ...match, backendId };
 }
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtTime(iso: string) {
   const d = new Date(iso);
@@ -198,41 +205,104 @@ function dayLabel(iso: string): string {
   return d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" });
 }
 
-// ── Section label ─────────────────────────────────────────────────────────────
+function titleCase(value: string) {
+  return value.replace(/[-_]/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
 
-function SectionLabel({
-  label, sub, count, action,
+function fmtPct(value: number, digits = 0) {
+  return `${(value * 100).toFixed(digits)}%`;
+}
+
+function chipTone(conf: number) {
+  if (conf >= 0.7) return "positive" as const;
+  if (conf >= 0.55) return "warning" as const;
+  return "neutral" as const;
+}
+
+function toneClasses(tone: "positive" | "warning" | "accent" | "neutral") {
+  return {
+    positive: "border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-300",
+    warning: "border-amber-400/20 bg-amber-400/[0.08] text-amber-300",
+    accent: "border-[rgba(0,255,132,0.18)] bg-[rgba(0,255,132,0.08)] text-[#8fffc7]",
+    neutral: "border-white/[0.08] bg-white/[0.04] text-white/68",
+  }[tone];
+}
+
+function SummaryStat({
+  label,
+  value,
+  note,
+  tone = "neutral",
+  icon: Icon,
 }: {
   label: string;
+  value: string;
+  note: string;
+  tone?: "positive" | "warning" | "accent" | "neutral";
+  icon: ComponentType<{ className?: string }>;
+}) {
+  return (
+    <div className={cn("rounded-[22px] border p-4", toneClasses(tone))}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/34">{label}</p>
+        <Icon className="h-4 w-4 text-current/40" />
+      </div>
+      <p className="mt-3 font-mono text-[26px] font-bold tracking-[-0.04em] text-white tabular-nums">{value}</p>
+      <p className="mt-2 text-[11px] text-white/36">{note}</p>
+    </div>
+  );
+}
+
+function TinyMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[18px] bg-white/[0.05] px-3 py-2.5">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/30">{label}</p>
+      <p className="mt-1 text-[13px] font-semibold text-white/82">{value}</p>
+    </div>
+  );
+}
+
+function SectionLabel({
+  icon: Icon,
+  label,
+  sub,
+  count,
+  action,
+}: {
+  icon?: ComponentType<{ className?: string }>;
+  label: ReactNode;
   sub?: string;
   count?: number;
   action?: { label: string; href: string };
 }) {
   return (
-    <div className="mb-3 flex items-center gap-2.5">
-      <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/65">{label}</span>
-      {count != null && (
-        <span className="rounded-full border border-white/10 bg-white/[0.05] px-1.5 py-px text-[10px] font-semibold tabular-nums text-white/38">
-          {count}
+    <div className="mb-4 flex items-center gap-3">
+      {Icon ? (
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.04] text-white/70">
+          <Icon className="h-4 w-4" />
         </span>
-      )}
-      {sub && <span className="text-[11px] text-white/28">{sub}</span>}
+      ) : null}
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <h2 className="text-[12px] font-bold uppercase tracking-[0.18em] text-white/58">{label}</h2>
+          {count != null ? (
+            <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold text-white/36">
+              {count}
+            </span>
+          ) : null}
+        </div>
+        {sub ? <p className="mt-1 text-[12px] text-white/34">{sub}</p> : null}
+      </div>
       <div className="h-px flex-1 bg-white/[0.06]" />
-      {action && (
-        <Link
-          href={action.href}
-          className="flex shrink-0 items-center gap-0.5 text-[11px] font-medium text-[var(--accent)] transition-opacity hover:opacity-75"
-        >
-          {action.label} <ChevronRight size={11} />
+      {action ? (
+        <Link href={action.href} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] transition-opacity hover:opacity-75">
+          {action.label}
+          <ChevronRight className="h-3.5 w-3.5" />
         </Link>
-      )}
+      ) : null}
     </div>
   );
 }
-
-// ── Featured pick card ────────────────────────────────────────────────────────
-
-type MatchWithSport = BettingMatch & { sport: SportSlug; backendId?: string };
 
 function FeaturedPickCard({ match }: { match: MatchWithSport }) {
   const href = `/sports/${match.sport}/matches/${match.id}`;
@@ -240,214 +310,202 @@ function FeaturedPickCard({ match }: { match: MatchWithSport }) {
   const confPct = Math.round(conf * 100);
   const hPct = match.pHome != null ? Math.round(match.pHome * 100) : null;
   const aPct = match.pAway != null ? Math.round(match.pAway * 100) : null;
-  const leagueLabel = LEAGUE_LABELS[match.league] ?? match.league;
-  const isTop = conf >= 0.75;
-  const isMid = conf >= 0.65 && conf < 0.75;
-
-  const confBadge = isTop
-    ? { border: "rgba(52,211,153,0.28)", bg: "rgba(52,211,153,0.09)", color: "#6ee7b7" }
-    : isMid
-    ? { border: "rgba(251,191,36,0.25)", bg: "rgba(251,191,36,0.08)", color: "#fcd34d" }
-    : { border: "rgba(255,255,255,0.10)", bg: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.55)" };
+  const dPct = match.pDraw != null ? Math.round(match.pDraw * 100) : null;
+  const leagueLabel = LEAGUE_LABELS[match.league] ?? titleCase(match.league);
+  const tone = chipTone(conf);
+  const favorite = hPct != null && aPct != null ? (hPct >= aPct ? match.home.name : match.away.name) : "Awaiting read";
+  const source = match.modelConfidence != null ? "Model read" : match.pHome != null ? "ELO read" : "Market read";
+  const edge = hPct != null && aPct != null ? Math.abs(hPct - aPct) : null;
 
   return (
-    <Link
-      href={href}
-      className={cn(
-        "group relative flex items-center gap-4 overflow-hidden rounded-2xl border p-4 transition-all duration-150 hover:-translate-y-px",
-        isTop
-          ? "border-emerald-400/[0.18] bg-[linear-gradient(135deg,rgba(54,242,143,0.05),rgba(255,255,255,0.02))] hover:border-emerald-400/[0.28]"
-          : "border-white/[0.08] bg-white/[0.03] hover:border-white/[0.12]"
-      )}
-    >
-      {isTop && (
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(54,242,143,0.07),transparent_55%)]" />
-      )}
-
-      <span className="relative shrink-0 text-xl leading-none">{SPORT_ICONS[match.sport] ?? "🏆"}</span>
-
-      <div className="relative min-w-0 flex-1">
-        <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/28">
-          {leagueLabel}
-        </div>
-        <div className="flex items-baseline gap-2">
-          <span className={cn(
-            "max-w-[130px] truncate text-[14px] font-semibold leading-tight",
-            hPct != null && hPct >= (aPct ?? 0) ? "text-white" : "text-white/60"
-          )}>
-            {match.home.name}
-          </span>
-          <span className="shrink-0 text-[10px] text-white/22">vs</span>
-          <span className={cn(
-            "max-w-[130px] truncate text-[14px] font-semibold leading-tight",
-            aPct != null && aPct > (hPct ?? 0) ? "text-white" : "text-white/60"
-          )}>
-            {match.away.name}
-          </span>
-        </div>
-
-        {hPct != null && aPct != null && (
-          <div className="mt-2.5 flex items-center gap-2">
-            <span className={cn(
-              "w-9 shrink-0 text-right font-mono text-[12px] font-bold tabular-nums",
-              hPct > aPct ? "text-emerald-300" : "text-white/38"
-            )}>
-              {hPct}%
+    <Link href={href} className="group block rounded-[22px] border border-white/[0.08] bg-[#10131a] p-4 transition-colors hover:border-white/[0.14] hover:bg-[#141923]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/54">
+              <span>{SPORT_ICONS[match.sport] ?? "🏆"}</span>
+              {leagueLabel}
             </span>
-            <div className="relative flex-1 overflow-hidden rounded-full" style={{ height: 8, background: "rgba(255,255,255,0.05)" }}>
-              <div
-                className="absolute left-0 top-0 h-full"
-                style={{
-                  width: `${hPct}%`,
-                  background: hPct > aPct ? "linear-gradient(90deg, #34d399, #10b981)" : "linear-gradient(90deg, #f97316, #fb923c)",
-                  boxShadow: hPct > aPct ? "0 0 10px rgba(52,211,153,0.5)" : "0 0 10px rgba(249,115,22,0.4)",
-                }}
-              />
-              <div
-                className="absolute right-0 top-0 h-full"
-                style={{
-                  width: `${aPct}%`,
-                  background: aPct > hPct ? "linear-gradient(270deg, #34d399, #10b981)" : "linear-gradient(270deg, #f97316, #fb923c)",
-                  boxShadow: aPct > hPct ? "0 0 10px rgba(52,211,153,0.5)" : "0 0 10px rgba(249,115,22,0.4)",
-                }}
-              />
+            <span
+              className={cn(
+                "inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]",
+                tone === "positive"
+                  ? "border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-300"
+                  : "border-white/[0.08] bg-white/[0.04] text-white/56"
+              )}
+            >
+              {confPct}% confidence
+            </span>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[18px] font-semibold leading-tight text-white">
+            <span>{match.home.name}</span>
+            <span className="text-white/22">vs</span>
+            <span>{match.away.name}</span>
+          </div>
+
+          <p className="mt-2 text-[12px] leading-5 text-white/38">
+            {source}
+            {edge != null ? ` · ${edge}% separation between the two main sides` : " · Signal still forming"}
+          </p>
+        </div>
+
+        <div className="rounded-[16px] border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-right">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/34">Kickoff</p>
+          <p className="mt-1 font-mono text-[13px] font-semibold text-white">{fmtTime(match.startTime)}</p>
+        </div>
+      </div>
+
+      {hPct != null && aPct != null ? (
+        <>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] px-3 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/28">Home</p>
+              <p className="mt-2 truncate text-[13px] font-semibold text-white/74">{match.home.name}</p>
+              <p className={cn("mt-1 font-mono text-[22px] font-bold leading-none tabular-nums", hPct >= aPct ? "text-emerald-300" : "text-white/44")}>{hPct}%</p>
             </div>
-            <span className={cn(
-              "w-9 shrink-0 font-mono text-[12px] font-bold tabular-nums",
-              aPct > hPct ? "text-emerald-300" : "text-orange-300/70"
-            )}>
-              {aPct}%
-            </span>
+            <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] px-3 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/28">Away</p>
+              <p className="mt-2 truncate text-[13px] font-semibold text-white/74">{match.away.name}</p>
+              <p className={cn("mt-1 font-mono text-[22px] font-bold leading-none tabular-nums", aPct > hPct ? "text-orange-300" : "text-white/44")}>{aPct}%</p>
+            </div>
+            <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.03] px-3 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/28">Draw / market</p>
+              <p className="mt-2 text-[13px] font-semibold text-white/74">{dPct != null ? "Draw available" : "Two-way market"}</p>
+              <p className="mt-1 font-mono text-[22px] font-bold leading-none tabular-nums text-amber-300">{dPct != null ? `${dPct}%` : "—"}</p>
+            </div>
           </div>
-        )}
-      </div>
 
-      <div className="relative flex shrink-0 flex-col items-end gap-1.5">
-        <div
-          className="min-w-[58px] rounded-xl border px-3 py-1.5 text-center"
-          style={{ borderColor: confBadge.border, background: confBadge.bg }}
-        >
-          <div className="mb-0.5 text-[8px] uppercase tracking-[0.14em] text-white/28">Conf</div>
-          <div className="font-mono text-[18px] font-bold tabular-nums leading-none" style={{ color: confBadge.color }}>
-            {confPct}%
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+            <div className="h-full bg-[linear-gradient(90deg,#00ff84,#10b981)]" style={{ width: `${hPct}%` }} />
           </div>
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <TinyMetric label="Favorite" value={favorite} />
+            <TinyMetric label="Source" value={source} />
+            <TinyMetric label="Edge" value={edge != null ? `${edge}%` : "—"} />
+          </div>
+        </>
+      ) : (
+        <div className="mt-4 rounded-[18px] border border-dashed border-white/[0.10] bg-white/[0.02] px-4 py-4 text-[12px] text-white/42">
+          Probabilities are still warming up for this fixture.
         </div>
-        <div className="font-mono text-[10px] text-white/25">{fmtTime(match.startTime)}</div>
-      </div>
+      )}
 
-      <ChevronRight
-        size={13}
-        className="relative shrink-0 text-white/18 opacity-0 transition-opacity group-hover:opacity-100"
-      />
+      <div className="mt-4 flex items-center justify-between gap-3 text-[11px] font-semibold text-white/38">
+        <span>{match.backendId ? "Backend-linked analysis ready" : "Fixture card only"}</span>
+        <span className="inline-flex items-center gap-1 text-white/48 transition-colors group-hover:text-white/72">
+          Open match
+          <ChevronRight className="h-3.5 w-3.5" />
+        </span>
+      </div>
     </Link>
   );
 }
 
-// ── Tipster card ──────────────────────────────────────────────────────────────
-
 function avatarColor(name: string): string {
   const palette = ["#6ee7b7", "#93c5fd", "#c4b5fd", "#fca5a5", "#fcd34d", "#67e8f9"];
   let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+  for (let i = 0; i < name.length; i += 1) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
   return palette[h % palette.length];
 }
 
 function TipsterCard({ tipster }: { tipster: TipsterProfile }) {
   const pl = tipster.profit_loss ?? 0;
-  const plStr = `${pl >= 0 ? "+" : ""}${pl.toFixed(1)}u`;
   const col = avatarColor(tipster.username);
-  const isHot = pl >= 5;
-  const plColor = pl >= 5 ? "text-emerald-300" : pl >= 0 ? "text-amber-300" : "text-white/50";
+  const isHot = (tipster.weekly_win_rate ?? 0) >= 0.6 || pl >= 5;
+  const meta = [
+    (tipster.active_tips_count ?? 0) > 0 ? `${tipster.active_tips_count} active tip${tipster.active_tips_count === 1 ? "" : "s"}` : null,
+    (tipster.followers ?? 0) > 0 ? `${tipster.followers.toLocaleString()} followers` : null,
+  ].filter(Boolean).join(" · ") || "Building sample";
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3 transition-colors hover:border-white/[0.12]">
-      <div
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[12px] font-bold uppercase"
-        style={{ background: `${col}1a`, color: col, border: `1px solid ${col}35` }}
-      >
-        {tipster.username.slice(0, 2)}
+    <div className="rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4 transition-colors hover:border-white/[0.14]">
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-[13px] font-bold uppercase" style={{ background: `${col}1a`, color: col, borderColor: `${col}35` }}>
+          {(tipster.display_name || tipster.username).slice(0, 2)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-[14px] font-semibold text-white">{tipster.display_name || tipster.username}</p>
+            {isHot ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/20 bg-amber-400/[0.08] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-amber-300">
+                <Flame className="h-3 w-3" />
+                Hot
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-1 text-[11px] text-white/34">{meta}</p>
+        </div>
+        <div className="text-right">
+          <p className={cn("font-mono text-[20px] font-bold leading-none tabular-nums", pl >= 0 ? "text-emerald-300" : "text-red-400")}>{pl >= 0 ? "+" : ""}{pl.toFixed(1)}u</p>
+          <p className="mt-1 text-[9px] uppercase tracking-[0.14em] text-white/28">Profit</p>
+        </div>
       </div>
 
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <span className="truncate text-[13px] font-semibold text-white">{tipster.username}</span>
-          {isHot && (
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <TinyMetric label="Weekly" value={fmtPct(tipster.weekly_win_rate ?? 0)} />
+        <TinyMetric label="Overall" value={fmtPct(tipster.overall_win_rate ?? 0)} />
+        <TinyMetric label="Sample" value={`${tipster.settled_picks}`} />
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-1">
+          {tipster.recent_results.slice(0, 6).map((result, index) => (
             <span
-              className="inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-px text-[8px] font-bold uppercase tracking-wider"
-              style={{ borderColor: "rgba(251,191,36,0.28)", background: "rgba(251,191,36,0.08)", color: "#fcd34d" }}
-            >
-              <Zap size={7} /> Hot
-            </span>
-          )}
-        </div>
-        <div className="mt-1 flex items-center gap-1">
-          {tipster.recent_results.slice(0, 5).map((r, i) => (
-            <span
-              key={i}
+              key={`${tipster.id}-${index}`}
               className={cn(
-                "inline-flex h-4 w-4 items-center justify-center rounded text-[8px] font-bold",
-                r === "W" ? "bg-emerald-400/15 text-emerald-400" : "bg-red-400/12 text-red-400"
+                "inline-flex h-5 w-5 items-center justify-center rounded-[8px] text-[9px] font-bold",
+                result === "W" ? "bg-emerald-400/15 text-emerald-300" : "bg-red-400/15 text-red-300"
               )}
             >
-              {r}
+              {result}
             </span>
           ))}
-          {tipster.active_tips_count > 0 && (
-            <span className="ml-1 text-[10px] text-white/28">{tipster.active_tips_count} active</span>
-          )}
         </div>
-      </div>
-
-      <div className="shrink-0 text-right">
-        <div className={cn("font-mono text-[20px] font-bold tabular-nums leading-none", plColor)}>
-          {tipster.settled_picks > 0 ? plStr : "—"}
-        </div>
-        <div className="mt-0.5 text-[9px] uppercase tracking-[0.10em] text-white/28">units</div>
+        <Link href="/tipsters" className="text-[11px] font-semibold text-[var(--accent)] transition-opacity hover:opacity-75">
+          View profile
+        </Link>
       </div>
     </div>
   );
 }
 
-// ── Pill group ────────────────────────────────────────────────────────────────
-
 function PillGroup<T extends string>({
-  label, options, active, onChange, badges,
+  label,
+  options,
+  active,
+  onChange,
+  badges,
 }: {
   label: string;
   options: { value: T; label: string }[];
   active: T;
-  onChange: (v: T) => void;
+  onChange: (value: T) => void;
   badges?: Partial<Record<string, number>>;
 }) {
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/38 shrink-0">{label}</span>
-      <div className="flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] p-1">
-        {options.map((o) => {
-          const badge = badges?.[o.value];
-          const isActive = active === o.value;
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/38">{label}</span>
+      <div className="flex flex-wrap items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] p-1">
+        {options.map((option) => {
+          const badge = badges?.[option.value];
+          const isActive = active === option.value;
           return (
             <button
-              key={o.value}
-              onClick={() => onChange(o.value)}
+              key={option.value}
+              onClick={() => onChange(option.value)}
               className={cn(
-                "relative flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all",
-                isActive
-                  ? "bg-[#2edb6c] text-[#07110d] shadow-sm"
-                  : "text-white/55 hover:bg-white/[0.06] hover:text-white"
+                "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all",
+                isActive ? "bg-[#00ff84] text-[#07110d]" : "text-white/55 hover:bg-white/[0.06] hover:text-white"
               )}
             >
-              {o.label}
-              {badge != null && badge > 0 && (
-                <span className={cn(
-                  "inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold tabular-nums leading-none",
-                  isActive
-                    ? "bg-[#07110d]/30 text-[#07110d]"
-                    : "bg-emerald-400/20 text-emerald-300"
-                )}>
+              {option.label}
+              {badge != null && badge > 0 ? (
+                <span className={cn("inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold", isActive ? "bg-[#07110d]/25 text-[#07110d]" : "bg-emerald-400/20 text-emerald-300")}>
                   {badge}
                 </span>
-              )}
+              ) : null}
             </button>
           );
         })}
@@ -456,40 +514,39 @@ function PillGroup<T extends string>({
   );
 }
 
-// ── Match card (full predictions feed) ───────────────────────────────────────
-
 function MatchCard({ match }: { match: MatchWithSport }) {
   const href = `/sports/${match.sport}/matches/${match.id}`;
   const [reasoningOpen, setReasoningOpen] = useState(false);
   const [reasoning, setReasoning] = useState<string | null>(null);
   const [loadingReasoning, setLoadingReasoning] = useState(false);
 
-  async function handleAnalysis(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (reasoning) { setReasoningOpen((v) => !v); return; }
+  async function handleAnalysis(event: React.MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (reasoning) {
+      setReasoningOpen((value) => !value);
+      return;
+    }
     setReasoningOpen(true);
     setLoadingReasoning(true);
-    const r = await getMatchReasoning(match.backendId ?? match.id);
-    setReasoning(r);
+    const value = await getMatchReasoning(match.backendId ?? match.id);
+    setReasoning(value);
     setLoadingReasoning(false);
   }
 
-  // A model prediction of exactly 50/50 (confidence=0) means features were all default/zero
-  // — treat it the same as having no prediction so we fall through to market-implied odds.
   const modelConf = match.modelConfidence ?? 0;
   const hasModelProbs = match.pHome != null && modelConf > 0;
 
   const ml = match.featuredMarkets?.[0];
   const homeOdds = ml?.selections[0]?.odds;
-  const drawSel = ml?.selections.find((s) => s.id === "draw");
+  const drawSel = ml?.selections.find((selection) => selection.id === "draw");
   const awayOdds = ml?.selections[ml.selections.length - 1]?.odds;
 
-  // Compute implied probability from market odds if no useful model prediction
   let hPct: number | null = hasModelProbs ? Math.round((match.pHome ?? 0) * 100) : null;
   let aPct: number | null = hasModelProbs ? Math.round((match.pAway ?? 0) * 100) : null;
   let dPct: number | null = hasModelProbs && match.pDraw != null ? Math.round(match.pDraw * 100) : null;
   let isMarketImplied = false;
+
   if (!hasModelProbs && homeOdds && awayOdds && homeOdds > 1 && awayOdds > 1) {
     const impHome = 1 / homeOdds;
     const impDraw = drawSel ? 1 / drawSel.odds : 0;
@@ -500,9 +557,9 @@ function MatchCard({ match }: { match: MatchWithSport }) {
     dPct = impDraw > 0 ? 100 - hPct - aPct : null;
     isMarketImplied = true;
   }
+
   const hasProbabilities = hPct != null && aPct != null;
 
-  // Derive confidence from probabilities when model didn't supply one (e.g. ELO fallback)
   let conf = hasModelProbs ? modelConf : 0;
   if (match.modelConfidence == null && hasModelProbs && !isMarketImplied) {
     const maxRaw = Math.max(match.pHome ?? 0, match.pAway ?? 0, match.pDraw ?? 0);
@@ -510,227 +567,140 @@ function MatchCard({ match }: { match: MatchWithSport }) {
     const random = 1 / numOutcomes;
     conf = Math.max(0, Math.min(1, (maxRaw - random) / (1 - random)));
   }
+
   const hasConfidence = match.modelConfidence != null || (hasModelProbs && !isMarketImplied);
-
-  const isHighConf = hasConfidence && conf >= 0.7;
-  const confBarBg = conf >= 0.7 ? "bg-emerald-400" : conf >= 0.5 ? "bg-amber-400" : "bg-red-400";
-
-  const leagueLabel = LEAGUE_LABELS[match.league] ?? match.league;
+  const leagueLabel = LEAGUE_LABELS[match.league] ?? titleCase(match.league);
   const sportIcon = SPORT_ICONS[match.sport] ?? "🏆";
+  const favoredSide = hasProbabilities ? ((hPct ?? 0) >= (aPct ?? 0) ? match.home.name : match.away.name) : "No lean yet";
+  const sourceLabel = match.modelConfidence != null ? "Model" : hasProbabilities && !isMarketImplied ? "ELO" : isMarketImplied ? "Market" : "Pending";
+  const confidenceTone = hasConfidence ? chipTone(conf) : "neutral";
 
   return (
-    <div className={cn(
-      "group relative overflow-hidden rounded-[28px] border transition-all duration-200",
-      isHighConf
-        ? "border-emerald-400/25 bg-[linear-gradient(135deg,rgba(54,242,143,0.08),rgba(54,242,143,0.03))]"
-        : "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))]"
-    )}>
-      {isHighConf && (
-        <div className="pointer-events-none absolute inset-0 rounded-[28px] bg-[radial-gradient(circle_at_top_left,rgba(54,242,143,0.08),transparent_60%)]" />
-      )}
-
-      {/* Main clickable area */}
-      <Link href={href} className="relative block p-5 hover:-translate-y-0.5 hover:shadow-[0_24px_60px_rgba(0,0,0,0.32)] transition-all duration-200">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+    <div className={cn("overflow-hidden rounded-[28px] border bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] transition-colors", hasConfidence && conf >= 0.7 ? "border-emerald-400/22" : "border-white/[0.08]")}>
+      <Link href={href} className="group block p-5 transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/[0.015]">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
             <span className="text-sm">{sportIcon}</span>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
-              {leagueLabel}
-            </span>
-            {isHighConf && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
-                <Zap size={9} />
-                High confidence
-              </span>
-            )}
+            <span className="truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-white/42">{leagueLabel}</span>
           </div>
-          <span className="shrink-0 font-mono text-[11px] text-white/30">{fmtTime(match.startTime)}</span>
+          <span className="font-mono text-[11px] text-white/30">{fmtTime(match.startTime)}</span>
         </div>
 
-        <div className="mt-4 grid grid-cols-[1fr_32px_1fr] items-start gap-2">
+        <div className="mt-4 grid grid-cols-[1fr_34px_1fr] items-start gap-2">
           <div>
-            <p className="text-[13px] font-semibold leading-snug text-white">{match.home.name}</p>
-            {hasProbabilities && (
-              <p className={cn(
-                "mt-1.5 font-mono text-[26px] font-bold tabular-nums leading-none",
-                isMarketImplied
-                  ? ((hPct ?? 0) >= (aPct ?? 0) ? "text-sky-300" : "text-sky-300/50")
-                  : ((hPct ?? 0) >= (aPct ?? 0) ? "text-emerald-300" : "text-white/50")
-              )}>{hPct}%</p>
-            )}
-            {homeOdds && (
-              <p className="mt-0.5 font-mono text-[11px] text-white/30">{homeOdds.toFixed(2)}</p>
-            )}
+            <p className="text-[15px] font-semibold leading-tight text-white">{match.home.name}</p>
+            {hPct != null ? <p className={cn("mt-2 font-mono text-[28px] font-bold leading-none tabular-nums", hPct >= (aPct ?? 0) ? "text-emerald-300" : "text-white/45")}>{hPct}%</p> : null}
+            {homeOdds ? <p className="mt-1 font-mono text-[11px] text-white/28">Odds {homeOdds.toFixed(2)}</p> : null}
           </div>
 
-          <div className="flex h-full flex-col items-center pt-1">
+          <div className="flex flex-col items-center pt-1">
             <span className="text-[11px] font-medium text-white/25">vs</span>
-            {dPct != null && (
-              <div className="mt-2 rounded-xl border border-white/8 bg-black/20 px-1.5 py-2 text-center">
-                <p className="text-[9px] font-semibold uppercase text-white/35">D</p>
-                <p className="font-mono text-xs font-bold text-amber-300/70 tabular-nums">{dPct}%</p>
+            {dPct != null ? (
+              <div className="mt-2 rounded-[12px] border border-white/[0.08] bg-white/[0.03] px-2 py-2 text-center">
+                <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/26">Draw</p>
+                <p className="mt-1 font-mono text-[12px] font-bold text-amber-300">{dPct}%</p>
               </div>
-            )}
+            ) : null}
           </div>
 
           <div className="text-right">
-            <p className="text-[13px] font-semibold leading-snug text-white">{match.away.name}</p>
-            {hasProbabilities && (
-              <p className={cn(
-                "mt-1.5 font-mono text-[26px] font-bold tabular-nums leading-none",
-                isMarketImplied
-                  ? ((aPct ?? 0) > (hPct ?? 0) ? "text-sky-300" : "text-sky-300/50")
-                  : ((aPct ?? 0) > (hPct ?? 0) ? "text-orange-300" : "text-white/50")
-              )}>{aPct}%</p>
-            )}
-            {awayOdds && (
-              <p className="mt-0.5 font-mono text-[11px] text-white/30">{awayOdds.toFixed(2)}</p>
-            )}
+            <p className="text-[15px] font-semibold leading-tight text-white">{match.away.name}</p>
+            {aPct != null ? <p className={cn("mt-2 font-mono text-[28px] font-bold leading-none tabular-nums", aPct > (hPct ?? 0) ? "text-orange-300" : "text-white/45")}>{aPct}%</p> : null}
+            {awayOdds ? <p className="mt-1 font-mono text-[11px] text-white/28">Odds {awayOdds.toFixed(2)}</p> : null}
           </div>
         </div>
 
-        {hasProbabilities && (
-          <div className="mt-4 overflow-hidden rounded-full" style={{ height: 12, background: "rgba(255,255,255,0.05)" }}>
-            <div className="relative h-full">
-              <div
-                className="absolute left-0 top-0 h-full transition-all"
-                style={{
-                  width: `${(hPct ?? 0) - (dPct != null ? dPct / 2 : 0)}%`,
-                  background: isMarketImplied
-                    ? "linear-gradient(90deg, rgba(56,189,248,0.9), rgba(56,189,248,0.6))"
-                    : "linear-gradient(90deg, #34d399, #10b981)",
-                  boxShadow: isMarketImplied ? "0 0 16px rgba(56,189,248,0.55)" : "0 0 16px rgba(52,211,153,0.55)",
-                }}
-              />
-              {dPct != null && (
-                <div className="absolute top-0 h-full" style={{
-                  left: `${(hPct ?? 0) - dPct / 2}%`,
-                  width: `${dPct}%`,
-                  background: "rgba(251,191,36,0.55)",
-                }} />
-              )}
-              <div
-                className="absolute right-0 top-0 h-full transition-all"
-                style={{
-                  width: `${(aPct ?? 0) - (dPct != null ? dPct / 2 : 0)}%`,
-                  background: isMarketImplied
-                    ? "linear-gradient(270deg, rgba(56,189,248,0.9), rgba(56,189,248,0.6))"
-                    : "linear-gradient(270deg, #f97316, #fb923c)",
-                  boxShadow: isMarketImplied ? "0 0 16px rgba(56,189,248,0.55)" : "0 0 16px rgba(249,115,22,0.45)",
-                }}
-              />
+        {hasProbabilities ? (
+          <>
+            <div className="mt-4 relative h-2 overflow-hidden rounded-full bg-white/[0.06]">
+              <div className="absolute left-0 top-0 h-full bg-[linear-gradient(90deg,#00ff84,#10b981)]" style={{ width: `${Math.max(0, (hPct ?? 0) - (dPct != null ? dPct / 2 : 0))}%` }} />
+              {dPct != null ? <div className="absolute top-0 h-full bg-amber-300/75" style={{ left: `${Math.max(0, (hPct ?? 0) - dPct / 2)}%`, width: `${dPct}%` }} /> : null}
+              <div className="absolute right-0 top-0 h-full bg-[linear-gradient(270deg,#fb923c,#f97316)]" style={{ width: `${Math.max(0, (aPct ?? 0) - (dPct != null ? dPct / 2 : 0))}%` }} />
             </div>
+
+            <div className="mt-4 grid gap-2 sm:grid-cols-4">
+              <TinyMetric label="Lean" value={favoredSide} />
+              <TinyMetric label="Source" value={sourceLabel} />
+              <TinyMetric label="Home" value={`${hPct}%`} />
+              <TinyMetric label="Away" value={`${aPct}%`} />
+            </div>
+          </>
+        ) : (
+          <div className="mt-4 rounded-[18px] border border-dashed border-white/[0.10] bg-white/[0.02] px-4 py-4 text-[12px] text-white/40">
+            No clean prediction signal yet for this fixture.
           </div>
         )}
 
         <div className="mt-4 flex items-center justify-between gap-3">
           {hasConfidence ? (
-            <div className="flex items-center gap-2.5">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/35">Confidence</span>
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-24 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className={cn("h-full rounded-full shadow-sm", confBarBg,
-                      conf >= 0.7 ? "shadow-emerald-400/40" : conf >= 0.5 ? "shadow-amber-400/40" : "shadow-red-400/40"
-                    )}
-                    style={{ width: `${Math.round(conf * 100)}%` }}
-                  />
-                </div>
-                <span className={cn(
-                  "rounded-full border px-2 py-0.5 font-mono text-[12px] font-bold tabular-nums",
-                  conf >= 0.7
-                    ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
-                    : conf >= 0.5
-                    ? "border-amber-400/30 bg-amber-400/10 text-amber-300"
-                    : "border-red-400/30 bg-red-400/10 text-red-400"
-                )}>
-                  {Math.round(conf * 100)}%
-                </span>
-              </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/34">Confidence</span>
+              <span className={cn("inline-flex rounded-full border px-2.5 py-1 font-mono text-[12px] font-bold tabular-nums", toneClasses(confidenceTone))}>
+                {Math.round(conf * 100)}%
+              </span>
             </div>
-          ) : isMarketImplied ? (
-            <span className="text-[11px] text-white/25">Market implied</span>
-          ) : hasProbabilities ? (
-            <span className="text-[11px] text-white/25">ELO estimate</span>
           ) : (
-            <span className="text-[11px] text-white/20">No prediction</span>
+            <span className="text-[11px] text-white/28">{sourceLabel} signal</span>
           )}
-
-          <span className="flex items-center gap-1 text-[11px] font-semibold text-white/40 opacity-0 transition-opacity group-hover:opacity-100">
-            View <ChevronRight size={12} />
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-white/42 opacity-0 transition-opacity group-hover:opacity-100">
+            Open analysis
+            <ChevronRight className="h-3.5 w-3.5" />
           </span>
         </div>
       </Link>
 
-      {/* AI Analysis toggle — only for matches tracked in backend DB */}
-      {match.backendId && <div className="relative border-t border-white/[0.05]">
-        <button
-          onClick={handleAnalysis}
-          className={cn(
-            "flex w-full items-center gap-2 px-5 py-2.5 text-left text-[11px] font-semibold transition-colors",
-            reasoningOpen
-              ? "text-purple-300"
-              : "text-white/30 hover:text-white/55"
-          )}
-        >
-          {loadingReasoning
-            ? <Loader2 size={11} className="animate-spin text-purple-400" />
-            : <Sparkles size={11} className={reasoningOpen ? "text-purple-400" : "text-white/25"} />
-          }
-          {loadingReasoning ? "Generating analysis…" : reasoningOpen ? "Hide pre-match analysis" : "Pre-match analysis"}
-        </button>
+      {match.backendId ? (
+        <div className="border-t border-white/[0.05] px-5 pb-4 pt-2.5">
+          <button
+            onClick={handleAnalysis}
+            className={cn("flex w-full items-center gap-2 text-left text-[11px] font-semibold transition-colors", reasoningOpen ? "text-purple-300" : "text-white/34 hover:text-white/58")}
+          >
+            {loadingReasoning ? <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-400" /> : <Sparkles className={cn("h-3.5 w-3.5", reasoningOpen ? "text-purple-400" : "text-white/28")} />}
+            {loadingReasoning ? "Generating analysis…" : reasoningOpen ? "Hide pre-match analysis" : "Pre-match analysis"}
+          </button>
 
-        {reasoningOpen && (
-          <div className="px-5 pb-4">
-            {loadingReasoning ? (
-              <div className="flex items-center gap-2 py-2">
-                <Loader2 size={12} className="animate-spin text-purple-400/60" />
-                <span className="text-[12px] text-white/30">Analysing match data…</span>
-              </div>
-            ) : reasoning ? (
-              <p className="text-[12px] leading-relaxed text-white/55 border-l-2 border-purple-400/30 pl-3">
-                {reasoning}
-              </p>
-            ) : (
-              <p className="text-[12px] text-white/40">Analysis not yet available — check back shortly.</p>
-            )}
-          </div>
-        )}
-      </div>}
+          {reasoningOpen ? (
+            <div className="mt-3 rounded-[18px] border border-purple-400/15 bg-purple-400/[0.05] px-4 py-3">
+              {loadingReasoning ? (
+                <div className="flex items-center gap-2 text-[12px] text-white/36">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-400/60" />
+                  Analysing match data…
+                </div>
+              ) : reasoning ? (
+                <p className="text-[12px] leading-6 text-white/58">{reasoning}</p>
+              ) : (
+                <p className="text-[12px] text-white/42">Analysis not yet available — check back shortly.</p>
+              )}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
-
-// ── Day section ───────────────────────────────────────────────────────────────
 
 function DaySection({ label, matches }: { label: string; matches: MatchWithSport[] }) {
   return (
-    <div>
-      <div className="mb-3 flex items-center gap-3">
-        <h3 className="text-[13px] font-bold text-white/60">{label}</h3>
+    <section className="space-y-4">
+      <div className="flex items-center gap-3">
+        <h3 className="text-[16px] font-semibold tracking-[-0.02em] text-white">{label}</h3>
         <div className="h-px flex-1 bg-white/[0.06]" />
-        <span className="text-[11px] text-white/30">{matches.length} fixture{matches.length !== 1 ? "s" : ""}</span>
+        <span className="text-[11px] uppercase tracking-[0.14em] text-white/30">{matches.length} fixture{matches.length !== 1 ? "s" : ""}</span>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {matches.map((m) => <MatchCard key={m.id} match={m} />)}
+      <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+        {matches.map((match) => (
+          <MatchCard key={match.id} match={match} />
+        ))}
       </div>
-    </div>
+    </section>
   );
 }
-
-// ── Main shell ────────────────────────────────────────────────────────────────
-
-const ALL_SPORT_LEAGUES: { sport: SportSlug; leagueID: string }[] = Object.entries(SPORT_LEAGUES)
-  .flatMap(([sport, leagues]) =>
-    (leagues as string[]).map((leagueID) => ({ sport: sport as SportSlug, leagueID }))
-  );
 
 export function PredictionsShell({ initialSport }: { initialSport: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  type MatchWithSportLocal = BettingMatch & { sport: SportSlug; backendId?: string };
-  const [matches, setMatches] = useState<MatchWithSportLocal[]>([]);
+  const [matches, setMatches] = useState<MatchWithSport[]>([]);
   const [loading, setLoading] = useState(true);
   const [minConf, setMinConf] = useState("0");
   const [showAll, setShowAll] = useState(true);
@@ -740,94 +710,87 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
   const sport = searchParams.get("sport") ?? initialSport;
 
   function navigate(updates: Record<string, string>) {
-    const p = new URLSearchParams(searchParams.toString());
-    Object.entries(updates).forEach(([k, v]) => {
-      if (v === "all") p.delete(k); else p.set(k, v);
+    const params = new URLSearchParams(searchParams.toString());
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === "all") params.delete(key);
+      else params.set(key, value);
     });
-    router.replace(`/predictions${p.size ? `?${p}` : ""}`, { scroll: false });
+    router.replace(`/predictions${params.size ? `?${params}` : ""}`, { scroll: false });
   }
 
-  // Load matches
   useEffect(() => {
     setLoading(true);
-    const leagues = sport === "all"
-      ? ALL_SPORT_LEAGUES
-      : ALL_SPORT_LEAGUES.filter((l) => l.sport === sport);
+    const leagues = sport === "all" ? ALL_SPORT_LEAGUES : ALL_SPORT_LEAGUES.filter((league) => league.sport === sport);
 
-    if (!leagues.length) { setLoading(false); return; }
-
-    const sportSlugs = Array.from(new Set(leagues.map((l) => l.sport)));
+    // sportSlugs: always include the selected sport (or all sports) for backend fetch,
+    // even if that sport has no SGO league IDs (e.g. esports).
+    const sportSlugs: SportSlug[] = sport === "all"
+      ? (SPORT_META.map((m) => m.value).filter((v) => v !== "all") as SportSlug[])
+      : [sport as SportSlug];
 
     Promise.all([
-      Promise.all(leagues.map(({ leagueID, sport: s }) =>
-        fetchSGOEvents(leagueID).then((events) =>
-          events
-            .filter((e) => !e.status.started && !e.status.ended && !e.status.cancelled)
-            .map((e) => ({ ...sgoEventToMatch(e, s), sport: s }))
-        )
-      )).then((res) => res.flat()),
-      Promise.all(sportSlugs.map((s) => fetchBackendForSport(s).then((items) => ({ sport: s, items })))),
+      leagues.length > 0
+        ? Promise.all(
+            leagues.map(({ leagueID, sport: currentSport }) =>
+              fetchSGOEvents(leagueID).then((events) =>
+                events
+                  .filter((event) => !event.status.started && !event.status.ended && !event.status.cancelled)
+                  .map((event) => ({ ...sgoEventToMatch(event, currentSport), sport: currentSport }))
+              )
+            )
+          ).then((result) => result.flat())
+        : Promise.resolve([] as MatchWithSport[]),
+      Promise.all(sportSlugs.map((currentSport) => fetchBackendForSport(currentSport).then((items) => ({ sport: currentSport, items })))),
     ]).then(async ([sgoMatches, backendBySport]) => {
-      const backendMap = Object.fromEntries(backendBySport.map(({ sport: s, items }) => [s, items]));
+      const backendMap = Object.fromEntries(backendBySport.map(({ sport: currentSport, items }) => [currentSport, items]));
       const now = Date.now();
       const cutoff = now + 48 * 3600_000;
 
-      // First pass: merge SGO events with backend DB predictions
-      const sgoFiltered = sgoMatches.filter((m) => {
-        const t = new Date(m.startTime).getTime();
-        return t >= now && t <= cutoff;
+      const sgoFiltered = sgoMatches.filter((match) => {
+        const time = new Date(match.startTime).getTime();
+        return time >= now && time <= cutoff;
       });
 
-      const sgoMerged: MatchWithSportLocal[] = sgoFiltered
-        .map((m) => ({ ...mergeBackend(m, backendMap[m.sport] ?? []), sport: m.sport }));
+      const sgoMerged: MatchWithSport[] = sgoFiltered.map((match) => ({ ...mergeBackend(match, backendMap[match.sport] ?? []), sport: match.sport }));
 
-      // Backend-only fallback: include DB matches not already covered by SGO events
-      const backendOnly: MatchWithSportLocal[] = [];
-      for (const { sport: s, items } of backendBySport) {
+      const backendOnly: MatchWithSport[] = [];
+      for (const { sport: currentSport, items } of backendBySport) {
         for (const item of items) {
-          const t = new Date(item.kickoff_utc).getTime();
-          if (t < now || t > cutoff) continue;
-          // Skip if already matched by an SGO event
+          const time = new Date(item.kickoff_utc).getTime();
+          if (time < now || time > cutoff) continue;
           const alreadyCovered = sgoMerged.some(
-            (m) => m.sport === s && teamsMatch(m.home.name, item.home_name) && teamsMatch(m.away.name, item.away_name)
+            (match) => match.sport === currentSport && teamsMatch(match.home.name, item.home_name) && teamsMatch(match.away.name, item.away_name)
           );
-          if (!alreadyCovered) {
-            backendOnly.push(backendItemToMatch(item, s));
-          }
+          if (!alreadyCovered) backendOnly.push(backendItemToMatch(item, currentSport));
         }
       }
 
-      const firstPass: MatchWithSportLocal[] = [...sgoMerged, ...backendOnly]
-        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-
+      const firstPass = [...sgoMerged, ...backendOnly].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
       setMatches(firstPass);
       setLoading(false);
 
-      // Second pass: call preview for matches missing probabilities OR missing draw on draw-capable sports
-      const needsPreview = (m: MatchWithSportLocal) => {
-        if (m.status === "finished") return false;
-        if (m.pHome == null) return true;
-        // Also re-fetch for draw sports (soccer, mls, etc.) that have a draw market but no pDraw yet
-        const hasDrawMarket = m.featuredMarkets?.[0]?.selections.some((s) => s.id === "draw");
-        return hasDrawMarket && m.pDraw == null;
+      const needsPreview = (match: MatchWithSport) => {
+        if (match.status === "finished") return false;
+        if (match.pHome == null) return true;
+        const hasDrawMarket = match.featuredMarkets?.[0]?.selections.some((selection) => selection.id === "draw");
+        return Boolean(hasDrawMarket && match.pDraw == null);
       };
+
       const unmatched = firstPass.filter(needsPreview);
       if (unmatched.length > 0) {
-        const previews = await Promise.all(
-          unmatched.map((m) => fetchPreview(m.sport, m.home.name, m.away.name))
-        );
+        const previews = await Promise.all(unmatched.map((match) => fetchPreview(match.sport, match.home.name, match.away.name)));
         setMatches((prev) =>
-          prev.map((m) => {
-            if (!needsPreview(m)) return m;
-            const idx = unmatched.findIndex((u) => u.id === m.id);
-            const p = idx >= 0 ? previews[idx] : null;
-            if (!p) return m;
+          prev.map((match) => {
+            if (!needsPreview(match)) return match;
+            const index = unmatched.findIndex((candidate) => candidate.id === match.id);
+            const preview = index >= 0 ? previews[index] : null;
+            if (!preview) return match;
             return {
-              ...m,
-              pHome: p.p_home ?? m.pHome ?? undefined,
-              pAway: p.p_away ?? m.pAway ?? undefined,
-              pDraw: p.p_draw ?? undefined,
-              modelConfidence: p.confidence != null ? p.confidence / 100 : (m.modelConfidence ?? undefined),
+              ...match,
+              pHome: preview.p_home ?? match.pHome ?? undefined,
+              pAway: preview.p_away ?? match.pAway ?? undefined,
+              pDraw: preview.p_draw ?? undefined,
+              modelConfidence: preview.confidence != null ? preview.confidence / 100 : match.modelConfidence ?? undefined,
             };
           })
         );
@@ -835,246 +798,288 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
     });
   }, [sport]);
 
-  // Load tipsters
   useEffect(() => {
     getTipsters()
       .then((data) => {
-        setTipsters(
-          [...data]
-            .sort((a, b) => (b.profit_loss ?? 0) - (a.profit_loss ?? 0))
-            .slice(0, 5)
-        );
+        setTipsters([...data].sort((a, b) => (b.profit_loss ?? 0) - (a.profit_loss ?? 0)).slice(0, 5));
       })
       .catch(() => {})
       .finally(() => setTipstersLoading(false));
   }, []);
 
   const threshold = parseFloat(minConf);
-  const base = showAll ? matches : matches.filter((m) => m.pHome != null);
-  const items = threshold > 0
-    ? base.filter((m) => (m.modelConfidence ?? 0) >= threshold)
-    : base;
+  const baseItems = showAll ? matches : matches.filter((match) => match.pHome != null);
+  const items = threshold > 0 ? baseItems.filter((match) => (match.modelConfidence ?? 0) >= threshold) : baseItems;
+  const withConf = matches.filter((match) => match.modelConfidence != null).length;
+  const highConf = matches.filter((match) => (match.modelConfidence ?? 0) >= 0.7).length;
+  const withProbabilities = matches.filter((match) => match.pHome != null).length;
+  const coverage = matches.length ? Math.round((withProbabilities / matches.length) * 100) : 0;
 
-  const withConf = matches.filter((m) => m.modelConfidence != null).length;
-  const highConf = matches.filter((m) => (m.modelConfidence ?? 0) >= 0.7).length;
-
-  // Per-sport signal count (confidence >= 60%) for sport pill badges
   const sportSignals: Partial<Record<string, number>> = {};
   let totalSignals = 0;
-  for (const m of matches) {
-    if ((m.modelConfidence ?? 0) >= 0.6) {
-      sportSignals[m.sport] = (sportSignals[m.sport] ?? 0) + 1;
-      totalSignals++;
+  for (const match of matches) {
+    if ((match.modelConfidence ?? 0) >= 0.6) {
+      sportSignals[match.sport] = (sportSignals[match.sport] ?? 0) + 1;
+      totalSignals += 1;
     }
   }
-  if (totalSignals > 0) sportSignals["all"] = totalSignals;
+  if (totalSignals > 0) sportSignals.all = totalSignals;
 
-  // Featured picks: top 5 by confidence, min 60%, from ALL matches regardless of filters
-  const featuredPicks = matches
-    .filter((m) => (m.modelConfidence ?? 0) >= 0.6)
-    .sort((a, b) => (b.modelConfidence ?? 0) - (a.modelConfidence ?? 0))
-    .slice(0, 5);
+  const featuredPicks = useMemo(
+    () => matches.filter((match) => (match.modelConfidence ?? 0) >= 0.6).sort((a, b) => (b.modelConfidence ?? 0) - (a.modelConfidence ?? 0)).slice(0, 5),
+    [matches]
+  );
 
-  // Group remaining by day
-  const grouped: { label: string; matches: MatchWithSportLocal[] }[] = [];
-  for (const m of items) {
-    const label = dayLabel(m.startTime);
-    const existing = grouped.find((g) => g.label === label);
-    if (existing) existing.matches.push(m);
-    else grouped.push({ label, matches: [m] });
-  }
+  const grouped = useMemo(() => {
+    const rows: { label: string; matches: MatchWithSport[] }[] = [];
+    for (const match of items) {
+      const label = dayLabel(match.startTime);
+      const existing = rows.find((row) => row.label === label);
+      if (existing) existing.matches.push(match);
+      else rows.push({ label, matches: [match] });
+    }
+    return rows;
+  }, [items]);
+
+  const topSignalSport = useMemo(() => {
+    const rows = Object.entries(sportSignals).filter(([key]) => key !== "all").sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
+    return rows[0] ?? null;
+  }, [matches.length, totalSignals]);
+
+  const nextKickoff = matches[0]?.startTime;
+  const boardModeLabel = showAll ? "All fixtures" : "Predictions only";
 
   return (
-    <div className="space-y-6 pb-12">
-
-      {/* ── Sport bar ─────────────────────────────────────────────────────── */}
-      <div className="overflow-x-auto no-scrollbar">
-        <div className="flex min-w-max items-center gap-2 rounded-[24px] border border-white/8 bg-white/[0.03] p-2">
-          {SPORT_META.map((s) => {
-            const badge = sportSignals[s.value];
+    <div className="space-y-5 pb-24 lg:pb-12">
+      <div className="-mx-1 overflow-x-auto px-1 pb-1 no-scrollbar">
+        <div className="flex min-w-max items-center gap-2 rounded-[24px] border border-white/[0.08] bg-white/[0.03] p-2 pr-3">
+          {SPORT_META.map((entry) => {
+            const badge = sportSignals[entry.value];
+            const active = entry.value === sport;
             return (
               <button
-                key={s.value}
-                onClick={() => navigate({ sport: s.value })}
+                key={entry.value}
+                onClick={() => navigate({ sport: entry.value })}
                 className={cn(
-                  "relative flex items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-all",
-                  s.value === sport
-                    ? "bg-[#2edb6c] text-[#07110d] shadow-sm"
-                    : "text-white/60 hover:bg-white/[0.06] hover:text-white"
+                  "inline-flex shrink-0 snap-start items-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-semibold transition-all",
+                  active ? "bg-[#00ff84] text-[#07110d]" : "text-white/60 hover:bg-white/[0.06] hover:text-white"
                 )}
               >
-                <span>{s.icon}</span>
-                <span>{s.label}</span>
-                {badge != null && badge > 0 && (
-                  <span className={cn(
-                    "inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold tabular-nums leading-none",
-                    s.value === sport
-                      ? "bg-[#07110d]/30 text-[#07110d]"
-                      : "bg-emerald-400/20 text-emerald-300"
-                  )}>
+                <span>{entry.icon}</span>
+                <span>{entry.label}</span>
+                {badge != null && badge > 0 ? (
+                  <span className={cn("inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold", active ? "bg-[#07110d]/25 text-[#07110d]" : "bg-emerald-400/20 text-emerald-300")}>
                     {badge}
                   </span>
-                )}
+                ) : null}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* ── Page header ───────────────────────────────────────────────────── */}
-      <div className="overflow-hidden rounded-[24px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-[20px] font-bold tracking-[-0.03em] text-white">
-              Today&apos;s Intelligence
-            </h1>
-            <p className="mt-0.5 text-[12px] text-white/35">
-              Best model picks · Top tipsters · Next 48 hours
-            </p>
-          </div>
-
-          {!loading && (withConf > 0 || highConf > 0) && (
-            <div className="flex items-center gap-2 shrink-0">
-              <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-center">
-                <div className="font-mono text-[18px] font-bold tabular-nums text-white leading-none">{withConf}</div>
-                <div className="mt-1 text-[9px] uppercase tracking-[0.14em] text-white/30">Predictions</div>
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="overflow-hidden rounded-[28px] border border-[rgba(0,255,132,0.12)] bg-[radial-gradient(circle_at_top_left,rgba(0,255,132,0.12),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 lg:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-[620px]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(0,255,132,0.16)] bg-[rgba(0,255,132,0.08)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9dffcb]">
+                <Activity className="h-3.5 w-3.5" />
+                Board overview
               </div>
-              {highConf > 0 && (
-                <div className="rounded-xl border px-3 py-1.5 text-center"
-                  style={{ borderColor: "rgba(52,211,153,0.25)", background: "rgba(52,211,153,0.08)" }}>
-                  <div className="font-mono text-[18px] font-bold tabular-nums text-emerald-300 leading-none">{highConf}</div>
-                  <div className="mt-1 text-[9px] uppercase tracking-[0.14em]" style={{ color: "rgba(52,211,153,0.5)" }}>High conf</div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Filters */}
-        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-white/[0.05] pt-4">
-          <PillGroup
-            label="Confidence"
-            options={CONF_THRESHOLDS}
-            active={minConf}
-            onChange={setMinConf}
-          />
-
-          <button
-            onClick={() => setShowAll((v) => !v)}
-            className={cn(
-              "ml-auto flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all",
-              showAll
-                ? "border-white/15 bg-white/[0.06] text-white/70"
-                : "border-white/[0.08] text-white/40 hover:text-white/60"
-            )}
-          >
-            {showAll ? <Eye size={13} /> : <EyeOff size={13} />}
-            {showAll ? "Showing all" : "Predictions only"}
-          </button>
-        </div>
-      </div>
-
-      {/* ── Two-column: Featured picks + Top tipsters ──────────────────────── */}
-      <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
-
-        {/* Featured picks */}
-        <div>
-          <SectionLabel
-            label="Top Picks"
-            sub={loading ? "Loading…" : "Highest confidence today"}
-            count={loading ? undefined : featuredPicks.length}
-          />
-          {loading ? (
-            <div className="space-y-2">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="h-[88px] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02]" />
-              ))}
-            </div>
-          ) : featuredPicks.length === 0 ? (
-            <div className="flex min-h-[160px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/[0.10] bg-white/[0.02] p-6 text-center">
-              <BrainCircuit size={24} className="text-white/25" />
-              <p className="mt-3 text-[13px] text-white/40">No high-confidence picks yet</p>
-              <p className="mt-1 text-[11px] text-white/22">
-                Lower the confidence filter to see more matches
+              <h2 className="mt-4 text-[26px] font-semibold tracking-[-0.04em] text-white sm:text-[32px]">
+                {matches.length === 0 && !loading
+                  ? "No live board right now — relax the filters or open the wider fixture list."
+                  : "Start with the strongest reads, then move straight into fixtures."}
+              </h2>
+              <p className="mt-3 max-w-[58ch] text-[14px] leading-6 text-white/48">
+                {matches.length === 0 && !loading
+                  ? threshold > 0
+                    ? `Nothing in the next 48 hours clears the ${Math.round(threshold * 100)}% confidence bar yet. Reset the filter or open all fixtures to keep moving.`
+                    : "The board is quiet right now. Use the sport tabs, open all fixtures, or jump into match hubs while fresh signals warm up."
+                  : "Scan by sport, tighten the confidence bar, and move from featured conviction into the full fixture feed without duplicate framing."}
               </p>
             </div>
-          ) : (
-            <div className="space-y-2">
-              {featuredPicks.map((m) => (
-                <FeaturedPickCard key={m.id} match={m} />
-              ))}
+            <div className="rounded-[22px] border border-white/[0.08] bg-[#0b0c14]/70 px-4 py-3 text-right">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/34">Current board mode</p>
+              <p className="mt-2 text-[18px] font-semibold text-white">{titleCase(boardModeLabel)}</p>
+              <p className="mt-1 text-[11px] text-white/36">{nextKickoff ? `Next kickoff ${fmtTime(nextKickoff)}` : "Waiting for fixtures"}</p>
             </div>
-          )}
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <SummaryStat
+              label="Visible board"
+              value={`${items.length}`}
+              note={
+                items.length > 0
+                  ? showAll
+                    ? `${matches.length} fixtures in the next 48 hours`
+                    : "Prediction-ready fixtures only"
+                  : "Waiting for the next readable board"
+              }
+              tone="accent"
+              icon={Activity}
+            />
+            <SummaryStat
+              label="Featured picks"
+              value={`${featuredPicks.length}`}
+              note={featuredPicks.length > 0 ? "60%+ confidence reads surfaced first" : "Waiting for 60%+ reads"}
+              tone={featuredPicks.length > 0 ? "positive" : "neutral"}
+              icon={Zap}
+            />
+          </div>
         </div>
 
-        {/* Top tipsters */}
-        <div>
-          <SectionLabel
-            label="Top Tipsters"
-            sub="Best win rates this week"
-            action={{ label: "View all", href: "/tipsters" }}
-          />
-          {tipstersLoading ? (
-            <div className="space-y-2">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="h-[60px] animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.02]" />
-              ))}
-            </div>
-          ) : tipsters.length === 0 ? (
-            <div className="flex min-h-[160px] flex-col items-center justify-center rounded-xl border border-dashed border-white/[0.10] bg-white/[0.02] p-6 text-center">
-              <Users size={22} className="text-white/25" />
-              <p className="mt-3 text-[13px] text-white/40">No tipsters yet</p>
-              <Link href="/tipsters" className="mt-2 text-[11px] text-[var(--accent)] hover:opacity-75 transition-opacity">
-                Go to tipsters →
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {tipsters.map((t) => (
-                <TipsterCard key={t.id} tipster={t} />
-              ))}
-              <Link
-                href="/tipsters"
-                className="mt-1 flex w-full items-center justify-center gap-1 rounded-xl border border-white/[0.08] py-2.5 text-[11px] font-medium text-white/38 transition-colors hover:bg-white/[0.03] hover:text-white/60"
-              >
-                Full leaderboard <ChevronRight size={11} />
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
+        <div className="rounded-[28px] border border-white/[0.08] bg-white/[0.03] p-5">
+          <SectionLabel icon={Target} label="Quick filters" sub="Confidence and visibility controls in one place" />
+          <div className="space-y-4">
+            <PillGroup label="Confidence" options={CONF_THRESHOLDS} active={minConf} onChange={setMinConf} />
 
-      {/* ── All fixtures ──────────────────────────────────────────────────── */}
-      <div>
-        <SectionLabel
-          label="All Fixtures"
-          sub={loading ? "Loading…" : `${items.length} upcoming · sorted by kickoff`}
-          count={loading ? undefined : items.length}
-        />
+            <div className="rounded-[22px] border border-white/[0.08] bg-[#0b0c14]/70 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/34">Visibility</p>
+                  <p className="mt-2 text-[15px] font-semibold text-white">{showAll ? "Showing all upcoming fixtures" : "Predictions-only board"}</p>
+                  <p className="mt-1 text-[11px] text-white/36">Keep the full board open or collapse to fixtures with a readable prediction.</p>
+                </div>
+                <button
+                  onClick={() => setShowAll((value) => !value)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-[12px] font-semibold transition-all",
+                    showAll ? "border-white/[0.12] bg-white/[0.06] text-white/74" : "border-[rgba(0,255,132,0.18)] bg-[rgba(0,255,132,0.08)] text-[#8fffc7]"
+                  )}
+                >
+                  {showAll ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                  {showAll ? "Showing all" : "Predictions only"}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
+              <TinyMetric label="Selected sport" value={sport === "all" ? "All sports" : titleCase(sport)} />
+              <TinyMetric label="Coverage" value={`${coverage}% readable`} />
+              <TinyMetric label="Signals" value={highConf > 0 ? `${highConf} high-confidence` : `${withConf} with confidence`} />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className={cn("grid gap-5", loading || featuredPicks.length > 0 ? "lg:grid-cols-[minmax(0,1fr)_340px]" : "")}>
+
+        {loading || featuredPicks.length > 0 ? (
+        <div className="rounded-[28px] border border-white/[0.08] bg-[#0f1117] p-5">
+          <div className="border-b border-white/[0.06] pb-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="max-w-[640px]">
+                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/18 bg-emerald-400/[0.08] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                  <Zap className="h-3.5 w-3.5" />
+                  Featured picks
+                </div>
+                <h3 className="mt-3 text-[22px] font-semibold tracking-[-0.03em] text-white sm:text-[24px]">
+                  Highest-confidence reads only.
+                </h3>
+                <p className="mt-2 max-w-[60ch] text-[13px] leading-6 text-white/42">
+                  This shortlist appears only when the board has genuine 60%+ conviction, so the page stays lighter when signal quality is thin.
+                </p>
+              </div>
+
+              <div className="grid min-w-[220px] gap-2 sm:grid-cols-2">
+                <TinyMetric label="Showing" value={loading ? "..." : `${featuredPicks.length} picks`} />
+                <TinyMetric label="Entry rule" value="60%+ confidence" />
+              </div>
+            </div>
+          </div>
+
+          {(loading || featuredPicks.length > 0) ? (
+            loading ? (
+              <div className="mt-4 grid gap-3 xl:grid-cols-2">
+                {[0, 1, 2, 3].map((index) => (
+                  <div key={index} className="h-[250px] animate-pulse rounded-[22px] border border-white/[0.06] bg-white/[0.02]" />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4 grid gap-3 xl:grid-cols-2">
+                {featuredPicks.map((match) => (
+                  <FeaturedPickCard key={match.id} match={match} />
+                ))}
+              </div>
+            )
+          ) : null}
+        </div>
+        ) : null}
+
+        <div className="space-y-5">
+          <div className="rounded-[28px] border border-white/[0.08] bg-white/[0.03] p-5">
+            <SectionLabel icon={Users} label="Top tipsters" sub="Quick trust context beside the machine-led board" action={{ label: "View all", href: "/tipsters" }} />
+            {tipstersLoading ? (
+              <div className="space-y-3">
+                {[0, 1, 2].map((index) => (
+                  <div key={index} className="h-[132px] animate-pulse rounded-[22px] border border-white/[0.06] bg-white/[0.02]" />
+                ))}
+              </div>
+            ) : tipsters.length === 0 ? (
+              <div className="flex min-h-[180px] flex-col items-center justify-center rounded-[24px] border border-dashed border-white/[0.10] bg-white/[0.02] p-8 text-center">
+                <Users className="h-6 w-6 text-white/26" />
+                <p className="mt-4 text-[14px] font-semibold text-white">No tipsters yet</p>
+                <p className="mt-2 text-[12px] text-white/40">The leaderboard will appear here once profiles are active.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {tipsters.map((tipster) => (
+                  <TipsterCard key={tipster.id} tipster={tipster} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-[28px] border border-white/[0.08] bg-white/[0.03] p-5">
+        <SectionLabel icon={Activity} label="All fixtures" sub={loading ? "Loading upcoming match cards…" : `${items.length} visible fixtures · grouped by day and sorted by kickoff`} count={loading ? undefined : items.length} />
 
         {loading ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 9 }).map((_, i) => (
-              <div key={i} className="h-52 animate-pulse rounded-[28px] border border-white/[0.06] bg-white/[0.02]" />
+          <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+            {Array.from({ length: 9 }).map((_, index) => (
+              <div key={index} className="h-[312px] animate-pulse rounded-[28px] border border-white/[0.06] bg-white/[0.02]" />
             ))}
           </div>
         ) : grouped.length === 0 ? (
-          <div className="flex min-h-[280px] flex-col items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-white/[0.02] p-8 text-center">
-            <BrainCircuit size={28} className="text-white/30" />
-            <div className="mt-4 text-xl font-semibold text-white">No predictions found</div>
-            <div className="mt-2 text-sm text-white/40">
-              {threshold > 0
-                ? `No matches meet the ${Math.round(threshold * 100)}%+ confidence threshold.`
-                : "No upcoming fixtures with model predictions in the next 48 hours."}
+          <div className="flex min-h-[300px] flex-col items-center justify-center rounded-[24px] border border-dashed border-white/[0.10] bg-white/[0.02] p-8 text-center">
+            <BrainCircuit className="h-7 w-7 text-white/28" />
+            <div className="mt-4 text-[20px] font-semibold text-white">
+              {threshold > 0 ? "Nothing meets this confidence filter" : "No prediction-ready fixtures right now"}
             </div>
-            {!showAll && (
-              <button
-                onClick={() => setShowAll(true)}
-                className="mt-4 flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[12px] text-white/50 hover:text-white/70 transition-colors"
+            <div className="mt-2 max-w-lg text-[13px] leading-6 text-white/40">
+              {threshold > 0
+                ? `No fixtures currently meet the ${Math.round(threshold * 100)}% confidence threshold.`
+                : "The next 48-hour window is clear for now. Reset the board or browse the wider match hubs while fresh reads populate."}
+            </div>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+              {threshold > 0 ? (
+                <button
+                  onClick={() => setMinConf("0")}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.10] bg-white/[0.04] px-4 py-2 text-[12px] font-semibold text-white/68 transition-colors hover:text-white/85"
+                >
+                  Reset confidence filter
+                </button>
+              ) : null}
+              {!showAll ? (
+                <button
+                  onClick={() => setShowAll(true)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.10] bg-white/[0.04] px-4 py-2 text-[12px] font-semibold text-white/68 transition-colors hover:text-white/85"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  Show all fixtures
+                </button>
+              ) : null}
+              <Link
+                href="/sports/soccer/matches"
+                className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent)] px-4 py-2 text-[12px] font-semibold text-[#07110d] transition-opacity hover:opacity-85"
               >
-                <Eye size={13} /> Show all fixtures
-              </button>
-            )}
+                Browse match hubs
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="space-y-8">
@@ -1083,7 +1088,7 @@ export function PredictionsShell({ initialSport }: { initialSport: string }) {
             ))}
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

@@ -1029,10 +1029,7 @@ function SetsTab({ match }: { match: TennisMatch }) {
           </Panel>
         )}
 
-        {/* Game timeline placeholder */}
-        <Panel title="Game Timeline">
-          <EmptyState icon={Activity} title="Timeline not available" desc="Point-by-point timeline will be added in a future update." />
-        </Panel>
+
       </MainCol>
 
       <SideCol>
@@ -1659,10 +1656,6 @@ function ModelTab({ match }: { match: TennisMatch }) {
           </Panel>
         )}
 
-        {/* Calibration placeholder */}
-        <Panel title="Calibration">
-          <EmptyState icon={Activity} title="Calibration chart coming soon" desc="Reliability diagram for model confidence bins." />
-        </Panel>
 
         {/* Market Odds */}
         {match.betting && (match.betting.home_ml != null || match.betting.away_ml != null) && (

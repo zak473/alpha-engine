@@ -179,7 +179,7 @@ export function MatchesTable({ sport, matches, total, initialStatus }: MatchesTa
                   return (
                     <tr
                       key={m.id}
-                      onClick={() => window.open(`/sports/${sport}/matches/${m.id}`, "_blank")}
+                      onClick={() => router.push(`/sports/${sport}/matches/${m.id}`)}
                       className="tr-hover"
                       style={isLive ? { borderLeft: "2px solid var(--positive)" } : undefined}
                     >
