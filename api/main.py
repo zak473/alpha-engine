@@ -577,6 +577,7 @@ def admin_nuke_ai_tips(secret: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=403, detail="Forbidden")
 
     from db.models.tipsters import TipsterTip
+    from db.models.picks import TrackedPick
     from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
 
     ai_ids = list(AI_TIPSTER_IDS.values())
@@ -588,8 +589,18 @@ def admin_nuke_ai_tips(secret: str, db: Session = Depends(get_db)):
         )
         .delete(synchronize_session=False)
     )
+    # Also clear pending TrackedPick rows so dedup doesn't block regeneration
+    deleted_picks = (
+        db.query(TrackedPick)
+        .filter(
+            TrackedPick.user_id == settings.AUTO_PICK_USER_ID,
+            TrackedPick.outcome.is_(None),
+            TrackedPick.auto_generated.is_(True),
+        )
+        .delete(synchronize_session=False)
+    )
     db.commit()
-    return {"deleted": deleted}
+    return {"deleted_tips": int(deleted), "deleted_picks": int(deleted_picks)}
 
 
 @app.get("/api/v1/admin/debug-sgo-odds", tags=["Admin"])
