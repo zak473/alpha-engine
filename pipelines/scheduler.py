@@ -67,8 +67,9 @@ def _job_fetch_live() -> None:
     except Exception as exc:
         log.error("[scheduler] soccer fetch failed: %s", exc, exc_info=True)
 
-    # Rebuild soccer features immediately so same-day predictions use fresh data
-    _job_build_soccer_features()
+    # Rebuild soccer features in background so it doesn't block tennis/esports fetch
+    import threading as _t
+    _t.Thread(target=_job_build_soccer_features, daemon=True, name="build-soccer-features").start()
 
     # Tennis (api-tennis.com: fixtures + live scores + set scores + serve stats)
     try:
@@ -86,6 +87,22 @@ def _job_fetch_live() -> None:
         log.info("[scheduler] tennis player form: %d rows upserted.", n)
     except Exception as exc:
         log.error("[scheduler] tennis build_player_form failed: %s", exc, exc_info=True)
+
+    # Tennis odds from api-tennis.com (real bookmaker odds per match)
+    try:
+        from pipelines.tennis.fetch_api_tennis import fetch_match_odds
+        n = fetch_match_odds()
+        log.info("[scheduler] tennis odds: %d matches updated.", n)
+    except Exception as exc:
+        log.error("[scheduler] tennis odds fetch failed: %s", exc, exc_info=True)
+
+    # Run tennis predictions immediately after fetch so tips are available without waiting for predict_only
+    try:
+        from pipelines.tennis.predict_tennis import run as run_tennis_pred
+        run_tennis_pred()
+        log.info("[scheduler] tennis predict done.")
+    except Exception as exc:
+        log.error("[scheduler] tennis predict failed: %s", exc, exc_info=True)
 
     # Esports (PandaScore: CS2, LoL, Dota2, Valorant)
     try:
@@ -280,6 +297,13 @@ def _job_fetch_player_profiles() -> None:
         log.info("[scheduler] tennis player profiles: %d upserted.", n)
     except Exception as exc:
         log.error("[scheduler] fetch_player_profiles failed: %s", exc, exc_info=True)
+    # Re-run tennis predictions immediately so new ranking data takes effect
+    try:
+        from pipelines.tennis.predict_tennis import run as run_tennis_pred
+        run_tennis_pred()
+        log.info("[scheduler] tennis predict (post-profiles) done.")
+    except Exception as exc:
+        log.error("[scheduler] tennis predict (post-profiles) failed: %s", exc, exc_info=True)
     log.info("[scheduler] fetch_player_profiles done.")
 
 
@@ -956,13 +980,14 @@ def start() -> BackgroundScheduler:
         replace_existing=True,
     )
 
-    # Fetch live data every 30 minutes
+    # Fetch live data every 30 minutes — run immediately on startup
     _scheduler.add_job(
         _job_fetch_live,
         trigger=IntervalTrigger(minutes=30),
         id="fetch_live",
         name="Fetch live fixtures + results",
         replace_existing=True,
+        next_run_time=_dt.now(_tz.utc),
     )
 
     # Re-score every hour (in case model is retrained mid-day) — run immediately on startup
@@ -972,7 +997,7 @@ def start() -> BackgroundScheduler:
         id="predict_only",
         name="Re-run prediction pipeline",
         replace_existing=True,
-        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=15),
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=5),
     )
 
     # Fetch real market odds + run auto-pick bot every 30 minutes (delay 8m on startup)
@@ -1044,12 +1069,14 @@ def start() -> BackgroundScheduler:
     )
 
     # Tennis player profiles refresh (weekly, Sunday 4 AM UTC)
+    # Also run ~60m after startup so rankings are available immediately on fresh deploys
     _scheduler.add_job(
         _job_fetch_player_profiles,
         trigger=CronTrigger(day_of_week="sun", hour=4, minute=0, timezone="UTC"),
         id="fetch_player_profiles",
         name="Tennis player profiles from Sackmann dataset",
         replace_existing=True,
+        next_run_time=_dt.now(_tz.utc) + _timedelta(minutes=60),
     )
 
     # Fetch Understat xG data nightly (3 AM UTC — Understat updates within ~24h of match)

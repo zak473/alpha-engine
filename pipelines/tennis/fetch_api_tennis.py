@@ -788,6 +788,96 @@ def fetch_all(dry_run: bool = False, days: int = 2) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Odds fetcher — populate core_matches.odds_home/away from api-tennis
+# ---------------------------------------------------------------------------
+
+def fetch_match_odds(dry_run: bool = False) -> int:
+    """
+    For every upcoming/live tennis CoreMatch, call api-tennis get_odds and
+    store the best-available decimal odds in odds_home / odds_away.
+
+    api-tennis returns a list of bookmaker rows per match:
+        [{"odd_1": "1.75", "odd_2": "2.10", "bookmaker_name": "..."}, ...]
+    We take the first bookmaker that has both values.
+    """
+    if not settings.TENNIS_LIVE_API_KEY:
+        return 0
+
+    from datetime import timezone
+    from db.models.mvp import CoreMatch
+    from db.session import SessionLocal
+
+    db = SessionLocal()
+    updated = 0
+    now = datetime.now(timezone.utc)
+
+    try:
+        upcoming = (
+            db.query(CoreMatch)
+            .filter(
+                CoreMatch.sport == "tennis",
+                CoreMatch.status.in_(["scheduled", "live"]),
+                CoreMatch.kickoff_utc >= now,
+            )
+            .all()
+        )
+        log.info("[tennis_odds] Checking odds for %d upcoming matches.", len(upcoming))
+
+        for match in upcoming:
+            # provider_id is "apitns-match-{event_key}"
+            event_key = match.provider_id.replace("apitns-match-", "") if match.provider_id else None
+            if not event_key or not event_key.isdigit():
+                continue
+
+            try:
+                rows = _get("get_odds", {"event_key": event_key})
+                time.sleep(0.3)
+            except Exception as exc:
+                log.debug("[tennis_odds] get_odds failed for %s: %s", event_key, exc)
+                continue
+
+            if not rows:
+                continue
+
+            # Find first bookmaker with both home + away odds
+            home_dec = away_dec = None
+            for row in rows:
+                try:
+                    h = float(row.get("odd_1") or 0)
+                    a = float(row.get("odd_2") or 0)
+                    if h > 1.0 and a > 1.0:
+                        home_dec, away_dec = round(h, 3), round(a, 3)
+                        break
+                except (TypeError, ValueError):
+                    continue
+
+            if not home_dec or not away_dec:
+                continue
+
+            if match.odds_home != home_dec or match.odds_away != away_dec:
+                log.info(
+                    "[tennis_odds] %s: home=%.3f away=%.3f (was %s/%s)",
+                    match.provider_id, home_dec, away_dec, match.odds_home, match.odds_away,
+                )
+                if not dry_run:
+                    match.odds_home = home_dec
+                    match.odds_away = away_dec
+                    updated += 1
+
+        if not dry_run:
+            db.commit()
+        log.info("[tennis_odds] Updated odds for %d matches.", updated)
+        return updated
+
+    except Exception as exc:
+        db.rollback()
+        log.error("[tennis_odds] fetch_match_odds failed: %s", exc, exc_info=True)
+        return 0
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
 # Player form builder — run after fetch to aggregate form stats
 # ---------------------------------------------------------------------------
 
