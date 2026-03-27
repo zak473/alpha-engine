@@ -87,14 +87,18 @@ SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "baseball":    0.10,  # model is 55.5% acc — 10% conf = ~55% win prob
     "basketball":  0.10,  # model is 60.3% acc — 10% conf = ~55% win prob
 }
-# Tennis/esports naturally have wider odds spreads — widen accepted range
+# Sports with wider odds spreads — heavy favourites common
 SPORT_MIN_ODDS: dict[str, float] = {
-    "tennis":  1.15,
-    "esports": 1.15,
+    "tennis":     1.15,
+    "esports":    1.15,
+    "basketball": 1.15,
+    "baseball":   1.15,
 }
 SPORT_MAX_ODDS: dict[str, float] = {
-    "tennis":  8.0,
-    "esports": 8.0,
+    "tennis":     8.0,
+    "esports":    8.0,
+    "basketball": 6.0,
+    "baseball":   6.0,
 }
 
 
