@@ -80,18 +80,27 @@ def _already_tipped(db: Session, user_id: str, match_label: str, market: str, se
 # Baseball: model picks heavy favourites with no real edge → require much higher
 # bar before auto-betting. Raise min_edge to 8% and min_confidence to 65%.
 SPORT_MIN_EDGE: dict[str, float] = {
-    "baseball":    0.06,
-    "basketball":  0.04,
+    "baseball":    0.05,
+    "basketball":  0.03,
 }
 SPORT_MIN_CONFIDENCE: dict[str, float] = {
-    "baseball":    0.35,  # ~67% win prob
-    "basketball":  0.30,  # ~65% win prob
-    "tennis":      0.40,
-    "esports":     0.40,
+    "baseball":    0.30,
+    "basketball":  0.25,
+    "tennis":      0.35,
+    "esports":     0.35,
 }
 
-# Only tip matches starting within this many hours — prevents bulk-tipping weeks of fixtures
-LOOKAHEAD_HOURS = 168  # 7 days
+# Per-sport lookahead window — prevents bulk-tipping the entire fixture calendar
+# Soccer has long gaps between matchdays so needs 2 weeks; daily sports need only 2-3 days
+SPORT_LOOKAHEAD_HOURS: dict[str, int] = {
+    "soccer":      336,  # 14 days — full Premier League matchday window
+    "tennis":       72,  # 3 days
+    "esports":      72,
+    "basketball":   48,
+    "baseball":     48,
+    "hockey":       48,
+}
+DEFAULT_LOOKAHEAD_HOURS = 72
 # Sports with wider odds spreads — heavy favourites common
 SPORT_MIN_ODDS: dict[str, float] = {
     "tennis":     1.15,
@@ -128,15 +137,15 @@ def run(
     try:
         from sqlalchemy import or_
         now = datetime.now(timezone.utc)
-        horizon = now + timedelta(hours=LOOKAHEAD_HOURS)
-        # Only upcoming/live matches within LOOKAHEAD_HOURS window
+        max_horizon = now + timedelta(hours=max(SPORT_LOOKAHEAD_HOURS.values(), default=DEFAULT_LOOKAHEAD_HOURS))
+        # Fetch up to the widest lookahead; per-sport window enforced in the loop
         rows = (
             db.query(CoreMatch, PredMatch)
             .join(PredMatch, PredMatch.match_id == CoreMatch.id)
             .filter(
                 CoreMatch.status.in_(["scheduled", "live"]),
                 CoreMatch.kickoff_utc > now,
-                CoreMatch.kickoff_utc <= horizon,
+                CoreMatch.kickoff_utc <= max_horizon,
                 or_(
                     # Real market odds available
                     (CoreMatch.odds_home.isnot(None) & CoreMatch.odds_away.isnot(None)),
@@ -165,6 +174,12 @@ def run(
 
             # Determine correct market name based on sport
             sport = match.sport
+
+            # Enforce per-sport lookahead window
+            sport_horizon_h = SPORT_LOOKAHEAD_HOURS.get(sport, DEFAULT_LOOKAHEAD_HOURS)
+            if match.kickoff_utc > now + timedelta(hours=sport_horizon_h):
+                continue
+
             ml_market = "Moneyline" if sport in ("basketball", "baseball") else "Match Winner" if sport in ("tennis", "esports") else "1X2"
 
             home_name = home_team.name
