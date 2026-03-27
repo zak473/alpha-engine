@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from api.deps import get_db, get_current_user
 from api.exceptions import register_exception_handlers
 from api.middleware import RequestLoggingMiddleware
-from api.routers import advisor, auth, backtest, baseball as baseball_router, billing, challenges, esports, matches, notifications, picks, predictions, reasoning, soccer, standings as standings_router, tennis, tipsters
+from api.routers import admin as admin_router, advisor, auth, backtest, baseball as baseball_router, billing, challenges, esports, matches, notifications, picks, predictions, reasoning, soccer, standings as standings_router, tennis, tipsters
 from api.sports.soccer import routes as soccer_sport
 from api.sports.tennis import routes as tennis_sport
 from api.sports.esports import routes as esports_sport
@@ -384,6 +384,7 @@ register_exception_handlers(app)
 # ─── Routers ──────────────────────────────────────────────────────────────
 
 app.include_router(auth.router,        prefix=settings.API_PREFIX)
+app.include_router(admin_router.router, prefix=settings.API_PREFIX)
 app.include_router(soccer.router,      prefix=settings.API_PREFIX)
 app.include_router(tennis.router,      prefix=settings.API_PREFIX)
 app.include_router(esports.router,     prefix=settings.API_PREFIX)
@@ -565,6 +566,29 @@ def admin_purge_unsettleable_tips(secret: str, db: Session = Depends(get_db)):
 
     if deleted:
         db.commit()
+    return {"deleted": deleted}
+
+
+@app.delete("/api/v1/admin/nuke-ai-tips", tags=["Admin"])
+def admin_nuke_ai_tips(secret: str, db: Session = Depends(get_db)):
+    """Delete ALL pending AI tipster tips regardless of age."""
+    if secret != "nid-nuke-2026":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from db.models.tipsters import TipsterTip
+    from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
+
+    ai_ids = list(AI_TIPSTER_IDS.values())
+    deleted = (
+        db.query(TipsterTip)
+        .filter(
+            TipsterTip.user_id.in_(ai_ids),
+            TipsterTip.outcome.is_(None),
+        )
+        .delete(synchronize_session=False)
+    )
+    db.commit()
     return {"deleted": deleted}
 
 
@@ -809,10 +833,20 @@ def trigger_sync(background_tasks=None):
         except Exception as exc:
             logger.error("[manual sync] Soccer failed: %s", exc, exc_info=True)
         try:
-            from pipelines.tennis.fetch_live import fetch_all as fetch_tennis
+            from pipelines.tennis.fetch_api_tennis import fetch_all as fetch_tennis
             total += fetch_tennis()
         except Exception as exc:
             logger.error("[manual sync] Tennis failed: %s", exc, exc_info=True)
+        try:
+            from pipelines.tennis.fetch_api_tennis import build_player_form
+            build_player_form()
+        except Exception as exc:
+            logger.error("[manual sync] Tennis player form failed: %s", exc, exc_info=True)
+        try:
+            from pipelines.tennis.predict_tennis import run as predict_tennis
+            predict_tennis()
+        except Exception as exc:
+            logger.error("[manual sync] Tennis predict failed: %s", exc, exc_info=True)
         try:
             from pipelines.esports.fetch_live import fetch_all as fetch_esports
             total += fetch_esports()
