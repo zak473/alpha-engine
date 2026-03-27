@@ -80,13 +80,18 @@ def _already_tipped(db: Session, user_id: str, match_label: str, market: str, se
 # Baseball: model picks heavy favourites with no real edge → require much higher
 # bar before auto-betting. Raise min_edge to 8% and min_confidence to 65%.
 SPORT_MIN_EDGE: dict[str, float] = {
-    "baseball":    0.05,
-    "basketball":  0.01,  # NBA books are efficient; accept any genuine edge ≥1%
+    "baseball":    0.06,
+    "basketball":  0.04,
 }
 SPORT_MIN_CONFIDENCE: dict[str, float] = {
-    "baseball":    0.30,  # ~65% win prob
-    "basketball":  0.20,  # ~60% win prob
+    "baseball":    0.35,  # ~67% win prob
+    "basketball":  0.30,  # ~65% win prob
+    "tennis":      0.40,
+    "esports":     0.40,
 }
+
+# Only tip matches starting within this many hours — prevents bulk-tipping weeks of fixtures
+LOOKAHEAD_HOURS = 48
 # Sports with wider odds spreads — heavy favourites common
 SPORT_MIN_ODDS: dict[str, float] = {
     "tennis":     1.15,
@@ -122,13 +127,16 @@ def run(
 
     try:
         from sqlalchemy import or_
-        # All upcoming/live matches with predictions AND (real odds OR fair_odds from model)
+        now = datetime.now(timezone.utc)
+        horizon = now + timedelta(hours=LOOKAHEAD_HOURS)
+        # Only upcoming/live matches within LOOKAHEAD_HOURS window
         rows = (
             db.query(CoreMatch, PredMatch)
             .join(PredMatch, PredMatch.match_id == CoreMatch.id)
             .filter(
                 CoreMatch.status.in_(["scheduled", "live"]),
-                CoreMatch.kickoff_utc > datetime.now(timezone.utc),
+                CoreMatch.kickoff_utc > now,
+                CoreMatch.kickoff_utc <= horizon,
                 or_(
                     # Real market odds available
                     (CoreMatch.odds_home.isnot(None) & CoreMatch.odds_away.isnot(None)),
