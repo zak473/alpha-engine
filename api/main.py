@@ -694,6 +694,34 @@ def admin_run_auto_picks(secret: str):
     return {"created": created}
 
 
+@app.get("/api/v1/admin/tip-history", tags=["Admin"])
+def admin_tip_history(secret: str, sport: str = "", db: Session = Depends(get_db)):
+    """All TipsterTip rows (settled + pending) for AI tipsters."""
+    if secret != "nid-nuke-2026":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from db.models.tipsters import TipsterTip
+    from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
+    ai_ids = list(AI_TIPSTER_IDS.values())
+    q = db.query(TipsterTip).filter(TipsterTip.user_id.in_(ai_ids))
+    if sport:
+        q = q.filter(TipsterTip.sport == sport)
+    tips = q.order_by(TipsterTip.created_at.desc()).limit(200).all()
+    return [
+        {
+            "sport": t.sport,
+            "match": t.match_label,
+            "selection": t.selection_label,
+            "odds": t.odds,
+            "outcome": t.outcome,
+            "start_time": t.start_time.isoformat() if t.start_time else None,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+            "note": t.note,
+        }
+        for t in tips
+    ]
+
+
 @app.post("/api/v1/admin/force-settle-tips", tags=["Admin"])
 def admin_force_settle_tips(secret: str, recheck: bool = False):
     """Force-run tip settlement immediately."""
