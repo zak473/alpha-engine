@@ -85,6 +85,8 @@ SPORT_MIN_EDGE: dict[str, float] = {
 }
 SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "baseball": 0.50,
+    "tennis":   0.35,
+    "esports":  0.35,
 }
 
 # Tennis + esports have no reliable real-odds feed so use model fair odds as a proxy.
