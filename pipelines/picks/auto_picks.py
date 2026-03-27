@@ -91,7 +91,7 @@ SPORT_MIN_CONFIDENCE: dict[str, float] = {
 }
 
 # Only tip matches starting within this many hours — prevents bulk-tipping weeks of fixtures
-LOOKAHEAD_HOURS = 48
+LOOKAHEAD_HOURS = 168  # 7 days
 # Sports with wider odds spreads — heavy favourites common
 SPORT_MIN_ODDS: dict[str, float] = {
     "tennis":     1.15,
