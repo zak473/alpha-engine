@@ -93,7 +93,7 @@ SPORT_MIN_CONFIDENCE: dict[str, float] = {
 # Per-sport lookahead window — prevents bulk-tipping the entire fixture calendar
 # Soccer has long gaps between matchdays so needs 2 weeks; daily sports need only 2-3 days
 SPORT_LOOKAHEAD_HOURS: dict[str, int] = {
-    "soccer":      336,  # 14 days — full Premier League matchday window
+    "soccer":      480,  # 20 days — full Premier League matchday window
     "tennis":       72,  # 3 days
     "esports":      72,
     "basketball":   48,
