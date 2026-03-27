@@ -86,6 +86,13 @@ SPORT_MIN_EDGE: dict[str, float] = {
 SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "baseball": 0.50,
 }
+# Tennis naturally has wider odds spreads (heavy favourites common) — widen accepted range
+SPORT_MIN_ODDS: dict[str, float] = {
+    "tennis": 1.15,
+}
+SPORT_MAX_ODDS: dict[str, float] = {
+    "tennis": 8.0,
+}
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -105,16 +112,20 @@ def run(
     created = 0
 
     try:
-        # All upcoming/live matches with predictions AND real odds
+        from sqlalchemy import or_
+        # All upcoming/live matches with predictions AND (real odds OR fair_odds from model)
         rows = (
             db.query(CoreMatch, PredMatch)
             .join(PredMatch, PredMatch.match_id == CoreMatch.id)
             .filter(
                 CoreMatch.status.in_(["scheduled", "live"]),
                 CoreMatch.kickoff_utc > datetime.now(timezone.utc),
-                # Must have at least home + away real odds
-                CoreMatch.odds_home.isnot(None),
-                CoreMatch.odds_away.isnot(None),
+                or_(
+                    # Real market odds available
+                    (CoreMatch.odds_home.isnot(None) & CoreMatch.odds_away.isnot(None)),
+                    # No market odds but model produced fair odds (e.g. tennis)
+                    (PredMatch.fair_odds_home.isnot(None) & PredMatch.fair_odds_away.isnot(None)),
+                ),
             )
             .order_by(CoreMatch.kickoff_utc.asc())
             .all()
@@ -142,25 +153,37 @@ def run(
             home_name = home_team.name
             away_name = away_team.name
 
-            if match.odds_home and pred.p_home:
-                candidates.append((home_name, pred.p_home, match.odds_home, ml_market))
-            if match.odds_away and pred.p_away:
-                candidates.append((away_name, pred.p_away, match.odds_away, ml_market))
-            if match.odds_draw and pred.p_draw and pred.p_draw > 0.01:
-                candidates.append(("Draw", pred.p_draw, match.odds_draw, ml_market))
+            # Decide whether we're working with real market odds or fair odds only
+            has_real_odds = bool(match.odds_home and match.odds_away)
+
+            if has_real_odds:
+                if match.odds_home and pred.p_home:
+                    candidates.append((home_name, pred.p_home, match.odds_home, ml_market, False))
+                if match.odds_away and pred.p_away:
+                    candidates.append((away_name, pred.p_away, match.odds_away, ml_market, False))
+                if match.odds_draw and pred.p_draw and pred.p_draw > 0.01:
+                    candidates.append(("Draw", pred.p_draw, match.odds_draw, ml_market, False))
+            else:
+                # No real odds — use model's fair odds (confidence-only filter, no edge check)
+                if pred.fair_odds_home and pred.p_home and pred.fair_odds_home < 990:
+                    candidates.append((home_name, pred.p_home, pred.fair_odds_home, ml_market, True))
+                if pred.fair_odds_away and pred.p_away and pred.fair_odds_away < 990:
+                    candidates.append((away_name, pred.p_away, pred.fair_odds_away, ml_market, True))
 
             effective_min_edge = SPORT_MIN_EDGE.get(sport, min_edge)
             effective_min_conf = SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
 
-            for selection_label, model_prob, book_odds, market_name in candidates:
-                e = edge_pct(model_prob, book_odds)
+            for selection_label, model_prob, book_odds, market_name, fair_only in candidates:
                 confidence = pred.confidence / 100.0 if pred.confidence else model_prob
+                e = 0.0 if fair_only else edge_pct(model_prob, book_odds)
 
-                if e < effective_min_edge:
+                if not fair_only and e < effective_min_edge:
                     continue
                 if confidence < effective_min_conf:
                     continue
-                if book_odds < settings.MIN_ODDS or book_odds > settings.MAX_ODDS:
+                eff_min_odds = SPORT_MIN_ODDS.get(sport, settings.MIN_ODDS)
+                eff_max_odds = SPORT_MAX_ODDS.get(sport, settings.MAX_ODDS)
+                if book_odds < eff_min_odds or book_odds > eff_max_odds:
                     continue
 
                 # Dedup
@@ -211,7 +234,7 @@ def run(
                             odds=book_odds,
                             start_time=match.kickoff_utc,
                             match_id=match.id,
-                            note=f"Edge: +{round(e * 100, 1)}% | Kelly: {round(k * 100, 1)}%",
+                            note=(f"Confidence: {round(confidence * 100, 1)}% | Fair odds" if fair_only else f"Edge: +{round(e * 100, 1)}% | Kelly: {round(k * 100, 1)}%"),
                         )
                         db.add(tip)
 
