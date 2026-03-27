@@ -672,6 +672,17 @@ def admin_debug_sgo_odds(secret: str, sport: str = "soccer", limit: int = 20):
     }
 
 
+@app.post("/api/v1/admin/run-auto-picks", tags=["Admin"])
+def admin_run_auto_picks(secret: str):
+    """Manually trigger the auto-picks bot to regenerate tips."""
+    if secret != "nid-nuke-2026":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from pipelines.picks.auto_picks import run as run_auto_picks
+    created = run_auto_picks()
+    return {"created": created}
+
+
 @app.post("/api/v1/admin/force-settle-tips", tags=["Admin"])
 def admin_force_settle_tips(secret: str, recheck: bool = False):
     """Force-run tip settlement immediately."""
