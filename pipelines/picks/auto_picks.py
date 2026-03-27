@@ -21,7 +21,7 @@ from __future__ import annotations
 import argparse
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -81,43 +81,11 @@ def _already_tipped(db: Session, user_id: str, match_label: str, market: str, se
 # bar before auto-betting. Raise min_edge to 8% and min_confidence to 65%.
 SPORT_MIN_EDGE: dict[str, float] = {
     "baseball":    0.05,
-    "basketball":  0.03,
+    "basketball":  0.01,  # NBA books are efficient; accept any genuine edge ≥1%
 }
 SPORT_MIN_CONFIDENCE: dict[str, float] = {
-    "baseball":    0.30,
-    "basketball":  0.25,
-    "hockey":      0.25,
-    "tennis":      0.35,
-    "esports":     0.35,
-    "soccer":      0.30,
+    "baseball": 0.50,
 }
-
-# Per-sport lookahead window — prevents bulk-tipping the entire fixture calendar
-# Soccer has long gaps between matchdays so needs 2 weeks; daily sports need only 2-3 days
-SPORT_LOOKAHEAD_HOURS: dict[str, int] = {
-    "soccer":      480,  # 20 days — full Premier League matchday window
-    "tennis":       72,  # 3 days
-    "esports":      72,
-    "basketball":   48,
-    "baseball":     48,
-    "hockey":       48,
-}
-DEFAULT_LOOKAHEAD_HOURS = 72
-# Sports with wider odds spreads — heavy favourites common
-SPORT_MIN_ODDS: dict[str, float] = {
-    "tennis":     1.15,
-    "esports":    1.15,
-    "basketball": 1.20,
-    "baseball":   1.20,
-}
-SPORT_MAX_ODDS: dict[str, float] = {
-    "tennis":     8.0,
-    "esports":    8.0,
-    "basketball": 5.0,
-    "baseball":   5.0,
-}
-# Only use fair_odds fallback for sports with no real odds feed
-FAIR_ODDS_SPORTS = {"tennis", "esports"}
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -137,23 +105,16 @@ def run(
     created = 0
 
     try:
-        from sqlalchemy import or_
-        now = datetime.now(timezone.utc)
-        max_horizon = now + timedelta(hours=max(SPORT_LOOKAHEAD_HOURS.values(), default=DEFAULT_LOOKAHEAD_HOURS))
-        # Fetch up to the widest lookahead; per-sport window enforced in the loop
+        # All upcoming/live matches with predictions AND real odds
         rows = (
             db.query(CoreMatch, PredMatch)
             .join(PredMatch, PredMatch.match_id == CoreMatch.id)
             .filter(
                 CoreMatch.status.in_(["scheduled", "live"]),
-                CoreMatch.kickoff_utc > now,
-                CoreMatch.kickoff_utc <= max_horizon,
-                or_(
-                    # Real market odds available
-                    (CoreMatch.odds_home.isnot(None) & CoreMatch.odds_away.isnot(None)),
-                    # No market odds but model produced fair odds (e.g. tennis)
-                    (PredMatch.fair_odds_home.isnot(None) & PredMatch.fair_odds_away.isnot(None)),
-                ),
+                CoreMatch.kickoff_utc > datetime.now(timezone.utc),
+                # Must have at least home + away real odds
+                CoreMatch.odds_home.isnot(None),
+                CoreMatch.odds_away.isnot(None),
             )
             .order_by(CoreMatch.kickoff_utc.asc())
             .all()
@@ -176,53 +137,30 @@ def run(
 
             # Determine correct market name based on sport
             sport = match.sport
-
-            # Enforce per-sport lookahead window
-            sport_horizon_h = SPORT_LOOKAHEAD_HOURS.get(sport, DEFAULT_LOOKAHEAD_HOURS)
-            if match.kickoff_utc > now + timedelta(hours=sport_horizon_h):
-                continue
-
             ml_market = "Moneyline" if sport in ("basketball", "baseball") else "Match Winner" if sport in ("tennis", "esports") else "1X2"
 
             home_name = home_team.name
             away_name = away_team.name
 
-            # Decide whether we're working with real market odds or fair odds only
-            # Fair odds fallback only for sports with no real odds feed (tennis, esports)
-            has_real_odds = bool(match.odds_home and match.odds_away)
-            use_fair_odds = not has_real_odds and sport in FAIR_ODDS_SPORTS
-
-            if not has_real_odds and not use_fair_odds:
-                continue
-
-            if has_real_odds:
-                if match.odds_home and pred.p_home:
-                    candidates.append((home_name, pred.p_home, match.odds_home, ml_market, False))
-                if match.odds_away and pred.p_away:
-                    candidates.append((away_name, pred.p_away, match.odds_away, ml_market, False))
-                if match.odds_draw and pred.p_draw and pred.p_draw > 0.01:
-                    candidates.append(("Draw", pred.p_draw, match.odds_draw, ml_market, False))
-            else:
-                # No real odds — use model's fair odds (tennis/esports only)
-                if pred.fair_odds_home and pred.p_home and pred.fair_odds_home < 990:
-                    candidates.append((home_name, pred.p_home, pred.fair_odds_home, ml_market, True))
-                if pred.fair_odds_away and pred.p_away and pred.fair_odds_away < 990:
-                    candidates.append((away_name, pred.p_away, pred.fair_odds_away, ml_market, True))
+            if match.odds_home and pred.p_home:
+                candidates.append((home_name, pred.p_home, match.odds_home, ml_market))
+            if match.odds_away and pred.p_away:
+                candidates.append((away_name, pred.p_away, match.odds_away, ml_market))
+            if match.odds_draw and pred.p_draw and pred.p_draw > 0.01:
+                candidates.append(("Draw", pred.p_draw, match.odds_draw, ml_market))
 
             effective_min_edge = SPORT_MIN_EDGE.get(sport, min_edge)
             effective_min_conf = SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
 
-            for selection_label, model_prob, book_odds, market_name, fair_only in candidates:
+            for selection_label, model_prob, book_odds, market_name in candidates:
+                e = edge_pct(model_prob, book_odds)
                 confidence = pred.confidence / 100.0 if pred.confidence else model_prob
-                e = 0.0 if fair_only else edge_pct(model_prob, book_odds)
 
-                if not fair_only and e < effective_min_edge:
+                if e < effective_min_edge:
                     continue
                 if confidence < effective_min_conf:
                     continue
-                eff_min_odds = SPORT_MIN_ODDS.get(sport, settings.MIN_ODDS)
-                eff_max_odds = SPORT_MAX_ODDS.get(sport, settings.MAX_ODDS)
-                if book_odds < eff_min_odds or book_odds > eff_max_odds:
+                if book_odds < settings.MIN_ODDS or book_odds > settings.MAX_ODDS:
                     continue
 
                 # Dedup
@@ -273,7 +211,7 @@ def run(
                             odds=book_odds,
                             start_time=match.kickoff_utc,
                             match_id=match.id,
-                            note=(f"Confidence: {round(confidence * 100, 1)}% | Fair odds" if fair_only else f"Edge: +{round(e * 100, 1)}% | Kelly: {round(k * 100, 1)}%"),
+                            note=f"Edge: +{round(e * 100, 1)}% | Kelly: {round(k * 100, 1)}%",
                         )
                         db.add(tip)
 
