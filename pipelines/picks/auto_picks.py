@@ -84,22 +84,24 @@ SPORT_MIN_EDGE: dict[str, float] = {
     "basketball":  0.01,  # NBA books are efficient; accept any genuine edge ≥1%
 }
 SPORT_MIN_CONFIDENCE: dict[str, float] = {
-    "baseball":    0.10,  # model is 55.5% acc — 10% conf = ~55% win prob
-    "basketball":  0.10,  # model is 60.3% acc — 10% conf = ~55% win prob
+    "baseball":    0.30,  # ~65% win prob
+    "basketball":  0.20,  # ~60% win prob
 }
 # Sports with wider odds spreads — heavy favourites common
 SPORT_MIN_ODDS: dict[str, float] = {
     "tennis":     1.15,
     "esports":    1.15,
-    "basketball": 1.15,
-    "baseball":   1.15,
+    "basketball": 1.20,
+    "baseball":   1.20,
 }
 SPORT_MAX_ODDS: dict[str, float] = {
     "tennis":     8.0,
     "esports":    8.0,
-    "basketball": 6.0,
-    "baseball":   6.0,
+    "basketball": 5.0,
+    "baseball":   5.0,
 }
+# Only use fair_odds fallback for sports with no real odds feed
+FAIR_ODDS_SPORTS = {"tennis", "esports"}
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -161,7 +163,12 @@ def run(
             away_name = away_team.name
 
             # Decide whether we're working with real market odds or fair odds only
+            # Fair odds fallback only for sports with no real odds feed (tennis, esports)
             has_real_odds = bool(match.odds_home and match.odds_away)
+            use_fair_odds = not has_real_odds and sport in FAIR_ODDS_SPORTS
+
+            if not has_real_odds and not use_fair_odds:
+                continue
 
             if has_real_odds:
                 if match.odds_home and pred.p_home:
@@ -171,7 +178,7 @@ def run(
                 if match.odds_draw and pred.p_draw and pred.p_draw > 0.01:
                     candidates.append(("Draw", pred.p_draw, match.odds_draw, ml_market, False))
             else:
-                # No real odds — use model's fair odds (confidence-only filter, no edge check)
+                # No real odds — use model's fair odds (tennis/esports only)
                 if pred.fair_odds_home and pred.p_home and pred.fair_odds_home < 990:
                     candidates.append((home_name, pred.p_home, pred.fair_odds_home, ml_market, True))
                 if pred.fair_odds_away and pred.p_away and pred.fair_odds_away < 990:
