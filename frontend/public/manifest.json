@@ -1,0 +1,41 @@
+{
+  "name": "NeverInDoubt",
+  "short_name": "NeverInDoubt",
+  "description": "AI-powered sports predictions and betting intelligence",
+  "start_url": "/predictions",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#00FF84",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/nidmainlogo.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/nidmainlogo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["sports", "finance"],
+  "shortcuts": [
+    {
+      "name": "Predictions",
+      "short_name": "Picks",
+      "description": "Browse today's AI predictions",
+      "url": "/predictions",
+      "icons": [{ "src": "/nidmainlogo.jpg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Tipsters",
+      "short_name": "Tipsters",
+      "description": "View top tipster leaderboard",
+      "url": "/tipsters",
+      "icons": [{ "src": "/nidmainlogo.jpg", "sizes": "96x96" }]
+    }
+  ]
+}

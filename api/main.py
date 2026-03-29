@@ -1132,6 +1132,26 @@ def trigger_rebuild_hockey_data():
     return {"status": "started", "note": "Hockey data rebuild running. Check Railway logs."}
 
 
+@app.post("/api/v1/admin/run-migrations", tags=["Admin"])
+def admin_run_migrations(secret: str):
+    """Run alembic upgrade head. Safe to call multiple times (idempotent)."""
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    import subprocess, sys
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        capture_output=True,
+        text=True,
+        cwd="/app",  # Railway working directory
+    )
+    return {
+        "returncode": result.returncode,
+        "stdout": result.stdout[-2000:] if result.stdout else "",
+        "stderr": result.stderr[-2000:] if result.stderr else "",
+    }
+
+
 @app.get("/ready", tags=["Health"])
 def readiness_check(db: Session = Depends(get_db)):
     """

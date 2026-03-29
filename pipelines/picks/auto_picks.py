@@ -91,6 +91,14 @@ SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "soccer":   0.50,  # lgb_v18 validated at 60.1% acc only at ≥50% confidence
 }
 
+# Sports where we fall back to model fair odds (1/p) when real market odds are
+# unavailable. SGO only covers top-tier soccer leagues (EPL/La Liga/etc.) so the
+# majority of Highlightly soccer fixtures never get market odds populated.
+# For these sports we generate picks against the model's own no-vig line; this
+# means we're betting on model confidence rather than market edge, so we drop the
+# min_edge requirement to 0 for fair-odds-derived picks.
+FAIR_ODDS_SPORTS: set[str] = {"soccer", "tennis", "esports"}
+
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 
@@ -109,16 +117,21 @@ def run(
     created = 0
 
     try:
-        # All upcoming/live matches with predictions AND real odds
+        # All upcoming/live matches with predictions. Real market odds are preferred;
+        # for FAIR_ODDS_SPORTS we fall back to the model's own fair odds so that
+        # soccer/tennis/esports matches without SGO coverage still generate picks.
+        from sqlalchemy import or_
         rows = (
             db.query(CoreMatch, PredMatch)
             .join(PredMatch, PredMatch.match_id == CoreMatch.id)
             .filter(
                 CoreMatch.status.in_(["scheduled", "live"]),
                 CoreMatch.kickoff_utc > datetime.now(timezone.utc),
-                # Must have at least home + away real odds
-                CoreMatch.odds_home.isnot(None),
-                CoreMatch.odds_away.isnot(None),
+                # Must have real odds OR be a fair-odds sport (we'll fall back below)
+                or_(
+                    CoreMatch.odds_home.isnot(None),
+                    CoreMatch.sport.in_(list(FAIR_ODDS_SPORTS)),
+                ),
             )
             .order_by(CoreMatch.kickoff_utc.asc())
             .all()
@@ -146,14 +159,24 @@ def run(
             home_name = home_team.name
             away_name = away_team.name
 
-            if match.odds_home and pred.p_home:
-                candidates.append((home_name, pred.p_home, match.odds_home, ml_market))
-            if match.odds_away and pred.p_away:
-                candidates.append((away_name, pred.p_away, match.odds_away, ml_market))
-            if match.odds_draw and pred.p_draw and pred.p_draw > 0.01:
-                candidates.append(("Draw", pred.p_draw, match.odds_draw, ml_market))
+            # Determine odds source: prefer real market odds, fall back to fair odds
+            # for sports in FAIR_ODDS_SPORTS. Fair odds = model's own no-vig line
+            # (1/p), so edge vs fair odds is always ~0; we lower the edge bar to 0
+            # for these picks and rely purely on the confidence gate.
+            using_fair_odds = (sport in FAIR_ODDS_SPORTS) and not match.odds_home
 
-            effective_min_edge = SPORT_MIN_EDGE.get(sport, min_edge)
+            h_odds = match.odds_home or (pred.fair_odds_home if using_fair_odds else None)
+            a_odds = match.odds_away or (pred.fair_odds_away if using_fair_odds else None)
+            d_odds = match.odds_draw or (pred.fair_odds_draw if using_fair_odds else None)
+
+            if h_odds and pred.p_home:
+                candidates.append((home_name, pred.p_home, h_odds, ml_market))
+            if a_odds and pred.p_away:
+                candidates.append((away_name, pred.p_away, a_odds, ml_market))
+            if d_odds and pred.p_draw and pred.p_draw > 0.01:
+                candidates.append(("Draw", pred.p_draw, d_odds, ml_market))
+
+            effective_min_edge = 0.0 if using_fair_odds else SPORT_MIN_EDGE.get(sport, min_edge)
             effective_min_conf = SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
 
             for selection_label, model_prob, book_odds, market_name in candidates:
@@ -175,9 +198,10 @@ def run(
                 k = kelly_fraction(model_prob, book_odds)
                 stake = round(k * kelly_frac, 4)
 
+                odds_source = "fair" if using_fair_odds else "market"
                 log.info(
-                    "  [%s] %s | %s @ %.2f | edge=+%.1f%% | kelly=%.1f%% | stake=%.2fu",
-                    sport, match_label, selection_label, book_odds,
+                    "  [%s] %s | %s @ %.2f (%s) | edge=+%.1f%% | kelly=%.1f%% | stake=%.2fu",
+                    sport, match_label, selection_label, book_odds, odds_source,
                     e * 100, k * 100, stake,
                 )
 

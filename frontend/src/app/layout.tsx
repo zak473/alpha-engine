@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Barlow_Condensed, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
+import Script from "next/script";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -33,6 +34,12 @@ export const metadata: Metadata = {
     template: "%s | Never In Doubt",
   },
   description: "Never In Doubt is an AI-powered sports betting platform for sharper tips, live markets, and confident match analysis.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "NeverInDoubt",
+  },
   icons: {
     icon: "/never-in-doubt-logo.png",
     shortcut: "/never-in-doubt-logo.png",
@@ -54,6 +61,16 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#00FF84",
+};
+
+const plausibleDomain = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN ?? "neverindoubt.app";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -68,6 +85,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </AuthProvider>
           </OddsFormatProvider>
         </ThemeProvider>
+        <Script
+          defer
+          data-domain={plausibleDomain}
+          src="https://plausible.io/js/script.js"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
