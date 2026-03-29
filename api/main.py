@@ -14,8 +14,12 @@ try:
     from slowapi.util import get_remote_address
     from slowapi.errors import RateLimitExceeded
     _rate_limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
+    logging.getLogger("alpha_engine").info("Rate limiting: enabled (slowapi)")
 except ImportError:
-    pass
+    _rate_limiter = None
+    logging.getLogger("alpha_engine").warning(
+        "⚠️  Rate limiting DISABLED — install slowapi to enable: pip install slowapi"
+    )
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -420,7 +424,7 @@ def admin_refetch_hockey(secret: str, db: Session = Depends(get_db)):
     """Backfill outcomes for finished hockey matches with null outcome, then settle tips.
     Matches Highlightly (hl-hockey-*) matches to NHL API scores by home/away team name + date.
     """
-    if secret != "nid-settle-2026":
+    if secret != settings.ADMIN_SETTLE_SECRET:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
     import httpx
@@ -511,7 +515,7 @@ def admin_fix_baseball_outcomes(secret: str, db: Session = Depends(get_db)):
     One-off: normalize 'H'/'A' outcomes to 'home_win'/'away_win' for baseball matches,
     then re-settle all AI tipster tips (including already-settled ones) to fix wrong results.
     """
-    if secret != "nid-settle-2026":
+    if secret != settings.ADMIN_SETTLE_SECRET:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -539,7 +543,7 @@ def admin_fix_baseball_outcomes(secret: str, db: Session = Depends(get_db)):
 @app.delete("/api/v1/admin/purge-unsettleable-tips", tags=["Admin"])
 def admin_purge_unsettleable_tips(secret: str, db: Session = Depends(get_db)):
     """Delete AI tipster tips where the match is finished but has no outcome and no scores (orphaned)."""
-    if secret != "nid-settle-2026":
+    if secret != settings.ADMIN_SETTLE_SECRET:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -572,7 +576,7 @@ def admin_purge_unsettleable_tips(secret: str, db: Session = Depends(get_db)):
 @app.delete("/api/v1/admin/nuke-ai-tips", tags=["Admin"])
 def admin_nuke_ai_tips(secret: str, db: Session = Depends(get_db)):
     """Delete ALL pending AI tipster tips regardless of age."""
-    if secret != "nid-nuke-2026":
+    if secret != settings.ADMIN_SECRET:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -609,7 +613,7 @@ def admin_debug_sgo_odds(secret: str, sport: str = "soccer", limit: int = 20):
     Debug SGO odds matching: fetch live SGO events for a sport and show which DB matches
     they would/wouldn't match, and what the name differences look like.
     """
-    if secret != "nid-settle-2026":
+    if secret != settings.ADMIN_SETTLE_SECRET:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -686,7 +690,7 @@ def admin_debug_sgo_odds(secret: str, sport: str = "soccer", limit: int = 20):
 @app.post("/api/v1/admin/run-auto-picks", tags=["Admin"])
 def admin_run_auto_picks(secret: str):
     """Manually trigger the auto-picks bot to regenerate tips."""
-    if secret != "nid-nuke-2026":
+    if secret != settings.ADMIN_SECRET:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
     from pipelines.picks.auto_picks import run as run_auto_picks
@@ -694,10 +698,21 @@ def admin_run_auto_picks(secret: str):
     return {"created": created}
 
 
+@app.post("/api/v1/admin/backfill-picks", tags=["Admin"])
+def admin_backfill_picks(secret: str, days: int = 14, dry_run: bool = False):
+    """Backfill TrackedPick + TipsterTip rows from historical finished matches."""
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from pipelines.picks.backfill_picks import run as backfill
+    created = backfill(days=days, dry_run=dry_run)
+    return {"created": created, "dry_run": dry_run}
+
+
 @app.get("/api/v1/admin/tip-history", tags=["Admin"])
 def admin_tip_history(secret: str, sport: str = "", db: Session = Depends(get_db)):
     """All TipsterTip rows (settled + pending) for AI tipsters."""
-    if secret != "nid-nuke-2026":
+    if secret != settings.ADMIN_SECRET:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
     from db.models.tipsters import TipsterTip
@@ -725,7 +740,7 @@ def admin_tip_history(secret: str, sport: str = "", db: Session = Depends(get_db
 @app.post("/api/v1/admin/force-settle-tips", tags=["Admin"])
 def admin_force_settle_tips(secret: str, recheck: bool = False):
     """Force-run tip settlement immediately."""
-    if secret != "nid-settle-2026":
+    if secret != settings.ADMIN_SETTLE_SECRET:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
     from pipelines.tipsters.settle_tips import run as settle
@@ -736,7 +751,7 @@ def admin_force_settle_tips(secret: str, recheck: bool = False):
 @app.post("/api/v1/admin/fetch-recent-results", tags=["Admin"])
 def admin_fetch_recent_results(secret: str):
     """Fetch recent MLB + NHL + Highlightly results to fill in missing outcomes, then re-settle."""
-    if secret != "nid-settle-2026":
+    if secret != settings.ADMIN_SETTLE_SECRET:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -766,7 +781,7 @@ def admin_fetch_recent_results(secret: str):
 @app.get("/api/v1/admin/pending-tips", tags=["Admin"])
 def admin_pending_tips(secret: str, db: Session = Depends(get_db)):
     """Show all pending AI tips and their match status, to diagnose settlement failures."""
-    if secret != "nid-settle-2026":
+    if secret != settings.ADMIN_SETTLE_SECRET:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
 

@@ -56,12 +56,13 @@ def _challenge_out(
     )
 
 
-def _entry_out(entry: ChallengeEntry, db: Session) -> ChallengeEntryOut:
-    result = (
-        db.query(ChallengeEntryResult)
-        .filter(ChallengeEntryResult.entry_id == entry.id)
-        .first()
-    )
+def _entry_out(entry: ChallengeEntry, db: Session, result: ChallengeEntryResult | None = None) -> ChallengeEntryOut:
+    if result is None:
+        result = (
+            db.query(ChallengeEntryResult)
+            .filter(ChallengeEntryResult.entry_id == entry.id)
+            .first()
+        )
     return ChallengeEntryOut(
         id=entry.id,
         challenge_id=entry.challenge_id,
@@ -232,8 +233,17 @@ def list_entries(
         .all()
     )
 
+    # Bulk-load all ChallengeEntryResult rows for this page to avoid N+1 queries
+    entry_ids = [e.id for e in items]
+    results_map = {
+        r.entry_id: r
+        for r in db.query(ChallengeEntryResult).filter(
+            ChallengeEntryResult.entry_id.in_(entry_ids)
+        ).all()
+    }
+
     return EntryFeedPage(
-        items=[_entry_out(e, db) for e in items],
+        items=[_entry_out(e, db, result=results_map.get(e.id)) for e in items],
         total=total,
         page=page,
         page_size=page_size,

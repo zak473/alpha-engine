@@ -77,17 +77,17 @@ function getAuthHeaders(): Record<string, string> {
 
 async function request<T>(
   path: string,
-  options?: { retries?: number }
+  options?: { retries?: number; revalidate?: number }
 ): Promise<T> {
   const maxRetries = options?.retries ?? 2;
   let lastError: Error = new Error("Request failed");
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const res = await fetch(`${BASE}${path}`, {
-        cache: "no-store",   // never cache — auth responses are user-specific
-        headers: getAuthHeaders(),
-      });
+      const fetchOptions: RequestInit = options?.revalidate != null
+        ? { next: { revalidate: options.revalidate }, headers: getAuthHeaders() }
+        : { cache: "no-store", headers: getAuthHeaders() };   // never cache — auth responses are user-specific
+      const res = await fetch(`${BASE}${path}`, fetchOptions);
 
       if (!res.ok) {
         const text = await res.text().catch(() => "Unknown error");
@@ -208,16 +208,16 @@ export async function getPredictions(params?: {
   if (params?.limit)     qs.set("limit",      String(params.limit));
   if (params?.offset)    qs.set("offset",     String(params.offset));
   const suffix = qs.toString() ? `?${qs}` : "";
-  return request<MvpPredictionList>(`/predictions${suffix}`);
+  return request<MvpPredictionList>(`/predictions${suffix}`, { revalidate: 30 });
 }
 
 export async function getMatchPrediction(matchId: string): Promise<MvpPrediction> {
-  return request<MvpPrediction>(`/predictions/match/${matchId}`);
+  return request<MvpPrediction>(`/predictions/match/${matchId}`, { revalidate: 30 });
 }
 
 export async function getPerformance(sport?: string): Promise<MvpPerformance> {
   const suffix = sport ? `?sport=${sport}` : "";
-  return request<MvpPerformance>(`/predictions/performance${suffix}`);
+  return request<MvpPerformance>(`/predictions/performance${suffix}`, { revalidate: 60 });
 }
 
 // ─── Challenges ───────────────────────────────────────────────────────────
@@ -320,7 +320,8 @@ export async function getSportMatches(
   if (params?.offset)    qs.set("offset",    String(params.offset));
   const suffix = qs.toString() ? `?${qs}` : "";
   return request<{ items: SportMatchListItem[]; total: number; sport: string }>(
-    `/sports/${sport}/matches${suffix}`
+    `/sports/${sport}/matches${suffix}`,
+    { revalidate: 30 }
   );
 }
 
@@ -328,7 +329,7 @@ export async function getSportMatchDetail(
   sport: SportSlug,
   matchId: string
 ): Promise<SportMatchDetail> {
-  return request<SportMatchDetail>(`/sports/${sport}/matches/${matchId}`);
+  return request<SportMatchDetail>(`/sports/${sport}/matches/${matchId}`, { revalidate: 30 });
 }
 
 export async function getEsportsMatchDetail(matchId: string): Promise<EsportsMatchDetail> {
@@ -441,7 +442,7 @@ export interface LiveMatchOut {
 }
 
 export async function getLiveMatches(): Promise<LiveMatchOut[]> {
-  return request<LiveMatchOut[]>("/matches/live");
+  return request<LiveMatchOut[]>("/matches/live", { revalidate: 30 });
 }
 
 // ─── Picks / Record ───────────────────────────────────────────────────────
@@ -520,6 +521,17 @@ export async function getPicksStats(sport?: string): Promise<PicksStatsOut> {
   const suffix = sport ? `?sport=${sport}` : "";
   const res = await fetch(`${BASE}/picks/stats${suffix}`, { cache: "no-store", headers: getAuthHeaders() });
   if (!res.ok) throw new ApiError(`API ${res.status}`, res.status, "/picks/stats");
+  return res.json();
+}
+
+export interface PicksStatsAllOut {
+  overall: PicksStatsOut;
+  by_sport: Record<string, PicksStatsOut>;
+}
+
+export async function getPicksStatsAll(): Promise<PicksStatsAllOut> {
+  const res = await fetch(`${BASE}/picks/stats/all`, { cache: "no-store", headers: getAuthHeaders() });
+  if (!res.ok) throw new ApiError(`API ${res.status}`, res.status, "/picks/stats/all");
   return res.json();
 }
 
@@ -612,7 +624,7 @@ export interface TipsterTip {
 }
 
 export async function getTipsters(): Promise<TipsterProfile[]> {
-  const res = await fetch(`${BASE}/tipsters`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/tipsters`, { next: { revalidate: 60 } });
   if (!res.ok) throw new ApiError(`API ${res.status}`, res.status, "/tipsters");
   return res.json();
 }
@@ -635,7 +647,7 @@ export async function triggerSync(): Promise<{ status: string; note: string }> {
 }
 
 export async function getEloMovers(limit = 10): Promise<RatingEntry[]> {
-  return request(`/sports/elo-movers?limit=${limit}`);
+  return request(`/sports/elo-movers?limit=${limit}`, { revalidate: 60 });
 }
 
 // ─── Picks ROI series ─────────────────────────────────────────────────────
@@ -735,7 +747,7 @@ export interface PredictionAccuracy {
 
 export async function getPredictionAccuracy(sport?: string): Promise<PredictionAccuracy> {
   const qs = sport ? `?sport=${sport}` : "";
-  return request<PredictionAccuracy>(`/predictions/accuracy${qs}`);
+  return request<PredictionAccuracy>(`/predictions/accuracy${qs}`, { revalidate: 60 });
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────
@@ -775,12 +787,12 @@ export async function updateProfile(data: { display_name?: string; current_passw
 
 export async function getStandingsBySport(sport: string, season?: string): Promise<StandingsResponse[]> {
   const suffix = season ? `?season=${encodeURIComponent(season)}` : "";
-  return request<StandingsResponse[]>(`/standings/${sport}${suffix}`);
+  return request<StandingsResponse[]>(`/standings/${sport}${suffix}`, { revalidate: 3600 });
 }
 
 export async function getStandingsForMatch(matchId: string): Promise<StandingsResponse | null> {
   try {
-    return await request<StandingsResponse>(`/standings/match/${matchId}`);
+    return await request<StandingsResponse>(`/standings/match/${matchId}`, { revalidate: 3600 });
   } catch {
     return null;
   }
@@ -790,7 +802,7 @@ export async function getStandingsForMatch(matchId: string): Promise<StandingsRe
 
 export async function getMatchReasoning(matchId: string): Promise<string | null> {
   try {
-    const res = await request<{ match_id: string; reasoning: string }>(`/reasoning/${matchId}`);
+    const res = await request<{ match_id: string; reasoning: string }>(`/reasoning/${matchId}`, { revalidate: 3600 });
     return res.reasoning;
   } catch {
     return null;

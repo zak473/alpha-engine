@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(`${BDL_BASE}/matches?${qs}`, {
       headers: bdlHeaders(),
-      cache: "no-store",
+      next: { revalidate: 300 },
     });
     if (!res.ok) return NextResponse.json({ data: [] }, { status: res.status });
     const json = await res.json();
@@ -41,7 +41,9 @@ export async function GET(req: NextRequest) {
       return ids.includes(t1) && ids.includes(t2);
     });
 
-    return NextResponse.json({ data: h2h });
+    return NextResponse.json({ data: h2h }, {
+      headers: { 'Cache-Control': 's-maxage=300, stale-while-revalidate=600' }
+    });
   } catch {
     return NextResponse.json({ data: [] }, { status: 500 });
   }

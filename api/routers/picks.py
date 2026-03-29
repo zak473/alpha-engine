@@ -396,6 +396,53 @@ def picks_stats(
     )
 
 
+@router.get("/stats/all")
+def picks_stats_all(
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user),
+):
+    """Return overall + per-sport picks stats in a single request."""
+    SPORTS = ["soccer", "tennis", "basketball", "baseball", "hockey", "esports"]
+
+    all_picks = db.query(TrackedPick).filter(TrackedPick.user_id == user_id).all()
+
+    def _compute(picks: list) -> dict:
+        total = len(picks)
+        won = sum(1 for p in picks if p.outcome == "won")
+        lost = sum(1 for p in picks if p.outcome == "lost")
+        void = sum(1 for p in picks if p.outcome == "void")
+        pending = sum(1 for p in picks if p.outcome is None)
+        settled = won + lost + void
+        win_rate = round(won / (won + lost), 4) if (won + lost) > 0 else 0.0
+        avg_odds = round(sum(p.odds for p in picks) / total, 3) if total else 0.0
+        avg_edge = round(sum((p.edge or 0) for p in picks) / total, 2) if total else 0.0
+        units_staked = float(total)
+        units_returned = sum(p.odds for p in picks if p.outcome == "won")
+        roi = round((units_returned - units_staked) / units_staked, 4) if units_staked > 0 else 0.0
+        clv_picks = [p for p in picks if p.clv is not None]
+        avg_clv = round(sum(p.clv for p in clv_picks) / len(clv_picks), 4) if clv_picks else None
+        kelly_picks = [p for p in picks if p.stake_fraction and p.outcome in ("won", "lost")]
+        if kelly_picks:
+            k_staked = sum(p.stake_fraction for p in kelly_picks)
+            k_returned = sum(p.stake_fraction * p.odds for p in kelly_picks if p.outcome == "won")
+            kelly_roi = round((k_returned - k_staked) / k_staked, 4) if k_staked > 0 else None
+        else:
+            kelly_roi = None
+        return {
+            "total": total, "settled": settled, "pending": pending,
+            "won": won, "lost": lost, "void": void,
+            "win_rate": win_rate, "avg_odds": avg_odds, "avg_edge": avg_edge,
+            "roi": roi, "avg_clv": avg_clv, "kelly_roi": kelly_roi,
+        }
+
+    by_sport = {
+        sport: _compute([p for p in all_picks if p.sport == sport])
+        for sport in SPORTS
+    }
+
+    return {"overall": _compute(all_picks), "by_sport": by_sport}
+
+
 @router.get("/recent-wins", response_model=list[PickOut])
 def recent_wins(
     limit: int = Query(5, le=20),

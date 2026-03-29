@@ -60,10 +60,11 @@ export default function SubscribePage() {
       <div className="relative w-full max-w-md">
         <div className="mb-8 flex justify-center">
           <Image
-            src="/nidmainlogo.png"
+            src="/nidmainlogo.jpg"
             alt="Never In Doubt"
             width={200}
             height={56}
+            sizes="(max-width: 768px) 100px, 132px"
             className="h-12 w-auto [filter:invert(1)_hue-rotate(180deg)]"
             priority
           />

@@ -20,12 +20,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(url, { headers: bdlHeaders(), cache: "no-store" });
+    const res = await fetch(url, { headers: bdlHeaders(), next: { revalidate: 60 } });
     if (!res.ok) {
       return NextResponse.json({ data: [] }, { status: res.status });
     }
     const data = await res.json();
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: { 'Cache-Control': 's-maxage=60, stale-while-revalidate=120' }
+    });
   } catch {
     return NextResponse.json({ data: [] }, { status: 500 });
   }

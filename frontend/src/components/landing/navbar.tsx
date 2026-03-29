@@ -40,7 +40,7 @@ export function Navbar() {
       >
         <div className="site-container flex h-[76px] items-center justify-between xl:h-20">
           <Link href="/" className="flex items-center">
-            <Image src="/nidmainlogo.png" alt="Never In Doubt" width={160} height={44} className="h-28 w-auto [filter:invert(1)_hue-rotate(180deg)]" priority />
+            <Image src="/nidmainlogo.jpg" alt="Never In Doubt" width={160} height={44} sizes="(max-width: 768px) 100px, 132px" className="h-28 w-auto [filter:invert(1)_hue-rotate(180deg)]" priority />
           </Link>
 
           <nav className="hidden items-center gap-8 lg:flex">

@@ -21,10 +21,12 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(`${BDL_BASE}/match_maps?${qs}`, {
       headers: bdlHeaders(),
-      cache: "no-store",
+      next: { revalidate: 300 },
     });
     if (!res.ok) return NextResponse.json({ data: [] }, { status: res.status });
-    return NextResponse.json(await res.json());
+    return NextResponse.json(await res.json(), {
+      headers: { 'Cache-Control': 's-maxage=300, stale-while-revalidate=600' }
+    });
   } catch {
     return NextResponse.json({ data: [] }, { status: 500 });
   }

@@ -14,10 +14,12 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(
       `${BDL_BASE}/player_accuracy_stats?player_id=${playerId}`,
-      { headers: bdlHeaders(), cache: "no-store" }
+      { headers: bdlHeaders(), next: { revalidate: 300 } }
     );
     if (!res.ok) return NextResponse.json({ data: [] }, { status: res.status });
-    return NextResponse.json(await res.json());
+    return NextResponse.json(await res.json(), {
+      headers: { 'Cache-Control': 's-maxage=300, stale-while-revalidate=600' }
+    });
   } catch {
     return NextResponse.json({ data: [] }, { status: 500 });
   }

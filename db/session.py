@@ -14,8 +14,8 @@ def _db_url() -> str:
 engine = create_engine(
     _db_url(),
     pool_pre_ping=True,
-    pool_size=2,
-    max_overflow=3,
+    pool_size=10,
+    max_overflow=5,
     pool_recycle=180,
     pool_timeout=10,
     connect_args={"connect_timeout": 10},

@@ -174,3 +174,41 @@ def emergency_purge_ai_tips(
     db.commit()
     logger.info("[admin] emergency_purge_ai_tips: deleted %d tips", deleted)
     return {"deleted": deleted}
+
+
+@router.get("/ai-tipsters/status")
+def ai_tipsters_status(
+    db: Session = Depends(get_db),
+    _: str = Depends(_require_admin),
+):
+    """
+    Returns the DB state of all AI tipster accounts — useful for diagnosing
+    'No tipsters yet' issues. Re-seeds them (idempotent) before returning.
+    """
+    from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTERS, seed
+    from db.models.tipsters import TipsterTip
+
+    # Re-seed to ensure is_ai=True for all AI tipsters
+    seed()
+
+    results = []
+    for tipster in AI_TIPSTERS:
+        user = db.get(User, tipster["id"])
+        tip_count = db.query(func.count(TipsterTip.id)).filter(
+            TipsterTip.user_id == tipster["id"]
+        ).scalar() or 0
+        pending = db.query(func.count(TipsterTip.id)).filter(
+            TipsterTip.user_id == tipster["id"],
+            TipsterTip.outcome.is_(None),
+        ).scalar() or 0
+        results.append({
+            "id": tipster["id"],
+            "sport": tipster["sport"],
+            "display_name": tipster["display_name"],
+            "exists_in_db": user is not None,
+            "is_ai": user.is_ai if user else None,
+            "total_tips": tip_count,
+            "pending_tips": pending,
+        })
+
+    return {"tipsters": results}

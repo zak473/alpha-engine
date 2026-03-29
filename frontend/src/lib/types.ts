@@ -382,22 +382,14 @@ export interface SportMatchDetail {
   fair_odds?: { home_win?: number | null; draw?: number | null; away_win?: number | null } | null;
   confidence?: number | null;
   key_drivers?: Array<{ feature: string; value?: number | null; importance: number; direction?: string | null }> | null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  model?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  elo_home?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  elo_away?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  h2h?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  stats_home?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  stats_away?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  form_home?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  form_away?: any;
+  model?: { version: string; algorithm?: string | null; trained_at: string | null; accuracy?: number | null; brier_score?: number | null; n_train_samples?: number | null } | null;
+  elo_home?: EloSnapshotOut | null;
+  elo_away?: EloSnapshotOut | null;
+  h2h?: H2HRecordOut | null;
+  stats_home?: Record<string, unknown> | null;
+  stats_away?: Record<string, unknown> | null;
+  form_home?: Record<string, unknown> | null;
+  form_away?: Record<string, unknown> | null;
   context?: {
     venue_name?: string | null;
     venue_city?: string | null;
@@ -429,27 +421,17 @@ export interface SportMatchDetail {
   }>;
   stats_home_live?: Record<string, unknown> | null;
   stats_away_live?: Record<string, unknown> | null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  lineup_home?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  lineup_away?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  injuries_home?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  injuries_away?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  referee?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  league_context?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  adv_home?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  adv_away?: any;
+  lineup_home?: Record<string, unknown> | null;
+  lineup_away?: Record<string, unknown> | null;
+  injuries_home?: Array<{ player_name: string; position?: string | null; status: string; reason?: string | null; expected_return?: string | null }> | null;
+  injuries_away?: Array<{ player_name: string; position?: string | null; status: string; reason?: string | null; expected_return?: string | null }> | null;
+  referee?: Record<string, unknown> | null;
+  league_context?: Record<string, unknown> | null;
+  adv_home?: Record<string, unknown> | null;
+  adv_away?: Record<string, unknown> | null;
   // Basketball player box scores
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  box_home?: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  box_away?: any;
+  box_home?: Record<string, unknown> | null;
+  box_away?: Record<string, unknown> | null;
 }
 
 // Soccer-specific ELO history point
@@ -1209,8 +1191,8 @@ export interface BasketballMatchDetail {
   injuries_away?: BasketballInjury[] | null;
   shots_home?: BasketballShotZone[] | null;
   shots_away?: BasketballShotZone[] | null;
-  h2h?: { total_matches: number; home_wins: number; away_wins: number; draws?: number | null; recent_matches: any[] } | null;
-  context?: Record<string, any> | null;
+  h2h?: { total_matches: number; home_wins: number; away_wins: number; draws?: number | null; recent_matches: Record<string, unknown>[] } | null;
+  context?: Record<string, unknown> | null;
   data_completeness?: Record<string, boolean> | null;
   clutch_home?: BasketballClutchStatsOut | null;
   clutch_away?: BasketballClutchStatsOut | null;
@@ -1524,11 +1506,11 @@ export interface BaseballMatchDetail {
   form_home?: BaseballTeamFormOut | null;
   form_away?: BaseballTeamFormOut | null;
   inning_events?: BaseballInningEvent[] | null;
-  h2h?: { total_matches: number; home_wins: number; away_wins: number; recent_matches: any[] } | null;
+  h2h?: { total_matches: number; home_wins: number; away_wins: number; recent_matches: Record<string, unknown>[] } | null;
   injuries_home?: Array<{ player_name: string; position?: string | null; status: string; reason?: string | null; expected_return?: string | null }> | null;
   injuries_away?: Array<{ player_name: string; position?: string | null; status: string; reason?: string | null; expected_return?: string | null }> | null;
-  context?: Record<string, any> | null;
-  league_context?: Record<string, any> | null;
+  context?: Record<string, unknown> | null;
+  league_context?: Record<string, unknown> | null;
   data_completeness?: Record<string, boolean> | null;
   batted_ball_home?: BattedBallStatsOut | null;
   batted_ball_away?: BattedBallStatsOut | null;
@@ -1640,14 +1622,14 @@ export interface HockeyMatchDetail {
   lineup_home?: HockeyLineupOut | null;
   lineup_away?: HockeyLineupOut | null;
   events?: HockeyEventOut[];
-  h2h?: { total_matches: number; home_wins: number; away_wins: number; recent_matches: any[] } | null;
+  h2h?: { total_matches: number; home_wins: number; away_wins: number; recent_matches: Record<string, unknown>[] } | null;
   odds_home?: number | null;
   odds_away?: number | null;
   odds_draw?: number | null;
   injuries_home?: Array<{ player_name: string; position?: string | null; status: string; reason?: string | null; expected_return?: string | null }> | null;
   injuries_away?: Array<{ player_name: string; position?: string | null; status: string; reason?: string | null; expected_return?: string | null }> | null;
-  context?: Record<string, any> | null;
-  league_context?: Record<string, any> | null;
+  context?: Record<string, unknown> | null;
+  league_context?: Record<string, unknown> | null;
   data_completeness?: Record<string, boolean> | null;
   simulation?: { n_simulations: number; distribution: Array<{ score: string; probability: number }>; mean_home_goals?: number | null } | null;
 }

@@ -3,7 +3,7 @@ import { DeskPageIntro } from "@/components/layout/DeskPageIntro";
 import { TipstersView } from "./TipstersView";
 import { getTipsters } from "@/lib/api";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export const metadata = {
   title: "Tipsters",

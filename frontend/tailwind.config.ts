@@ -42,9 +42,9 @@ const config: Config = {
         b1: "var(--border1)",
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-        display: ["Barlow Condensed", "Arial Narrow", "sans-serif"],
-        mono: ["JetBrains Mono", "Menlo", "monospace"],
+        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        display: ["var(--font-barlow-condensed)", "Arial Narrow", "sans-serif"],
+        mono: ["var(--font-jetbrains-mono)", "Menlo", "monospace"],
       },
       boxShadow: {
         "nid-1": "0 16px 38px rgba(0,0,0,0.28)",

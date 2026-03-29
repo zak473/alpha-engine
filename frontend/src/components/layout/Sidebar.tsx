@@ -60,7 +60,7 @@ export function Sidebar() {
       <aside className={`shell-sidebar transition-transform duration-200 ${open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
         <div className="shell-sidebar__brand">
           <div className="flex items-center gap-3">
-            <Image src="/nidmainlogo.png" alt="Never In Doubt" width={132} height={36} className="h-12 w-auto [filter:invert(1)_hue-rotate(180deg)]" priority />
+            <Image src="/nidmainlogo.jpg" alt="Never In Doubt" width={132} height={36} sizes="(max-width: 768px) 100px, 132px" className="h-12 w-auto [filter:invert(1)_hue-rotate(180deg)]" priority />
           </div>
           <p className="shell-sidebar__tag">AI betting intelligence · cleaner decision desk</p>
         </div>

@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
       dates.map((date) =>
         fetch(`${BDL_BASE}/games?dates[]=${date}&per_page=100`, {
           headers: bdlHeaders(),
-          cache: "no-store",
+          next: { revalidate: 60 },
         }).then((r) => (r.ok ? r.json() : { data: [] }))
       )
     );
@@ -42,7 +42,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ data: Array.from(byId.values()), meta: {} });
+    return NextResponse.json({ data: Array.from(byId.values()), meta: {} }, {
+      headers: { 'Cache-Control': 's-maxage=60, stale-while-revalidate=120' }
+    });
   } catch {
     return NextResponse.json({ data: [], meta: {} }, { status: 500 });
   }

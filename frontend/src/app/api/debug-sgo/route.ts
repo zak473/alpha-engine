@@ -14,7 +14,7 @@ export async function GET(req: Request) {
     : `${BASE}/${endpoint}/?apiKey=${KEY}&leagueID=EPL&live=true`;
 
   try {
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await fetch(url, { next: { revalidate: 300 } });
     const raw = await res.json();
 
     // For the event, show what top-level keys exist beyond odds
@@ -35,7 +35,9 @@ export async function GET(req: Request) {
       rawTeams: event.teams,
     } : { error: "no event found", raw };
 
-    return NextResponse.json({ url, status: res.status, summary });
+    return NextResponse.json({ url, status: res.status, summary }, {
+      headers: { 'Cache-Control': 's-maxage=300, stale-while-revalidate=600' }
+    });
   } catch (e) {
     return NextResponse.json({ error: String(e), url });
   }

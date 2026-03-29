@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Users, Plus, X, Search, ChevronRight, Trophy, Zap, Activity, BarChart3, Flame, Clock3, Timer } from "lucide-react";
+import { Users, Plus, X, Search, ChevronRight, Trophy, Zap, Activity, BarChart3, Flame, Clock3, Timer, Share2 } from "lucide-react";
+import { useToast } from "@/components/ui/Toast";
 import { SPORT_CONFIG } from "@/lib/betting-types";
 import type { SportSlug } from "@/lib/betting-types";
 import { cn } from "@/lib/utils";
@@ -118,9 +119,25 @@ function TipRow({ tip, tipsterUsername }: { tip: TipsterTip; tipsterUsername: st
   const cfg = SPORT_CONFIG[tip.sport as SportSlug];
   const isPending = !tip.outcome || tip.outcome === "pending";
   const { addToQueue, isInQueue } = useBetting();
+  const { toast } = useToast();
   const queueId = `tipster:${tip.id}`;
   const tailed = isInQueue(queueId);
   const countdown = useCountdown(tip.start_time, tip.outcome);
+
+  async function handleShare(e: React.MouseEvent) {
+    e.stopPropagation();
+    const text = `📊 ${tip.selection_label} @ ${tip.odds.toFixed(2)} (${tip.sport})\n${tip.match_label}\nFollow the AI tipsters at neverindoubt.app`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ text, url: window.location.href });
+      } else {
+        await navigator.clipboard.writeText(text);
+        toast.success("Copied to clipboard!");
+      }
+    } catch {
+      // user dismissed share sheet — no-op
+    }
+  }
 
   return (
     <div
@@ -209,6 +226,13 @@ function TipRow({ tip, tipsterUsername }: { tip: TipsterTip; tipsterUsername: st
             Lost
           </span>
         )}
+        <button
+          onClick={handleShare}
+          title="Share this tip"
+          className="ml-1 inline-flex items-center justify-center rounded-full p-1.5 text-text-muted transition-colors hover:bg-white/[0.06] hover:text-text-primary"
+        >
+          <Share2 size={13} />
+        </button>
       </div>
     </div>
   );

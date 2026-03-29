@@ -1,10 +1,17 @@
+import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/AppShell";
 import { notFound } from "next/navigation";
 import { SGOMatchDetail } from "@/app/sports/[sport]/matches/[id]/SGOMatchDetail";
 import { fetchMatchPageData } from "@/app/sports/_lib/fetchMatchPageData";
-import { getSportDetailShell } from "@/app/sports/_lib/display";
+import { getSportDetailShell, buildMatchMetadata } from "@/app/sports/_lib/display";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const data = await fetchMatchPageData("basketball", params.id).catch(() => null);
+  if (!data) return {};
+  return buildMatchMetadata("basketball", data);
+}
 
 export default async function BasketballMatchPage({ params }: { params: { id: string } }) {
   const data = await fetchMatchPageData("basketball", params.id);

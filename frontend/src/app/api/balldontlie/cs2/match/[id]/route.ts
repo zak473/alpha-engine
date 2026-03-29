@@ -13,10 +13,12 @@ export async function GET(
   try {
     const res = await fetch(`${BDL_BASE}/matches/${params.id}`, {
       headers: bdlHeaders(),
-      cache: "no-store",
+      next: { revalidate: 60 },
     });
     if (!res.ok) return NextResponse.json({ data: null }, { status: res.status });
-    return NextResponse.json(await res.json());
+    return NextResponse.json(await res.json(), {
+      headers: { 'Cache-Control': 's-maxage=60, stale-while-revalidate=120' }
+    });
   } catch {
     return NextResponse.json({ data: null }, { status: 500 });
   }

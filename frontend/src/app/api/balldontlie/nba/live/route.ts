@@ -6,7 +6,7 @@ function bdlHeaders(): Record<string, string> {
 
 async function tryFetch(url: string): Promise<{ ok: boolean; data: any[] }> {
   try {
-    const res = await fetch(url, { headers: bdlHeaders(), cache: "no-store" });
+    const res = await fetch(url, { headers: bdlHeaders(), next: { revalidate: 60 } });
     if (!res.ok) return { ok: false, data: [] };
     const json = await res.json();
     return { ok: true, data: json.data ?? [] };
@@ -24,15 +24,16 @@ async function tryFetch(url: string): Promise<{ ok: boolean; data: any[] }> {
 export async function GET() {
   // Try the URL the user confirmed from the docs first
   const primary = await tryFetch("https://api.balldontlie.io/v1/box_scores/live");
+  const liveHeaders = { 'Cache-Control': 's-maxage=60, stale-while-revalidate=120' };
   if (primary.ok && primary.data.length > 0) {
-    return NextResponse.json({ data: primary.data, source: "v1" });
+    return NextResponse.json({ data: primary.data, source: "v1" }, { headers: liveHeaders });
   }
 
   // Fall back to nba/v1 variant
   const fallback = await tryFetch("https://api.balldontlie.io/nba/v1/box_scores/live");
   if (fallback.ok) {
-    return NextResponse.json({ data: fallback.data, source: "nba/v1" });
+    return NextResponse.json({ data: fallback.data, source: "nba/v1" }, { headers: liveHeaders });
   }
 
-  return NextResponse.json({ data: [] });
+  return NextResponse.json({ data: [] }, { headers: liveHeaders });
 }

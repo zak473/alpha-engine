@@ -17,11 +17,11 @@ export async function GET(_req: NextRequest) {
     const [page1Res, page2Res] = await Promise.all([
       fetch(`${BDL_BASE}/matches?cursor=${LIVE_CURSOR}&per_page=100`, {
         headers: bdlHeaders(),
-        cache: "no-store",
+        next: { revalidate: 300 },
       }),
       fetch(`${BDL_BASE}/matches?cursor=4074668&per_page=100`, {
         headers: bdlHeaders(),
-        cache: "no-store",
+        next: { revalidate: 300 },
       }),
     ]);
 
@@ -41,7 +41,9 @@ export async function GET(_req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ data: all, meta: { total: all.length } });
+    return NextResponse.json({ data: all, meta: { total: all.length } }, {
+      headers: { 'Cache-Control': 's-maxage=300, stale-while-revalidate=600' }
+    });
   } catch {
     return NextResponse.json({ data: [], meta: {} }, { status: 500 });
   }

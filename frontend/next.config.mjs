@@ -2,6 +2,13 @@
 const nextConfig = {
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
+  experimental: { optimizePackageImports: ["recharts", "lucide-react"] },
+  compress: true,
+  poweredByHeader: false,
+  images: {
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 60,
+  },
   env: {
     NEXT_PUBLIC_ENV: process.env.ENV ?? "development",
   },

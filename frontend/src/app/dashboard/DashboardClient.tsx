@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Clock3,
   Flame,
+  Share2,
   Sparkles,
   Target,
   Trophy,
@@ -17,6 +18,7 @@ import {
   Users,
   Zap,
 } from "lucide-react";
+import { useToast } from "@/components/ui/Toast";
 import { useBetting } from "@/components/betting/BettingContext";
 import { SPORT_CONFIG, type QueueSelection, type SportSlug } from "@/lib/betting-types";
 import {
@@ -121,6 +123,23 @@ function modelAccuracyForSport(performance: MvpPerformance | null, sport: string
   };
 }
 
+// ── Share helper ──────────────────────────────────────────────────────────────
+
+async function shareText(text: string, onCopied: () => void) {
+  try {
+    if (typeof navigator !== "undefined" && navigator.share) {
+      await navigator.share({ text, url: window.location.href });
+    } else {
+      await navigator.clipboard.writeText(text);
+      onCopied();
+    }
+  } catch {
+    // dismissed — no-op
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function LiveTicker({ matches }: { matches: LiveMatchOut[] }) {
   if (!matches.length) return null;
 
@@ -157,6 +176,7 @@ function LiveTicker({ matches }: { matches: LiveMatchOut[] }) {
 
 function HeroCard({ prediction, performance }: { prediction: MvpPrediction; performance: MvpPerformance | null }) {
   const { addToQueue, isInQueue } = useBetting();
+  const { toast } = useToast();
   const best = getBestPick(prediction);
   const edge = getEdge(prediction, best.key);
   const cfg = SPORT_CONFIG[(prediction.sport as SportSlug) ?? "soccer"] ?? SPORT_CONFIG.soccer;
@@ -252,6 +272,17 @@ function HeroCard({ prediction, performance }: { prediction: MvpPrediction; perf
               {formatPct(edge * 100)} edge
             </div>
           ) : null}
+          <button
+            onClick={() => {
+              const opponent = best.key === "home_win" ? prediction.participants.away.name : prediction.participants.home.name;
+              const text = `🔥 ${best.label} to win vs ${opponent} @ ${(prediction.market_odds?.[best.key] ?? prediction.fair_odds[best.key] ?? 2).toFixed(2)}\n${prediction.sport} • Match result\nTrack AI picks at neverindoubt.app`;
+              shareText(text, () => toast.success("Copied to clipboard!"));
+            }}
+            title="Share this pick"
+            className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] p-2.5 text-white/55 transition-colors hover:text-white"
+          >
+            <Share2 size={14} />
+          </button>
         </div>
       </div>
     </section>
@@ -260,6 +291,7 @@ function HeroCard({ prediction, performance }: { prediction: MvpPrediction; perf
 
 function IntelCard({ prediction }: { prediction: MvpPrediction }) {
   const { addToQueue, isInQueue } = useBetting();
+  const { toast } = useToast();
   const best = getBestPick(prediction);
   const pickType = getPickType(prediction);
   const confidence = Math.round(prediction.confidence * 100);
@@ -303,12 +335,25 @@ function IntelCard({ prediction }: { prediction: MvpPrediction }) {
         <span className="text-sm font-semibold text-white/84">
           {(prediction.market_odds?.[best.key] ?? prediction.fair_odds[best.key] ?? 0).toFixed(2)}
         </span>
-        <button
-          onClick={() => addToQueue(buildQueueItem(prediction, best))}
-          className="rounded-lg bg-[#00FF84] px-3 py-1.5 text-xs font-bold text-[#07110d]"
-        >
-          {inQueue ? "Tailed" : "Tail"}
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => addToQueue(buildQueueItem(prediction, best))}
+            className="rounded-lg bg-[#00FF84] px-3 py-1.5 text-xs font-bold text-[#07110d]"
+          >
+            {inQueue ? "Tailed" : "Tail"}
+          </button>
+          <button
+            onClick={() => {
+              const opponent = best.key === "home_win" ? prediction.participants.away.name : prediction.participants.home.name;
+              const text = `🔥 ${best.label} to win vs ${opponent} @ ${(prediction.market_odds?.[best.key] ?? prediction.fair_odds[best.key] ?? 2).toFixed(2)}\n${prediction.sport} • Match result\nTrack AI picks at neverindoubt.app`;
+              shareText(text, () => toast.success("Copied to clipboard!"));
+            }}
+            title="Share this pick"
+            className="inline-flex items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] p-1.5 text-white/45 transition-colors hover:text-white"
+          >
+            <Share2 size={12} />
+          </button>
+        </div>
       </div>
     </article>
   );
@@ -443,6 +488,33 @@ function FooterStrip({ performance, queueCount }: { performance: MvpPerformance 
       <div className="flex flex-wrap items-center gap-3 text-xs lg:text-sm">
         <span className="rounded-full border border-white/8 px-3 py-1">{liveModels.length} live model{liveModels.length === 1 ? "" : "s"}</span>
         <span className="rounded-full border border-white/8 px-3 py-1">{queueCount} in queue</span>
+      </div>
+    </section>
+  );
+}
+
+function GettingStartedCard() {
+  return (
+    <section className="sportsbook-card p-5 lg:p-6">
+      <div className="mb-4 flex items-center gap-2">
+        <Sparkles size={15} className="text-[#00FF84]" />
+        <h3 className="text-sm font-bold text-white">Get started in 3 steps</h3>
+      </div>
+      <div className="space-y-3">
+        {[
+          { step: "1", title: "Browse predictions", desc: "See today's AI picks across soccer, tennis, basketball and more.", href: "/predictions", cta: "View predictions" },
+          { step: "2", title: "Track a pick", desc: "Add picks to your tracker to measure your performance over time.", href: "/predictions", cta: "Find a pick" },
+          { step: "3", title: "Follow tipsters", desc: "See who's performing best and tail their strategy.", href: "/tipsters", cta: "See tipsters" },
+        ].map(({ step, title, desc, href, cta }) => (
+          <div key={step} className="flex items-start gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#00FF84] text-[11px] font-black text-[#07110d]">{step}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white">{title}</p>
+              <p className="text-xs text-white/50">{desc}</p>
+            </div>
+            <Link href={href} className="shrink-0 text-xs font-semibold text-[#00FF84] hover:underline whitespace-nowrap">{cta} →</Link>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -603,6 +675,8 @@ export function DashboardClient() {
           ))}
         </div>
       </section>
+
+      {(!pickStats || pickStats.total === 0) ? <GettingStartedCard /> : null}
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <YourEdgeCard stats={pickStats} />

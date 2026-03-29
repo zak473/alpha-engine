@@ -1,6 +1,8 @@
+import type { Metadata } from "next";
 import type { SportSlug } from "@/lib/api";
 import type { SGOEvent } from "@/lib/sgo";
 import { LEAGUE_LABELS } from "@/lib/sgo";
+import type { MatchPageData } from "./fetchMatchPageData";
 
 export const VALID_SPORTS: SportSlug[] = ["soccer", "tennis", "esports", "basketball", "baseball", "hockey"];
 
@@ -70,6 +72,42 @@ export function getSportHubShell(sport: SportSlug) {
     eyebrow: meta.eyebrow,
     stats: perSportStats[sport],
   };
+}
+
+export function buildMatchMetadata(sport: SportSlug, data: MatchPageData): Metadata {
+  try {
+    const homeName = data.event.teams.home.names.long;
+    const awayName = data.event.teams.away.names.long;
+    const leagueName = LEAGUE_LABELS[data.event.leagueID] ?? data.backendMatch?.league ?? data.event.leagueID;
+    const sportLabel = SPORT_META[sport]?.label ?? sport;
+
+    const conf = data.backendMatch?.confidence;
+    const probs = data.backendMatch?.probabilities;
+    let predLabel: string | null = null;
+    if (probs != null && conf != null && conf > 0) {
+      const homeWin = probs.home_win;
+      const awayWin = probs.away_win;
+      const draw = probs.draw ?? 0;
+      const max = Math.max(homeWin, awayWin, draw);
+      if (max === homeWin) predLabel = `${homeName} win`;
+      else if (max === awayWin) predLabel = `${awayName} win`;
+      else predLabel = "draw";
+    }
+
+    const title = `${homeName} vs ${awayName} | ${leagueName} | NeverInDoubt`;
+    const desc = predLabel != null && conf != null
+      ? `AI prediction for ${homeName} vs ${awayName} (${sportLabel}). Model confidence: ${Math.round(conf)}% ${predLabel}.`
+      : `Match preview and AI prediction for ${homeName} vs ${awayName} (${sportLabel}).`;
+
+    return {
+      title,
+      description: desc,
+      openGraph: { title, description: desc, type: "website" },
+      twitter: { card: "summary", title, description: desc },
+    };
+  } catch {
+    return {};
+  }
 }
 
 export function getSportDetailShell(sport: SportSlug, event: SGOEvent) {

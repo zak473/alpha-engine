@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useMemo, useState, type ComponentType, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ROIChart } from "@/components/charts/ROIChart";
+import dynamic from "next/dynamic";
+const ROIChart = dynamic(() => import("@/components/charts/ROIChart").then((m) => ({ default: m.ROIChart })), {
+  loading: () => <div className="h-48 animate-pulse bg-white/5 rounded-lg" />,
+  ssr: false,
+});
 import type { RoiPoint } from "@/lib/types";
 import type {
   PicksStatsOut,

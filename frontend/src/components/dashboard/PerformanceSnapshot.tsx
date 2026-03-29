@@ -3,7 +3,11 @@
 import { useState, useEffect } from "react";
 import { PanelCard } from "@/components/ui/PanelCard";
 import { StateTabs } from "@/components/ui/Tabs";
-import { SparklineChart } from "@/components/charts/SparklineChart";
+import dynamic from "next/dynamic";
+const SparklineChart = dynamic(() => import("@/components/charts/SparklineChart").then((m) => ({ default: m.SparklineChart })), {
+  loading: () => <div className="h-20 animate-pulse bg-white/5 rounded" />,
+  ssr: false,
+});
 import { Skeleton } from "@/components/ui/Skeleton";
 import { getPicksRoiSeries, getBacktestSummary, type PerformanceWindow, type RoiSeriesPoint, type BacktestRunResult } from "@/lib/api";
 import { cn, formatPercent } from "@/lib/utils";

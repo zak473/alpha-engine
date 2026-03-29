@@ -22,7 +22,7 @@ export async function GET() {
   try {
     const res = await fetch(
       `${BDL_BASE}/games?dates[]=${today}&per_page=100`,
-      { headers: bdlHeaders(), cache: "no-store" }
+      { headers: bdlHeaders(), next: { revalidate: 60 } }
     );
 
     if (!res.ok) {
@@ -64,7 +64,9 @@ export async function GET() {
       odds_draw: null,
     }));
 
-    return NextResponse.json({ items });
+    return NextResponse.json({ items }, {
+      headers: { 'Cache-Control': 's-maxage=60, stale-while-revalidate=120' }
+    });
   } catch {
     return NextResponse.json({ items: [] }, { status: 500 });
   }

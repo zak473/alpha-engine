@@ -25,7 +25,7 @@ const ALL_LEAGUES = [
 async function fetchLeagueLive(leagueID: string, apiKey: string): Promise<unknown[]> {
   try {
     const params = new URLSearchParams({ apiKey, leagueID, live: "true" });
-    const res = await fetch(`${BASE}/events/?${params}`, { cache: "no-store" });
+    const res = await fetch(`${BASE}/events/?${params}`, { next: { revalidate: 60 } });
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data.data) ? data.data : [];
@@ -56,5 +56,7 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ events });
+  return NextResponse.json({ events }, {
+    headers: { 'Cache-Control': 's-maxage=60, stale-while-revalidate=120' }
+  });
 }

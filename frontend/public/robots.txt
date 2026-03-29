@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /settings
+Disallow: /advisor
+Disallow: /subscribe
+
+Sitemap: https://www.neverindoubt.app/sitemap.xml

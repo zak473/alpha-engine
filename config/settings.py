@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     AUTH_ALGORITHM: str = "HS256"
     AUTH_ACCESS_TOKEN_MINUTES: int = 120
 
+    # Admin endpoint secrets (override via Railway env vars)
+    ADMIN_SECRET: str = "nid-nuke-2026"
+    ADMIN_SETTLE_SECRET: str = "nid-settle-2026"
+
     # Model artefact storage
     MODEL_ARTEFACT_PATH: str = "/app/artefacts"
 

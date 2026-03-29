@@ -227,20 +227,35 @@ def list_tipsters(
     Return all users who have posted at least one tip, with computed stats.
     Pass ?viewer_id=<user_id> (or rely on auth middleware) to populate is_following.
     """
+    import logging
+    _log = logging.getLogger(__name__)
+
     # Users who have posted tips OR are AI tipster accounts
-    tipster_ids_q = db.query(TipsterTip.user_id).distinct().subquery()
-    users = (
-        db.query(User)
-        .filter(
-            (User.id.in_(tipster_ids_q)) | (User.is_ai == True)  # noqa: E712
+    try:
+        tipster_ids_q = db.query(TipsterTip.user_id).distinct().subquery()
+        users = (
+            db.query(User)
+            .filter(
+                (User.id.in_(tipster_ids_q)) | (User.is_ai == True)  # noqa: E712
+            )
+            .all()
         )
-        .all()
-    )
+    except Exception as exc:
+        _log.error("list_tipsters: user query failed (%s) — falling back to tip-based query", exc)
+        # Fallback: only users who have posted tips (avoids is_ai column if it's missing)
+        tipster_ids = [r[0] for r in db.query(TipsterTip.user_id).distinct().all()]
+        users = db.query(User).filter(User.id.in_(tipster_ids)).all() if tipster_ids else []
+
     if not users:
         return []
 
     user_ids = [u.id for u in users]
-    bulk, followers_map = _bulk_stats(db, user_ids)
+    try:
+        bulk, followers_map = _bulk_stats(db, user_ids)
+    except Exception as exc:
+        _log.error("list_tipsters: _bulk_stats failed (%s) — returning profiles with zero stats", exc)
+        bulk, followers_map = {}, {}
+
     return [_build_profile(db, u, current_user_id, bulk, followers_map) for u in users]
 
 

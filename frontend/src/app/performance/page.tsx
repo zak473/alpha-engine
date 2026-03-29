@@ -6,7 +6,7 @@ import {
   getBankroll,
   getPerformance,
   getPicks,
-  getPicksStats,
+  getPicksStatsAll,
   getPredictionAccuracy,
 } from "@/lib/api";
 import type {
@@ -14,6 +14,7 @@ import type {
   BankrollStatsOut,
   PickOut,
   PicksStatsOut,
+  PicksStatsAllOut,
   PredictionAccuracy,
 } from "@/lib/api";
 import type { MvpPerformance, RoiPoint } from "@/lib/types";
@@ -46,24 +47,17 @@ function buildRoiSeries(picks: PickOut[]): RoiPoint[] {
 }
 
 export default async function PerformancePage() {
-  const [picks, overallStats, perfData, bankroll, accuracy, backtestSummary, ...sportStatsList] = await Promise.all([
-    getPicks({ limit: 500 }).catch((): PickOut[] => []),
-    getPicksStats().catch(
-      (): PicksStatsOut => ({
-        total: 0,
-        settled: 0,
-        pending: 0,
-        won: 0,
-        lost: 0,
-        void: 0,
-        win_rate: 0,
-        avg_odds: 0,
-        avg_edge: 0,
-        roi: 0,
-        avg_clv: null,
-        kelly_roi: null,
-      })
-    ),
+  const emptyStats = (): PicksStatsOut => ({
+    total: 0, settled: 0, pending: 0, won: 0, lost: 0, void: 0,
+    win_rate: 0, avg_odds: 0, avg_edge: 0, roi: 0, avg_clv: null, kelly_roi: null,
+  });
+
+  const [picks, allStats, perfData, bankroll, accuracy, backtestSummary] = await Promise.all([
+    getPicks({ limit: 100 }).catch((): PickOut[] => []),
+    getPicksStatsAll().catch((): PicksStatsAllOut => ({
+      overall: emptyStats(),
+      by_sport: Object.fromEntries(SPORTS.map((s) => [s, emptyStats()])),
+    })),
     getPerformance().catch((): MvpPerformance => ({ models: [], sport: null })),
     getBankroll().catch(
       (): BankrollStatsOut => ({
@@ -87,28 +81,13 @@ export default async function PerformancePage() {
       })
     ),
     getBacktestSummary().catch((): Record<string, BacktestRunResult> => ({})),
-    ...SPORTS.map((sport) =>
-      getPicksStats(sport)
-        .catch(
-          (): PicksStatsOut & { sport: string } => ({
-            sport,
-            total: 0,
-            settled: 0,
-            pending: 0,
-            won: 0,
-            lost: 0,
-            void: 0,
-            win_rate: 0,
-            avg_odds: 0,
-            avg_edge: 0,
-            roi: 0,
-            avg_clv: null,
-            kelly_roi: null,
-          })
-        )
-        .then((stats) => ({ ...stats, sport }))
-    ),
   ]);
+
+  const overallStats = allStats.overall;
+  const sportStatsList = SPORTS.map((sport) => ({
+    ...(allStats.by_sport[sport] ?? emptyStats()),
+    sport,
+  }));
 
   const roiSeries = buildRoiSeries(picks);
   const recentPicks = [...picks]
