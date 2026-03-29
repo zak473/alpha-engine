@@ -90,6 +90,11 @@ SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "baseball": 0.50,
     "soccer":   0.50,  # lgb_v18 validated at 60.1% acc only at ≥50% confidence
 }
+# When using fair odds (no market odds available), use a higher confidence bar
+# since there's no market edge to measure — pure model conviction only.
+FAIR_ODDS_MIN_CONFIDENCE: dict[str, float] = {
+    "soccer": 0.65,
+}
 
 # Sports where we fall back to model fair odds (1/p) when real market odds are
 # unavailable. SGO only covers top-tier soccer leagues (EPL/La Liga/etc.) so the
@@ -97,7 +102,10 @@ SPORT_MIN_CONFIDENCE: dict[str, float] = {
 # For these sports we generate picks against the model's own no-vig line; this
 # means we're betting on model confidence rather than market edge, so we drop the
 # min_edge requirement to 0 for fair-odds-derived picks.
-FAIR_ODDS_SPORTS: set[str] = {"soccer", "tennis", "esports"}
+# Only soccer falls back to fair odds — SGO covers only 7 top leagues out of
+# 950+ Highlightly leagues. Tennis and esports have their own real-odds APIs
+# (api-tennis.com and PandaScore) so they must have market odds or no pick.
+FAIR_ODDS_SPORTS: set[str] = {"soccer"}
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -177,7 +185,10 @@ def run(
                 candidates.append(("Draw", pred.p_draw, d_odds, ml_market))
 
             effective_min_edge = 0.0 if using_fair_odds else SPORT_MIN_EDGE.get(sport, min_edge)
-            effective_min_conf = SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
+            if using_fair_odds:
+                effective_min_conf = FAIR_ODDS_MIN_CONFIDENCE.get(sport, 0.65)
+            else:
+                effective_min_conf = SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
 
             for selection_label, model_prob, book_odds, market_name in candidates:
                 e = edge_pct(model_prob, book_odds)
