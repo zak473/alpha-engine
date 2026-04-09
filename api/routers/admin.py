@@ -116,6 +116,35 @@ def get_admin_users(
     ]
 
 
+@router.delete("/backfill/purge")
+def purge_backfill(
+    hours: int = 2,
+    db: Session = Depends(get_db),
+    _: str = Depends(_require_admin),
+):
+    """Delete TrackedPick (auto_generated) + TipsterTip rows created in the last N hours."""
+    from db.models.tipsters import TipsterTip
+    from db.models.picks import TrackedPick
+    from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    ai_ids = list(AI_TIPSTER_IDS.values())
+
+    tips_deleted = db.query(TipsterTip).filter(
+        TipsterTip.user_id.in_(ai_ids),
+        TipsterTip.created_at >= cutoff,
+    ).delete(synchronize_session=False)
+
+    picks_deleted = db.query(TrackedPick).filter(
+        TrackedPick.auto_generated == True,
+        TrackedPick.created_at >= cutoff,
+    ).delete(synchronize_session=False)
+
+    db.commit()
+    logger.info("[admin] purge_backfill: deleted %d tips, %d picks (last %dh)", tips_deleted, picks_deleted, hours)
+    return {"tips_deleted": tips_deleted, "picks_deleted": picks_deleted}
+
+
 @router.delete("/ai-tips/purge-bad-batch")
 def purge_bad_ai_tips(
     hours: int = 6,
