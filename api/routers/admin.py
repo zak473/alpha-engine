@@ -248,3 +248,69 @@ def backfill_picks(
     t.start()
 
     return {"status": "running", "days": days, "message": f"Backfilling last {days} days in background — check Railway logs for progress."}
+
+
+@router.post("/backfill-april")
+def backfill_april(
+    days: int = 9,
+    _: str = Depends(_require_admin),
+):
+    """
+    Run ML predictions for ALL historical matches (not just upcoming),
+    then immediately backfill picks for the last N days.
+    Use this to recover tips for periods when the system was down.
+    """
+    import threading
+
+    def _run():
+        try:
+            logger.info("[admin] backfill-april: running predictions for all historical matches ...")
+
+            from pipelines.soccer.predict_soccer import run as predict_soccer
+            n = predict_soccer(all_matches=True)
+            logger.info("[admin] backfill-april: soccer predictions: %d", n)
+        except Exception as exc:
+            logger.error("[admin] backfill-april: soccer predict failed: %s", exc)
+
+        try:
+            from pipelines.basketball.predict_basketball import run as predict_basketball
+            n = predict_basketball(all_matches=True)
+            logger.info("[admin] backfill-april: basketball predictions: %d", n)
+        except Exception as exc:
+            logger.error("[admin] backfill-april: basketball predict failed: %s", exc)
+
+        try:
+            from pipelines.tennis.predict_tennis import run as predict_tennis
+            n = predict_tennis(all_matches=True)
+            logger.info("[admin] backfill-april: tennis predictions: %d", n)
+        except Exception as exc:
+            logger.error("[admin] backfill-april: tennis predict failed: %s", exc)
+
+        try:
+            from pipelines.hockey.predict_hockey import run as predict_hockey
+            n = predict_hockey(all_matches=True)
+            logger.info("[admin] backfill-april: hockey predictions: %d", n)
+        except Exception as exc:
+            logger.error("[admin] backfill-april: hockey predict failed: %s", exc)
+
+        try:
+            from pipelines.baseball.predict_baseball import run as predict_baseball
+            n = predict_baseball(all_matches=True)
+            logger.info("[admin] backfill-april: baseball predictions: %d", n)
+        except Exception as exc:
+            logger.error("[admin] backfill-april: baseball predict failed: %s", exc)
+
+        try:
+            from pipelines.picks.backfill_picks import run as run_backfill
+            n = run_backfill(days=days)
+            logger.info("[admin] backfill-april: created %d picks for last %d days", n, days)
+        except Exception as exc:
+            logger.error("[admin] backfill-april: backfill picks failed: %s", exc)
+
+    t = threading.Thread(target=_run, daemon=True, name="backfill-april")
+    t.start()
+
+    return {
+        "status": "running",
+        "message": f"Running ML predictions for all matches then backfilling last {days} days. Check Railway logs for progress.",
+    }
