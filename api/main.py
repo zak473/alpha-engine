@@ -621,9 +621,8 @@ def admin_debug_sgo_odds(secret: str, sport: str = "soccer", limit: int = 20):
     from datetime import datetime, timedelta, timezone
     from db.session import SessionLocal
     from db.models.mvp import CoreMatch, CoreTeam
-    from pipelines.odds.fetch_odds_sgo import LEAGUE_SPORT, fetch_sgo_events, _teams_match, _normalize
+    from pipelines.odds.fetch_odds_sgo import LEAGUE_SPORT, fetch_sgo_events, _teams_match, _normalize, _extract_odds
 
-    SPORT_LEAGUES = {v: k for k, v in LEAGUE_SPORT.items()}
     leagues = [k for k, v in LEAGUE_SPORT.items() if v == sport]
 
     db2 = SessionLocal()
@@ -651,14 +650,31 @@ def admin_debug_sgo_odds(secret: str, sport: str = "soccer", limit: int = 20):
 
     results = []
     sgo_dates = []
+    per_league_counts: dict = {}
+    raw_sample: dict = {}  # first raw event per league (keys only, to diagnose structure)
     with httpx.Client() as client:
-        for league_id in leagues[:3]:
+        for league_id in leagues:  # all leagues, not just [:3]
             events = fetch_sgo_events(league_id, client)
+            per_league_counts[league_id] = len(events)
+            if events and league_id not in raw_sample:
+                ev0 = events[0]
+                h_dec, a_dec, d_dec = _extract_odds(ev0)
+                raw_sample[league_id] = {
+                    "teams_home": (ev0.get("teams") or {}).get("home", {}).get("names", {}),
+                    "teams_away": (ev0.get("teams") or {}).get("away", {}).get("names", {}),
+                    "status_keys": list((ev0.get("status") or {}).keys()),
+                    "odds_keys": list((ev0.get("odds") or {}).keys())[:20],
+                    "extracted_home": h_dec,
+                    "extracted_away": a_dec,
+                    "extracted_draw": d_dec,
+                }
             for ev in events[:limit]:
                 sgo_home = (ev.get("teams") or {}).get("home", {}).get("names", {}).get("long", "")
                 sgo_away = (ev.get("teams") or {}).get("away", {}).get("names", {}).get("long", "")
                 sgo_start = (ev.get("status") or {}).get("startsAt", "")
                 sgo_dates.append(str(sgo_start))
+                h_dec, a_dec, d_dec = _extract_odds(ev)
+                has_odds = bool(h_dec and a_dec)
                 # Try to find a match (no time constraint in debug)
                 matched = None
                 for m in upcoming:
@@ -672,6 +688,8 @@ def admin_debug_sgo_odds(secret: str, sport: str = "soccer", limit: int = 20):
                     "sgo": f"{sgo_home} vs {sgo_away}",
                     "sgo_date": str(sgo_start),
                     "sgo_norm": f"{_normalize(sgo_home)} vs {_normalize(sgo_away)}",
+                    "has_odds": has_odds,
+                    "odds": {"home": h_dec, "away": a_dec, "draw": d_dec},
                     "matched_to": matched,
                 })
 
@@ -679,12 +697,119 @@ def admin_debug_sgo_odds(secret: str, sport: str = "soccer", limit: int = 20):
         "sport": sport,
         "db_upcoming_60d": len(upcoming),
         "sample_db_matches": sample_db,
+        "leagues_queried": leagues,
+        "per_league_event_counts": per_league_counts,
+        "raw_sample_first_event": raw_sample,
         "sgo_events_checked": len(results),
         "sgo_date_range": f"{min(sgo_dates, default='?')} → {max(sgo_dates, default='?')}",
+        "with_odds": sum(1 for r in results if r["has_odds"]),
         "matched": sum(1 for r in results if r["matched_to"]),
+        "matched_with_odds": sum(1 for r in results if r["matched_to"] and r["has_odds"]),
         "unmatched": [r for r in results if not r["matched_to"]],
         "matched_list": [r for r in results if r["matched_to"]],
     }
+
+
+@app.post("/api/v1/admin/post-manual-tip", tags=["Admin"])
+def admin_post_manual_tip(
+    secret: str,
+    user_id: str,
+    sport: str,
+    match_label: str,
+    market_name: str,
+    selection_label: str,
+    odds: float,
+    note: str = "",
+    start_time: str = "",
+):
+    """Post a tip directly as any user (admin use only — for manually adding live picks)."""
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from datetime import datetime, timezone
+    from db.session import SessionLocal
+    from db.models.tipsters import TipsterTip
+    db = SessionLocal()
+    try:
+        kickoff = (
+            datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+            if start_time
+            else datetime.now(timezone.utc)
+        )
+        tip = TipsterTip(
+            user_id=user_id,
+            sport=sport,
+            match_label=match_label,
+            market_name=market_name,
+            selection_label=selection_label,
+            odds=odds,
+            start_time=kickoff,
+            note=note or None,
+        )
+        db.add(tip)
+        db.commit()
+        db.refresh(tip)
+        return {"status": "ok", "id": tip.id}
+    finally:
+        db.close()
+
+
+@app.post("/api/v1/admin/settle-tip", tags=["Admin"])
+def admin_settle_tip(secret: str, tip_id: str, outcome: str):
+    """Manually settle a tip by ID. outcome must be 'won' or 'lost'."""
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if outcome not in ("won", "lost"):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="outcome must be 'won' or 'lost'")
+    from datetime import datetime, timezone
+    from db.session import SessionLocal
+    from db.models.tipsters import TipsterTip
+    db = SessionLocal()
+    try:
+        tip = db.get(TipsterTip, tip_id)
+        if not tip:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail=f"Tip {tip_id} not found")
+        tip.outcome = outcome
+        tip.settled_at = datetime.now(timezone.utc)
+        db.commit()
+        return {"status": "ok", "tip_id": tip_id, "outcome": outcome}
+    finally:
+        db.close()
+
+
+@app.post("/api/v1/admin/clear-tennis-odds", tags=["Admin"])
+def admin_clear_tennis_odds(secret: str):
+    """
+    Null out odds_home/odds_away for all upcoming tennis CoreMatch rows.
+    Use this once to purge stale api-tennis odds so only SGO odds remain.
+    """
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from datetime import datetime, timezone
+    from db.session import SessionLocal
+    from db.models.mvp import CoreMatch
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        rows = db.query(CoreMatch).filter(
+            CoreMatch.sport == "tennis",
+            CoreMatch.status.in_(["scheduled", "live"]),
+            CoreMatch.kickoff_utc > now,
+            CoreMatch.odds_home.isnot(None),
+        ).all()
+        cleared = 0
+        for m in rows:
+            m.odds_home = None
+            m.odds_away = None
+            cleared += 1
+        db.commit()
+        return {"cleared": cleared}
+    finally:
+        db.close()
 
 
 @app.post("/api/v1/admin/run-auto-picks", tags=["Admin"])
@@ -706,6 +831,24 @@ def admin_backfill_picks(secret: str, days: int = 14, dry_run: bool = False):
         raise HTTPException(status_code=403, detail="Forbidden")
     from pipelines.picks.backfill_picks import run as backfill
     created = backfill(days=days, dry_run=dry_run)
+    return {"created": created, "dry_run": dry_run}
+
+
+@app.post("/api/v1/admin/backfill-spread-picks", tags=["Admin"])
+def admin_backfill_spread_picks(secret: str, days: int = 60, dry_run: bool = False):
+    """
+    Backfill historical spread + Asian Handicap tips.
+
+    Two sources:
+    - Real SpreadOdds rows (SGO) for any finished match that has stored spread/OU lines.
+    - Asian Handicap 0 (Draw No Bet) synthetic picks for soccer, using PredMatch
+      model probability and standard -110 juice (1.909 decimal). Settled immediately.
+    """
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from pipelines.picks.backfill_spread_picks import run as backfill_spread
+    created = backfill_spread(days=days, dry_run=dry_run)
     return {"created": created, "dry_run": dry_run}
 
 
