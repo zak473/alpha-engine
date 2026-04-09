@@ -266,6 +266,14 @@ def run(
     finally:
         db.close()
 
+    # Also run spread + over/under picks from SGO lines
+    try:
+        from pipelines.picks.spread_picks import run as run_spread
+        spread_created = run_spread(kelly_frac=kelly_frac, user_id=user_id, dry_run=dry_run)
+        created += spread_created
+    except Exception as exc:
+        log.error("spread_picks failed: %s", exc, exc_info=True)
+
     return created
 
 

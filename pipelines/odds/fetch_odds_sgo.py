@@ -20,6 +20,7 @@ import httpx
 
 from config.settings import settings
 from db.models.mvp import CoreMatch, CoreTeam
+from db.models.odds import SpreadOdds
 from db.session import SessionLocal
 
 log = logging.getLogger(__name__)
@@ -58,6 +59,16 @@ AWAY_ODD_KEYS = [
     "points-away-game-ml-away",
 ]
 DRAW_ODD_KEY = "points-all-reg-ml3way-draw"
+
+# SGO oddID keys for spread and totals
+SPREAD_KEYS = {
+    "home": ["points-home-game-sp-home", "points-home-reg-sp-home"],
+    "away": ["points-away-game-sp-away", "points-away-reg-sp-away"],
+}
+TOTAL_KEYS = {
+    "over":  ["points-all-game-ou-over",  "points-all-reg-ou-over"],
+    "under": ["points-all-game-ou-under", "points-all-reg-ou-under"],
+}
 
 
 def _american_to_decimal(american: str) -> Optional[float]:
@@ -99,6 +110,82 @@ def _extract_odds(event: dict) -> tuple[Optional[float], Optional[float], Option
         draw_dec = _american_to_decimal(o.get("bookOdds", ""))
 
     return home_dec, away_dec, draw_dec
+
+
+def _extract_spread_odds(event: dict) -> list[dict]:
+    """
+    Extract spread and over/under odds from an SGO event.
+    Returns list of dicts: {market_type, side, line, book_odds_decimal, fair_odds_decimal, book_available}
+    """
+    odds: dict = event.get("odds") or {}
+    results = []
+
+    def _parse(keys: list[str], market_type: str, side: str, line_field: str):
+        for key in keys:
+            o = odds.get(key)
+            if not o:
+                continue
+            line_raw = o.get(f"book{line_field}") or o.get(f"fair{line_field}")
+            if line_raw is None:
+                continue
+            try:
+                line = float(str(line_raw))
+            except (ValueError, TypeError):
+                continue
+            book_dec = _american_to_decimal(o.get("bookOdds", "")) if o.get("bookOddsAvailable") else None
+            fair_dec = _american_to_decimal(o.get("fairOdds", ""))
+            results.append({
+                "market_type": market_type,
+                "side": side,
+                "line": line,
+                "book_odds_decimal": book_dec,
+                "fair_odds_decimal": fair_dec,
+                "book_available": bool(o.get("bookOddsAvailable")),
+            })
+            break  # use first key that has data
+
+    for side, keys in SPREAD_KEYS.items():
+        _parse(keys, "spread", side, "Spread")
+    for side, keys in TOTAL_KEYS.items():
+        _parse(keys, "total", side, "OverUnder")
+
+    return results
+
+
+def _upsert_spread_odds(db, match_id: str, sport: str, rows: list[dict], now) -> int:
+    """Insert or update SpreadOdds rows for a match. Returns count upserted."""
+    from datetime import timezone
+    count = 0
+    for row in rows:
+        existing = (
+            db.query(SpreadOdds)
+            .filter(
+                SpreadOdds.match_id == match_id,
+                SpreadOdds.market_type == row["market_type"],
+                SpreadOdds.side == row["side"],
+            )
+            .first()
+        )
+        if existing:
+            existing.line = row["line"]
+            existing.book_odds_decimal = row["book_odds_decimal"]
+            existing.fair_odds_decimal = row["fair_odds_decimal"]
+            existing.book_available = row["book_available"]
+            existing.fetched_at = now
+        else:
+            db.add(SpreadOdds(
+                match_id=match_id,
+                sport=sport,
+                market_type=row["market_type"],
+                side=row["side"],
+                line=row["line"],
+                book_odds_decimal=row["book_odds_decimal"],
+                fair_odds_decimal=row["fair_odds_decimal"],
+                book_available=row["book_available"],
+                fetched_at=now,
+            ))
+        count += 1
+    return count
 
 
 def _normalize(name: str) -> str:
@@ -290,6 +377,12 @@ def fetch_all(dry_run: bool = False) -> int:
                             best.odds_away = away_dec
                             best.odds_draw = draw_dec
                         updated += 1
+
+                    # Also extract and store spread + over/under odds
+                    if not dry_run:
+                        spread_rows = _extract_spread_odds(event)
+                        if spread_rows:
+                            _upsert_spread_odds(db, best.id, best.sport, spread_rows, now)
 
                 time.sleep(0.3)  # polite rate-limiting between league calls
 

@@ -88,13 +88,13 @@ def _job_fetch_live() -> None:
     except Exception as exc:
         log.error("[scheduler] tennis build_player_form failed: %s", exc, exc_info=True)
 
-    # Tennis odds from api-tennis.com (real bookmaker odds per match)
-    try:
-        from pipelines.tennis.fetch_api_tennis import fetch_match_odds
-        n = fetch_match_odds()
-        log.info("[scheduler] tennis odds: %d matches updated.", n)
-    except Exception as exc:
-        log.error("[scheduler] tennis odds fetch failed: %s", exc, exc_info=True)
+    # NOTE: api-tennis odds (fetch_match_odds) are intentionally NOT fetched here.
+    # api-tennis returns single-bookmaker early lines that can be days old by match time
+    # (e.g., Rodionov at 2.13 when the real market had moved him to 1.40 favourite).
+    # Stale odds invert the edge calculation and create wrong picks.
+    # Real market odds for ATP/WTA come from SGO (fetch_odds_sgo) every 30 min — which
+    # is more reliable and multi-book. Tennis matches without SGO coverage (Challengers etc.)
+    # will have no odds and therefore no auto-picks, which is the correct safe behaviour.
 
     # Run tennis predictions immediately after fetch so tips are available without waiting for predict_only
     try:
@@ -350,24 +350,65 @@ def _job_settle_pending_picks() -> None:
                 continue
 
             market = pick.market_name.lower()
-            if not any(kw in market for kw in ("moneyline", "match winner", "1x2", "to win")):
-                continue
-
             label = pick.selection_label.lower()
             home_name = pick.match_label.split(" vs ")[0].lower() if " vs " in pick.match_label else ""
             away_name = pick.match_label.split(" vs ")[-1].lower() if " vs " in pick.match_label else ""
 
-            is_home = label in ("home", "1") or (home_name and home_name in label)
-            is_away = label in ("away", "2") or (away_name and away_name in label)
-            is_draw = label in ("draw", "x")
+            # ── Spread / handicap settlement ─────────────────────────────────
+            is_spread = any(kw in market for kw in ("spread", "run line", "puck line", "handicap"))
+            is_total = "total" in market
 
-            result = match.outcome
-            if is_home:
-                pick.outcome = "won" if result == "home_win" else "lost"
-            elif is_away:
-                pick.outcome = "won" if result == "away_win" else "lost"
-            elif is_draw:
-                pick.outcome = "won" if result == "draw" else "lost"
+            if is_spread:
+                if match.home_score is None or match.away_score is None:
+                    continue
+                try:
+                    h, a = int(match.home_score), int(match.away_score)
+                    parts = pick.selection_label.rsplit(None, 1)
+                    line = float(parts[-1])
+                    team_part = parts[0].lower()
+                    if home_name and (home_name in team_part or team_part in home_name):
+                        result = (h + line) - a   # home_score + line > away_score
+                    elif away_name and (away_name in team_part or team_part in away_name):
+                        result = (a + line) - h   # away_score + line > home_score
+                    else:
+                        continue
+                    pick.outcome = "won" if result > 0 else ("void" if result == 0 else "lost")
+                except (ValueError, TypeError, IndexError):
+                    continue
+
+            # ── Total (over/under) settlement ────────────────────────────────
+            elif is_total:
+                if match.home_score is None or match.away_score is None:
+                    continue
+                try:
+                    total = int(match.home_score) + int(match.away_score)
+                    parts = label.split()
+                    line = float(parts[-1])
+                    side = parts[0]  # "over" or "under"
+                    if side == "over":
+                        pick.outcome = "won" if total > line else ("void" if total == line else "lost")
+                    elif side == "under":
+                        pick.outcome = "won" if total < line else ("void" if total == line else "lost")
+                    else:
+                        continue
+                except (ValueError, TypeError, IndexError):
+                    continue
+
+            # ── Moneyline / 1X2 settlement ───────────────────────────────────
+            elif any(kw in market for kw in ("moneyline", "match winner", "1x2", "to win")):
+                is_home = label in ("home", "1") or (home_name and home_name in label)
+                is_away = label in ("away", "2") or (away_name and away_name in label)
+                is_draw = label in ("draw", "x")
+
+                result = match.outcome
+                if is_home:
+                    pick.outcome = "won" if result == "home_win" else "lost"
+                elif is_away:
+                    pick.outcome = "won" if result == "away_win" else "lost"
+                elif is_draw:
+                    pick.outcome = "won" if result == "draw" else "lost"
+            else:
+                continue
 
             if pick.outcome is not None:
                 pick.settled_at = datetime.now(tz=timezone.utc)
@@ -538,14 +579,61 @@ def _job_settle_ai_tipster_tips() -> None:
                 continue
 
             label = tip.selection_label.lower().strip()
+            market = (tip.market_name or "").lower()
             mo = match.outcome or ""
             is_home_win = mo in ("home_win", "H")
             is_away_win = mo in ("away_win", "A")
 
-            # "Draw" is explicit
-            if label == "draw":
+            # ── Spread settlement ─────────────────────────────────────────────
+            if any(kw in market for kw in ("spread", "run line", "puck line", "handicap")):
+                if match.home_score is None or match.away_score is None:
+                    not_finished += 1
+                    continue
+                try:
+                    h, a = int(match.home_score), int(match.away_score)
+                    parts = tip.selection_label.rsplit(None, 1)
+                    line = float(parts[-1])
+                    team_part = parts[0].lower()
+                    home_team = db.get(CoreTeam, match.home_team_id)
+                    away_team = db.get(CoreTeam, match.away_team_id)
+                    home_name = (home_team.name or "").lower() if home_team else ""
+                    away_name = (away_team.name or "").lower() if away_team else ""
+                    if home_name and (home_name in team_part or team_part in home_name):
+                        diff = (h + line) - a
+                    elif away_name and (away_name in team_part or team_part in away_name):
+                        diff = (a + line) - h
+                    else:
+                        skipped += 1
+                        continue
+                    tip.outcome = "won" if diff > 0 else ("void" if diff == 0 else "lost")
+                except (ValueError, TypeError, IndexError):
+                    skipped += 1
+                    continue
+
+            # ── Total settlement ──────────────────────────────────────────────
+            elif "total" in market:
+                if match.home_score is None or match.away_score is None:
+                    not_finished += 1
+                    continue
+                try:
+                    total = int(match.home_score) + int(match.away_score)
+                    parts = label.split()
+                    line = float(parts[-1])
+                    side = parts[0]
+                    if side == "over":
+                        tip.outcome = "won" if total > line else ("void" if total == line else "lost")
+                    elif side == "under":
+                        tip.outcome = "won" if total < line else ("void" if total == line else "lost")
+                    else:
+                        skipped += 1
+                        continue
+                except (ValueError, TypeError, IndexError):
+                    skipped += 1
+                    continue
+
+            # ── Moneyline / 1X2 settlement ────────────────────────────────────
+            elif label == "draw":
                 tip.outcome = "won" if match.outcome == "draw" else "lost"
-            # Legacy "home"/"away" labels from old tip format
             elif label == "home":
                 tip.outcome = "won" if is_home_win else "lost"
             elif label == "away":
