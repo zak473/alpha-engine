@@ -26,7 +26,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from config.settings import settings
-from db.models.mvp import CoreMatch, PredMatch, CoreLeague, CoreTeam
+from db.models.mvp import CoreMatch, PredMatch, CoreLeague, CoreTeam, RatingEloTeam
 from db.models.picks import TrackedPick
 from db.models.tipsters import TipsterTip
 from db.session import SessionLocal
@@ -122,6 +122,31 @@ def _resolve_outcome(
     return None
 
 
+def _elo_probs(db: Session, match: CoreMatch) -> tuple[float, float, float]:
+    """Return (p_home, p_away, confidence 0-1) from ELO ratings, or (0.5, 0.5, 0) if unavailable."""
+    kickoff = match.kickoff_utc
+    if kickoff.tzinfo is None:
+        kickoff = kickoff.replace(tzinfo=timezone.utc)
+    home_row = (
+        db.query(RatingEloTeam)
+        .filter(RatingEloTeam.team_id == match.home_team_id, RatingEloTeam.rated_at < kickoff)
+        .order_by(RatingEloTeam.rated_at.desc())
+        .first()
+    )
+    away_row = (
+        db.query(RatingEloTeam)
+        .filter(RatingEloTeam.team_id == match.away_team_id, RatingEloTeam.rated_at < kickoff)
+        .order_by(RatingEloTeam.rated_at.desc())
+        .first()
+    )
+    if not home_row or not away_row:
+        return 0.5, 0.5, 0.0
+    p_home = round(1 / (1 + 10 ** ((away_row.rating_after - home_row.rating_after) / 400)), 4)
+    p_away = round(1 - p_home, 4)
+    confidence = round(max(0.0, min(1.0, abs(p_home - 0.5) * 2)), 4)
+    return p_home, p_away, confidence
+
+
 def run(
     days: int = 14,
     min_edge: float = BACKFILL_MIN_EDGE,
@@ -132,6 +157,7 @@ def run(
 ) -> int:
     """
     Backfill TrackedPick + TipsterTip rows for finished historical matches.
+    Uses PredMatch (ML) when available, falls back to ELO probabilities.
     Returns number of picks created.
     """
     db = SessionLocal()
@@ -140,11 +166,9 @@ def run(
     try:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
-        # Finished matches within the lookback window that have predictions.
-        # Real market odds preferred; fair odds from PredMatch used as fallback.
-        rows = (
-            db.query(CoreMatch, PredMatch)
-            .join(PredMatch, PredMatch.match_id == CoreMatch.id)
+        # All finished matches in the window with a known outcome
+        matches = (
+            db.query(CoreMatch)
             .filter(
                 CoreMatch.status == "finished",
                 CoreMatch.outcome.isnot(None),
@@ -154,15 +178,10 @@ def run(
             .all()
         )
 
-        log.info(
-            "Backfill: evaluating %d finished match-prediction pairs (last %d days) ...",
-            len(rows),
-            days,
-        )
-
+        log.info("Backfill: evaluating %d finished matches (last %d days) ...", len(matches), days)
         now = datetime.now(timezone.utc)
 
-        for match, pred in rows:
+        for match in matches:
             league = db.get(CoreLeague, match.league_id)
             home_team = db.get(CoreTeam, match.home_team_id)
             away_team = db.get(CoreTeam, match.away_team_id)
@@ -173,10 +192,24 @@ def run(
             home_name = home_team.name
             away_name = away_team.name
             match_label = f"{home_name} vs {away_name}"
-
             sport = match.sport
 
-            # Market name — same logic as auto_picks
+            # Try ML prediction first, fall back to ELO
+            pred = db.query(PredMatch).filter(PredMatch.match_id == match.id).first()
+            if pred and pred.p_home and pred.p_away:
+                p_home, p_away = pred.p_home, pred.p_away
+                p_draw = pred.p_draw or 0.0
+                confidence = (pred.confidence / 100.0) if pred.confidence else max(p_home, p_away)
+                source = "ml"
+            else:
+                p_home, p_away, confidence = _elo_probs(db, match)
+                p_draw = 0.0
+                source = "elo"
+
+            if confidence == 0.0:
+                continue
+
+            # Market name
             if sport in ("basketball", "baseball"):
                 ml_market = "Moneyline"
             elif sport in ("tennis", "esports"):
@@ -184,21 +217,21 @@ def run(
             else:
                 ml_market = "1X2"
 
-            # Prefer real market odds; fall back to fair odds from PredMatch
+            # Prefer real market odds; fall back to fair odds
             using_fair_odds = not match.odds_home
-            h_odds = match.odds_home or (1 / pred.p_home if pred.p_home and pred.p_home > 0 else None)
-            a_odds = match.odds_away or (1 / pred.p_away if pred.p_away and pred.p_away > 0 else None)
-            d_odds = match.odds_draw or (1 / pred.p_draw if pred.p_draw and pred.p_draw > 0.01 else None)
+            h_odds = match.odds_home or (round(1 / p_home, 3) if p_home > 0 else None)
+            a_odds = match.odds_away or (round(1 / p_away, 3) if p_away > 0 else None)
+            d_odds = match.odds_draw or (round(1 / p_draw, 3) if p_draw and p_draw > 0.01 else None)
 
             candidates: list[tuple[str, float, float, str]] = []
-            if h_odds and pred.p_home:
-                candidates.append((home_name, pred.p_home, h_odds, ml_market))
-            if a_odds and pred.p_away:
-                candidates.append((away_name, pred.p_away, a_odds, ml_market))
-            if d_odds and pred.p_draw and pred.p_draw > 0.01:
-                candidates.append(("Draw", pred.p_draw, d_odds, ml_market))
+            if h_odds and p_home:
+                candidates.append((home_name, p_home, h_odds, ml_market))
+            if a_odds and p_away:
+                candidates.append((away_name, p_away, a_odds, ml_market))
+            if d_odds and p_draw and p_draw > 0.01:
+                candidates.append(("Draw", p_draw, d_odds, ml_market))
 
-            # With fair odds edge is always ~0 so use confidence-only gate
+            # With fair odds use confidence-only gate
             if using_fair_odds:
                 effective_min_edge = 0.0
                 effective_min_conf = BACKFILL_SPORT_MIN_CONFIDENCE.get(sport, 0.60)
@@ -208,7 +241,6 @@ def run(
 
             for selection_label, model_prob, book_odds, market_name in candidates:
                 e = edge_pct(model_prob, book_odds)
-                confidence = pred.confidence / 100.0 if pred.confidence else model_prob
 
                 if e < effective_min_edge:
                     continue
@@ -289,7 +321,7 @@ def run(
                             start_time=kickoff,
                             settled_at=settled_at,
                             match_id=match.id,
-                            note=f"{'Fair odds' if using_fair_odds else 'Edge: +' + str(round(e * 100, 1)) + '%'} | Kelly: {round(k * 100, 1)}% [backfill]",
+                            note=f"[{source}] {'Fair odds' if using_fair_odds else 'Edge: +' + str(round(e * 100, 1)) + '%'} | Kelly: {round(k * 100, 1)}% [backfill]",
                         )
                         db.add(tip)
 
