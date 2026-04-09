@@ -13,7 +13,6 @@ export async function GET(req: NextRequest) {
   const params = new URLSearchParams({
     apiKey,
     leagueID,
-    oddsAvailable: "true",
     ...(live ? { live: "true" } : {}),
   });
 
