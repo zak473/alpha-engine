@@ -28,20 +28,22 @@ export function CallbackHandler() {
       localStorage.setItem(USER_KEY, JSON.stringify({ userId, email, displayName, token }));
       document.cookie = `${COOKIE_KEY}=${token}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
 
-      // Check subscription — redirect to payment if not active
+      // Check subscription — set ae_sub cookie if active, else redirect to subscribe
       try {
         const statusRes = await fetch("/api/v1/billing/status", {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (statusRes.ok) {
           const { is_active } = await statusRes.json();
-          if (!is_active) {
+          if (is_active) {
+            document.cookie = `ae_sub=1; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+          } else {
             router.replace("/subscribe");
             return;
           }
         }
       } catch {
-        // If the check fails, let them through
+        // non-fatal — middleware will redirect to /subscribe if cookie missing
       }
 
       router.replace("/dashboard");

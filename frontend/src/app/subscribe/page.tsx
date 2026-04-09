@@ -1,53 +1,95 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getStoredToken } from "@/lib/auth";
-import { ShieldCheck } from "lucide-react";
+import { setSubCookie } from "@/lib/auth";
+import { ArrowRight, ShieldCheck } from "lucide-react";
 import Image from "next/image";
 
 const FANBASIS_PAYMENT_LINK = "https://www.fanbasis.com/agency-checkout/never-in-doubt/B657N";
 
 export default function SubscribePage() {
   const router = useRouter();
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    const token = getStoredToken();
-    if (!token) {
-      router.replace("/login");
-      return;
+    async function checkAndRedirect() {
+      const token = getStoredToken();
+      if (!token) {
+        router.replace("/login");
+        return;
+      }
+
+      // If webhook has already fired and subscription is active, let them through
+      try {
+        const res = await fetch("/api/v1/billing/status", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const { is_active } = await res.json();
+          if (is_active) {
+            setSubCookie();
+            router.replace("/dashboard");
+            return;
+          }
+        }
+      } catch {
+        // non-fatal
+      }
+
+      // Not yet subscribed — show the Fanbasis link
+      setChecking(false);
     }
-    window.location.href = FANBASIS_PAYMENT_LINK;
+    checkAndRedirect();
   }, [router]);
+
+  if (checking) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#06060e] px-4 text-white">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(0,255,132,0.10),transparent_24%)]" />
+        <div className="relative w-full max-w-md">
+          <div className="mb-8 flex justify-center">
+            <Image src="/nidmainlogo.jpg" alt="Never In Doubt" width={200} height={56}
+              sizes="(max-width: 768px) 100px, 132px"
+              className="h-12 w-auto [filter:invert(1)_hue-rotate(180deg)]" priority />
+          </div>
+          <div className="rounded-[28px] border border-white/[0.08] bg-white/[0.04] p-8 text-center shadow-[0_30px_80px_rgba(0,0,0,0.40)]">
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-[rgba(0,255,132,0.20)] bg-[rgba(0,255,132,0.08)]">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-[rgba(0,255,132,0.3)] border-t-[#00ff84]" />
+            </div>
+            <h1 className="text-[22px] font-semibold tracking-[-0.03em] text-white">Checking your subscription…</h1>
+            <div className="mt-6 flex items-center justify-center gap-2 text-xs text-white/30">
+              <ShieldCheck className="h-3.5 w-3.5 text-[#7dffbf]" />
+              Secure payment via Fanbasis · Cancel any time
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#06060e] px-4 text-white">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(0,255,132,0.10),transparent_24%)]" />
-
       <div className="relative w-full max-w-md">
         <div className="mb-8 flex justify-center">
-          <Image
-            src="/nidmainlogo.jpg"
-            alt="Never In Doubt"
-            width={200}
-            height={56}
+          <Image src="/nidmainlogo.jpg" alt="Never In Doubt" width={200} height={56}
             sizes="(max-width: 768px) 100px, 132px"
-            className="h-12 w-auto [filter:invert(1)_hue-rotate(180deg)]"
-            priority
-          />
+            className="h-12 w-auto [filter:invert(1)_hue-rotate(180deg)]" priority />
         </div>
-
         <div className="rounded-[28px] border border-white/[0.08] bg-white/[0.04] p-8 text-center shadow-[0_30px_80px_rgba(0,0,0,0.40)]">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-[rgba(0,255,132,0.20)] bg-[rgba(0,255,132,0.08)]">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-[rgba(0,255,132,0.3)] border-t-[#00ff84]" />
-          </div>
-          <h1 className="text-[22px] font-semibold tracking-[-0.03em] text-white">
-            Taking you to checkout…
-          </h1>
+          <h1 className="text-[22px] font-semibold tracking-[-0.03em] text-white">Complete your subscription</h1>
           <p className="mt-3 text-[14px] leading-6 text-white/50">
-            You&apos;ll be redirected to complete your £24.99/month subscription.
+            A subscription is required to access Never In Doubt. £24.99/month, cancel any time.
           </p>
-
+          <a
+            href={FANBASIS_PAYMENT_LINK}
+            className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#00ff84] px-5 py-4 text-[15px] font-semibold text-[#07110d] transition hover:brightness-95"
+          >
+            Go to checkout
+            <ArrowRight className="h-4 w-4" />
+          </a>
           <div className="mt-6 flex items-center justify-center gap-2 text-xs text-white/30">
             <ShieldCheck className="h-3.5 w-3.5 text-[#7dffbf]" />
             Secure payment via Fanbasis · Cancel any time

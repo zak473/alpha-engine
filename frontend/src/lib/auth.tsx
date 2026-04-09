@@ -38,6 +38,14 @@ function clearCookie() {
   document.cookie = `${COOKIE_KEY}=; path=/; max-age=0; SameSite=Lax`;
 }
 
+export function setSubCookie() {
+  document.cookie = `ae_sub=1; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+}
+
+export function clearSubCookie() {
+  document.cookie = `ae_sub=; path=/; max-age=0; SameSite=Lax`;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -74,12 +82,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(USER_KEY, JSON.stringify(authUser));
     setCookie(data.access_token);
     setUser(authUser);
+
+    // Set subscription cookie if active so middleware can gate protected routes
+    try {
+      const statusRes = await fetch("/api/v1/billing/status", {
+        headers: { Authorization: `Bearer ${data.access_token}` },
+      });
+      if (statusRes.ok) {
+        const { is_active } = await statusRes.json();
+        if (is_active) setSubCookie();
+      }
+    } catch {
+      // non-fatal — middleware will redirect to /subscribe if cookie missing
+    }
   }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     clearCookie();
+    clearSubCookie();
     setUser(null);
   }, []);
 
