@@ -283,6 +283,7 @@ def run(
                     e * 100, k * 100, pick_outcome,
                 )
 
+                created += 1
                 if not dry_run:
                     pick = TrackedPick(
                         id=str(uuid.uuid4()),
@@ -303,7 +304,6 @@ def run(
                         settled_at=settled_at,
                     )
                     db.add(pick)
-                    created += 1
 
                     # Also create TipsterTip under the sport-specific AI tipster account
                     ai_tipster_id = AI_TIPSTER_IDS.get(sport)
