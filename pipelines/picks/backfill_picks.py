@@ -231,10 +231,15 @@ def run(
             if d_odds and p_draw and p_draw > 0.01:
                 candidates.append(("Draw", p_draw, d_odds, ml_market))
 
+            # With fair odds: only keep the single best candidate (highest model_prob)
+            # to avoid picking both sides of every match
+            if using_fair_odds and candidates:
+                candidates = [max(candidates, key=lambda c: c[1])]
+
             # With fair odds use confidence-only gate
             if using_fair_odds:
                 effective_min_edge = 0.0
-                effective_min_conf = BACKFILL_SPORT_MIN_CONFIDENCE.get(sport, 0.50)
+                effective_min_conf = BACKFILL_SPORT_MIN_CONFIDENCE.get(sport, 0.55)
             else:
                 effective_min_edge = BACKFILL_SPORT_MIN_EDGE.get(sport, min_edge)
                 effective_min_conf = BACKFILL_SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
