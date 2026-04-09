@@ -212,3 +212,39 @@ def ai_tipsters_status(
         })
 
     return {"tipsters": results}
+
+
+@router.post("/backfill-picks")
+def backfill_picks(
+    days: int = 9,
+    dry_run: bool = False,
+    _: str = Depends(_require_admin),
+):
+    """
+    Backfill TrackedPick + TipsterTip rows for finished matches in the last N days.
+    Uses real market odds where available, falls back to fair odds from PredMatch.
+    Outcomes are settled immediately from match results.
+    """
+    import threading
+    from pipelines.picks.backfill_picks import run as run_backfill
+
+    if dry_run:
+        n = run_backfill(days=days, dry_run=True)
+        return {"dry_run": True, "would_create": n}
+
+    # Run in background so the request doesn't time out for large windows
+    result: dict = {}
+
+    def _run():
+        try:
+            n = run_backfill(days=days)
+            result["created"] = n
+            logger.info("[admin] backfill-picks: created %d picks (last %d days)", n, days)
+        except Exception as exc:
+            logger.error("[admin] backfill-picks failed: %s", exc, exc_info=True)
+            result["error"] = str(exc)
+
+    t = threading.Thread(target=_run, daemon=True, name="backfill-picks")
+    t.start()
+
+    return {"status": "running", "days": days, "message": f"Backfilling last {days} days in background — check Railway logs for progress."}

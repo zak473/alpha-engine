@@ -140,7 +140,8 @@ def run(
     try:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
-        # Finished matches within the lookback window that have predictions + real odds
+        # Finished matches within the lookback window that have predictions.
+        # Real market odds preferred; fair odds from PredMatch used as fallback.
         rows = (
             db.query(CoreMatch, PredMatch)
             .join(PredMatch, PredMatch.match_id == CoreMatch.id)
@@ -148,8 +149,6 @@ def run(
                 CoreMatch.status == "finished",
                 CoreMatch.outcome.isnot(None),
                 CoreMatch.kickoff_utc >= cutoff,
-                CoreMatch.odds_home.isnot(None),
-                CoreMatch.odds_away.isnot(None),
             )
             .order_by(CoreMatch.kickoff_utc.asc())
             .all()
@@ -185,16 +184,27 @@ def run(
             else:
                 ml_market = "1X2"
 
-            candidates: list[tuple[str, float, float, str]] = []
-            if match.odds_home and pred.p_home:
-                candidates.append((home_name, pred.p_home, match.odds_home, ml_market))
-            if match.odds_away and pred.p_away:
-                candidates.append((away_name, pred.p_away, match.odds_away, ml_market))
-            if match.odds_draw and pred.p_draw and pred.p_draw > 0.01:
-                candidates.append(("Draw", pred.p_draw, match.odds_draw, ml_market))
+            # Prefer real market odds; fall back to fair odds from PredMatch
+            using_fair_odds = not match.odds_home
+            h_odds = match.odds_home or (1 / pred.p_home if pred.p_home and pred.p_home > 0 else None)
+            a_odds = match.odds_away or (1 / pred.p_away if pred.p_away and pred.p_away > 0 else None)
+            d_odds = match.odds_draw or (1 / pred.p_draw if pred.p_draw and pred.p_draw > 0.01 else None)
 
-            effective_min_edge = BACKFILL_SPORT_MIN_EDGE.get(sport, min_edge)
-            effective_min_conf = BACKFILL_SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
+            candidates: list[tuple[str, float, float, str]] = []
+            if h_odds and pred.p_home:
+                candidates.append((home_name, pred.p_home, h_odds, ml_market))
+            if a_odds and pred.p_away:
+                candidates.append((away_name, pred.p_away, a_odds, ml_market))
+            if d_odds and pred.p_draw and pred.p_draw > 0.01:
+                candidates.append(("Draw", pred.p_draw, d_odds, ml_market))
+
+            # With fair odds edge is always ~0 so use confidence-only gate
+            if using_fair_odds:
+                effective_min_edge = 0.0
+                effective_min_conf = BACKFILL_SPORT_MIN_CONFIDENCE.get(sport, 0.60)
+            else:
+                effective_min_edge = BACKFILL_SPORT_MIN_EDGE.get(sport, min_edge)
+                effective_min_conf = BACKFILL_SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
 
             for selection_label, model_prob, book_odds, market_name in candidates:
                 e = edge_pct(model_prob, book_odds)
@@ -279,7 +289,7 @@ def run(
                             start_time=kickoff,
                             settled_at=settled_at,
                             match_id=match.id,
-                            note=f"Edge: +{round(e * 100, 1)}% | Kelly: {round(k * 100, 1)}% [backfill]",
+                            note=f"{'Fair odds' if using_fair_odds else 'Edge: +' + str(round(e * 100, 1)) + '%'} | Kelly: {round(k * 100, 1)}% [backfill]",
                         )
                         db.add(tip)
 
