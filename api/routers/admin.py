@@ -428,6 +428,52 @@ def backfill_april(
     }
 
 
+@router.post("/register-fanbasis-webhook")
+def register_fanbasis_webhook(
+    _: str = Depends(_require_admin),
+):
+    """Register our webhook URL with Fanbasis. Run once after deploy."""
+    from api.routers.billing import register_webhook
+    webhook_url = "https://alpha-engine-production.up.railway.app/api/v1/billing/webhook"
+    result = register_webhook(webhook_url)
+    logger.info("[admin] Fanbasis webhook registration result: %s", result)
+    return {"webhook_url": webhook_url, "fanbasis_response": result}
+
+
+@router.post("/run-predictions")
+def run_predictions(
+    sport: str = "all",
+    _: str = Depends(_require_admin),
+):
+    """Trigger ML predictions for upcoming matches. sport=all|soccer|tennis|basketball|baseball|hockey|esports"""
+    import threading
+
+    def _run():
+        sports = ["soccer", "tennis", "basketball", "baseball", "hockey", "esports"] if sport == "all" else [sport]
+        for s in sports:
+            try:
+                if s == "soccer":
+                    from pipelines.soccer.predict_soccer import run as p; n = p()
+                elif s == "tennis":
+                    from pipelines.tennis.predict_tennis import run as p; n = p()
+                elif s == "basketball":
+                    from pipelines.basketball.predict_basketball import run as p; n = p()
+                elif s == "baseball":
+                    from pipelines.baseball.predict_baseball import run as p; n = p()
+                elif s == "hockey":
+                    from pipelines.hockey.predict_hockey import run as p; n = p()
+                elif s == "esports":
+                    from pipelines.esports.predict_esports import run as p; n = p()
+                else:
+                    continue
+                logger.info("[admin] run-predictions [%s]: %d predictions", s, n)
+            except Exception as exc:
+                logger.error("[admin] run-predictions [%s] failed: %s", s, exc, exc_info=True)
+
+    threading.Thread(target=_run, daemon=True, name="run-predictions").start()
+    return {"status": "running", "sport": sport, "message": "Predictions running in background — check Railway logs."}
+
+
 @router.post("/run-auto-picks")
 def run_auto_picks(
     _: str = Depends(_require_admin),
