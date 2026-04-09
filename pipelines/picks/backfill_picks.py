@@ -234,7 +234,7 @@ def run(
             # With fair odds use confidence-only gate
             if using_fair_odds:
                 effective_min_edge = 0.0
-                effective_min_conf = BACKFILL_SPORT_MIN_CONFIDENCE.get(sport, 0.60)
+                effective_min_conf = BACKFILL_SPORT_MIN_CONFIDENCE.get(sport, 0.50)
             else:
                 effective_min_edge = BACKFILL_SPORT_MIN_EDGE.get(sport, min_edge)
                 effective_min_conf = BACKFILL_SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
