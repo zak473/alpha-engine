@@ -164,7 +164,7 @@ def run(
     created = 0
 
     try:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff = datetime.utcnow() - timedelta(days=days)
 
         # All finished matches in the window with a known outcome
         matches = (
