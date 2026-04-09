@@ -346,7 +346,7 @@ def _job_settle_pending_picks() -> None:
         pending = db.query(TrackedPick).filter(TrackedPick.outcome.is_(None)).all()
         for pick in pending:
             match = db.query(CoreMatch).filter(CoreMatch.id == pick.match_id).first()
-            if not match or match.status != "finished" or not match.outcome:
+            if not match or match.status != "finished":
                 continue
 
             market = pick.market_name.lower()
@@ -396,6 +396,8 @@ def _job_settle_pending_picks() -> None:
 
             # ── Moneyline / 1X2 settlement ───────────────────────────────────
             elif any(kw in market for kw in ("moneyline", "match winner", "1x2", "to win")):
+                if not match.outcome:
+                    continue
                 is_home = label in ("home", "1") or (home_name and home_name in label)
                 is_away = label in ("away", "2") or (away_name and away_name in label)
                 is_draw = label in ("draw", "x")

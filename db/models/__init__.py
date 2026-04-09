@@ -30,7 +30,7 @@ from db.models.tipsters import TipsterTip, TipsterFollow
 from db.models.notifications import UserNotification
 from db.models.horseracing import HorseRace, HorseRunner
 from db.models.user import User
-from db.models.odds import MarketOdds, SpreadOdds
+from db.models.odds import SpreadOdds  # registers table with Base.metadata for create_all()
 
 __all__ = [
     "Sport", "Competition", "Season", "Venue",
