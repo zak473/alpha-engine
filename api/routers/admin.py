@@ -426,3 +426,22 @@ def backfill_april(
         "status": "running",
         "message": f"Running ML predictions for all matches then backfilling last {days} days. Check Railway logs for progress.",
     }
+
+
+@router.post("/run-auto-picks")
+def run_auto_picks(
+    _: str = Depends(_require_admin),
+):
+    """Trigger the auto_picks pipeline immediately — generates fresh tips for upcoming matches."""
+    import threading
+
+    def _run():
+        try:
+            from pipelines.picks.auto_picks import run
+            n = run()
+            logger.info("[admin] run-auto-picks: created %d picks", n)
+        except Exception as exc:
+            logger.error("[admin] run-auto-picks failed: %s", exc, exc_info=True)
+
+    threading.Thread(target=_run, daemon=True, name="auto-picks-manual").start()
+    return {"status": "running", "message": "Auto-picks running in background — check Railway logs."}
