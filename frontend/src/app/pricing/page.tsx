@@ -3,8 +3,11 @@
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { createCheckoutSession, getBillingStatus } from "@/lib/api";
-import { Loader2, Check, Zap } from "lucide-react";
+import { getBillingStatus } from "@/lib/api";
+
+import { Check, Zap } from "lucide-react";
+
+const FANBASIS_PAYMENT_LINK = "https://www.fanbasis.com/agency-checkout/never-in-doubt/B657N";
 
 const PRO_FEATURES = [
   "AI match predictions across all sports",
@@ -18,8 +21,6 @@ function PricingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isLoggedIn } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(true);
 
@@ -33,37 +34,16 @@ function PricingContent() {
       .finally(() => setCheckingStatus(false));
   }, [isLoggedIn]);
 
-  async function handleSubscribe() {
+  function handleSubscribe() {
     if (!isLoggedIn) {
       router.push("/login?next=/pricing");
       return;
     }
-    setLoading(true);
-    setError(null);
-    try {
-      const { url } = await createCheckoutSession();
-      window.location.href = url;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
-      setLoading(false);
-    }
+    window.location.href = FANBASIS_PAYMENT_LINK;
   }
 
-  async function handleManage() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/v1/billing/portal", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${localStorage.getItem("alpha_engine_token")}` },
-      });
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-      else throw new Error(data.detail ?? "Portal unavailable");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-      setLoading(false);
-    }
+  function handleManage() {
+    window.open("https://www.fanbasis.com/never-in-doubt", "_blank");
   }
 
   return (
@@ -156,8 +136,7 @@ function PricingContent() {
         {!checkingStatus && isActive ? (
           <button
             onClick={handleManage}
-            disabled={loading}
-            className="w-full rounded-[var(--radius-md)] py-3 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-[var(--radius-md)] py-3 text-sm font-semibold transition-all"
             style={{
               background: "var(--bg2)",
               border: "1px solid var(--border0)",
@@ -166,12 +145,12 @@ function PricingContent() {
             onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--bg3)"; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--bg2)"; }}
           >
-            {loading ? "Opening portal…" : "Manage subscription"}
+            Manage subscription
           </button>
         ) : (
           <button
             onClick={handleSubscribe}
-            disabled={loading || checkingStatus}
+            disabled={checkingStatus}
             className="w-full rounded-[var(--radius-md)] py-3 text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: "var(--accent)",
@@ -179,17 +158,12 @@ function PricingContent() {
               boxShadow: "0 4px 20px rgba(54,242,143,0.20)",
             }}
           >
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <Loader2 size={14} className="animate-spin" />
-                Redirecting to checkout…
-              </span>
-            ) : !isLoggedIn ? "Sign in to subscribe" : checkingStatus ? "Loading…" : "Start subscription"}
+            {!isLoggedIn ? "Sign in to subscribe" : checkingStatus ? "Loading…" : "Start subscription"}
           </button>
         )}
 
         <p className="mt-4 text-center text-xs" style={{ color: "var(--text2)" }}>
-          Secured by Stripe · Cancel any time from your account
+          Secured by Fanbasis · Cancel any time from your account
         </p>
       </div>
     </main>

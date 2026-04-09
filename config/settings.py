@@ -112,11 +112,10 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     FRONTEND_URL: str = "http://localhost:3000"   # Override in Railway/Vercel
 
-    # Stripe — subscription billing
-    STRIPE_SECRET_KEY: str = ""
-    STRIPE_PUBLISHABLE_KEY: str = ""
-    STRIPE_WEBHOOK_SECRET: str = ""
-    STRIPE_PRICE_ID: str = ""  # monthly £24.99 price ID
+    # Fanbasis — subscription billing
+    FANBASIS_API_KEY: str = ""
+    FANBASIS_WEBHOOK_SECRET: str = ""
+    FANBASIS_PAYMENT_LINK: str = "https://www.fanbasis.com/agency-checkout/never-in-doubt/B657N"
 
     # API
     API_PREFIX: str = "/api/v1"

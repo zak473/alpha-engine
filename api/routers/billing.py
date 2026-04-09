@@ -1,16 +1,19 @@
 """
 Billing API — /api/v1/billing
 
-Handles Stripe Checkout, Customer Portal, subscription status, and webhooks.
+Handles Fanbasis webhook events and subscription status.
+Fanbasis manages the checkout/portal UI on their end — we only need
+to receive webhooks and keep our user subscription state in sync.
 """
 
 from __future__ import annotations
 
+import http.client
+import json
 import logging
 from datetime import datetime, timezone
 
-import stripe
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -23,119 +26,59 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
-# Configure the Stripe client using the secret key from settings.
-# The key is set at import time; if STRIPE_SECRET_KEY is empty the SDK will
-# raise when an actual API call is made, not at startup.
-stripe.api_key = settings.STRIPE_SECRET_KEY
+FANBASIS_HOST = "www.fanbasis.com"
 
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+# ─── Fanbasis API helpers ──────────────────────────────────────────────────────
 
-def _get_user(db: Session, user_id: str) -> User:
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+def _fanbasis_request(method: str, path: str, body: dict | None = None) -> dict:
+    conn = http.client.HTTPSConnection(FANBASIS_HOST)
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "x-api-key": settings.FANBASIS_API_KEY,
+    }
+    payload = json.dumps(body) if body else None
+    conn.request(method, path, payload, headers)
+    res = conn.getresponse()
+    return json.loads(res.read().decode("utf-8"))
 
 
-def _apply_subscription(user: User, sub: stripe.Subscription) -> None:
-    """Write Stripe subscription fields onto a User ORM object (does not commit)."""
-    user.subscription_id = sub["id"]
-    user.subscription_status = sub["status"]
-    period_end = sub.get("current_period_end")
-    if period_end is not None:
-        user.subscription_current_period_end = datetime.fromtimestamp(
-            int(period_end), tz=timezone.utc
-        )
-    else:
-        user.subscription_current_period_end = None
+def register_webhook(webhook_url: str) -> dict:
+    """Register our webhook endpoint with Fanbasis for all relevant event types."""
+    return _fanbasis_request("POST", "/public-api/webhook-subscriptions", {
+        "webhook_url": webhook_url,
+        "event_types": [
+            "payment.succeeded",
+            "payment.failed",
+            "payment.expired",
+            "payment.canceled",
+            "product.purchased",
+            "subscription.created",
+            "subscription.renewed",
+            "subscription.completed",
+            "subscription.canceled",
+        ],
+    })
 
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
-
-@router.post("/checkout")
-def create_checkout_session(
-    db: Session = Depends(get_session),
-    user_id: str = Depends(get_current_user),
-):
-    """
-    Create a Stripe Checkout Session for the Pro subscription.
-    Returns the hosted checkout URL the frontend should redirect to.
-    """
-    if not settings.STRIPE_SECRET_KEY:
-        raise HTTPException(status_code=503, detail="Billing not configured")
-    if not settings.STRIPE_PRICE_ID:
-        raise HTTPException(status_code=503, detail="Stripe price ID not configured")
-
-    user = _get_user(db, user_id)
-
-    kwargs: dict = {
-        "mode": "subscription",
-        "line_items": [{"price": settings.STRIPE_PRICE_ID, "quantity": 1}],
-        "customer_email": user.email,
-        "success_url": f"{settings.FRONTEND_URL}/dashboard?checkout=success",
-        "cancel_url": f"{settings.FRONTEND_URL}/pricing?checkout=cancelled",
-        "metadata": {"user_id": user_id},
-    }
-
-    # If the user already has a Stripe customer record, reuse it so payment
-    # methods and invoicing history are preserved.
-    if user.stripe_customer_id:
-        del kwargs["customer_email"]
-        kwargs["customer"] = user.stripe_customer_id
-
-    try:
-        session = stripe.checkout.Session.create(**kwargs)
-    except stripe.StripeError as exc:
-        logger.error("Stripe checkout session creation failed: %s", exc)
-        raise HTTPException(status_code=502, detail="Payment provider error") from exc
-
-    return {"url": session.url}
-
-
-@router.post("/portal")
-def create_portal_session(
-    db: Session = Depends(get_session),
-    user_id: str = Depends(get_current_user),
-):
-    """
-    Create a Stripe Billing Portal session so the user can manage their
-    subscription (cancel, update payment method, view invoices, etc.).
-    Returns the portal URL the frontend should redirect to.
-    """
-    if not settings.STRIPE_SECRET_KEY:
-        raise HTTPException(status_code=503, detail="Billing not configured")
-
-    user = _get_user(db, user_id)
-
-    if not user.stripe_customer_id:
-        raise HTTPException(
-            status_code=400,
-            detail="No active subscription found — please subscribe first",
-        )
-
-    try:
-        session = stripe.billing_portal.Session.create(
-            customer=user.stripe_customer_id,
-            return_url=f"{settings.FRONTEND_URL}/dashboard",
-        )
-    except stripe.StripeError as exc:
-        logger.error("Stripe portal session creation failed: %s", exc)
-        raise HTTPException(status_code=502, detail="Payment provider error") from exc
-
-    return {"url": session.url}
-
 
 @router.get("/status")
 def get_billing_status(
     db: Session = Depends(get_session),
     user_id: str = Depends(get_current_user),
 ):
-    """
-    Return the current subscription status for the authenticated user.
-    is_active is True when the subscription is active or in a trial period.
-    """
-    user = _get_user(db, user_id)
+    """Return the current subscription status for the authenticated user."""
+    from api.routers.admin import ADMIN_EMAILS
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Admin accounts always have full access
+    if user.email.lower() in ADMIN_EMAILS:
+        return {"status": "active", "current_period_end": None, "is_active": True}
+
     is_active = user.subscription_status in ("active", "trialing")
     period_end = (
         user.subscription_current_period_end.isoformat()
@@ -146,178 +89,183 @@ def get_billing_status(
         "status": user.subscription_status,
         "current_period_end": period_end,
         "is_active": is_active,
+        "payment_link": settings.FANBASIS_PAYMENT_LINK if not is_active else None,
     }
 
 
 @router.post("/webhook")
-async def stripe_webhook(
+async def fanbasis_webhook(
     request: Request,
-    stripe_signature: str = Header(default=None, alias="stripe-signature"),
     db: Session = Depends(get_session),
 ):
     """
-    Receive and verify Stripe webhook events.
-    Always returns 200 — Stripe retries on non-2xx so we swallow handled errors
-    and log unexpected ones rather than letting them trigger retry storms.
+    Receive Fanbasis webhook events.
+    Always returns 200 — Fanbasis retries on non-2xx so we log errors
+    rather than propagating them.
     """
-    payload = await request.body()
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        logger.error("Fanbasis webhook: failed to parse payload: %s", exc)
+        return JSONResponse(status_code=200, content={"error": "parse_error"})
 
-    if not settings.STRIPE_WEBHOOK_SECRET:
-        logger.warning("STRIPE_WEBHOOK_SECRET not set — skipping webhook signature verification")
-        try:
-            event = stripe.Event.construct_from(
-                stripe.util.convert_to_stripe_object(
-                    stripe.util.json.loads(payload)
-                ),
-                stripe.api_key,
-            )
-        except Exception as exc:
-            logger.error("Webhook payload parse error: %s", exc)
-            return JSONResponse(status_code=200, content={"error": "parse_error"})
-    else:
-        try:
-            event = stripe.Webhook.construct_event(
-                payload, stripe_signature, settings.STRIPE_WEBHOOK_SECRET
-            )
-        except stripe.SignatureVerificationError as exc:
-            logger.warning("Stripe webhook signature verification failed: %s", exc)
-            return JSONResponse(status_code=200, content={"error": "invalid_signature"})
-        except Exception as exc:
-            logger.error("Webhook construct_event error: %s", exc)
-            return JSONResponse(status_code=200, content={"error": "parse_error"})
+    event_type: str = payload.get("event_type") or _infer_event_type(payload)
 
-    event_type: str = event["type"]
-    data_object = event["data"]["object"]
+    logger.info("Fanbasis webhook received: %s", event_type)
 
     try:
-        if event_type in ("customer.subscription.created", "customer.subscription.updated"):
-            _handle_subscription_upsert(db, data_object)
+        if event_type == "subscription.created":
+            _handle_subscription_created(db, payload)
 
-        elif event_type == "customer.subscription.deleted":
-            _handle_subscription_deleted(db, data_object)
+        elif event_type == "subscription.renewed":
+            _handle_subscription_renewed(db, payload)
 
-        elif event_type == "checkout.session.completed":
-            _handle_checkout_completed(db, data_object)
+        elif event_type in ("subscription.completed", "subscription.canceled"):
+            _handle_subscription_ended(db, payload, event_type)
 
-        elif event_type == "invoice.paid":
-            _handle_invoice_paid(db, data_object)
+        elif event_type == "payment.succeeded":
+            _handle_payment_succeeded(db, payload)
+
+        elif event_type == "payment.failed":
+            logger.warning(
+                "Fanbasis payment.failed: customer=%s reason=%s",
+                payload.get("customer_id"),
+                payload.get("failure_reason"),
+            )
+
+        elif event_type in ("payment.expired", "payment.canceled"):
+            logger.info(
+                "Fanbasis %s: customer=%s reason=%s",
+                event_type,
+                payload.get("customer_id"),
+                payload.get("failure_reason"),
+            )
+
+        elif event_type == "product.purchased":
+            _handle_product_purchased(db, payload)
 
         else:
-            logger.debug("Unhandled Stripe event type: %s", event_type)
+            logger.debug("Fanbasis: unhandled event type: %s", event_type)
 
     except Exception as exc:
-        # Log but do not re-raise — we must return 200 to prevent Stripe retries
-        # for already-processed events.
-        logger.error("Error handling Stripe event %s: %s", event_type, exc, exc_info=True)
+        logger.error("Error handling Fanbasis event %s: %s", event_type, exc, exc_info=True)
 
     return JSONResponse(status_code=200, content={"received": True})
 
 
 # ─── Webhook handlers ──────────────────────────────────────────────────────────
 
-def _handle_subscription_upsert(db: Session, sub: dict) -> None:
-    """Apply subscription.created / subscription.updated to the matching user."""
-    customer_id: str = sub.get("customer", "")
-    if not customer_id:
-        return
+def _infer_event_type(payload: dict) -> str:
+    """Fanbasis may omit event_type on some events — infer from payload shape."""
+    if "subscription" in payload:
+        sub = payload["subscription"]
+        if "cancelled_at" in sub:
+            return "subscription.canceled"
+        if "completed_at" in sub:
+            return "subscription.completed"
+        if "renewed_at" in sub:
+            return "subscription.renewed"
+        return "subscription.created"
+    if "payment_id" in payload and "amount" in payload:
+        return "payment.succeeded"
+    if "checkout_session_id" in payload:
+        return "payment.expired"
+    return "unknown"
 
-    user = db.query(User).filter(User.stripe_customer_id == customer_id).first()
+
+def _find_user_by_email(db: Session, email: str) -> User | None:
+    return db.query(User).filter(User.email == email).first()
+
+
+def _handle_subscription_created(db: Session, payload: dict) -> None:
+    buyer = payload.get("buyer", {})
+    email = buyer.get("email", "")
+    sub = payload.get("subscription", {})
+
+    user = _find_user_by_email(db, email)
     if not user:
-        logger.warning("Webhook: no user found for Stripe customer %s", customer_id)
+        logger.warning("Fanbasis subscription.created: no user for email %s", email)
         return
 
     prev_status = user.subscription_status
-    _apply_subscription(user, sub)
+    user.subscription_id = str(sub.get("id", ""))
+    user.subscription_status = sub.get("status", "active")
 
-    # Top up AI tokens when a subscription becomes active or renews
-    new_status = sub.get("status")
-    if new_status in ("active", "trialing") and prev_status not in ("active", "trialing"):
+    end_date = sub.get("end_date")
+    user.subscription_current_period_end = (
+        datetime.fromisoformat(end_date) if end_date else None
+    )
+
+    # Top up AI tokens on new subscription
+    if prev_status not in ("active", "trialing"):
         user.ai_tokens = (user.ai_tokens or 0) + PRO_MONTHLY_TOKENS
-        logger.info("Webhook: added %d AI tokens to user %s (new Pro)", PRO_MONTHLY_TOKENS, user.id)
+        logger.info("Fanbasis: added %d AI tokens to user %s (new sub)", PRO_MONTHLY_TOKENS, user.id)
 
     db.commit()
-    logger.info(
-        "Webhook: subscription %s → status=%s for user %s",
-        sub.get("id"),
-        new_status,
-        user.id,
-    )
+    logger.info("Fanbasis subscription.created: user=%s sub_id=%s", user.id, user.subscription_id)
 
 
-def _handle_subscription_deleted(db: Session, sub: dict) -> None:
-    """Mark subscription as canceled when Stripe reports deletion."""
-    customer_id: str = sub.get("customer", "")
-    if not customer_id:
-        return
+def _handle_subscription_renewed(db: Session, payload: dict) -> None:
+    buyer = payload.get("buyer", {})
+    email = buyer.get("email", "")
+    sub = payload.get("subscription", {})
 
-    user = db.query(User).filter(User.stripe_customer_id == customer_id).first()
+    user = _find_user_by_email(db, email)
     if not user:
-        logger.warning("Webhook: no user found for Stripe customer %s", customer_id)
+        logger.warning("Fanbasis subscription.renewed: no user for email %s", email)
         return
 
-    user.subscription_id = sub.get("id")
-    user.subscription_status = "canceled"
-    user.subscription_current_period_end = None
-    db.commit()
-    logger.info("Webhook: subscription canceled for user %s", user.id)
+    user.subscription_status = sub.get("status", "active")
+    end_date = sub.get("end_date")
+    if end_date:
+        user.subscription_current_period_end = datetime.fromisoformat(end_date)
 
-
-def _handle_checkout_completed(db: Session, session: dict) -> None:
-    """
-    Link the Stripe customer to our user after a successful checkout.
-    The customer_id is stored so the portal endpoint can retrieve it later.
-    If the session includes a subscription, write those fields too.
-    """
-    user_id: str = (session.get("metadata") or {}).get("user_id", "")
-    customer_id: str = session.get("customer", "")
-
-    if not user_id or not customer_id:
-        logger.warning(
-            "Webhook: checkout.session.completed missing user_id or customer_id — skipping"
-        )
-        return
-
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        logger.warning("Webhook: no user found with id %s", user_id)
-        return
-
-    user.stripe_customer_id = customer_id
-
-    subscription_id: str = session.get("subscription", "")
-    if subscription_id:
-        try:
-            sub = stripe.Subscription.retrieve(subscription_id)
-            _apply_subscription(user, sub)
-        except stripe.StripeError as exc:
-            logger.error("Webhook: failed to retrieve subscription %s: %s", subscription_id, exc)
-
-    db.commit()
-    logger.info(
-        "Webhook: checkout completed — linked Stripe customer %s to user %s",
-        customer_id,
-        user_id,
-    )
-
-
-def _handle_invoice_paid(db: Session, invoice: dict) -> None:
-    """Top up AI tokens on each successful subscription renewal."""
-    # Only process subscription invoices (not one-off charges)
-    if invoice.get("billing_reason") not in ("subscription_cycle", "subscription_create"):
-        return
-
-    customer_id: str = invoice.get("customer", "")
-    if not customer_id:
-        return
-
-    user = db.query(User).filter(User.stripe_customer_id == customer_id).first()
-    if not user:
-        logger.warning("Webhook invoice.paid: no user for customer %s", customer_id)
-        return
-
+    # Top up AI tokens on renewal
     user.ai_tokens = (user.ai_tokens or 0) + PRO_MONTHLY_TOKENS
     db.commit()
     logger.info(
-        "Webhook invoice.paid: added %d AI tokens to user %s (%d total)",
-        PRO_MONTHLY_TOKENS, user.id, user.ai_tokens,
+        "Fanbasis subscription.renewed: user=%s renewal_count=%s",
+        user.id,
+        sub.get("auto_renew_count"),
+    )
+
+
+def _handle_subscription_ended(db: Session, payload: dict, event_type: str) -> None:
+    buyer = payload.get("buyer", {})
+    email = buyer.get("email", "")
+    sub = payload.get("subscription", {})
+
+    user = _find_user_by_email(db, email)
+    if not user:
+        logger.warning("Fanbasis %s: no user for email %s", event_type, email)
+        return
+
+    user.subscription_status = "canceled"
+    user.subscription_current_period_end = None
+    db.commit()
+    logger.info("Fanbasis %s: user=%s reason=%s", event_type, user.id, sub.get("cancellation_reason") or sub.get("completion_reason"))
+
+
+def _handle_payment_succeeded(db: Session, payload: dict) -> None:
+    buyer = payload.get("buyer", {})
+    email = buyer.get("email", "")
+    logger.info(
+        "Fanbasis payment.succeeded: email=%s payment_id=%s amount=%s %s",
+        email,
+        payload.get("payment_id"),
+        payload.get("amount"),
+        payload.get("currency"),
+    )
+
+
+def _handle_product_purchased(db: Session, payload: dict) -> None:
+    buyer = payload.get("buyer", {})
+    email = buyer.get("email", "")
+    item = payload.get("item", {})
+    logger.info(
+        "Fanbasis product.purchased: email=%s item=%s type=%s price=%s",
+        email,
+        item.get("title"),
+        item.get("type"),
+        payload.get("product_price"),
     )
