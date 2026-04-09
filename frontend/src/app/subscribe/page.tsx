@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getStoredToken } from "@/lib/auth";
-import { setSubCookie } from "@/lib/auth";
-import { ArrowRight, ShieldCheck } from "lucide-react";
+import { getStoredToken, setSubCookie, clearSubCookie } from "@/lib/auth";
+import { ArrowRight, ShieldCheck, LogOut } from "lucide-react";
 import Image from "next/image";
 
 const FANBASIS_PAYMENT_LINK = "https://www.fanbasis.com/agency-checkout/never-in-doubt/B657N";
@@ -94,6 +93,19 @@ export default function SubscribePage() {
             <ShieldCheck className="h-3.5 w-3.5 text-[#7dffbf]" />
             Secure payment via Fanbasis · Cancel any time
           </div>
+          <button
+            onClick={() => {
+              localStorage.removeItem("alpha_engine_token");
+              localStorage.removeItem("alpha_engine_user");
+              document.cookie = "ae_token=; path=/; max-age=0; SameSite=Lax";
+              clearSubCookie();
+              router.replace("/login");
+            }}
+            className="mt-4 inline-flex items-center justify-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors"
+          >
+            <LogOut className="h-3 w-3" />
+            Sign out
+          </button>
         </div>
       </div>
     </div>
