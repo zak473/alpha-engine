@@ -214,6 +214,56 @@ def ai_tipsters_status(
     return {"tipsters": results}
 
 
+@router.get("/backfill-debug")
+def backfill_debug(
+    days: int = 9,
+    db: Session = Depends(get_db),
+    _: str = Depends(_require_admin),
+):
+    """Debug: show what the backfill query actually finds."""
+    from db.models.mvp import CoreMatch
+    from datetime import timedelta
+    cutoff_aware = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff_naive = datetime.utcnow() - timedelta(days=days)
+
+    total = db.query(CoreMatch).count()
+    finished = db.query(CoreMatch).filter(CoreMatch.status == "finished").count()
+    with_outcome = db.query(CoreMatch).filter(
+        CoreMatch.status == "finished",
+        CoreMatch.outcome.isnot(None),
+    ).count()
+    aware_window = db.query(CoreMatch).filter(
+        CoreMatch.status == "finished",
+        CoreMatch.outcome.isnot(None),
+        CoreMatch.kickoff_utc >= cutoff_aware,
+    ).count()
+    naive_window = db.query(CoreMatch).filter(
+        CoreMatch.status == "finished",
+        CoreMatch.outcome.isnot(None),
+        CoreMatch.kickoff_utc >= cutoff_naive,
+    ).count()
+
+    # Sample a few finished matches
+    sample = db.query(CoreMatch).filter(
+        CoreMatch.status == "finished",
+        CoreMatch.outcome.isnot(None),
+    ).order_by(CoreMatch.kickoff_utc.desc()).limit(5).all()
+
+    return {
+        "total_matches": total,
+        "finished": finished,
+        "finished_with_outcome": with_outcome,
+        "in_window_aware": aware_window,
+        "in_window_naive": naive_window,
+        "cutoff_aware": cutoff_aware.isoformat(),
+        "cutoff_naive": cutoff_naive.isoformat(),
+        "sample_recent": [
+            {"id": m.id, "sport": m.sport, "kickoff": m.kickoff_utc.isoformat() if m.kickoff_utc else None, "outcome": m.outcome}
+            for m in sample
+        ],
+    }
+
+
 @router.post("/backfill-picks")
 def backfill_picks(
     days: int = 9,
