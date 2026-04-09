@@ -249,6 +249,36 @@ def backfill_debug(
         CoreMatch.outcome.isnot(None),
     ).order_by(CoreMatch.kickoff_utc.desc()).limit(5).all()
 
+    from db.models.mvp import PredMatch, RatingEloTeam
+    pred_count = db.query(PredMatch).filter(PredMatch.match_id.in_([m.id for m in sample])).count()
+    elo_total = db.query(RatingEloTeam).count()
+
+    # Check one match end-to-end
+    test_match = sample[0] if sample else None
+    test_detail = {}
+    if test_match:
+        pred = db.query(PredMatch).filter(PredMatch.match_id == test_match.id).first()
+        elo_home = db.query(RatingEloTeam).filter(
+            RatingEloTeam.team_id == test_match.home_team_id,
+            RatingEloTeam.rated_at < test_match.kickoff_utc,
+        ).order_by(RatingEloTeam.rated_at.desc()).first()
+        elo_away = db.query(RatingEloTeam).filter(
+            RatingEloTeam.team_id == test_match.away_team_id,
+            RatingEloTeam.rated_at < test_match.kickoff_utc,
+        ).order_by(RatingEloTeam.rated_at.desc()).first()
+        test_detail = {
+            "match_id": test_match.id,
+            "sport": test_match.sport,
+            "home_team_id": test_match.home_team_id,
+            "away_team_id": test_match.away_team_id,
+            "odds_home": test_match.odds_home,
+            "odds_away": test_match.odds_away,
+            "has_pred": pred is not None,
+            "pred_p_home": pred.p_home if pred else None,
+            "has_elo_home": elo_home is not None,
+            "has_elo_away": elo_away is not None,
+        }
+
     return {
         "total_matches": total,
         "finished": finished,
@@ -257,6 +287,9 @@ def backfill_debug(
         "in_window_naive": naive_window,
         "cutoff_aware": cutoff_aware.isoformat(),
         "cutoff_naive": cutoff_naive.isoformat(),
+        "elo_total_rows": elo_total,
+        "pred_count_in_sample": pred_count,
+        "test_match": test_detail,
         "sample_recent": [
             {"id": m.id, "sport": m.sport, "kickoff": m.kickoff_utc.isoformat() if m.kickoff_utc else None, "outcome": m.outcome}
             for m in sample
