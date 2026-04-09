@@ -16,7 +16,7 @@ import {
   AuthSwitchCard,
   AuthTrustNote,
 } from "@/app/auth/AuthExperience";
-import { useAuth, getStoredToken } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 
 export function RegisterForm() {
   const { login } = useAuth();
@@ -60,17 +60,7 @@ export function RegisterForm() {
         throw new Error(err.detail ?? "Registration failed");
       }
       await login(email, password);
-      const token = getStoredToken();
-      const checkoutRes = await fetch("/api/v1/billing/checkout", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (checkoutRes.ok) {
-        const { url } = await checkoutRes.json();
-        window.location.href = url;
-      } else {
-        router.push("/subscribe");
-      }
+      window.location.href = "https://www.fanbasis.com/agency-checkout/never-in-doubt/B657N";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
