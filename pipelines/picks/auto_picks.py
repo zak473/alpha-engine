@@ -141,11 +141,11 @@ def _already_tipped(db: Session, user_id: str, match_label: str, market: str, se
 # (covers 48% of matches). Picks below 50% confidence drag the track record down,
 # so we gate the auto-picks bot at the same threshold the model was evaluated on.
 SPORT_MIN_EDGE: dict[str, float] = {
-    "baseball":    0.05,
+    "baseball":    0.08,  # raised from 0.05 — model picks too many low-edge games
     "basketball":  0.01,  # NBA books are efficient; accept any genuine edge ≥1%
 }
 SPORT_MIN_CONFIDENCE: dict[str, float] = {
-    "baseball": 0.50,
+    "baseball": 0.65,  # raised from 0.50 — was generating ~50 tips/day, target ~10
     "soccer":   0.50,  # lgb_v18 validated at 60.1% acc only at ≥50% confidence
 }
 # When using fair odds (no market odds available), use a higher confidence bar
