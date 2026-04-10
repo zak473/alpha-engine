@@ -997,11 +997,13 @@ def admin_fetch_tennis(secret: str):
 
 
 @app.post("/api/v1/admin/run-backtest", tags=["Admin"])
-def admin_run_backtest(secret: str, sport: str = "all"):
+def admin_run_backtest(secret: str, sport: str = "all", min_confidence: float = 0.0):
     """
     Run the backtest pipeline for all (or one) sport and save results to
     model_registry.metrics['backtest'] so the /backtest/summary endpoint
     (and the website performance page) reflects the latest numbers.
+
+    min_confidence: 0.0–1.0 — only include predictions above this confidence.
     """
     if secret != settings.ADMIN_SECRET:
         from fastapi import HTTPException
@@ -1012,13 +1014,58 @@ def admin_run_backtest(secret: str, sport: str = "all"):
     def _run():
         try:
             from pipelines.backtest.run_backtest import run as bt_run
-            bt_run(sport=sport if sport != "all" else None)
+            bt_run(sport=sport if sport != "all" else None, min_confidence=min_confidence)
             log.info("[admin] run-backtest complete for sport=%s", sport)
         except Exception as exc:
             log.error("[admin] run-backtest failed: %s", exc, exc_info=True)
 
     threading.Thread(target=_run, daemon=True, name="run-backtest").start()
-    return {"status": "started", "sport": sport, "message": "Backtest running in background — results will appear on website once complete."}
+    return {"status": "started", "sport": sport, "min_confidence": min_confidence, "message": "Backtest running in background — results will appear on website once complete."}
+
+
+@app.get("/api/v1/admin/backtest-sweep", tags=["Admin"])
+def admin_backtest_sweep(secret: str, sport: str, thresholds: str = "0.50,0.55,0.60,0.65,0.70,0.75"):
+    """
+    Run the backtester at multiple confidence thresholds and return a comparison
+    table — useful for picking the right confidence gate before committing.
+
+    thresholds: comma-separated floats, e.g. "0.50,0.60,0.70"
+    Results are NOT saved to model_registry — read-only sweep.
+    """
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from pipelines.backtest.run_backtest import _run_for_sport
+    from db.session import SessionLocal
+
+    try:
+        levels = [float(t.strip()) for t in thresholds.split(",")]
+    except ValueError:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="thresholds must be comma-separated floats")
+
+    db = SessionLocal()
+    rows = []
+    try:
+        for conf in levels:
+            result = _run_for_sport(db, sport, min_confidence=conf)
+            if result:
+                rows.append({
+                    "min_confidence": conf,
+                    "n_predictions": result["n_predictions"],
+                    "n_bets_placed": result.get("n_bets_placed", 0),
+                    "accuracy": result["accuracy"],
+                    "roi": result["roi"],
+                    "pnl_units": result["pnl_units"],
+                    "sharpe_ratio": result["sharpe_ratio"],
+                })
+            else:
+                rows.append({"min_confidence": conf, "error": "no data"})
+    finally:
+        db.close()
+
+    return {"sport": sport, "sweep": rows}
 
 
 @app.post("/api/v1/admin/backfill-tennis", tags=["Admin"])

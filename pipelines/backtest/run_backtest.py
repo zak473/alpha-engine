@@ -194,6 +194,7 @@ def _run_for_sport(
     staking: str = "flat",
     kelly_fraction: float = 0.25,
     min_edge: float = 0.02,
+    min_confidence: float = 0.0,
 ) -> dict | None:
     """Run backtester for one sport using all historical predictions."""
     registry = (
@@ -244,6 +245,9 @@ def _run_for_sport(
         p_draw = pred.p_draw or 0.0
         confidence = (pred.confidence or 0) / 100.0
 
+        if confidence < min_confidence:
+            continue
+
         # Use home market odds for edge calculation — draw/away odds are rarely
         # populated in the DB, so we use home odds as a market-efficiency proxy.
         # The backtester's _select_bet still picks the highest-probability outcome
@@ -288,6 +292,7 @@ def _run_for_sport(
         "staking": staking,
         "kelly_fraction": kelly_fraction if staking == "kelly" else None,
         "min_edge": min_edge,
+        "min_confidence": min_confidence,
         "date_from": date_from.isoformat() if date_from else None,
         "date_to": date_to.isoformat() if date_to else None,
         "run_at": datetime.now(tz=timezone.utc).isoformat(),
@@ -320,16 +325,16 @@ def _run_for_sport(
     return summary
 
 
-def run(sport: str | None = None, staking: str = "flat", kelly_fraction: float = 0.25, min_edge: float = 0.02) -> None:
+def run(sport: str | None = None, staking: str = "flat", kelly_fraction: float = 0.25, min_edge: float = 0.02, min_confidence: float = 0.0) -> None:
     session: Session = SessionLocal()
     try:
         target_sports = [sport] if sport and sport != "all" else SPORTS
-        log.info("Running backtest for: %s  staking=%s  min_edge=%.2f", target_sports, staking, min_edge)
+        log.info("Running backtest for: %s  staking=%s  min_edge=%.2f  min_conf=%.2f", target_sports, staking, min_edge, min_confidence)
 
         all_results = {}
         for s in target_sports:
             log.info("--- %s ---", s.upper())
-            result = _run_for_sport(session, s, staking, kelly_fraction, min_edge)
+            result = _run_for_sport(session, s, staking, kelly_fraction, min_edge, min_confidence)
             if result:
                 all_results[s] = result
 
