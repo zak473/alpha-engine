@@ -619,7 +619,8 @@ def admin_purge_ai_history(secret: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=403, detail="Forbidden")
 
     from db.models.tipsters import TipsterTip
-    from db.models.picks import TrackedPick, BankrollSnapshot
+    from db.models.picks import TrackedPick
+    from db.models.bankroll import BankrollSnapshot
     from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
 
     ai_ids = list(AI_TIPSTER_IDS.values())
