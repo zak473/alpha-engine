@@ -233,10 +233,12 @@ def _run_for_sport(
         log.warning("  No finished predictions for %s (%s).", sport, registry.model_name)
         return None
 
-    # Per-sport confidence gates (mirror auto_picks.py SPORT_MIN_CONFIDENCE)
+    # Per-sport confidence gates (mirror backfill_picks.py thresholds)
+    # Soccer uses fair odds where edge≈0, so gate on confidence alone.
+    # 0.25 = abs(p-0.5)*2 ≥ 0.25 → p ≥ 0.625 (matches BACKFILL_MIN_CONFIDENCE)
     CONF_GATE: dict[str, float] = {
-        "soccer": 0.50,
-        "baseball": 0.50,
+        "soccer": 0.25,
+        "baseball": 0.25,
     }
     conf_gate = CONF_GATE.get(sport, 0.0)
 
@@ -284,10 +286,20 @@ def _run_for_sport(
         log.warning("  No valid predictions for %s after filtering.", sport)
         return None
 
-    # Soccer uses fair odds (edge ≈ 0) — drop the edge gate so confident picks
-    # aren't filtered out. Other sports keep the 2% edge gate for real odds.
-    effective_min_edge = 0.0 if sport == "soccer" else min_edge
-    config = StakingConfig(method=staking, kelly_fraction=kelly_fraction, min_edge=effective_min_edge)
+    # Soccer uses fair odds (edge ≈ 0) — drop edge gate and min_odds filter so
+    # confident picks aren't filtered out. Backfill also bypasses MIN_ODDS for
+    # fair odds, so we match that behaviour here for an accurate track record.
+    # Other sports keep the 2% edge gate with normal odds bounds.
+    if sport == "soccer":
+        config = StakingConfig(
+            method=staking,
+            kelly_fraction=kelly_fraction,
+            min_edge=0.0,
+            min_odds=1.0,
+            max_odds=20.0,
+        )
+    else:
+        config = StakingConfig(method=staking, kelly_fraction=kelly_fraction, min_edge=min_edge)
     result = Backtester(config).run(predictions, actuals, odds_list)
 
     date_from = rows[0][0].kickoff_utc
