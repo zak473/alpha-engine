@@ -35,6 +35,72 @@ from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
 
 log = logging.getLogger(__name__)
 
+
+# ── Tennis set handicap helpers ────────────────────────────────────────────────
+
+def _solve_per_set_prob(match_win_prob: float, best_of: int = 3) -> float:
+    """Invert match-win formula to get per-set win prob via binary search."""
+    w = max(0.001, min(0.999, match_win_prob))
+    lo, hi = 0.001, 0.999
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        f = mid ** 2 * (3 - 2 * mid) if best_of != 5 else mid ** 3 * (10 - 15 * mid + 6 * mid ** 2)
+        lo, hi = (mid, hi) if f < w else (lo, mid)
+    return (lo + hi) / 2
+
+
+def _tennis_handicap_candidates(
+    home_name: str,
+    away_name: str,
+    p_home: float,
+    best_of: int = 3,
+) -> list[tuple[str, float, float, str]]:
+    """
+    Derive set handicap (-1.5) candidates from match win probability.
+    Returns (selection_label, prob, fair_odds, market_name) tuples.
+    """
+    p = _solve_per_set_prob(p_home, best_of)
+    q = 1.0 - p
+    if best_of == 5:
+        p_home_clean = p ** 3 + 3 * p ** 3 * q
+        p_away_clean = q ** 3 + 3 * q ** 3 * p
+    else:
+        p_home_clean = p ** 2
+        p_away_clean = q ** 2
+    out = []
+    for name, prob in ((home_name, p_home_clean), (away_name, p_away_clean)):
+        if prob > 0.01:
+            out.append((f"{name} -1.5", prob, round(1.0 / prob, 3), "Set Handicap"))
+    return out
+
+
+def _resolve_handicap_outcome(
+    selection_label: str,
+    home_sets: Optional[int],
+    away_sets: Optional[int],
+) -> Optional[str]:
+    """
+    Resolve a -1.5 set handicap from stored set scores.
+    selection_label ends with " -1.5".
+    """
+    if home_sets is None or away_sets is None:
+        return None
+    try:
+        h, a = int(home_sets), int(away_sets)
+    except (ValueError, TypeError):
+        return None
+    parts = selection_label.rsplit(None, 1)
+    try:
+        line = float(parts[-1])  # -1.5
+    except (ValueError, IndexError):
+        return None
+    # The team named in selection_label[:-4] holds the handicap
+    # diff > 0 → won, diff < 0 → lost (no push at -1.5)
+    # We determine which side by checking the label ends with home or away name below;
+    # this is called from outside with the correct home/away context.
+    return None  # handled inline in run()
+
+
 # Lower thresholds for backfill — we want volume for track record
 BACKFILL_MIN_EDGE: float = 0.0
 BACKFILL_MIN_CONFIDENCE: float = 0.25  # ~62.5% model probability
@@ -323,6 +389,100 @@ def run(
                             note=f"[{source}] {'Fair odds' if using_fair_odds else 'Edge: +' + str(round(e * 100, 1)) + '%'} | Kelly: {round(k * 100, 1)}% [backfill]",
                         )
                         db.add(tip)
+
+            # ── Tennis set handicap (-1.5 sets) ──────────────────────────────
+            # Generates handicap picks from the model's match-win probability.
+            # Uses fair set odds (no market odds needed). Settlement uses stored
+            # set scores (match.home_score / match.away_score) which for tennis
+            # hold the number of sets won by each player.
+            if sport == "tennis" and p_home and p_away:
+                hc_cands = _tennis_handicap_candidates(home_name, away_name, p_home)
+                for sel, prob, hc_odds, hc_market in hc_cands:
+                    if confidence < effective_min_conf:
+                        continue
+                    if hc_odds < settings.MIN_ODDS or hc_odds > settings.MAX_ODDS:
+                        continue
+                    if _already_picked(db, user_id, match.id, hc_market, sel):
+                        continue
+
+                    # Resolve outcome from set scores
+                    h_sets = match.home_score
+                    a_sets = match.away_score
+                    if h_sets is None or a_sets is None:
+                        continue
+                    try:
+                        h_int, a_int = int(h_sets), int(a_sets)
+                    except (ValueError, TypeError):
+                        continue
+
+                    sel_lower = sel.lower()
+                    home_lower = home_name.lower()
+                    away_lower = away_name.lower()
+                    if home_lower in sel_lower or sel_lower in home_lower:
+                        # home -1.5: wins if home_sets - 1.5 > away_sets → 2-0
+                        diff = (h_int - 1.5) - a_int
+                    elif away_lower in sel_lower or sel_lower in away_lower:
+                        # away -1.5: wins if away_sets - 1.5 > home_sets → 2-0
+                        diff = (a_int - 1.5) - h_int
+                    else:
+                        continue
+
+                    hc_outcome = "won" if diff > 0 else "lost"
+
+                    kickoff = match.kickoff_utc
+                    if kickoff.tzinfo is None:
+                        kickoff = kickoff.replace(tzinfo=timezone.utc)
+                    settled_at = kickoff + timedelta(hours=2)
+                    if settled_at > now:
+                        settled_at = now
+
+                    k = kelly_fraction(prob, hc_odds)
+                    stake = round(k * kelly_frac, 4)
+
+                    log.info(
+                        "  [%s] %s | %s @ %.2f | set-hc | kelly=%.1f%% | outcome=%s",
+                        sport, match_label, sel, hc_odds, k * 100, hc_outcome,
+                    )
+                    created += 1
+                    if not dry_run:
+                        pick = TrackedPick(
+                            id=str(uuid.uuid4()),
+                            user_id=user_id,
+                            match_id=match.id,
+                            match_label=match_label,
+                            sport=sport,
+                            league=league_name,
+                            start_time=kickoff,
+                            market_name=hc_market,
+                            selection_label=sel,
+                            odds=hc_odds,
+                            edge=0.0,
+                            kelly_fraction=round(k, 4),
+                            stake_fraction=stake,
+                            auto_generated=True,
+                            outcome=hc_outcome,
+                            settled_at=settled_at,
+                        )
+                        db.add(pick)
+
+                        ai_tipster_id = AI_TIPSTER_IDS.get(sport)
+                        if ai_tipster_id and not _already_tipped(
+                            db, ai_tipster_id, match_label, hc_market, sel
+                        ):
+                            tip = TipsterTip(
+                                user_id=ai_tipster_id,
+                                sport=sport,
+                                match_label=match_label,
+                                market_name=hc_market,
+                                selection_label=sel,
+                                odds=hc_odds,
+                                outcome=hc_outcome,
+                                start_time=kickoff,
+                                settled_at=settled_at,
+                                match_id=match.id,
+                                note=f"[{source}] Set handicap (fair) | Kelly: {round(k * 100, 1)}% [backfill]",
+                            )
+                            db.add(tip)
 
         if not dry_run:
             db.commit()

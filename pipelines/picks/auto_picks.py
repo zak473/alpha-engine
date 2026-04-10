@@ -36,6 +36,64 @@ from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
 log = logging.getLogger(__name__)
 
 
+# ── Tennis set handicap helpers ────────────────────────────────────────────────
+
+def _solve_per_set_prob(match_win_prob: float, best_of: int = 3) -> float:
+    """
+    Invert the match-win formula to get the per-set win probability.
+    BO3: W = p²(3-2p)   BO5: W = p³(10 - 15p + 6p²)
+    Uses binary search; returns p in (0, 1).
+    """
+    w = max(0.001, min(0.999, match_win_prob))
+    lo, hi = 0.001, 0.999
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        if best_of == 5:
+            f = mid ** 3 * (10 - 15 * mid + 6 * mid ** 2)
+        else:
+            f = mid ** 2 * (3 - 2 * mid)
+        if f < w:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2
+
+
+def _tennis_handicap_candidates(
+    home_name: str,
+    away_name: str,
+    p_home: float,
+    best_of: int = 3,
+) -> list[tuple[str, float, float, str]]:
+    """
+    Derive set handicap (-1.5) candidates from match win probability.
+
+    BO3: P(home -1.5) = p²  where p = per-set win prob
+         P(away -1.5) = (1-p)²
+    BO5: P(home -1.5) = P(3-0) + P(3-1) = p³ + 3p³(1-p)
+         P(away -1.5) = (1-p)³ + 3(1-p)³·p
+
+    Selection format:  "{TeamName} -1.5"   Market: "Set Handicap"
+    Returns (selection_label, prob, fair_odds, market_name) tuples.
+    """
+    p = _solve_per_set_prob(p_home, best_of)
+    q = 1.0 - p
+
+    if best_of == 5:
+        p_home_clean = p ** 3 + 3 * p ** 3 * q   # 3-0 + 3-1
+        p_away_clean = q ** 3 + 3 * q ** 3 * p   # 0-3 + 1-3
+    else:
+        p_home_clean = p ** 2
+        p_away_clean = q ** 2
+
+    out: list[tuple[str, float, float, str]] = []
+    for name, prob in ((home_name, p_home_clean), (away_name, p_away_clean)):
+        if prob > 0.01:
+            fair = round(1.0 / prob, 3)
+            out.append((f"{name} -1.5", prob, fair, "Set Handicap"))
+    return out
+
+
 # ── Kelly maths ───────────────────────────────────────────────────────────────
 
 def kelly_fraction(prob: float, decimal_odds: float) -> float:
@@ -184,11 +242,76 @@ def run(
             if d_odds and pred.p_draw and pred.p_draw > 0.01:
                 candidates.append(("Draw", pred.p_draw, d_odds, ml_market))
 
+            # Tennis set handicap — add fair-odds -1.5 set candidates derived from
+            # the model's match-win probability. These have edge≈0 vs fair odds but
+            # convert low-odds ML favourites (< MIN_ODDS) into higher-odds handicap
+            # bets that pass the MIN_ODDS filter and improve unit gain per pick.
+            hc_candidates: list[tuple[str, float, float, str]] = []
+            if sport == "tennis" and pred.p_home and pred.p_away:
+                hc_candidates = _tennis_handicap_candidates(
+                    home_name, away_name, pred.p_home
+                )
+
             effective_min_edge = 0.0 if using_fair_odds else SPORT_MIN_EDGE.get(sport, min_edge)
             if using_fair_odds:
                 effective_min_conf = FAIR_ODDS_MIN_CONFIDENCE.get(sport, 0.65)
             else:
                 effective_min_conf = SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
+
+            # Process handicap candidates (fair odds — skip edge gate, keep conf + odds gates)
+            hc_conf_threshold = SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
+            for selection_label, model_prob, book_odds, market_name in hc_candidates:
+                confidence = pred.confidence / 100.0 if pred.confidence else model_prob
+                if confidence < hc_conf_threshold:
+                    continue
+                if book_odds < settings.MIN_ODDS or book_odds > settings.MAX_ODDS:
+                    continue
+                if _already_picked(db, user_id, match.id, market_name, selection_label):
+                    log.debug("  Skip (already picked): %s %s", match_label, selection_label)
+                    continue
+
+                k = kelly_fraction(model_prob, book_odds)
+                stake = round(k * settings.AUTO_PICK_KELLY_FRACTION, 4)
+                log.info(
+                    "  [%s] %s | %s @ %.2f (fair hc) | kelly=%.1f%% | stake=%.2fu",
+                    sport, match_label, selection_label, book_odds, k * 100, stake,
+                )
+                if not dry_run:
+                    pick = TrackedPick(
+                        id=str(uuid.uuid4()),
+                        user_id=user_id,
+                        match_id=match.id,
+                        match_label=match_label,
+                        sport=sport,
+                        league=league_name,
+                        start_time=match.kickoff_utc,
+                        market_name=market_name,
+                        selection_label=selection_label,
+                        odds=book_odds,
+                        edge=0.0,
+                        kelly_fraction=round(k, 4),
+                        stake_fraction=stake,
+                        auto_generated=True,
+                    )
+                    db.add(pick)
+                    created += 1
+
+                    ai_tipster_id = AI_TIPSTER_IDS.get(sport)
+                    if ai_tipster_id and not _already_tipped(
+                        db, ai_tipster_id, match_label, market_name, selection_label
+                    ):
+                        tip = TipsterTip(
+                            user_id=ai_tipster_id,
+                            sport=sport,
+                            match_label=match_label,
+                            market_name=market_name,
+                            selection_label=selection_label,
+                            odds=book_odds,
+                            start_time=match.kickoff_utc,
+                            match_id=match.id,
+                            note=f"Set handicap (fair) | Kelly: {round(k * 100, 1)}%",
+                        )
+                        db.add(tip)
 
             for selection_label, model_prob, book_odds, market_name in candidates:
                 e = edge_pct(model_prob, book_odds)
