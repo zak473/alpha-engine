@@ -248,14 +248,14 @@ function SpotlightCard({
   const sport = detectTipsterSport(tipster);
   const days = period === "7d" ? 7 : period === "30d" ? 30 : undefined;
 
+  // Sparkline shape from live tips (period-filtered)
   const pl = useMemo(() => computePLCurve(tips, days), [tips, period]);
 
-  // Show live computed stats when we have enough data, else backtest fallback
-  const hasLive = pl.total >= 5;
-  const accuracy = hasLive ? pl.pct : (backtest ? Math.round((backtest.accuracy ?? 0) * 100) : 0);
-  const unitsVal = hasLive ? pl.units : (backtest?.pnl_units ?? 0);
+  // Stats always from backtest — consistent with modal and correct scale
+  const accuracy = backtest ? Math.round((backtest.accuracy ?? 0) * 100) : 0;
+  const unitsVal = backtest?.pnl_units ?? 0;
   const sharpe = backtest?.sharpe_ratio ?? 0;
-  const sampleSize = hasLive ? pl.total : (backtest?.n_predictions ?? 0);
+  const sampleSize = backtest?.n_predictions ?? tipster.settled_picks ?? 0;
   const isPositive = unitsVal >= 0;
   const accColor = accuracy >= 58 ? "var(--positive)" : accuracy >= 52 ? "var(--warning)" : "var(--text1)";
 
@@ -388,20 +388,31 @@ function SpotlightBoards({
   const days = period === "7d" ? 7 : period === "30d" ? 30 : undefined;
 
   const agg = useMemo(() => {
-    let totalWins = 0, totalLosses = 0, totalUnits = 0;
+    // Accuracy and units always from backtest (correct scale, matches modal)
+    let totalPredictions = 0;
+    let weightedAccSum = 0;
+    let totalUnits = 0;
     aiTipsters.forEach((t) => {
-      const { wins, losses, units } = computePLCurve(tipHistory[t.id] ?? [], days);
-      totalWins += wins;
-      totalLosses += losses;
-      totalUnits += units;
+      const sport = detectTipsterSport(t);
+      const bt = backtestSummary[sport.slug ?? ""];
+      if (!bt) return;
+      const n = bt.n_predictions ?? 0;
+      totalPredictions += n;
+      weightedAccSum += (bt.accuracy ?? 0) * n;
+      totalUnits += bt.pnl_units ?? 0;
     });
-    const total = totalWins + totalLosses;
+    // Period-filtered pick count from live tips (just for context)
+    let periodPicks = 0;
+    aiTipsters.forEach((t) => {
+      const { total } = computePLCurve(tipHistory[t.id] ?? [], days);
+      periodPicks += total;
+    });
     return {
-      picks: total,
-      accuracy: total > 0 ? Math.round((totalWins / total) * 100) : 0,
+      picks: period === "all" ? totalPredictions : periodPicks,
+      accuracy: totalPredictions > 0 ? Math.round((weightedAccSum / totalPredictions) * 100) : 0,
       units: Number(totalUnits.toFixed(1)),
     };
-  }, [tipHistory, period, aiTipsters]);
+  }, [backtestSummary, tipHistory, period, aiTipsters]);
 
   if (aiTipsters.length === 0) return null;
 
