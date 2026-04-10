@@ -36,17 +36,12 @@ from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
 log = logging.getLogger(__name__)
 
 # Lower thresholds for backfill — we want volume for track record
-BACKFILL_MIN_EDGE: float = 0.01
-BACKFILL_MIN_CONFIDENCE: float = 0.40
+BACKFILL_MIN_EDGE: float = 0.0
+BACKFILL_MIN_CONFIDENCE: float = 0.25  # ~62.5% model probability
 
-# Per-sport overrides (same as auto_picks, but relaxed for backfill)
-BACKFILL_SPORT_MIN_EDGE: dict[str, float] = {
-    "baseball":    0.03,
-    "basketball":  0.01,
-}
-BACKFILL_SPORT_MIN_CONFIDENCE: dict[str, float] = {
-    "baseball": 0.45,
-}
+# Per-sport overrides
+BACKFILL_SPORT_MIN_EDGE: dict[str, float] = {}
+BACKFILL_SPORT_MIN_CONFIDENCE: dict[str, float] = {}
 
 
 def _already_picked(
@@ -237,12 +232,8 @@ def run(
                 candidates = [max(candidates, key=lambda c: c[1])]
 
             # With fair odds use confidence-only gate
-            if using_fair_odds:
-                effective_min_edge = 0.0
-                effective_min_conf = BACKFILL_SPORT_MIN_CONFIDENCE.get(sport, 0.55)
-            else:
-                effective_min_edge = BACKFILL_SPORT_MIN_EDGE.get(sport, min_edge)
-                effective_min_conf = BACKFILL_SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
+            effective_min_edge = BACKFILL_SPORT_MIN_EDGE.get(sport, min_edge)
+            effective_min_conf = BACKFILL_SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
 
             for selection_label, model_prob, book_odds, market_name in candidates:
                 e = edge_pct(model_prob, book_odds)
@@ -251,7 +242,10 @@ def run(
                     continue
                 if confidence < effective_min_conf:
                     continue
-                if book_odds < settings.MIN_ODDS or book_odds > settings.MAX_ODDS:
+                # Skip odds range check for fair odds — the MIN_ODDS bound is
+                # for real bookmaker markets (to avoid heavy vig on short prices).
+                # Fair odds are mathematically clean so no range filtering needed.
+                if not using_fair_odds and (book_odds < settings.MIN_ODDS or book_odds > settings.MAX_ODDS):
                     continue
 
                 # Dedup — don't create if already exists

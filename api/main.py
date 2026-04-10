@@ -823,15 +823,39 @@ def admin_run_auto_picks(secret: str):
     return {"created": created}
 
 
-@app.post("/api/v1/admin/backfill-picks", tags=["Admin"])
-def admin_backfill_picks(secret: str, days: int = 14, dry_run: bool = False):
-    """Backfill TrackedPick + TipsterTip rows from historical finished matches."""
+@app.post("/api/v1/admin/backfill-all-picks", tags=["Admin"])
+def admin_backfill_all_picks(secret: str, days: int = 60):
+    """Backfill TrackedPick + TipsterTip rows for all sports, running in background."""
     if secret != settings.ADMIN_SECRET:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
-    from pipelines.picks.backfill_picks import run as backfill
-    created = backfill(days=days, dry_run=dry_run)
-    return {"created": created, "dry_run": dry_run}
+    import threading
+
+    def _run():
+        try:
+            from pipelines.picks.backfill_picks import run as backfill
+            n = backfill(days=days)
+            log.info("[admin] backfill-all-picks: created %d picks (last %d days)", n, days)
+        except Exception as exc:
+            log.error("[admin] backfill-all-picks failed: %s", exc, exc_info=True)
+
+    threading.Thread(target=_run, daemon=True, name="backfill-all-picks").start()
+    return {"status": "started", "days": days, "message": f"Backfilling last {days} days for all sports in background."}
+
+
+@app.get("/api/v1/admin/backfill-picks-diag", tags=["Admin"])
+def admin_backfill_picks_diag(secret: str, days: int = 3):
+    """Synchronous diagnostic: run backfill for a short window and return results or errors."""
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    try:
+        from pipelines.picks.backfill_picks import run as backfill
+        n = backfill(days=days, dry_run=True)
+        return {"status": "ok", "dry_run": True, "days": days, "would_create": n}
+    except Exception as exc:
+        import traceback
+        return {"status": "error", "error": str(exc), "trace": traceback.format_exc()[-2000:]}
 
 
 @app.post("/api/v1/admin/backfill-spread-picks", tags=["Admin"])
@@ -850,6 +874,24 @@ def admin_backfill_spread_picks(secret: str, days: int = 60, dry_run: bool = Fal
     from pipelines.picks.backfill_spread_picks import run as backfill_spread
     created = backfill_spread(days=days, dry_run=dry_run)
     return {"created": created, "dry_run": dry_run}
+
+
+@app.get("/api/v1/admin/pick-outcome-stats", tags=["Admin"])
+def admin_pick_outcome_stats(secret: str, db: Session = Depends(get_db)):
+    """Outcome distribution for all auto-generated picks."""
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from db.models.picks import TrackedPick
+    from sqlalchemy import func
+    rows = (
+        db.query(TrackedPick.sport, TrackedPick.outcome, func.count().label("n"))
+        .filter(TrackedPick.auto_generated.is_(True))
+        .group_by(TrackedPick.sport, TrackedPick.outcome)
+        .order_by(TrackedPick.sport, TrackedPick.outcome)
+        .all()
+    )
+    return [{"sport": r.sport, "outcome": r.outcome, "count": r.n} for r in rows]
 
 
 @app.get("/api/v1/admin/tip-history", tags=["Admin"])
@@ -919,6 +961,185 @@ def admin_fetch_recent_results(secret: str):
     from pipelines.tipsters.settle_tips import run as settle
     results["newly_settled"] = settle(dry_run=False, all_users=True, recheck=False)
     return results
+
+
+@app.post("/api/v1/admin/fetch-tennis", tags=["Admin"])
+def admin_fetch_tennis(secret: str):
+    """Fetch tennis fixtures from api-tennis.com, run predictions, and generate auto-picks (background)."""
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    import threading
+
+    def _run():
+        try:
+            from pipelines.tennis.fetch_api_tennis import fetch_all as fetch_tennis
+            n = fetch_tennis()
+            log.info("[admin] fetch-tennis: %d rows fetched", n)
+        except Exception as exc:
+            log.error("[admin] fetch-tennis fetch error: %s", exc)
+        try:
+            from pipelines.tennis.predict_tennis import run as predict_tennis
+            predict_tennis()
+            log.info("[admin] fetch-tennis: predictions done")
+        except Exception as exc:
+            log.error("[admin] fetch-tennis predict error: %s", exc)
+        try:
+            from pipelines.picks.auto_picks import run as auto_picks
+            n = auto_picks()
+            log.info("[admin] fetch-tennis: %d picks created", n)
+        except Exception as exc:
+            log.error("[admin] fetch-tennis auto-picks error: %s", exc)
+
+    threading.Thread(target=_run, daemon=True, name="fetch-tennis").start()
+    return {"status": "started", "message": "Tennis fetch running in background — check logs for results"}
+
+
+@app.post("/api/v1/admin/run-backtest", tags=["Admin"])
+def admin_run_backtest(secret: str, sport: str = "all"):
+    """
+    Run the backtest pipeline for all (or one) sport and save results to
+    model_registry.metrics['backtest'] so the /backtest/summary endpoint
+    (and the website performance page) reflects the latest numbers.
+    """
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    import threading
+
+    def _run():
+        try:
+            from pipelines.backtest.run_backtest import run as bt_run
+            bt_run(sport=sport if sport != "all" else None)
+            log.info("[admin] run-backtest complete for sport=%s", sport)
+        except Exception as exc:
+            log.error("[admin] run-backtest failed: %s", exc, exc_info=True)
+
+    threading.Thread(target=_run, daemon=True, name="run-backtest").start()
+    return {"status": "started", "sport": sport, "message": "Backtest running in background — results will appear on website once complete."}
+
+
+@app.post("/api/v1/admin/backfill-tennis", tags=["Admin"])
+def admin_backfill_tennis(secret: str, days: int = 60):
+    """
+    Fetch `days` days of historical tennis results from api-tennis.com, then run
+    predictions on ALL tennis matches (including historical) so the backtest has data.
+    Runs in background — check Railway logs for progress.
+    """
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    import threading
+    from datetime import date, timedelta
+
+    def _run():
+        try:
+            import httpx as _httpx
+            from db.session import engine as _engine
+            from sqlalchemy.orm import Session as _Session
+            from pipelines.tennis.fetch_api_tennis import _upsert_match
+
+            total = 0
+            today = date.today()
+            for offset in range(1, days + 1):
+                d = today - timedelta(days=offset)
+                date_str = d.isoformat()
+                try:
+                    resp = _httpx.get(
+                        "https://api.api-tennis.com/tennis/",
+                        params={
+                            "method": "get_fixtures",
+                            "APIkey": settings.TENNIS_LIVE_API_KEY,
+                            "date_start": date_str,
+                            "date_stop": date_str,
+                        },
+                        timeout=20,
+                    )
+                    data = resp.json()
+                    if not data.get("success"):
+                        log.warning("[tennis-backfill] Day %s: success=0", date_str)
+                        continue
+                    events = data.get("result", [])
+                    with _Session(_engine) as session:
+                        day_count = 0
+                        for ev in events:
+                            fp = ev.get("event_first_player", "")
+                            sp = ev.get("event_second_player", "")
+                            if not fp or not sp or "/" in fp or "/" in sp:
+                                continue
+                            try:
+                                mid = _upsert_match(session, ev)
+                                if mid:
+                                    day_count += 1
+                                    session.commit()
+                            except Exception as exc:
+                                session.rollback()
+                                log.warning("[tennis-backfill] upsert error %s: %s", ev.get("event_key"), exc)
+                        total += day_count
+                        log.info("[tennis-backfill] %s: %d matches", date_str, day_count)
+                except Exception as exc:
+                    log.error("[tennis-backfill] Day %s failed: %s", date_str, exc)
+                import time as _time
+                _time.sleep(0.4)
+
+            log.info("[tennis-backfill] Fetch complete: %d total matches across %d days", total, days)
+        except Exception as exc:
+            log.error("[tennis-backfill] Fatal error: %s", exc, exc_info=True)
+
+        # Run predictions on ALL tennis matches (historical + upcoming)
+        try:
+            from pipelines.tennis.predict_tennis import run as predict_tennis
+            n = predict_tennis(all_matches=True)
+            log.info("[tennis-backfill] Predictions complete: %d rows", n)
+        except Exception as exc:
+            log.error("[tennis-backfill] Predictions failed: %s", exc, exc_info=True)
+
+    threading.Thread(target=_run, daemon=True, name="tennis-backfill").start()
+    return {
+        "status": "started",
+        "days": days,
+        "message": f"Fetching {days} days of tennis history then running all-match predictions. Check Railway logs.",
+    }
+
+
+@app.get("/api/v1/admin/tennis-diag", tags=["Admin"])
+def admin_tennis_diag(secret: str):
+    """Diagnostic: test api-tennis API and try a single DB write."""
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    result = {}
+    # 1. Test API key
+    try:
+        import httpx as _httpx
+        from datetime import date as _date
+        today = _date.today().isoformat()
+        resp = _httpx.get("https://api.api-tennis.com/tennis/", params={
+            "method": "get_fixtures", "APIkey": settings.TENNIS_LIVE_API_KEY,
+            "date_start": today, "date_stop": today,
+        }, timeout=15)
+        data = resp.json()
+        events = data.get("result", [])
+        singles = [e for e in events if isinstance(e, dict) and e.get("event_first_player") and "/" not in str(e.get("event_first_player", ""))]
+        result["api_success"] = data.get("success")
+        result["total_fixtures"] = len(events)
+        result["singles"] = len(singles)
+        result["sample"] = singles[0].get("event_first_player") + " vs " + singles[0].get("event_second_player") if singles else None
+    except Exception as exc:
+        result["api_error"] = str(exc)
+    # 2. Test DB write via fetch
+    try:
+        from pipelines.tennis.fetch_api_tennis import fetch_all as fetch_tennis
+        n = fetch_tennis()
+        result["db_rows_written"] = n
+    except Exception as exc:
+        result["db_error"] = str(exc)
+        import traceback
+        result["db_trace"] = traceback.format_exc()[-500:]
+    return result
 
 
 @app.get("/api/v1/admin/pending-tips", tags=["Admin"])

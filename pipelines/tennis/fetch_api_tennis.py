@@ -21,13 +21,11 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import time
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
 import httpx
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from config.settings import settings
@@ -305,17 +303,17 @@ def _upsert_match(session: Session, event: dict, dry_run: bool = False) -> Optio
     home_score = str(home_score_int) if home_score_int is not None else ""
     away_score = str(away_score_int) if away_score_int is not None else ""
 
-    # Outcome
-    outcome = ""
+    # Outcome — normalise to home_win/away_win for consistency with other sports
+    outcome = None
     if event_winner == "First Player":
-        outcome = "H"
+        outcome = "home_win"
     elif event_winner == "Second Player":
-        outcome = "A"
+        outcome = "away_win"
     elif status == "finished" and home_score_int is not None and away_score_int is not None:
         if home_score_int > away_score_int:
-            outcome = "H"
+            outcome = "home_win"
         elif away_score_int > home_score_int:
-            outcome = "A"
+            outcome = "away_win"
 
     provider_id = f"apitns-{event_key}"
 
@@ -670,8 +668,7 @@ def fetch_all(dry_run: bool = False, days: int = 2) -> int:
         )
         return 0
 
-    dsn = os.environ.get("POSTGRES_DSN", "postgresql://postgres:postgres@postgres:5432/alpha_engine")
-    engine = create_engine(dsn)
+    from db.session import engine
 
     all_events: list[dict] = []
 
@@ -886,9 +883,7 @@ def build_player_form(dry_run: bool = False) -> int:
     Compute rolling TennisPlayerForm stats for all players from their TennisMatchStats history.
     Aggregates last 365 days of data and writes/updates TennisPlayerForm rows.
     """
-    dsn = os.environ.get("POSTGRES_DSN", "postgresql://postgres:postgres@postgres:5432/alpha_engine")
-    engine = create_engine(dsn)
-
+    from db.session import engine
     from db.models.mvp import CoreMatch, CoreTeam
     from db.models.tennis import TennisMatch, TennisMatchStats, TennisPlayerForm
 

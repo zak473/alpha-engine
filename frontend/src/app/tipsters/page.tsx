@@ -1,7 +1,8 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { DeskPageIntro } from "@/components/layout/DeskPageIntro";
 import { TipstersView } from "./TipstersView";
-import { getTipsters } from "@/lib/api";
+import { getTipsters, getBacktestSummary } from "@/lib/api";
+import type { BacktestRunResult } from "@/lib/api";
 
 export const revalidate = 60;
 
@@ -10,7 +11,10 @@ export const metadata = {
 };
 
 export default async function TipstersPage() {
-  const tipsters = await getTipsters().catch(() => []);
+  const [tipsters, backtestSummary] = await Promise.all([
+    getTipsters().catch(() => []),
+    getBacktestSummary().catch((): Record<string, BacktestRunResult> => ({})),
+  ]);
 
   const profileCount = tipsters.length;
   const hotStreakCount = tipsters.filter((t) => {
@@ -35,7 +39,7 @@ export default async function TipstersPage() {
           ]}
           primaryCta={{ label: "Browse top boards", href: "/predictions" }}
         />
-        <TipstersView initialTipsters={tipsters} />
+        <TipstersView initialTipsters={tipsters} initialBacktest={backtestSummary} />
       </div>
     </AppShell>
   );

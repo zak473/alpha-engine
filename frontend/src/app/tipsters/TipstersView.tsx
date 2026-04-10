@@ -6,8 +6,8 @@ import { useToast } from "@/components/ui/Toast";
 import { SPORT_CONFIG } from "@/lib/betting-types";
 import type { SportSlug } from "@/lib/betting-types";
 import { cn } from "@/lib/utils";
-import type { TipsterProfile, TipsterTip } from "@/lib/api";
-import { getTipsters, getTipsterTips } from "@/lib/api";
+import type { TipsterProfile, TipsterTip, BacktestRunResult } from "@/lib/api";
+import { getTipsters, getTipsterTips, getBacktestSummary } from "@/lib/api";
 import { useBetting } from "@/components/betting/BettingContext";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -221,6 +221,10 @@ function TipRow({ tip, tipsterUsername }: { tip: TipsterTip; tipsterUsername: st
           <span className="rounded-full px-3 py-1.5 text-[11px] font-semibold" style={{ background: "rgba(34,197,94,0.15)", color: "var(--positive)" }}>
             Won
           </span>
+        ) : tip.outcome === "void" ? (
+          <span className="rounded-full px-3 py-1.5 text-[11px] font-semibold" style={{ background: "rgba(255,255,255,0.06)", color: "var(--text2)" }}>
+            Void
+          </span>
         ) : (
           <span className="rounded-full px-3 py-1.5 text-[11px] font-semibold" style={{ background: "rgba(239,68,68,0.12)", color: "var(--negative)" }}>
             Lost
@@ -245,11 +249,13 @@ function TipsterModal({
   tips,
   onClose,
   onFollow,
+  backtest,
 }: {
   tipster: TipsterProfile;
   tips: TipsterTip[];
   onClose: () => void;
   onFollow: () => void;
+  backtest?: BacktestRunResult | null;
 }) {
   const color = avatarColor(tipster.username);
   const [activeTab, setActiveTab] = useState<"active" | "history">("active");
@@ -273,14 +279,25 @@ function TipsterModal({
   const weeklyWinPct = Math.round(tipster.weekly_win_rate * 100);
   const plStr = `${profitLoss >= 0 ? "+" : ""}${profitLoss.toFixed(1)}u`;
   const activeTips = tips.filter((t) => !t.outcome || t.outcome === "pending");
-  const settledHistory = historyTips.filter((t) => t.outcome === "won" || t.outcome === "lost");
+  const settledHistory = historyTips.filter((t) => t.outcome === "won" || t.outcome === "lost" || t.outcome === "void");
 
-  const summary = [
-    { label: "Win rate", value: `${overallWinPct}%`, tone: overallWinPct >= 55 ? "var(--positive)" : overallWinPct >= 50 ? "var(--warning)" : "var(--text0)" },
-    { label: "Units", value: tipster.settled_picks > 0 ? plStr : "—", tone: profitLoss >= 0 ? "var(--positive)" : "var(--negative)" },
-    { label: "Active tips", value: String(activeTips.length), tone: "var(--text0)" },
-    { label: "Avg odds", value: (tipster.avg_odds ?? 0) > 0 ? (tipster.avg_odds ?? 0).toFixed(2) : "—", tone: "var(--text0)" },
-  ];
+  const voidPicks = tipster.void_picks ?? 0;
+  const recordStr = `${tipster.won_picks}W - ${tipster.lost_picks}L${voidPicks > 0 ? ` - ${voidPicks}V` : ""}`;
+
+  const useBacktest = tipster.is_ai && backtest;
+  const summary = useBacktest
+    ? [
+        { label: "Accuracy", value: `${((backtest!.accuracy ?? 0) * 100).toFixed(1)}%`, tone: (backtest!.accuracy ?? 0) >= 0.55 ? "var(--positive)" : "var(--warning)" },
+        { label: "Units", value: `${(backtest!.pnl_units ?? 0) >= 0 ? "+" : ""}${(backtest!.pnl_units ?? 0).toFixed(1)}u`, tone: (backtest!.pnl_units ?? 0) >= 0 ? "var(--positive)" : "var(--negative)" },
+        { label: "Sharpe", value: (backtest!.sharpe_ratio ?? 0).toFixed(2), tone: (backtest!.sharpe_ratio ?? 0) >= 2 ? "var(--positive)" : "var(--warning)" },
+        { label: "Predictions", value: (backtest!.n_predictions ?? 0).toLocaleString(), tone: "var(--text0)" },
+      ]
+    : [
+        { label: "Win rate", value: `${overallWinPct}%`, tone: overallWinPct >= 55 ? "var(--positive)" : overallWinPct >= 50 ? "var(--warning)" : "var(--text0)" },
+        { label: "Units", value: tipster.settled_picks > 0 ? plStr : "—", tone: profitLoss >= 0 ? "var(--positive)" : "var(--negative)" },
+        { label: "Record", value: tipster.settled_picks > 0 ? recordStr : "—", tone: "var(--text0)" },
+        { label: "Avg odds", value: (tipster.avg_odds ?? 0) > 0 ? (tipster.avg_odds ?? 0).toFixed(2) : "—", tone: "var(--text0)" },
+      ];
 
   const displayedTips = activeTab === "active" ? activeTips : settledHistory;
   const emptyCopy = activeTab === "active" ? "No active tips right now" : "No settled tips yet";
@@ -490,15 +507,18 @@ function PostTipModal({ onClose, onPosted }: { onClose: () => void; onPosted: ()
   );
 }
 
+const SPORT_SLUGS = ["soccer", "tennis", "basketball", "baseball", "hockey", "esports"] as const;
+type DetectedSport = typeof SPORT_SLUGS[number];
+
 function detectTipsterSport(tipster: Pick<TipsterProfile, "display_name" | "username" | "bio">) {
   const haystack = `${tipster.display_name ?? ""} ${tipster.username} ${tipster.bio ?? ""}`.toLowerCase();
-  const match = (Object.keys(AI_SPORT_EMOJI) as SportSlug[]).find((sport) => haystack.includes(sport));
+  const match = SPORT_SLUGS.find((sport) => haystack.includes(sport));
   if (!match) {
-    return { slug: undefined, label: "Multi-sport", emoji: "📡", color: "var(--accent)" };
+    return { slug: undefined as DetectedSport | undefined, label: "Multi-sport", emoji: "📡", color: "var(--accent)" };
   }
-  const cfg = SPORT_CONFIG[match];
+  const cfg = SPORT_CONFIG[match as SportSlug];
   return {
-    slug: match,
+    slug: match as DetectedSport,
     label: cfg?.label ?? match[0].toUpperCase() + match.slice(1),
     emoji: AI_SPORT_EMOJI[match] ?? "🤖",
     color: cfg?.color ?? "var(--accent)",
@@ -554,10 +574,12 @@ function TipsterCard({
   tipster,
   onOpen,
   onFollow,
+  backtest,
 }: {
   tipster: TipsterProfile;
   onOpen: () => void;
   onFollow: () => void;
+  backtest?: BacktestRunResult | null;
 }) {
   const color = avatarColor(tipster.username);
   const winPct = Math.round((tipster.overall_win_rate ?? 0) * 100);
@@ -570,7 +592,21 @@ function TipsterCard({
   const followers = tipster.followers ?? 0;
   const openTips = tipster.active_tips_count ?? 0;
   const supportLabel = followers > 0 ? `${followers.toLocaleString()} follower${followers === 1 ? "" : "s"}` : "Fresh profile";
-  const profileMeta = settled > 0 ? `${supportLabel} · ${settled} graded` : supportLabel;
+  const profileMeta = tipster.is_ai && backtest
+    ? `${supportLabel} · ${(backtest.n_predictions ?? 0).toLocaleString()} predictions`
+    : settled > 0 ? `${supportLabel} · ${settled} graded` : supportLabel;
+
+  // For AI tipsters use backtest stats; fall back to live settled stats
+  const useBacktest = tipster.is_ai && backtest;
+  const stat1 = useBacktest
+    ? { label: "Accuracy", value: `${((backtest!.accuracy ?? 0) * 100).toFixed(1)}%`, color: (backtest!.accuracy ?? 0) >= 0.55 ? "var(--positive)" : "var(--warning)" }
+    : { label: "Win rate", value: settled > 0 ? `${winPct}%` : "Building", color: settled > 0 ? (winPct >= 60 ? "var(--positive)" : winPct >= 50 ? "var(--warning)" : "var(--negative)") : "var(--text1)" };
+  const stat2 = useBacktest
+    ? { label: "Units", value: `${(backtest!.pnl_units ?? 0) >= 0 ? "+" : ""}${(backtest!.pnl_units ?? 0).toFixed(1)}u`, color: (backtest!.pnl_units ?? 0) >= 0 ? "var(--positive)" : "var(--negative)" }
+    : { label: "Units", value: settled > 0 ? plStr : "—", color: settled > 0 ? (pl >= 0 ? "var(--positive)" : "var(--negative)") : "var(--text1)" };
+  const stat3 = useBacktest
+    ? { label: "Sharpe", value: (backtest!.sharpe_ratio ?? 0).toFixed(2), color: (backtest!.sharpe_ratio ?? 0) >= 2 ? "var(--positive)" : "var(--warning)" }
+    : { label: "Open tips", value: String(openTips || "—"), color: "var(--text0)" };
 
   const toneStyles = {
     accent: { background: "rgba(0,255,132,0.10)", borderColor: "rgba(0,255,132,0.16)", color: "var(--accent)" },
@@ -631,22 +667,12 @@ function TipsterCard({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border px-3.5 py-3" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)" }}>
-            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-text-subtle">Win rate</div>
-            <div className="mt-2 text-xl font-black tracking-[-0.04em]" style={{ color: settled > 0 ? (winPct >= 60 ? "var(--positive)" : winPct >= 50 ? "var(--warning)" : "var(--negative)") : "var(--text1)" }}>
-              {settled > 0 ? `${winPct}%` : "Building"}
+          {[stat1, stat2, stat3].map((s) => (
+            <div key={s.label} className="rounded-2xl border px-3.5 py-3" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)" }}>
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-text-subtle">{s.label}</div>
+              <div className="mt-2 text-xl font-black tracking-[-0.04em]" style={{ color: s.color }}>{s.value}</div>
             </div>
-          </div>
-          <div className="rounded-2xl border px-3.5 py-3" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)" }}>
-            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-text-subtle">Units</div>
-            <div className="mt-2 text-xl font-black tracking-[-0.04em]" style={{ color: settled > 0 ? (pl >= 0 ? "var(--positive)" : "var(--negative)") : "var(--text1)" }}>
-              {settled > 0 ? plStr : "—"}
-            </div>
-          </div>
-          <div className="rounded-2xl border px-3.5 py-3" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)" }}>
-            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-text-subtle">Open tips</div>
-            <div className="mt-2 text-xl font-black tracking-[-0.04em] text-text-primary">{openTips || "—"}</div>
-          </div>
+          ))}
         </div>
 
         <div className="rounded-[20px] border px-4 py-3" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.025)" }}>
@@ -749,7 +775,13 @@ function LeaderboardView({ tipsters }: { tipsters: TipsterProfile[] }) {
   );
 }
 
-export function TipstersView({ initialTipsters = [] }: { initialTipsters?: TipsterProfile[] }) {
+export function TipstersView({
+  initialTipsters = [],
+  initialBacktest = {},
+}: {
+  initialTipsters?: TipsterProfile[];
+  initialBacktest?: Record<string, BacktestRunResult>;
+}) {
   const [tipsters, setTipsters] = useState<TipsterProfile[]>(initialTipsters);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortOpt>("followers");
@@ -757,9 +789,12 @@ export function TipstersView({ initialTipsters = [] }: { initialTipsters?: Tipst
   const [openTipster, setOpenTipster] = useState<TipsterProfile | null>(null);
   const [openTips, setOpenTips] = useState<TipsterTip[]>([]);
   const [showPostModal, setShowPostModal] = useState(false);
+  const [backtestSummary, setBacktestSummary] = useState<Record<string, BacktestRunResult>>(initialBacktest);
 
   useEffect(() => {
     getTipsters().then(setTipsters).catch(() => {});
+    // Refresh backtest in background in case server-side data was stale
+    getBacktestSummary().then(setBacktestSummary).catch(() => {});
   }, []);
 
   function handleOpenTipster(tipster: TipsterProfile) {
@@ -961,6 +996,7 @@ export function TipstersView({ initialTipsters = [] }: { initialTipsters?: Tipst
                       tipster={t}
                       onOpen={() => handleOpenTipster(t)}
                       onFollow={() => handleFollow(t.id)}
+                      backtest={t.is_ai ? (backtestSummary[detectTipsterSport(t).slug ?? ""] ?? null) : null}
                     />
                   ))}
                 </div>
@@ -985,6 +1021,7 @@ export function TipstersView({ initialTipsters = [] }: { initialTipsters?: Tipst
                       tipster={t}
                       onOpen={() => handleOpenTipster(t)}
                       onFollow={() => handleFollow(t.id)}
+                      backtest={t.is_ai ? (backtestSummary[detectTipsterSport(t).slug ?? ""] ?? null) : null}
                     />
                   ))}
                 </div>
@@ -1009,6 +1046,7 @@ export function TipstersView({ initialTipsters = [] }: { initialTipsters?: Tipst
                       tipster={t}
                       onOpen={() => handleOpenTipster(t)}
                       onFollow={() => handleFollow(t.id)}
+                      backtest={t.is_ai ? (backtestSummary[detectTipsterSport(t).slug ?? ""] ?? null) : null}
                     />
                   ))}
                 </div>
@@ -1030,6 +1068,7 @@ export function TipstersView({ initialTipsters = [] }: { initialTipsters?: Tipst
           tips={openTips}
           onClose={() => { setOpenTipster(null); setOpenTips([]); }}
           onFollow={() => handleFollow(openTipster.id)}
+          backtest={openTipster.is_ai ? (backtestSummary[detectTipsterSport(openTipster).slug ?? ""] ?? null) : null}
         />
       )}
 

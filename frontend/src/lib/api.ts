@@ -603,6 +603,7 @@ export interface TipsterProfile {
   active_tips_count: number;
   lost_picks: number;
   settled_picks: number;
+  void_picks: number;
   overall_win_rate: number;
   roi: number;
   avg_odds: number;

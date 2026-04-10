@@ -14,11 +14,11 @@ def _db_url() -> str:
 engine = create_engine(
     _db_url(),
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=5,
+    pool_size=15,
+    max_overflow=10,
     pool_recycle=180,
-    pool_timeout=10,
-    connect_args={"connect_timeout": 10},
+    pool_timeout=30,
+    connect_args={"connect_timeout": 15},
 )
 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)

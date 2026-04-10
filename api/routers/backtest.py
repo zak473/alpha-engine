@@ -36,11 +36,11 @@ def get_backtest_summary(db: Session = Depends(get_db)):
 
 def _outcome_to_float(outcome: str | None) -> float | None:
     """Map CoreMatch.outcome string to Backtester float convention."""
-    if outcome == "home_win":
+    if outcome in ("home_win", "H"):
         return 1.0
-    if outcome == "draw":
+    if outcome in ("draw", "D"):
         return 0.5
-    if outcome == "away_win":
+    if outcome in ("away_win", "A"):
         return 0.0
     return None
 
@@ -64,94 +64,99 @@ def run_backtest(
     from sqlalchemy import func
     from evaluation.backtester import Backtester, StakingConfig
     from db.models.mvp import CoreMatch, PredMatch, ModelRegistry
+    try:
+        # Deduplicate by match_id, keep the latest prediction per match
+        subq = (
+            db.query(PredMatch.match_id, func.max(PredMatch.id).label("latest_id"))
+            .join(CoreMatch, CoreMatch.id == PredMatch.match_id)
+            .group_by(PredMatch.match_id)
+            .subquery()
+        )
+        query = (
+            db.query(CoreMatch, PredMatch)
+            .join(subq, subq.c.match_id == CoreMatch.id)
+            .join(PredMatch, PredMatch.id == subq.c.latest_id)
+            .filter(CoreMatch.status == "finished", CoreMatch.outcome.isnot(None))
+        )
+        if sport and sport != "all":
+            query = query.filter(CoreMatch.sport == sport)
+        if date_from:
+            query = query.filter(CoreMatch.kickoff_utc >= date_from)
+        if date_to:
+            query = query.filter(CoreMatch.kickoff_utc <= date_to)
 
-    # Deduplicate by match_id, keep the latest prediction per match
-    subq = (
-        db.query(PredMatch.match_id, func.max(PredMatch.id).label("latest_id"))
-        .join(CoreMatch, CoreMatch.id == PredMatch.match_id)
-        .group_by(PredMatch.match_id)
-        .subquery()
-    )
-    query = (
-        db.query(CoreMatch, PredMatch)
-        .join(subq, subq.c.match_id == CoreMatch.id)
-        .join(PredMatch, PredMatch.id == subq.c.latest_id)
-        .filter(CoreMatch.status == "finished", CoreMatch.outcome.isnot(None))
-    )
-    if sport and sport != "all":
-        query = query.filter(CoreMatch.sport == sport)
-    if date_from:
-        query = query.filter(CoreMatch.kickoff_utc >= date_from)
-    if date_to:
-        query = query.filter(CoreMatch.kickoff_utc <= date_to)
+        rows = query.order_by(CoreMatch.kickoff_utc.asc()).all()
 
-    rows = query.order_by(CoreMatch.kickoff_utc.asc()).all()
+        if not rows:
+            return {
+                "sport": sport or "all",
+                "staking": staking,
+                "n_predictions": 0,
+                "message": "No finished predictions found for the given filters.",
+            }
 
-    if not rows:
+        predictions: list[PredictionResult] = []
+        actuals: list[float] = []
+        odds_list: list[float | None] = []
+
+        for match, pred in rows:
+            actual = _outcome_to_float(match.outcome)
+            if actual is None:
+                continue
+
+            predictions.append(PredictionResult(
+                match_id=match.id,
+                sport=Sport(match.sport or "soccer"),
+                p_home=pred.p_home or 0.0,
+                p_away=pred.p_away or 0.0,
+                p_draw=pred.p_draw or 0.0,
+                confidence=(pred.confidence or 0) / 100.0,
+            ))
+            actuals.append(actual)
+
+            # Use sharpest bookmaker odds when available
+            if match.odds_home and match.odds_home > 1.0:
+                odds_list.append(match.odds_home)
+            else:
+                odds_list.append(1.0 / pred.p_home if (pred.p_home or 0) > 0.05 else None)
+
+        if not predictions:
+            return {
+                "sport": sport or "all",
+                "staking": staking,
+                "n_predictions": 0,
+                "message": "No valid predictions after filtering.",
+            }
+
+        config = StakingConfig(
+            method=staking,
+            kelly_fraction=kelly_fraction,
+            min_edge=min_edge,
+        )
+        backtester = Backtester(config)
+        result = backtester.run(predictions, actuals, odds_list)
+
         return {
             "sport": sport or "all",
             "staking": staking,
-            "n_predictions": 0,
-            "message": "No finished predictions found for the given filters.",
+            "kelly_fraction": kelly_fraction if staking == "kelly" else None,
+            "min_edge": min_edge,
+            "date_from": date_from.isoformat() if date_from else None,
+            "date_to": date_to.isoformat() if date_to else None,
+            "n_predictions": result.n_predictions,
+            "n_correct": result.n_correct,
+            "accuracy": round(result.accuracy, 4),
+            "roi": round(result.roi, 4),
+            "sharpe_ratio": round(result.sharpe_ratio, 3),
+            "max_drawdown": round(result.max_drawdown, 4),
+            "log_loss": round(result.log_loss, 4),
+            "brier_score": round(result.brier_score, 4),
+            "calibration_error": round(result.calibration_error, 4),
+            "pnl_units": round(result.pnl_units, 2),
+            **result.metadata,
         }
-
-    predictions: list[PredictionResult] = []
-    actuals: list[float] = []
-    odds_list: list[float | None] = []
-
-    for match, pred in rows:
-        actual = _outcome_to_float(match.outcome)
-        if actual is None:
-            continue
-
-        predictions.append(PredictionResult(
-            match_id=match.id,
-            sport=Sport(match.sport or "soccer"),
-            p_home=pred.p_home or 0.0,
-            p_away=pred.p_away or 0.0,
-            p_draw=pred.p_draw or 0.0,
-            confidence=(pred.confidence or 0) / 100.0,
-        ))
-        actuals.append(actual)
-
-        # Use sharpest bookmaker odds when available
-        if match.odds_home and match.odds_home > 1.0:
-            odds_list.append(match.odds_home)
-        else:
-            odds_list.append(1.0 / pred.p_home if (pred.p_home or 0) > 0.05 else None)
-
-    if not predictions:
-        return {
-            "sport": sport or "all",
-            "staking": staking,
-            "n_predictions": 0,
-            "message": "No valid predictions after filtering.",
-        }
-
-    config = StakingConfig(
-        method=staking,
-        kelly_fraction=kelly_fraction,
-        min_edge=min_edge,
-    )
-    backtester = Backtester(config)
-    result = backtester.run(predictions, actuals, odds_list)
-
-    return {
-        "sport": sport or "all",
-        "staking": staking,
-        "kelly_fraction": kelly_fraction if staking == "kelly" else None,
-        "min_edge": min_edge,
-        "date_from": date_from.isoformat() if date_from else None,
-        "date_to": date_to.isoformat() if date_to else None,
-        "n_predictions": result.n_predictions,
-        "n_correct": result.n_correct,
-        "accuracy": round(result.accuracy, 4),
-        "roi": round(result.roi, 4),
-        "sharpe_ratio": round(result.sharpe_ratio, 3),
-        "max_drawdown": round(result.max_drawdown, 4),
-        "log_loss": round(result.log_loss, 4),
-        "brier_score": round(result.brier_score, 4),
-        "calibration_error": round(result.calibration_error, 4),
-        "pnl_units": round(result.pnl_units, 2),
-        **result.metadata,
-    }
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("[backtest] error: %s", exc, exc_info=True)
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=str(exc))
