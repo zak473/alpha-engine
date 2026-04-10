@@ -830,16 +830,6 @@ export function TipstersView({
   const activeBoardsCount = filtered.filter((t) => (t.active_tips_count ?? 0) > 0).length;
   const profitableBoards = filtered.filter((t) => (t.profit_loss ?? 0) > 0).length;
 
-  const rankedForSpotlight = [...filtered].sort((a, b) => {
-    const scoreA = (a.active_tips_count ?? 0) * 100 + (a.profit_loss ?? 0) * 10 + (a.followers ?? 0) * 0.2 + (a.overall_win_rate ?? 0) * 100;
-    const scoreB = (b.active_tips_count ?? 0) * 100 + (b.profit_loss ?? 0) * 10 + (b.followers ?? 0) * 0.2 + (b.overall_win_rate ?? 0) * 100;
-    return scoreB - scoreA;
-  });
-
-  const featured = rankedForSpotlight.slice(0, Math.min(3, rankedForSpotlight.length));
-  const featuredIds = new Set(featured.map((t) => t.id));
-  const activeBoards = filtered.filter((t) => !featuredIds.has(t.id) && (t.active_tips_count ?? 0) > 0);
-  const watchlistBoards = filtered.filter((t) => !featuredIds.has(t.id) && (t.active_tips_count ?? 0) === 0);
 
   return (
     <>
@@ -977,82 +967,28 @@ export function TipstersView({
             </div>
           </div>
         ) : (
-          <>
-            {featured.length > 0 && (
-              <section className="space-y-3">
-                <div className="flex items-end justify-between gap-3 flex-wrap">
-                  <div>
-                    <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-subtle">Spotlight boards</div>
-                    <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-text-primary">Best places to start following</h2>
-                  </div>
-                  <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)", color: "var(--text1)" }}>
-                    <BarChart3 size={12} /> Ranked by form and activity
-                  </div>
-                </div>
-                <div className="grid gap-4 xl:grid-cols-3">
-                  {featured.map(t => (
-                    <TipsterCard
-                      key={t.id}
-                      tipster={t}
-                      onOpen={() => handleOpenTipster(t)}
-                      onFollow={() => handleFollow(t.id)}
-                      backtest={t.is_ai ? (backtestSummary[detectTipsterSport(t).slug ?? ""] ?? null) : null}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {activeBoards.length > 0 && (
-              <section className="space-y-3">
-                <div className="flex items-end justify-between gap-3 flex-wrap">
-                  <div>
-                    <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-subtle">Active now</div>
-                    <h3 className="mt-1 text-lg font-black tracking-[-0.04em] text-text-primary">Boards with open plays</h3>
-                  </div>
-                  <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold" style={{ borderColor: "rgba(0,255,132,0.16)", background: "rgba(0,255,132,0.08)", color: "var(--accent)" }}>
-                    <Flame size={12} /> {activeBoards.reduce((sum, t) => sum + (t.active_tips_count ?? 0), 0)} live opportunities
-                  </div>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {activeBoards.map(t => (
-                    <TipsterCard
-                      key={t.id}
-                      tipster={t}
-                      onOpen={() => handleOpenTipster(t)}
-                      onFollow={() => handleFollow(t.id)}
-                      backtest={t.is_ai ? (backtestSummary[detectTipsterSport(t).slug ?? ""] ?? null) : null}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {watchlistBoards.length > 0 && (
-              <section className="space-y-3">
-                <div className="flex items-end justify-between gap-3 flex-wrap">
-                  <div>
-                    <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-subtle">Watchlist</div>
-                    <h3 className="mt-1 text-lg font-black tracking-[-0.04em] text-text-primary">Quiet or developing boards</h3>
-                  </div>
-                  <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)", color: "var(--text1)" }}>
-                    <Clock3 size={12} /> Cleaner empty states for inactive profiles
-                  </div>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {watchlistBoards.map(t => (
-                    <TipsterCard
-                      key={t.id}
-                      tipster={t}
-                      onOpen={() => handleOpenTipster(t)}
-                      onFollow={() => handleFollow(t.id)}
-                      backtest={t.is_ai ? (backtestSummary[detectTipsterSport(t).slug ?? ""] ?? null) : null}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-          </>
+          <section className="space-y-3">
+            <div className="flex items-end justify-between gap-3 flex-wrap">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-subtle">Spotlight boards</div>
+                <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-text-primary">All {filtered.length} boards</h2>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)", color: "var(--text1)" }}>
+                <BarChart3 size={12} /> {totalActiveTips > 0 ? `${totalActiveTips} live tips` : "Ranked by form"}
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {filtered.map(t => (
+                <TipsterCard
+                  key={t.id}
+                  tipster={t}
+                  onOpen={() => handleOpenTipster(t)}
+                  onFollow={() => handleFollow(t.id)}
+                  backtest={t.is_ai ? (backtestSummary[detectTipsterSport(t).slug ?? ""] ?? null) : null}
+                />
+              ))}
+            </div>
+          </section>
         )}
 
         <div className="rounded-2xl border px-4 py-3 text-[11px] leading-5 text-text-muted" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)" }}>
