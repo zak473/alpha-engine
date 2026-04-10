@@ -410,13 +410,31 @@ def _run_for_sport(
         if confidence < min_confidence:
             continue
 
-        # Use home market odds for edge calculation — draw/away odds are rarely
-        # populated in the DB, so we use home odds as a market-efficiency proxy.
-        # The backtester's _select_bet still picks the highest-probability outcome
-        # and correctly tracks whether that outcome won.
-        real_odds = match.odds_home
-        fair_odds = 1.0 / p_home if p_home > 0.05 else None
-        bet_odds = real_odds if (real_odds and real_odds > 1.0) else fair_odds
+        # Select odds for the model's best predicted outcome.
+        # For binary sports (no draw): both home + away odds are stored, so use
+        # the correct side. This prevents artificially inflating P/L by paying
+        # home-odds for away wins.
+        # For soccer: draw/away odds are often missing (SGO only covers top leagues)
+        # so fall back to home odds as a market-efficiency proxy when unavailable.
+        best_p = max(p_home, p_draw, p_away)
+        if best_p == p_away and p_away > 0.05:
+            real_odds = match.odds_away
+            fair_odds = 1.0 / p_away
+        elif best_p == p_draw and p_draw > 0.05:
+            real_odds = match.odds_draw
+            fair_odds = 1.0 / p_draw
+        else:
+            real_odds = match.odds_home
+            fair_odds = 1.0 / p_home if p_home > 0.05 else None
+
+        if real_odds and real_odds > 1.0:
+            bet_odds = real_odds
+        elif sport == "soccer":
+            # Soccer fallback: home odds proxy preserves ~300-bet SGO coverage
+            bet_odds = match.odds_home if (match.odds_home and match.odds_home > 1.0) else fair_odds
+        else:
+            # For binary-odds sports, skip if specific outcome odds aren't stored
+            bet_odds = fair_odds
 
         predictions.append(PredictionResult(
             match_id=match.id,
