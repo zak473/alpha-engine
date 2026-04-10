@@ -1,10 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import {
-  Users, Plus, X, Search, ChevronRight, Trophy, Zap, Activity,
-  BarChart3, Flame, Clock3, Timer, Share2, Cpu, TrendingUp, Star,
-} from "lucide-react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { Users, Plus, X, Search, ChevronRight, Trophy, Zap, Activity, BarChart3, Flame, Clock3, Timer, Share2 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { SPORT_CONFIG } from "@/lib/betting-types";
 import type { SportSlug } from "@/lib/betting-types";
@@ -56,6 +53,8 @@ function AiAvatar({ displayName, size = "md" }: { displayName: string; size?: "s
   );
 }
 
+// ── Result badge ──────────────────────────────────────────────────────────────
+
 function ResultBadge({ result }: { result: "W" | "L" }) {
   return (
     <span
@@ -70,6 +69,8 @@ function ResultBadge({ result }: { result: "W" | "L" }) {
   );
 }
 
+// ── Countdown helper ──────────────────────────────────────────────────────────
+
 function formatCountdown(startTime: string | null | undefined, outcome: string | null | undefined): { text: string; live: boolean; past: boolean } {
   if (!startTime) return { text: "", live: false, past: false };
   const ms = new Date(startTime).getTime() - Date.now();
@@ -77,6 +78,7 @@ function formatCountdown(startTime: string | null | undefined, outcome: string |
 
   if (ms <= 0) {
     if (isPending) return { text: "Live now", live: true, past: false };
+    // settled — show the date
     const d = new Date(startTime);
     return { text: d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }), live: false, past: true };
   }
@@ -85,6 +87,7 @@ function formatCountdown(startTime: string | null | undefined, outcome: string |
   const hrs = Math.floor(totalMins / 60);
   const mins = totalMins % 60;
   const days = Math.floor(hrs / 24);
+  const remHrs = hrs % 24;
 
   if (days >= 2) {
     const d = new Date(startTime);
@@ -108,403 +111,6 @@ function useCountdown(startTime: string | null | undefined, outcome: string | nu
   }, [startTime, outcome]);
 
   return display;
-}
-
-// ── Sport detection ───────────────────────────────────────────────────────────
-
-const SPORT_SLUGS = ["soccer", "tennis", "basketball", "baseball", "hockey", "esports"] as const;
-type DetectedSport = typeof SPORT_SLUGS[number];
-
-function detectTipsterSport(tipster: Pick<TipsterProfile, "display_name" | "username" | "bio">) {
-  const haystack = `${tipster.display_name ?? ""} ${tipster.username} ${tipster.bio ?? ""}`.toLowerCase();
-  const match = SPORT_SLUGS.find((sport) => haystack.includes(sport));
-  if (!match) {
-    return { slug: undefined as DetectedSport | undefined, label: "Multi-sport", emoji: "📡", color: "var(--accent)" };
-  }
-  const cfg = SPORT_CONFIG[match as SportSlug];
-  return {
-    slug: match as DetectedSport,
-    label: cfg?.label ?? match[0].toUpperCase() + match.slice(1),
-    emoji: AI_SPORT_EMOJI[match] ?? "🤖",
-    color: cfg?.color ?? "var(--accent)",
-  };
-}
-
-// ── P/L computation ───────────────────────────────────────────────────────────
-
-type PLResult = { curve: number[]; wins: number; losses: number; units: number; pct: number; total: number };
-
-function computePLCurve(tips: TipsterTip[], daysCutoff?: number): PLResult {
-  const cutoff = daysCutoff ? Date.now() - daysCutoff * 86_400_000 : 0;
-  const settled = tips
-    .filter((t) =>
-      (t.outcome === "won" || t.outcome === "lost") &&
-      (!cutoff || new Date(t.start_time).getTime() > cutoff)
-    )
-    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
-  let cumulative = 0;
-  let wins = 0;
-  let losses = 0;
-  const curve: number[] = [0];
-  for (const tip of settled) {
-    if (tip.outcome === "won") { cumulative += tip.odds - 1; wins++; }
-    else { cumulative -= 1; losses++; }
-    curve.push(Number(cumulative.toFixed(2)));
-  }
-  const total = wins + losses;
-  return { curve, wins, losses, units: Number(cumulative.toFixed(1)), pct: total > 0 ? Math.round((wins / total) * 100) : 0, total };
-}
-
-// ── Mini P/L sparkline ────────────────────────────────────────────────────────
-
-function MiniPLChart({ curve, sportSlug, height = 44 }: { curve: number[]; sportSlug: string; height?: number }) {
-  if (curve.length < 3) {
-    return (
-      <div style={{ height }} className="flex items-center justify-center">
-        <span className="text-[10px] text-text-muted">Calculating…</span>
-      </div>
-    );
-  }
-
-  const min = Math.min(...curve);
-  const max = Math.max(...curve);
-  const range = max - min || 1;
-  const W = 200;
-  const H = height;
-  const pad = 3;
-
-  const pts = curve.map((v, i) => {
-    const x = pad + (i / (curve.length - 1)) * (W - 2 * pad);
-    const y = H - pad - ((v - min) / range) * (H - 2 * pad);
-    return [x, y] as [number, number];
-  });
-
-  const isPositive = curve[curve.length - 1] >= 0;
-  const lineColor = isPositive ? "var(--positive)" : "var(--negative)";
-  const gradId = `plg-${sportSlug}-${isPositive ? "p" : "n"}`;
-  const polyPoints = pts.map(([x, y]) => `${x},${y}`).join(" ");
-  const fillPath = `M ${pts[0][0]},${H} ${pts.map(([x, y]) => `L ${x},${y}`).join(" ")} L ${pts[pts.length - 1][0]},${H} Z`;
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ height, width: "100%" }} preserveAspectRatio="none">
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={lineColor} stopOpacity="0.22" />
-          <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={fillPath} fill={`url(#${gradId})`} />
-      <polyline points={polyPoints} fill="none" stroke={lineColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="2.5" fill={lineColor} />
-    </svg>
-  );
-}
-
-// ── Period toggle ─────────────────────────────────────────────────────────────
-
-type Period = "7d" | "30d" | "all";
-
-function PeriodToggle({ value, onChange }: { value: Period; onChange: (p: Period) => void }) {
-  return (
-    <div
-      className="flex items-center gap-0.5 rounded-[14px] p-1"
-      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid var(--border0)" }}
-    >
-      {(["7d", "30d", "all"] as Period[]).map((p) => (
-        <button
-          key={p}
-          onClick={() => onChange(p)}
-          className="px-3.5 py-1.5 rounded-[10px] text-[11px] font-bold transition-all"
-          style={value === p
-            ? { background: "var(--accent)", color: "#0f2418" }
-            : { color: "var(--text2)" }
-          }
-        >
-          {p === "7d" ? "7D" : p === "30d" ? "30D" : "All"}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ── Spotlight card (AI tipster) ───────────────────────────────────────────────
-
-function SpotlightCard({
-  tipster,
-  backtest,
-  tips,
-  period,
-  loading,
-  onOpen,
-}: {
-  tipster: TipsterProfile;
-  backtest?: BacktestRunResult | null;
-  tips: TipsterTip[];
-  period: Period;
-  loading: boolean;
-  onOpen: () => void;
-}) {
-  const sport = detectTipsterSport(tipster);
-  const days = period === "7d" ? 7 : period === "30d" ? 30 : undefined;
-
-  // Sparkline uses period-filtered tips; stats are always all-time (matches modal)
-  const pl = useMemo(() => computePLCurve(tips, days), [tips, period]);
-  const allTime = useMemo(() => computePLCurve(tips), [tips]);
-
-  // All-time stats — same source as modal so card and modal always agree
-  const hasTips = tips.length > 0;
-  const winRate = hasTips ? allTime.pct : Math.round((tipster.overall_win_rate ?? 0) * 100);
-  const unitsVal = hasTips ? allTime.units : (tipster.profit_loss ?? 0);
-  const sampleSize = hasTips ? allTime.total : (tipster.settled_picks ?? 0);
-  const sharpe = backtest?.sharpe_ratio ?? 0;
-  const isPositive = unitsVal >= 0;
-  const accColor = winRate >= 58 ? "var(--positive)" : winRate >= 50 ? "var(--warning)" : "var(--negative)";
-
-  return (
-    <article
-      className="group relative flex flex-col cursor-pointer overflow-hidden rounded-[22px] border transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_28px_56px_rgba(0,0,0,0.32)]"
-      style={{
-        background: `linear-gradient(155deg, ${sport.color}12 0%, rgba(6,10,18,0.96) 55%)`,
-        borderColor: `${sport.color}35`,
-      }}
-      onClick={onOpen}
-    >
-      {/* Ambient glow */}
-      <div
-        className="pointer-events-none absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-20"
-        style={{ background: `radial-gradient(circle, ${sport.color}55 0%, transparent 70%)` }}
-      />
-
-      <div className="relative flex flex-col gap-3.5 p-4">
-        {/* Sport badge */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-[26px] leading-none">{sport.emoji}</span>
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: sport.color }}>
-              {sport.label}
-            </span>
-          </div>
-          <span
-            className="text-[9px] font-black uppercase tracking-[0.18em] px-2 py-1 rounded-full"
-            style={{ background: `${sport.color}1a`, color: sport.color, border: `1px solid ${sport.color}30` }}
-          >
-            AI
-          </span>
-        </div>
-
-        {/* Main stat pair */}
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-[14px] px-3 py-2.5" style={{ background: "rgba(255,255,255,0.05)" }}>
-            <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-text-subtle">Win rate</div>
-            <div
-              className="mt-1 text-[22px] font-black tracking-[-0.04em] tabular-nums"
-              style={{ color: accColor }}
-            >
-              {loading ? <span className="text-text-muted text-sm">…</span> : sampleSize > 0 ? `${winRate}%` : "—"}
-            </div>
-          </div>
-          <div className="rounded-[14px] px-3 py-2.5" style={{ background: "rgba(255,255,255,0.05)" }}>
-            <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-text-subtle">Units</div>
-            <div
-              className="mt-1 text-[22px] font-black tracking-[-0.04em] tabular-nums"
-              style={{ color: isPositive ? "var(--positive)" : "var(--negative)" }}
-            >
-              {loading ? <span className="text-text-muted text-sm">…</span> : sampleSize > 0 ? `${unitsVal >= 0 ? "+" : ""}${unitsVal.toFixed(1)}u` : "—"}
-            </div>
-          </div>
-        </div>
-
-        {/* Secondary stats */}
-        <div className="flex items-center justify-between text-[10px] text-text-muted px-0.5">
-          <span>
-            Sharpe:{" "}
-            <span className="font-bold" style={{ color: sharpe >= 2 ? "var(--positive)" : "var(--text1)" }}>
-              {sharpe.toFixed(2)}
-            </span>
-          </span>
-          <span className="font-mono">{sampleSize.toLocaleString()} picks</span>
-        </div>
-
-        {/* Sparkline */}
-        <div className="rounded-[12px] overflow-hidden" style={{ background: "rgba(255,255,255,0.03)" }}>
-          <MiniPLChart curve={pl.curve} sportSlug={sport.slug ?? "unknown"} height={44} />
-        </div>
-
-        {/* Recent form + link */}
-        <div className="flex items-center justify-between pt-0.5">
-          <div className="flex items-center gap-1">
-            {(tipster.recent_results ?? []).slice(-6).map((r, i) => (
-              <span
-                key={i}
-                className="w-[18px] h-[18px] rounded text-[8px] font-black flex items-center justify-center"
-                style={r === "W"
-                  ? { background: "rgba(34,226,131,0.2)", color: "var(--positive)" }
-                  : { background: "rgba(239,68,68,0.15)", color: "var(--negative)" }
-                }
-              >
-                {r}
-              </span>
-            ))}
-          </div>
-          <span
-            className="text-[10px] font-bold flex items-center gap-0.5 transition-colors group-hover:opacity-100"
-            style={{ color: sport.color, opacity: 0.75 }}
-          >
-            View <ChevronRight size={11} />
-          </span>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-// ── Spotlight Boards section ──────────────────────────────────────────────────
-
-function SpotlightBoards({
-  aiTipsters,
-  backtestSummary,
-  onOpen,
-  onFollow,
-}: {
-  aiTipsters: TipsterProfile[];
-  backtestSummary: Record<string, BacktestRunResult>;
-  onOpen: (t: TipsterProfile) => void;
-  onFollow: (id: string) => void;
-}) {
-  const [period, setPeriod] = useState<Period>("30d");
-  const [tipHistory, setTipHistory] = useState<Record<string, TipsterTip[]>>({});
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (aiTipsters.length === 0) { setLoading(false); return; }
-    let done = 0;
-    aiTipsters.forEach((t) => {
-      getTipsterTips(t.id, true)
-        .then((tips) => setTipHistory((prev) => ({ ...prev, [t.id]: tips })))
-        .catch(() => {})
-        .finally(() => { done++; if (done === aiTipsters.length) setLoading(false); });
-    });
-  }, [aiTipsters.length]);
-
-  const days = period === "7d" ? 7 : period === "30d" ? 30 : undefined;
-
-  const agg = useMemo(() => {
-    // Always all-time — matches what each individual card shows
-    const fallbackPicks = aiTipsters.reduce((s, t) => s + (t.settled_picks ?? 0), 0);
-    const fallbackWins = aiTipsters.reduce((s, t) => s + (t.won_picks ?? 0), 0);
-    const fallbackUnits = aiTipsters.reduce((s, t) => s + (t.profit_loss ?? 0), 0);
-
-    let totalWins = 0, totalLosses = 0, totalUnits = 0;
-    const hasTipsLoaded = aiTipsters.some((t) => (tipHistory[t.id]?.length ?? 0) > 0);
-    aiTipsters.forEach((t) => {
-      const { wins, losses, units } = computePLCurve(tipHistory[t.id] ?? []);
-      totalWins += wins;
-      totalLosses += losses;
-      totalUnits += units;
-    });
-    const total = totalWins + totalLosses;
-    return {
-      picks: hasTipsLoaded ? total : fallbackPicks,
-      winRate: hasTipsLoaded
-        ? (total > 0 ? Math.round((totalWins / total) * 100) : 0)
-        : (fallbackPicks > 0 ? Math.round((fallbackWins / fallbackPicks) * 100) : 0),
-      units: hasTipsLoaded ? Number(totalUnits.toFixed(1)) : Number(fallbackUnits.toFixed(1)),
-    };
-  }, [tipHistory, aiTipsters]);
-
-  if (aiTipsters.length === 0) return null;
-
-  // Sort cards: most picks first (descending settled_picks)
-  const sortedAi = [...aiTipsters].sort((a, b) => (b.settled_picks ?? 0) - (a.settled_picks ?? 0));
-
-  return (
-    <section
-      className="px-4 pt-6 pb-7 lg:px-6"
-      style={{ borderBottom: "1px solid var(--border0)", background: "linear-gradient(180deg, rgba(245,158,11,0.04) 0%, transparent 60%)" }}
-    >
-      {/* Section header */}
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span
-              className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.22em] px-2.5 py-1 rounded-full"
-              style={{ background: "rgba(245,158,11,0.14)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.22)" }}
-            >
-              <Cpu size={9} /> Spotlight Boards
-            </span>
-          </div>
-          <h2 className="text-[28px] font-black tracking-[-0.04em] leading-none text-text-primary">
-            AI Model Boards
-          </h2>
-          <p className="mt-2 text-sm text-text-muted">
-            {aiTipsters.length} sport-specific models. Verified predictions, settled outcomes, real edge.
-          </p>
-        </div>
-        <PeriodToggle value={period} onChange={setPeriod} />
-      </div>
-
-      {/* Aggregate stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        {[
-          {
-            label: "Total picks",
-            value: loading ? "…" : agg.picks > 0 ? agg.picks.toLocaleString() : "—",
-            color: "var(--text0)",
-          },
-          {
-            label: "Combined win rate",
-            value: loading ? "…" : agg.winRate > 0 ? `${agg.winRate}%` : "—",
-            color: agg.winRate >= 55 ? "var(--positive)" : agg.winRate >= 50 ? "var(--warning)" : "var(--text1)",
-          },
-          {
-            label: "Combined units",
-            value: loading ? "…" : `${agg.units >= 0 ? "+" : ""}${agg.units}u`,
-            color: agg.units >= 0 ? "var(--positive)" : "var(--negative)",
-          },
-          {
-            label: "Active sports",
-            value: String(aiTipsters.length),
-            color: "var(--accent)",
-          },
-        ].map((item) => (
-          <div
-            key={item.label}
-            className="rounded-[18px] border px-4 py-3.5"
-            style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.035)" }}
-          >
-            <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-text-subtle">{item.label}</div>
-            <div className="mt-1.5 text-[26px] font-black tracking-[-0.04em] tabular-nums" style={{ color: item.color }}>
-              {item.value}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Sport cards grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
-        {sortedAi.map((t) => {
-          const sport = detectTipsterSport(t);
-          return (
-            <SpotlightCard
-              key={t.id}
-              tipster={t}
-              backtest={backtestSummary[sport.slug ?? ""] ?? null}
-              tips={tipHistory[t.id] ?? []}
-              period={period}
-              loading={loading && !(t.id in tipHistory)}
-              onOpen={() => onOpen(t)}
-            />
-          );
-        })}
-      </div>
-
-      {/* Disclaimer */}
-      <p className="mt-4 text-[11px] text-text-muted text-center">
-        Stats computed from settled tips in the selected window · Model accuracy ≠ guaranteed future returns
-      </p>
-    </section>
-  );
 }
 
 // ── Tip row (inside tipster modal) ────────────────────────────────────────────
@@ -678,16 +284,20 @@ function TipsterModal({
   const voidPicks = tipster.void_picks ?? 0;
   const recordStr = `${tipster.won_picks}W - ${tipster.lost_picks}L${voidPicks > 0 ? ` - ${voidPicks}V` : ""}`;
 
-  // All tipsters (AI and community) use the same live settled stats so card and modal always match
-  const sharpeVal = tipster.is_ai && backtest ? backtest.sharpe_ratio ?? 0 : null;
-  const summary = [
-    { label: "Win rate", value: tipster.settled_picks > 0 ? `${overallWinPct}%` : "—", tone: overallWinPct >= 55 ? "var(--positive)" : overallWinPct >= 50 ? "var(--warning)" : "var(--text0)" },
-    { label: "Units", value: tipster.settled_picks > 0 ? plStr : "—", tone: profitLoss >= 0 ? "var(--positive)" : "var(--negative)" },
-    { label: "Record", value: tipster.settled_picks > 0 ? recordStr : "—", tone: "var(--text0)" },
-    sharpeVal !== null
-      ? { label: "Sharpe", value: sharpeVal.toFixed(2), tone: sharpeVal >= 2 ? "var(--positive)" : "var(--warning)" }
-      : { label: "Avg odds", value: (tipster.avg_odds ?? 0) > 0 ? (tipster.avg_odds ?? 0).toFixed(2) : "—", tone: "var(--text0)" },
-  ];
+  const useBacktest = tipster.is_ai && backtest;
+  const summary = useBacktest
+    ? [
+        { label: "Accuracy", value: `${((backtest!.accuracy ?? 0) * 100).toFixed(1)}%`, tone: (backtest!.accuracy ?? 0) >= 0.55 ? "var(--positive)" : "var(--warning)" },
+        { label: "Units", value: `${(backtest!.pnl_units ?? 0) >= 0 ? "+" : ""}${(backtest!.pnl_units ?? 0).toFixed(1)}u`, tone: (backtest!.pnl_units ?? 0) >= 0 ? "var(--positive)" : "var(--negative)" },
+        { label: "Sharpe", value: (backtest!.sharpe_ratio ?? 0).toFixed(2), tone: (backtest!.sharpe_ratio ?? 0) >= 2 ? "var(--positive)" : "var(--warning)" },
+        { label: "Predictions", value: (backtest!.n_predictions ?? 0).toLocaleString(), tone: "var(--text0)" },
+      ]
+    : [
+        { label: "Win rate", value: `${overallWinPct}%`, tone: overallWinPct >= 55 ? "var(--positive)" : overallWinPct >= 50 ? "var(--warning)" : "var(--text0)" },
+        { label: "Units", value: tipster.settled_picks > 0 ? plStr : "—", tone: profitLoss >= 0 ? "var(--positive)" : "var(--negative)" },
+        { label: "Record", value: tipster.settled_picks > 0 ? recordStr : "—", tone: "var(--text0)" },
+        { label: "Avg odds", value: (tipster.avg_odds ?? 0) > 0 ? (tipster.avg_odds ?? 0).toFixed(2) : "—", tone: "var(--text0)" },
+      ];
 
   const displayedTips = activeTab === "active" ? activeTips : settledHistory;
   const emptyCopy = activeTab === "active" ? "No active tips right now" : "No settled tips yet";
@@ -814,6 +424,7 @@ function PostTipModal({ onClose, onPosted }: { onClose: () => void; onPosted: ()
     setSaving(true);
     setError(null);
     try {
+      // POST /api/v1/tipsters/tips
       const res = await fetch("/api/v1/tipsters/tips", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -838,6 +449,7 @@ function PostTipModal({ onClose, onPosted }: { onClose: () => void; onPosted: ()
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          {/* Sport */}
           <div className="flex flex-col gap-1.5">
             <label className="label">Sport</label>
             <div className="flex gap-1 flex-wrap">
@@ -853,11 +465,13 @@ function PostTipModal({ onClose, onPosted }: { onClose: () => void; onPosted: ()
             </div>
           </div>
 
+          {/* Match */}
           <div className="flex flex-col gap-1.5">
             <label className="label">Match</label>
             <input value={matchLabel} onChange={e => setMatchLabel(e.target.value)} placeholder="e.g. Arsenal vs Chelsea" className="input-field" />
           </div>
 
+          {/* Market + Selection */}
           <div className="flex gap-3">
             <div className="flex flex-col gap-1.5 w-24 flex-shrink-0">
               <label className="label">Market</label>
@@ -869,11 +483,13 @@ function PostTipModal({ onClose, onPosted }: { onClose: () => void; onPosted: ()
             </div>
           </div>
 
+          {/* Odds */}
           <div className="flex flex-col gap-1.5">
             <label className="label">Odds (decimal)</label>
             <input type="number" step="0.01" min="1.01" value={odds} onChange={e => setOdds(e.target.value)} placeholder="e.g. 2.10" className="input-field" required />
           </div>
 
+          {/* Note */}
           <div className="flex flex-col gap-1.5">
             <label className="label">Note <span className="text-text-muted font-normal">(optional)</span></label>
             <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Reasoning, context…" rows={2}
@@ -891,17 +507,58 @@ function PostTipModal({ onClose, onPosted }: { onClose: () => void; onPosted: ()
   );
 }
 
-// ── Community tipster card ────────────────────────────────────────────────────
+const SPORT_SLUGS = ["soccer", "tennis", "basketball", "baseball", "hockey", "esports"] as const;
+type DetectedSport = typeof SPORT_SLUGS[number];
+
+function detectTipsterSport(tipster: Pick<TipsterProfile, "display_name" | "username" | "bio">) {
+  const haystack = `${tipster.display_name ?? ""} ${tipster.username} ${tipster.bio ?? ""}`.toLowerCase();
+  const match = SPORT_SLUGS.find((sport) => haystack.includes(sport));
+  if (!match) {
+    return { slug: undefined as DetectedSport | undefined, label: "Multi-sport", emoji: "📡", color: "var(--accent)" };
+  }
+  const cfg = SPORT_CONFIG[match as SportSlug];
+  return {
+    slug: match as DetectedSport,
+    label: cfg?.label ?? match[0].toUpperCase() + match.slice(1),
+    emoji: AI_SPORT_EMOJI[match] ?? "🤖",
+    color: cfg?.color ?? "var(--accent)",
+  };
+}
 
 function boardState(tipster: TipsterProfile) {
+  const settled = tipster.settled_picks ?? 0;
   const active = tipster.active_tips_count ?? 0;
   const units = tipster.profit_loss ?? 0;
-  const settled = tipster.settled_picks ?? 0;
 
-  if (active > 0) return { label: active >= 3 ? "Active board" : "Live now", copy: `${active} open ${active === 1 ? "tip" : "tips"} available to tail right now.`, tone: "accent" as const };
-  if (settled === 0) return { label: "Building sample", copy: "Fresh profile — not enough settled picks to judge yet.", tone: "neutral" as const };
-  if (units > 0) return { label: "Profitable", copy: `Closed sample is in the green at ${units >= 0 ? "+" : ""}${units.toFixed(1)}u.`, tone: "positive" as const };
-  return { label: "Quiet board", copy: "No open plays right now, but recent settled performance is still tracked.", tone: "warning" as const };
+  if (active > 0) {
+    return {
+      label: active >= 3 ? "Active board" : "Live now",
+      copy: `${active} open ${active === 1 ? "tip" : "tips"} available to tail right now.`,
+      tone: "accent" as const,
+    };
+  }
+
+  if (settled === 0) {
+    return {
+      label: "Building sample",
+      copy: "New model or fresh profile — not enough settled picks to judge yet.",
+      tone: "neutral" as const,
+    };
+  }
+
+  if (units > 0) {
+    return {
+      label: "Profitable",
+      copy: `Closed sample is in the green at ${units >= 0 ? "+" : ""}${units.toFixed(1)}u.`,
+      tone: "positive" as const,
+    };
+  }
+
+  return {
+    label: "Quiet board",
+    copy: "No open plays right now, but recent settled performance is still tracked.",
+    tone: "warning" as const,
+  };
 }
 
 function recentSummary(results: ("W" | "L")[]) {
@@ -911,14 +568,18 @@ function recentSummary(results: ("W" | "L")[]) {
   return `Last ${results.length}: ${wins}-${losses}`;
 }
 
+// ── Tipster card ──────────────────────────────────────────────────────────────
+
 function TipsterCard({
   tipster,
   onOpen,
   onFollow,
+  backtest,
 }: {
   tipster: TipsterProfile;
   onOpen: () => void;
   onFollow: () => void;
+  backtest?: BacktestRunResult | null;
 }) {
   const color = avatarColor(tipster.username);
   const winPct = Math.round((tipster.overall_win_rate ?? 0) * 100);
@@ -930,6 +591,22 @@ function TipsterCard({
   const recent = recentSummary(tipster.recent_results);
   const followers = tipster.followers ?? 0;
   const openTips = tipster.active_tips_count ?? 0;
+  const supportLabel = followers > 0 ? `${followers.toLocaleString()} follower${followers === 1 ? "" : "s"}` : "Fresh profile";
+  const profileMeta = tipster.is_ai && backtest
+    ? `${supportLabel} · ${(backtest.n_predictions ?? 0).toLocaleString()} predictions`
+    : settled > 0 ? `${supportLabel} · ${settled} graded` : supportLabel;
+
+  // For AI tipsters use backtest stats; fall back to live settled stats
+  const useBacktest = tipster.is_ai && backtest;
+  const stat1 = useBacktest
+    ? { label: "Accuracy", value: `${((backtest!.accuracy ?? 0) * 100).toFixed(1)}%`, color: (backtest!.accuracy ?? 0) >= 0.55 ? "var(--positive)" : "var(--warning)" }
+    : { label: "Win rate", value: settled > 0 ? `${winPct}%` : "Building", color: settled > 0 ? (winPct >= 60 ? "var(--positive)" : winPct >= 50 ? "var(--warning)" : "var(--negative)") : "var(--text1)" };
+  const stat2 = useBacktest
+    ? { label: "Units", value: `${(backtest!.pnl_units ?? 0) >= 0 ? "+" : ""}${(backtest!.pnl_units ?? 0).toFixed(1)}u`, color: (backtest!.pnl_units ?? 0) >= 0 ? "var(--positive)" : "var(--negative)" }
+    : { label: "Units", value: settled > 0 ? plStr : "—", color: settled > 0 ? (pl >= 0 ? "var(--positive)" : "var(--negative)") : "var(--text1)" };
+  const stat3 = useBacktest
+    ? { label: "Sharpe", value: (backtest!.sharpe_ratio ?? 0).toFixed(2), color: (backtest!.sharpe_ratio ?? 0) >= 2 ? "var(--positive)" : "var(--warning)" }
+    : { label: "Open tips", value: String(openTips || "—"), color: "var(--text0)" };
 
   const toneStyles = {
     accent: { background: "rgba(0,255,132,0.10)", borderColor: "rgba(0,255,132,0.16)", color: "var(--accent)" },
@@ -966,30 +643,31 @@ function TipsterCard({
 
       <div className="flex flex-1 flex-col gap-4 p-5">
         <div className="flex items-start gap-3">
-          <div
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-            style={{ background: color }}
-          >
-            {initials(tipster.username)}
-          </div>
+          {tipster.is_ai ? (
+            <AiAvatar displayName={tipster.display_name ?? tipster.username} />
+          ) : (
+            <div
+              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+              style={{ background: color }}
+            >
+              {initials(tipster.username)}
+            </div>
+          )}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[15px] font-bold leading-tight text-text-primary">@{tipster.username}</p>
-            <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-text-subtle">
-              {followers > 0 ? `${followers.toLocaleString()} followers` : "Fresh profile"}
-              {settled > 0 ? ` · ${settled} graded` : ""}
-            </p>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-[15px] font-bold leading-tight text-text-primary">@{tipster.username}</p>
+                <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-text-subtle">{profileMeta}</p>
+              </div>
+            </div>
             <p className="mt-2 line-clamp-2 text-[12px] leading-5 text-text-muted">
-              {tipster.bio || "Community tipster board."}
+              {tipster.bio || "Model board and performance stream for this tipster."}
             </p>
           </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          {[
-            { label: "Win rate", value: settled > 0 ? `${winPct}%` : "Building", color: settled > 0 ? (winPct >= 60 ? "var(--positive)" : winPct >= 50 ? "var(--warning)" : "var(--negative)") : "var(--text1)" },
-            { label: "Units", value: settled > 0 ? plStr : "—", color: settled > 0 ? (pl >= 0 ? "var(--positive)" : "var(--negative)") : "var(--text1)" },
-            { label: "Open tips", value: String(openTips || "—"), color: "var(--text0)" },
-          ].map((s) => (
+          {[stat1, stat2, stat3].map((s) => (
             <div key={s.label} className="rounded-2xl border px-3.5 py-3" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)" }}>
               <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-text-subtle">{s.label}</div>
               <div className="mt-2 text-xl font-black tracking-[-0.04em]" style={{ color: s.color }}>{s.value}</div>
@@ -1028,6 +706,8 @@ function TipsterCard({
         >
           {tipster.is_following ? "Following" : "Follow"}
         </button>
+
+        {/* Open tips pill */}
         <span
           className="inline-flex h-10 items-center gap-1.5 rounded-xl px-3.5 text-[12px] font-bold"
           style={openTips > 0
@@ -1038,6 +718,7 @@ function TipsterCard({
           {openTips > 0 ? <Flame size={12} /> : <Clock3 size={12} />}
           {openTips > 0 ? `${openTips} open ${openTips === 1 ? "tip" : "tips"}` : "No open tips"}
         </span>
+
         <button
           onClick={(e) => { e.stopPropagation(); onOpen(); }}
           className="ml-auto inline-flex h-10 items-center gap-1.5 rounded-xl px-3.5 text-[12px] font-bold transition-all hover:-translate-y-0.5"
@@ -1050,7 +731,10 @@ function TipsterCard({
   );
 }
 
-// ── Leaderboard ───────────────────────────────────────────────────────────────
+// ── Main view ─────────────────────────────────────────────────────────────────
+
+type SortOpt = "followers" | "winrate" | "active";
+type Tab = "tipsters" | "leaderboard";
 
 function LeaderboardView({ tipsters }: { tipsters: TipsterProfile[] }) {
   const ranked = [...tipsters].sort((a, b) => (b.profit_loss ?? 0) - (a.profit_loss ?? 0));
@@ -1091,11 +775,6 @@ function LeaderboardView({ tipsters }: { tipsters: TipsterProfile[] }) {
   );
 }
 
-// ── Main view ─────────────────────────────────────────────────────────────────
-
-type SortOpt = "followers" | "winrate" | "active";
-type Tab = "tipsters" | "leaderboard";
-
 export function TipstersView({
   initialTipsters = [],
   initialBacktest = {},
@@ -1114,6 +793,7 @@ export function TipstersView({
 
   useEffect(() => {
     getTipsters().then(setTipsters).catch(() => {});
+    // Refresh backtest in background in case server-side data was stale
     getBacktestSummary().then(setBacktestSummary).catch(() => {});
   }, []);
 
@@ -1134,27 +814,32 @@ export function TipstersView({
     }
   }, [openTipster]);
 
-  // Split AI vs community tipsters
-  const aiTipsters = useMemo(() => tipsters.filter((t) => t.is_ai), [tipsters]);
-
-  const communityFiltered = useMemo(() =>
-    tipsters
-      .filter((t) => !t.is_ai)
-      .filter((t) => {
-        const haystack = `${t.username} ${t.display_name ?? ""} ${t.bio ?? ""}`.toLowerCase();
-        return !search || haystack.includes(search.toLowerCase());
-      })
-      .sort((a, b) => {
-        if (sort === "winrate") return (b.overall_win_rate ?? 0) - (a.overall_win_rate ?? 0);
-        if (sort === "active") return (b.active_tips_count ?? 0) - (a.active_tips_count ?? 0);
-        return (b.followers ?? 0) - (a.followers ?? 0);
-      }),
-    [tipsters, search, sort]
-  );
+  const filtered = tipsters
+    .filter((t) => {
+      const haystack = `${t.username} ${t.display_name ?? ""} ${t.bio ?? ""}`.toLowerCase();
+      return !search || haystack.includes(search.toLowerCase());
+    })
+    .sort((a, b) => {
+      if (sort === "winrate") return (b.overall_win_rate ?? 0) - (a.overall_win_rate ?? 0);
+      if (sort === "active") return (b.active_tips_count ?? 0) - (a.active_tips_count ?? 0);
+      return (b.followers ?? 0) - (a.followers ?? 0);
+    });
 
   const followingCount = tipsters.filter(t => t.is_following).length;
-  const activeCommunityBoards = communityFiltered.filter((t) => (t.active_tips_count ?? 0) > 0);
-  const quietCommunityBoards = communityFiltered.filter((t) => (t.active_tips_count ?? 0) === 0);
+  const totalActiveTips = filtered.reduce((sum, t) => sum + (t.active_tips_count ?? 0), 0);
+  const activeBoardsCount = filtered.filter((t) => (t.active_tips_count ?? 0) > 0).length;
+  const profitableBoards = filtered.filter((t) => (t.profit_loss ?? 0) > 0).length;
+
+  const rankedForSpotlight = [...filtered].sort((a, b) => {
+    const scoreA = (a.active_tips_count ?? 0) * 100 + (a.profit_loss ?? 0) * 10 + (a.followers ?? 0) * 0.2 + (a.overall_win_rate ?? 0) * 100;
+    const scoreB = (b.active_tips_count ?? 0) * 100 + (b.profit_loss ?? 0) * 10 + (b.followers ?? 0) * 0.2 + (b.overall_win_rate ?? 0) * 100;
+    return scoreB - scoreA;
+  });
+
+  const featured = rankedForSpotlight.slice(0, Math.min(3, rankedForSpotlight.length));
+  const featuredIds = new Set(featured.map((t) => t.id));
+  const activeBoards = filtered.filter((t) => !featuredIds.has(t.id) && (t.active_tips_count ?? 0) > 0);
+  const watchlistBoards = filtered.filter((t) => !featuredIds.has(t.id) && (t.active_tips_count ?? 0) === 0);
 
   return (
     <>
@@ -1164,9 +849,9 @@ export function TipstersView({
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Users size={16} style={{ color: "var(--accent)" }} />
-              <h1 className="text-lg font-bold text-text-primary">Tipsters</h1>
+              <h1 className="text-lg font-bold text-text-primary">Community Tipsters</h1>
             </div>
-            <p className="text-sm text-text-muted">AI model boards and community tipsters, all in one place.</p>
+            <p className="text-sm text-text-muted">Follow verified tipsters and tail their picks directly into your queue.</p>
           </div>
           <button
             onClick={() => setShowPostModal(true)}
@@ -1176,6 +861,7 @@ export function TipstersView({
           </button>
         </div>
 
+        {/* Following strip */}
         {followingCount > 0 && (
           <div className="mt-3 flex items-center gap-2 flex-wrap">
             <span className="text-[11px] text-text-muted">Following</span>
@@ -1209,81 +895,115 @@ export function TipstersView({
 
       {tab === "leaderboard" && <LeaderboardView tipsters={tipsters} />}
 
-      {tab === "tipsters" && (
-        <>
-          {/* ── Spotlight Boards (AI) ────────────────────────────────────── */}
-          <SpotlightBoards
-            aiTipsters={aiTipsters}
-            backtestSummary={backtestSummary}
-            onOpen={handleOpenTipster}
-            onFollow={handleFollow}
-          />
-
-          {/* ── Community tipsters ───────────────────────────────────────── */}
-          <div className="px-4 pt-6 pb-4 lg:px-6 border-b" style={{ borderColor: "var(--border0)" }}>
-            <div className="flex items-center gap-2 mb-1">
-              <Star size={13} style={{ color: "var(--accent)" }} />
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Community</span>
-            </div>
-            <h2 className="text-xl font-black tracking-[-0.04em] text-text-primary">Community Boards</h2>
-            <p className="mt-1 text-sm text-text-muted">Follow and tail picks from community tipsters.</p>
+      {tab === "tipsters" && <>
+      {/* Toolbar */}
+      <div className="flex flex-col gap-3 px-4 py-4 lg:px-6 border-b" style={{ borderColor: "var(--border0)" }}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative flex-1 lg:max-w-sm">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle pointer-events-none" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search tipsters, sports, bios…"
+              className="input-field pl-8 h-10 text-sm w-full"
+            />
           </div>
-
-          {/* Toolbar */}
-          <div className="flex flex-col gap-3 px-4 py-4 lg:px-6 border-b" style={{ borderColor: "var(--border0)" }}>
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-              <div className="relative flex-1 lg:max-w-sm">
-                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle pointer-events-none" />
-                <input
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Search tipsters, sports, bios…"
-                  className="input-field pl-8 h-10 text-sm w-full"
-                />
-              </div>
-              <div className="flex items-center gap-1 lg:ml-auto flex-wrap">
-                <span className="text-[11px] text-text-muted mr-1">Sort</span>
-                {(["followers", "winrate", "active"] as SortOpt[]).map(s => (
-                  <button
-                    key={s}
-                    onClick={() => setSort(s)}
-                    className={cn("px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-all border", sort === s
-                      ? "bg-[var(--bg1)] border-[var(--border1)] text-text-primary shadow-sm"
-                      : "border-transparent text-text-muted hover:text-text-primary"
-                    )}
-                  >
-                    {s === "followers" ? "Popular" : s === "winrate" ? "Win rate" : "Active tips"}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="px-4 py-5 lg:px-6 space-y-6">
-            {communityFiltered.length === 0 && (
-              <div className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] px-6 py-16">
-                <div className="flex flex-col items-center justify-center gap-5 text-center">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-300/10">
-                    <Users size={28} style={{ color: "var(--accent)" }} />
-                  </div>
-                  <div className="max-w-sm">
-                    <p className="mb-1 text-base font-bold text-text-primary">
-                      {search ? `No tipsters matching "${search}"` : "No community tipsters yet"}
-                    </p>
-                    <p className="text-sm text-text-muted">
-                      {search ? "Try a different search or clear the filter." : "Be the first to post a tip and build your reputation on the board."}
-                    </p>
-                  </div>
-                  {!search && (
-                    <button onClick={() => setShowPostModal(true)} className="btn btn-primary flex h-10 items-center gap-2 px-6 text-sm">
-                      <Plus size={14} /> Post your first tip
-                    </button>
+          <div className="flex items-center gap-1 lg:ml-auto flex-wrap">
+            <span className="text-[11px] text-text-muted mr-1">Sort</span>
+            {(["followers", "winrate", "active"] as SortOpt[]).map(s => {
+              const label = s === "followers" ? "Popular" : s === "winrate" ? "Win rate" : "Active tips";
+              return (
+                <button
+                  key={s}
+                  onClick={() => setSort(s)}
+                  className={cn("px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-all border", sort === s
+                    ? "bg-[var(--bg1)] border-[var(--border1)] text-text-primary shadow-sm"
+                    : "border-transparent text-text-muted hover:text-text-primary"
                   )}
-                </div>
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border px-4 py-3" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)" }}>
+            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-text-subtle">Boards tracked</div>
+            <div className="mt-2 text-[28px] font-black tracking-[-0.04em] text-text-primary">{filtered.length}</div>
+          </div>
+          <div className="rounded-2xl border px-4 py-3" style={{ borderColor: "rgba(0,255,132,0.16)", background: "rgba(0,255,132,0.08)" }}>
+            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-text-subtle">Active boards</div>
+            <div className="mt-2 text-[28px] font-black tracking-[-0.04em]" style={{ color: "var(--positive)" }}>{activeBoardsCount}</div>
+          </div>
+          <div className="rounded-2xl border px-4 py-3" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)" }}>
+            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-text-subtle">Open tips</div>
+            <div className="mt-2 text-[28px] font-black tracking-[-0.04em] text-text-primary">{totalActiveTips}</div>
+          </div>
+          <div className="rounded-2xl border px-4 py-3" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)" }}>
+            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-text-subtle">Profitable boards</div>
+            <div className="mt-2 text-[28px] font-black tracking-[-0.04em] text-text-primary">{profitableBoards}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Boards */}
+      <div className="px-4 py-5 lg:px-6 space-y-6">
+        {filtered.length === 0 ? (
+          <div className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] px-6 py-16 shadow-[0_24px_60px_rgba(0,0,0,0.18)]">
+            <div className="flex flex-col items-center justify-center gap-5 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-300/10">
+                <Users size={28} style={{ color: "var(--accent)" }} />
               </div>
+              <div className="max-w-sm">
+                <p className="mb-1 text-base font-bold text-text-primary">
+                  {search ? `No tipsters matching "${search}"` : "No tipsters yet"}
+                </p>
+                <p className="text-sm text-text-muted">
+                  {search
+                    ? "Try a different search or clear the filter."
+                    : "Be the first to post a tip and build your reputation on the board."}
+                </p>
+              </div>
+              {!search && (
+                <button
+                  onClick={() => setShowPostModal(true)}
+                  className="btn btn-primary flex h-10 items-center gap-2 px-6 text-sm"
+                >
+                  <Plus size={14} /> Post your first tip
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <>
+            {featured.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-end justify-between gap-3 flex-wrap">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-subtle">Spotlight boards</div>
+                    <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-text-primary">Best places to start following</h2>
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)", color: "var(--text1)" }}>
+                    <BarChart3 size={12} /> Ranked by form and activity
+                  </div>
+                </div>
+                <div className="grid gap-4 xl:grid-cols-3">
+                  {featured.map(t => (
+                    <TipsterCard
+                      key={t.id}
+                      tipster={t}
+                      onOpen={() => handleOpenTipster(t)}
+                      onFollow={() => handleFollow(t.id)}
+                      backtest={t.is_ai ? (backtestSummary[detectTipsterSport(t).slug ?? ""] ?? null) : null}
+                    />
+                  ))}
+                </div>
+              </section>
             )}
 
-            {activeCommunityBoards.length > 0 && (
+            {activeBoards.length > 0 && (
               <section className="space-y-3">
                 <div className="flex items-end justify-between gap-3 flex-wrap">
                   <div>
@@ -1291,40 +1011,57 @@ export function TipstersView({
                     <h3 className="mt-1 text-lg font-black tracking-[-0.04em] text-text-primary">Boards with open plays</h3>
                   </div>
                   <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold" style={{ borderColor: "rgba(0,255,132,0.16)", background: "rgba(0,255,132,0.08)", color: "var(--accent)" }}>
-                    <Flame size={12} /> {activeCommunityBoards.reduce((sum, t) => sum + (t.active_tips_count ?? 0), 0)} live opportunities
+                    <Flame size={12} /> {activeBoards.reduce((sum, t) => sum + (t.active_tips_count ?? 0), 0)} live opportunities
                   </div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {activeCommunityBoards.map(t => (
-                    <TipsterCard key={t.id} tipster={t} onOpen={() => handleOpenTipster(t)} onFollow={() => handleFollow(t.id)} />
+                  {activeBoards.map(t => (
+                    <TipsterCard
+                      key={t.id}
+                      tipster={t}
+                      onOpen={() => handleOpenTipster(t)}
+                      onFollow={() => handleFollow(t.id)}
+                      backtest={t.is_ai ? (backtestSummary[detectTipsterSport(t).slug ?? ""] ?? null) : null}
+                    />
                   ))}
                 </div>
               </section>
             )}
 
-            {quietCommunityBoards.length > 0 && (
+            {watchlistBoards.length > 0 && (
               <section className="space-y-3">
                 <div className="flex items-end justify-between gap-3 flex-wrap">
                   <div>
                     <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-subtle">Watchlist</div>
                     <h3 className="mt-1 text-lg font-black tracking-[-0.04em] text-text-primary">Quiet or developing boards</h3>
                   </div>
+                  <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)", color: "var(--text1)" }}>
+                    <Clock3 size={12} /> Cleaner empty states for inactive profiles
+                  </div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {quietCommunityBoards.map(t => (
-                    <TipsterCard key={t.id} tipster={t} onOpen={() => handleOpenTipster(t)} onFollow={() => handleFollow(t.id)} />
+                  {watchlistBoards.map(t => (
+                    <TipsterCard
+                      key={t.id}
+                      tipster={t}
+                      onOpen={() => handleOpenTipster(t)}
+                      onFollow={() => handleFollow(t.id)}
+                      backtest={t.is_ai ? (backtestSummary[detectTipsterSport(t).slug ?? ""] ?? null) : null}
+                    />
                   ))}
                 </div>
               </section>
             )}
+          </>
+        )}
 
-            <div className="rounded-2xl border px-4 py-3 text-[11px] leading-5 text-text-muted" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)" }}>
-              Win rates are calculated over settled picks and should always be read alongside sample size and open activity. Past performance does not guarantee future results.
-            </div>
-          </div>
-        </>
-      )}
+        <div className="rounded-2xl border px-4 py-3 text-[11px] leading-5 text-text-muted" style={{ borderColor: "var(--border0)", background: "rgba(255,255,255,0.03)" }}>
+          Win rates are calculated over the last 7 days and should always be read alongside sample size, open activity, and settled units. Past performance does not guarantee future results.
+        </div>
+      </div>
+      </>}
 
+      {/* Tipster detail modal */}
       {openTipster && (
         <TipsterModal
           tipster={openTipster}
@@ -1335,8 +1072,12 @@ export function TipstersView({
         />
       )}
 
+      {/* Post tip modal */}
       {showPostModal && (
-        <PostTipModal onClose={() => setShowPostModal(false)} onPosted={() => {}} />
+        <PostTipModal
+          onClose={() => setShowPostModal(false)}
+          onPosted={() => {}}
+        />
       )}
     </>
   );
