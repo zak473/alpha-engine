@@ -607,6 +607,78 @@ def admin_nuke_ai_tips(secret: str, db: Session = Depends(get_db)):
     return {"deleted_tips": int(deleted), "deleted_picks": int(deleted_picks)}
 
 
+@app.delete("/api/v1/admin/purge-ai-history", tags=["Admin"])
+def admin_purge_ai_history(secret: str, db: Session = Depends(get_db)):
+    """
+    Wipe ALL AI tipster tip history (settled + pending) and all auto-generated
+    TrackedPick rows. Use this to start fresh with new confidence thresholds.
+    Also resets BankrollSnapshot history for AI tipsters.
+    """
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from db.models.tipsters import TipsterTip
+    from db.models.picks import TrackedPick, BankrollSnapshot
+    from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
+
+    ai_ids = list(AI_TIPSTER_IDS.values())
+
+    deleted_tips = (
+        db.query(TipsterTip)
+        .filter(TipsterTip.user_id.in_(ai_ids))
+        .delete(synchronize_session=False)
+    )
+    deleted_picks = (
+        db.query(TrackedPick)
+        .filter(
+            TrackedPick.user_id == settings.AUTO_PICK_USER_ID,
+            TrackedPick.auto_generated.is_(True),
+        )
+        .delete(synchronize_session=False)
+    )
+    deleted_snapshots = (
+        db.query(BankrollSnapshot)
+        .filter(BankrollSnapshot.user_id.in_(ai_ids))
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {
+        "deleted_tips": int(deleted_tips),
+        "deleted_picks": int(deleted_picks),
+        "deleted_snapshots": int(deleted_snapshots),
+        "message": "AI tipster history wiped. Re-run backfill-all-picks to rebuild at new thresholds.",
+    }
+
+
+@app.delete("/api/v1/admin/clear-backtest-results", tags=["Admin"])
+def admin_clear_backtest_results(secret: str, sport: str = "all", db: Session = Depends(get_db)):
+    """
+    Remove the cached backtest results from model_registry.metrics['backtest'].
+    Use before re-running a fresh backtest to avoid stale data showing on the website.
+    """
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from db.models.mvp import ModelRegistry
+
+    query = db.query(ModelRegistry).filter(ModelRegistry.is_live == True)
+    if sport != "all":
+        query = query.filter(ModelRegistry.sport == sport)
+
+    cleared = []
+    for reg in query.all():
+        if reg.metrics and "backtest" in reg.metrics:
+            metrics = dict(reg.metrics)
+            del metrics["backtest"]
+            reg.metrics = metrics
+            cleared.append(reg.sport)
+
+    db.commit()
+    return {"cleared": cleared, "message": f"Backtest results removed for: {cleared}"}
+
+
 @app.get("/api/v1/admin/debug-sgo-odds", tags=["Admin"])
 def admin_debug_sgo_odds(secret: str, sport: str = "soccer", limit: int = 20):
     """
