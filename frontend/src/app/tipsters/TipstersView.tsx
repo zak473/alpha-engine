@@ -248,15 +248,15 @@ function SpotlightCard({
   const sport = detectTipsterSport(tipster);
   const days = period === "7d" ? 7 : period === "30d" ? 30 : undefined;
 
-  // Period-filtered stats from actual settled tips (matches history tab)
+  // Sparkline uses period-filtered tips; stats are always all-time (matches modal)
   const pl = useMemo(() => computePLCurve(tips, days), [tips, period]);
+  const allTime = useMemo(() => computePLCurve(tips), [tips]);
 
-  // Show period-specific stats when tips are loaded, else fall back to server-side totals
+  // All-time stats — same source as modal so card and modal always agree
   const hasTips = tips.length > 0;
-  const winRate = hasTips ? pl.pct : Math.round((tipster.overall_win_rate ?? 0) * 100);
-  const unitsVal = hasTips ? pl.units : (tipster.profit_loss ?? 0);
-  const sampleSize = hasTips ? pl.total : (tipster.settled_picks ?? 0);
-  // Sharpe from backtest only (model quality metric, no alternative source)
+  const winRate = hasTips ? allTime.pct : Math.round((tipster.overall_win_rate ?? 0) * 100);
+  const unitsVal = hasTips ? allTime.units : (tipster.profit_loss ?? 0);
+  const sampleSize = hasTips ? allTime.total : (tipster.settled_picks ?? 0);
   const sharpe = backtest?.sharpe_ratio ?? 0;
   const isPositive = unitsVal >= 0;
   const accColor = winRate >= 58 ? "var(--positive)" : winRate >= 50 ? "var(--warning)" : "var(--negative)";
@@ -390,26 +390,28 @@ function SpotlightBoards({
   const days = period === "7d" ? 7 : period === "30d" ? 30 : undefined;
 
   const agg = useMemo(() => {
-    // Aggregate from actual settled tips (same source as cards and history tabs)
+    // Always all-time — matches what each individual card shows
+    const fallbackPicks = aiTipsters.reduce((s, t) => s + (t.settled_picks ?? 0), 0);
+    const fallbackWins = aiTipsters.reduce((s, t) => s + (t.won_picks ?? 0), 0);
+    const fallbackUnits = aiTipsters.reduce((s, t) => s + (t.profit_loss ?? 0), 0);
+
     let totalWins = 0, totalLosses = 0, totalUnits = 0;
+    const hasTipsLoaded = aiTipsters.some((t) => (tipHistory[t.id]?.length ?? 0) > 0);
     aiTipsters.forEach((t) => {
-      const { wins, losses, units } = computePLCurve(tipHistory[t.id] ?? [], days);
+      const { wins, losses, units } = computePLCurve(tipHistory[t.id] ?? []);
       totalWins += wins;
       totalLosses += losses;
       totalUnits += units;
     });
     const total = totalWins + totalLosses;
-    // While tips are loading, fall back to server-side totals
-    const fallbackPicks = aiTipsters.reduce((s, t) => s + (t.settled_picks ?? 0), 0);
-    const fallbackWinRate = aiTipsters.reduce((s, t) => s + (t.overall_win_rate ?? 0), 0) / (aiTipsters.length || 1);
-    const fallbackUnits = aiTipsters.reduce((s, t) => s + (t.profit_loss ?? 0), 0);
-    const hasTipsLoaded = aiTipsters.some((t) => (tipHistory[t.id]?.length ?? 0) > 0);
     return {
-      picks: hasTipsLoaded ? total : (period === "all" ? fallbackPicks : 0),
-      winRate: hasTipsLoaded ? (total > 0 ? Math.round((totalWins / total) * 100) : 0) : Math.round(fallbackWinRate * 100),
+      picks: hasTipsLoaded ? total : fallbackPicks,
+      winRate: hasTipsLoaded
+        ? (total > 0 ? Math.round((totalWins / total) * 100) : 0)
+        : (fallbackPicks > 0 ? Math.round((fallbackWins / fallbackPicks) * 100) : 0),
       units: hasTipsLoaded ? Number(totalUnits.toFixed(1)) : Number(fallbackUnits.toFixed(1)),
     };
-  }, [tipHistory, period, aiTipsters]);
+  }, [tipHistory, aiTipsters]);
 
   if (aiTipsters.length === 0) return null;
 
@@ -446,7 +448,7 @@ function SpotlightBoards({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         {[
           {
-            label: period === "7d" ? "Picks (7D)" : period === "30d" ? "Picks (30D)" : "Total picks",
+            label: "Total picks",
             value: loading ? "…" : agg.picks > 0 ? agg.picks.toLocaleString() : "—",
             color: "var(--text0)",
           },
