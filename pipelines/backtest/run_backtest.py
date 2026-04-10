@@ -27,6 +27,11 @@ log = logging.getLogger(__name__)
 
 SPORTS = ["soccer", "tennis", "esports", "basketball", "baseball", "hockey"]
 
+# Thresholds for the handicap simulation (mirrors backfill_picks.py)
+HC_MIN_CONFIDENCE: float = 0.25
+HC_MIN_ODDS: float = 1.4
+HC_MAX_ODDS: float = 4.0
+
 
 def _outcome_to_float(outcome: str | None) -> float | None:
     if outcome in ("H", "home_win"):
@@ -36,6 +41,151 @@ def _outcome_to_float(outcome: str | None) -> float | None:
     if outcome in ("A", "away_win"):
         return 0.0
     return None
+
+
+def _run_tennis_handicap(session: Session) -> dict | None:
+    """
+    Simulate set handicap (-1.5 sets) betting on tennis predictions.
+
+    For each finished tennis match with a PredMatch and set scores:
+    - Compute P(favourite wins 2-0) using BO3 formula W = p²(3-2p)
+    - Only place the favourite's -1.5 bet if fair odds pass MIN/MAX range
+    - Apply a confidence gate of HC_MIN_CONFIDENCE
+    - Flat 1u staking (no Kelly — we have no market odds reference, just fair odds)
+
+    Returns a summary dict stored as metrics["backtest"]["set_handicap"].
+    """
+    import numpy as np
+    from sqlalchemy import func
+    from db.models.mvp import CoreMatch, PredMatch
+    from pipelines.picks.auto_picks import _solve_per_set_prob
+
+    subq = (
+        session.query(PredMatch.match_id, func.max(PredMatch.id).label("latest_id"))
+        .join(CoreMatch, CoreMatch.id == PredMatch.match_id)
+        .filter(CoreMatch.sport == "tennis")
+        .group_by(PredMatch.match_id)
+        .subquery()
+    )
+    rows = (
+        session.query(CoreMatch, PredMatch)
+        .join(subq, subq.c.match_id == CoreMatch.id)
+        .join(PredMatch, PredMatch.id == subq.c.latest_id)
+        .filter(
+            CoreMatch.sport == "tennis",
+            CoreMatch.status == "finished",
+            CoreMatch.outcome.isnot(None),
+            CoreMatch.home_score.isnot(None),
+            CoreMatch.away_score.isnot(None),
+        )
+        .order_by(CoreMatch.kickoff_utc.asc())
+        .all()
+    )
+
+    if not rows:
+        log.warning("  Tennis handicap: no finished matches with set scores.")
+        return None
+
+    bets = []
+    skipped_conf = 0
+    skipped_odds = 0
+    skipped_sets = 0
+
+    for match, pred in rows:
+        p_home = pred.p_home or 0.0
+        p_away = pred.p_away or 0.0
+        if p_home <= 0 or p_away <= 0:
+            continue
+
+        confidence = (pred.confidence or 0) / 100.0
+        if confidence < HC_MIN_CONFIDENCE:
+            skipped_conf += 1
+            continue
+
+        # Identify the favourite (higher match win prob)
+        fav_is_home = p_home >= p_away
+        fav_prob = p_home if fav_is_home else p_away
+
+        # Compute per-set probability for the favourite
+        p_set = _solve_per_set_prob(fav_prob)
+        p_clean = p_set ** 2          # P(favourite wins 2-0)
+        hc_odds = round(1.0 / p_clean, 3) if p_clean > 0.01 else None
+        if hc_odds is None or hc_odds < HC_MIN_ODDS or hc_odds > HC_MAX_ODDS:
+            skipped_odds += 1
+            continue
+
+        try:
+            h_sets = int(match.home_score)
+            a_sets = int(match.away_score)
+        except (ValueError, TypeError):
+            skipped_sets += 1
+            continue
+
+        if fav_is_home:
+            won = (h_sets - a_sets) >= 2   # home wins 2-0
+        else:
+            won = (a_sets - h_sets) >= 2   # away wins 2-0
+
+        pnl = (hc_odds - 1.0) if won else -1.0
+        bets.append({
+            "match_id": match.id,
+            "fav_prob": fav_prob,
+            "p_clean": p_clean,
+            "hc_odds": hc_odds,
+            "won": won,
+            "pnl": pnl,
+            "date": match.kickoff_utc,
+        })
+
+    if not bets:
+        log.warning("  Tennis handicap: no bets survived filters (conf_skip=%d odds_skip=%d sets_skip=%d).",
+                    skipped_conf, skipped_odds, skipped_sets)
+        return None
+
+    pnl_arr = np.array([b["pnl"] for b in bets])
+    won_arr = np.array([b["won"] for b in bets])
+    odds_arr = np.array([b["hc_odds"] for b in bets])
+    n_bets = len(bets)
+    n_won = int(won_arr.sum())
+    total_pnl = float(pnl_arr.sum())
+    roi = total_pnl / n_bets   # flat 1u per bet
+
+    # Sharpe (per-bet returns as % of stake)
+    ret_std = float(pnl_arr.std())
+    sharpe = float(pnl_arr.mean() / ret_std * (n_bets ** 0.5)) if ret_std > 0 else 0.0
+
+    # Max drawdown on cumulative P/L curve
+    cum = np.cumsum(pnl_arr)
+    running_max = np.maximum.accumulate(cum)
+    max_dd = float((cum - running_max).min())
+
+    date_from = bets[0]["date"]
+    date_to = bets[-1]["date"]
+
+    result = {
+        "n_bets": n_bets,
+        "n_won": n_won,
+        "hit_rate": round(n_won / n_bets, 4),
+        "pnl_units": round(total_pnl, 2),
+        "roi": round(roi, 4),
+        "sharpe_ratio": round(sharpe, 3),
+        "max_drawdown_units": round(max_dd, 2),
+        "avg_odds": round(float(odds_arr.mean()), 3),
+        "skipped_conf": skipped_conf,
+        "skipped_odds": skipped_odds,
+        "staking": "flat_1u",
+        "market": "Set Handicap -1.5",
+        "side": "favourite_only",
+        "date_from": date_from.isoformat() if date_from else None,
+        "date_to": date_to.isoformat() if date_to else None,
+        "run_at": datetime.now(tz=timezone.utc).isoformat(),
+    }
+
+    log.info(
+        "  tennis-handicap  n=%d  hit=%.1f%%  pnl=%+.1fu  roi=%+.1f%%  sharpe=%.2f  dd=%.1fu",
+        n_bets, n_won / n_bets * 100, total_pnl, roi * 100, sharpe, max_dd,
+    )
+    return result
 
 
 def _run_for_sport(
@@ -147,6 +297,13 @@ def _run_for_sport(
     # Persist into model_registry.metrics["backtest"]
     metrics = dict(registry.metrics or {})
     metrics["backtest"] = summary
+
+    # For tennis: also run set handicap simulation and embed the result
+    if sport == "tennis":
+        hc_result = _run_tennis_handicap(session)
+        if hc_result:
+            metrics["backtest"]["set_handicap"] = hc_result
+
     registry.metrics = metrics
 
     return summary
