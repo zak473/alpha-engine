@@ -844,18 +844,18 @@ def admin_backfill_all_picks(secret: str, days: int = 60):
 
 
 @app.get("/api/v1/admin/backfill-picks-diag", tags=["Admin"])
-def admin_backfill_picks_diag(secret: str, days: int = 3):
+def admin_backfill_picks_diag(secret: str, days: int = 3, dry_run: bool = True):
     """Synchronous diagnostic: run backfill for a short window and return results or errors."""
     if secret != settings.ADMIN_SECRET:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
     try:
         from pipelines.picks.backfill_picks import run as backfill
-        n = backfill(days=days, dry_run=True)
-        return {"status": "ok", "dry_run": True, "days": days, "would_create": n}
+        n = backfill(days=days, dry_run=dry_run)
+        return {"status": "ok", "dry_run": dry_run, "days": days, "created": n}
     except Exception as exc:
         import traceback
-        return {"status": "error", "error": str(exc), "trace": traceback.format_exc()[-2000:]}
+        return {"status": "error", "error": str(exc), "trace": traceback.format_exc()[-3000:]}
 
 
 @app.post("/api/v1/admin/backfill-spread-picks", tags=["Admin"])
