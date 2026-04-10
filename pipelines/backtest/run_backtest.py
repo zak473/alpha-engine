@@ -248,7 +248,13 @@ def _run_for_sport(
         if actual is None:
             continue
 
-        confidence = (pred.confidence or 0) / 100.0
+        # Use stored confidence when available; derive from p_home otherwise.
+        # pred.confidence may be NULL for older predictions.
+        if pred.confidence is not None:
+            confidence = pred.confidence / 100.0
+        else:
+            ph = pred.p_home or 0.5
+            confidence = abs(ph - 0.5) * 2.0  # same formula as all sport predictors
         if confidence < conf_gate:
             continue
 
