@@ -27,10 +27,10 @@ log = logging.getLogger(__name__)
 
 SPORTS = ["soccer", "tennis", "esports", "basketball", "baseball", "hockey"]
 
-# Thresholds for the handicap simulation (mirrors backfill_picks.py)
-HC_MIN_CONFIDENCE: float = 0.25
 HC_MIN_ODDS: float = 1.4
 HC_MAX_ODDS: float = 4.0
+# AH0 (Draw No Bet) markets naturally produce shorter odds than 1X2 — lower floor.
+AH0_MIN_ODDS: float = 1.1
 
 
 def _outcome_to_float(outcome: str | None) -> float | None:
@@ -43,14 +43,14 @@ def _outcome_to_float(outcome: str | None) -> float | None:
     return None
 
 
-def _run_tennis_handicap(session: Session) -> dict | None:
+def _run_tennis_handicap(session: Session, min_confidence: float = 0.25) -> dict | None:
     """
     Simulate set handicap (-1.5 sets) betting on tennis predictions.
 
     For each finished tennis match with a PredMatch and set scores:
     - Compute P(favourite wins 2-0) using BO3 formula W = p²(3-2p)
     - Only place the favourite's -1.5 bet if fair odds pass MIN/MAX range
-    - Apply a confidence gate of HC_MIN_CONFIDENCE
+    - Apply a confidence gate (min_confidence)
     - Flat 1u staking (no Kelly — we have no market odds reference, just fair odds)
 
     Returns a summary dict stored as metrics["backtest"]["set_handicap"].
@@ -98,7 +98,7 @@ def _run_tennis_handicap(session: Session) -> dict | None:
             continue
 
         confidence = (pred.confidence or 0) / 100.0
-        if confidence < HC_MIN_CONFIDENCE:
+        if confidence < min_confidence:
             skipped_conf += 1
             continue
 
@@ -184,6 +184,149 @@ def _run_tennis_handicap(session: Session) -> dict | None:
     log.info(
         "  tennis-handicap  n=%d  hit=%.1f%%  pnl=%+.1fu  roi=%+.1f%%  sharpe=%.2f  dd=%.1fu",
         n_bets, n_won / n_bets * 100, total_pnl, roi * 100, sharpe, max_dd,
+    )
+    return result
+
+
+def _run_soccer_draw_no_bet(session: Session, min_confidence: float = 0.65) -> dict | None:
+    """
+    Simulate Draw No Bet (Asian Handicap 0) for soccer predictions.
+
+    Bet on the model's favourite (higher of p_home / p_away):
+    - Win  if favourite wins outright  → +odds-1
+    - Push if match draws              → 0  (stake returned)
+    - Lose if other team wins          → -1
+
+    Fair AH0 odds for favourite = (p_fav + p_dog) / p_fav
+    (draw is excluded from the payout pool so it doesn't inflate the favourite's price).
+
+    Returns a summary dict stored as metrics["backtest"]["draw_no_bet"].
+    """
+    import numpy as np
+    from sqlalchemy import func
+
+    subq = (
+        session.query(PredMatch.match_id, func.max(PredMatch.id).label("latest_id"))
+        .join(CoreMatch, CoreMatch.id == PredMatch.match_id)
+        .filter(CoreMatch.sport == "soccer")
+        .group_by(PredMatch.match_id)
+        .subquery()
+    )
+    rows = (
+        session.query(CoreMatch, PredMatch)
+        .join(subq, subq.c.match_id == CoreMatch.id)
+        .join(PredMatch, PredMatch.id == subq.c.latest_id)
+        .filter(
+            CoreMatch.sport == "soccer",
+            CoreMatch.status == "finished",
+            CoreMatch.outcome.isnot(None),
+        )
+        .order_by(CoreMatch.kickoff_utc.asc())
+        .all()
+    )
+
+    if not rows:
+        log.warning("  Soccer DNB: no finished matches.")
+        return None
+
+    bets = []
+    skipped_conf = 0
+    skipped_odds = 0
+
+    for match, pred in rows:
+        p_home = pred.p_home or 0.0
+        p_away = pred.p_away or 0.0
+        if p_home <= 0 or p_away <= 0:
+            continue
+
+        confidence = (pred.confidence or 0) / 100.0
+        if confidence < min_confidence:
+            skipped_conf += 1
+            continue
+
+        fav_is_home = p_home >= p_away
+        p_fav = p_home if fav_is_home else p_away
+        p_dog = p_away if fav_is_home else p_home
+
+        # AH0 fair odds: draw is a push, only win/lose split for odds
+        ah0_odds = round((p_fav + p_dog) / p_fav, 3) if p_fav > 0 else None
+        if ah0_odds is None or ah0_odds < AH0_MIN_ODDS or ah0_odds > HC_MAX_ODDS:
+            skipped_odds += 1
+            continue
+
+        outcome = match.outcome  # "home_win"/"H", "draw"/"D", "away_win"/"A"
+        if outcome in ("home_win", "H"):
+            actual = "home"
+        elif outcome in ("draw", "D"):
+            actual = "draw"
+        else:
+            actual = "away"
+
+        fav_side = "home" if fav_is_home else "away"
+        if actual == fav_side:
+            pnl = ah0_odds - 1.0   # win
+        elif actual == "draw":
+            pnl = 0.0              # push — stake returned
+        else:
+            pnl = -1.0             # lose
+
+        bets.append({
+            "match_id": match.id,
+            "p_fav": p_fav,
+            "ah0_odds": ah0_odds,
+            "pnl": pnl,
+            "won": pnl > 0,
+            "push": pnl == 0.0,
+            "date": match.kickoff_utc,
+        })
+
+    if not bets:
+        log.warning("  Soccer DNB: no bets survived filters (conf_skip=%d odds_skip=%d).",
+                    skipped_conf, skipped_odds)
+        return None
+
+    pnl_arr = np.array([b["pnl"] for b in bets])
+    odds_arr = np.array([b["ah0_odds"] for b in bets])
+    n_bets = len(bets)
+    n_won = sum(1 for b in bets if b["won"])
+    n_push = sum(1 for b in bets if b["push"])
+    total_pnl = float(pnl_arr.sum())
+    roi = total_pnl / n_bets
+
+    ret_std = float(pnl_arr.std())
+    sharpe = float(pnl_arr.mean() / ret_std * (n_bets ** 0.5)) if ret_std > 0 else 0.0
+
+    cum = np.cumsum(pnl_arr)
+    running_max = np.maximum.accumulate(cum)
+    max_dd = float((cum - running_max).min())
+
+    date_from = bets[0]["date"]
+    date_to = bets[-1]["date"]
+
+    result = {
+        "n_bets": n_bets,
+        "n_won": n_won,
+        "n_push": n_push,
+        "hit_rate": round(n_won / n_bets, 4),
+        "pnl_units": round(total_pnl, 2),
+        "roi": round(roi, 4),
+        "sharpe_ratio": round(sharpe, 3),
+        "max_drawdown_units": round(max_dd, 2),
+        "avg_odds": round(float(odds_arr.mean()), 3),
+        "min_confidence": min_confidence,
+        "skipped_conf": skipped_conf,
+        "skipped_odds": skipped_odds,
+        "staking": "flat_1u",
+        "market": "Draw No Bet (AH0)",
+        "side": "favourite_only",
+        "date_from": date_from.isoformat() if date_from else None,
+        "date_to": date_to.isoformat() if date_to else None,
+        "run_at": datetime.now(tz=timezone.utc).isoformat(),
+    }
+
+    log.info(
+        "  soccer-DNB  n=%d  hit=%.1f%%  push=%d  pnl=%+.1fu  roi=%+.1f%%  sharpe=%.2f",
+        n_bets, n_won / n_bets * 100, n_push, total_pnl, roi * 100, sharpe,
     )
     return result
 
@@ -314,11 +457,15 @@ def _run_for_sport(
     metrics = dict(registry.metrics or {})
     metrics["backtest"] = summary
 
-    # For tennis: also run set handicap simulation and embed the result
+    # Sport-specific handicap simulations
     if sport == "tennis":
-        hc_result = _run_tennis_handicap(session)
+        hc_result = _run_tennis_handicap(session, min_confidence=min_confidence)
         if hc_result:
             metrics["backtest"]["set_handicap"] = hc_result
+    elif sport == "soccer":
+        dnb_result = _run_soccer_draw_no_bet(session, min_confidence=min_confidence)
+        if dnb_result:
+            metrics["backtest"]["draw_no_bet"] = dnb_result
 
     registry.metrics = metrics
 
