@@ -233,30 +233,61 @@ def _run_for_sport(
         log.warning("  No finished predictions for %s (%s).", sport, registry.model_name)
         return None
 
+    # Per-sport confidence gates (mirror auto_picks.py SPORT_MIN_CONFIDENCE)
+    CONF_GATE: dict[str, float] = {
+        "soccer": 0.50,
+        "baseball": 0.50,
+    }
+    conf_gate = CONF_GATE.get(sport, 0.0)
+
     predictions, actuals, odds_list = [], [], []
     for match, pred in rows:
         actual = _outcome_to_float(match.outcome)
         if actual is None:
             continue
+
+        confidence = (pred.confidence or 0) / 100.0
+        if confidence < conf_gate:
+            continue
+
+        p_home = pred.p_home or 0.0
+        p_away = pred.p_away or 0.0
+        p_draw = pred.p_draw or 0.0
+
+        # Determine the best outcome and pass ITS odds to the backtester.
+        # Previously we always passed home odds, which broke draw/away P/L.
+        best_p = max(p_home, p_draw, p_away)
+        if best_p == p_draw and p_draw > 0:
+            real_odds = match.odds_draw
+            fair_odds = 1.0 / p_draw if p_draw > 0.05 else None
+        elif best_p == p_away:
+            real_odds = match.odds_away
+            fair_odds = 1.0 / p_away if p_away > 0.05 else None
+        else:
+            real_odds = match.odds_home
+            fair_odds = 1.0 / p_home if p_home > 0.05 else None
+
+        bet_odds = (real_odds if real_odds and real_odds > 1.0 else fair_odds)
+
         predictions.append(PredictionResult(
             match_id=match.id,
             sport=Sport(sport),
-            p_home=pred.p_home or 0.0,
-            p_away=pred.p_away or 0.0,
-            p_draw=pred.p_draw or 0.0,
-            confidence=(pred.confidence or 0) / 100.0,
+            p_home=p_home,
+            p_away=p_away,
+            p_draw=p_draw,
+            confidence=confidence,
         ))
         actuals.append(actual)
-        if match.odds_home and match.odds_home > 1.0:
-            odds_list.append(match.odds_home)
-        else:
-            odds_list.append(1.0 / pred.p_home if (pred.p_home or 0) > 0.05 else None)
+        odds_list.append(bet_odds)
 
     if not predictions:
         log.warning("  No valid predictions for %s after filtering.", sport)
         return None
 
-    config = StakingConfig(method=staking, kelly_fraction=kelly_fraction, min_edge=min_edge)
+    # Soccer uses fair odds (edge ≈ 0) — drop the edge gate so confident picks
+    # aren't filtered out. Other sports keep the 2% edge gate for real odds.
+    effective_min_edge = 0.0 if sport == "soccer" else min_edge
+    config = StakingConfig(method=staking, kelly_fraction=kelly_fraction, min_edge=effective_min_edge)
     result = Backtester(config).run(predictions, actuals, odds_list)
 
     date_from = rows[0][0].kickoff_utc
