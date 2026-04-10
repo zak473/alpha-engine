@@ -233,34 +233,16 @@ def _run_for_sport(
         log.warning("  No finished predictions for %s (%s).", sport, registry.model_name)
         return None
 
-    # Per-sport confidence gates (mirror backfill_picks.py thresholds)
-    # Soccer uses fair odds where edge≈0, so gate on confidence alone.
-    # 0.25 = abs(p-0.5)*2 ≥ 0.25 → p ≥ 0.625 (matches BACKFILL_MIN_CONFIDENCE)
-    CONF_GATE: dict[str, float] = {
-        "soccer": 0.25,
-        "baseball": 0.25,
-    }
-    conf_gate = CONF_GATE.get(sport, 0.0)
-
     predictions, actuals, odds_list = [], [], []
     for match, pred in rows:
         actual = _outcome_to_float(match.outcome)
         if actual is None:
             continue
 
-        # Use stored confidence when available; derive from p_home otherwise.
-        # pred.confidence may be NULL for older predictions.
-        if pred.confidence is not None:
-            confidence = pred.confidence / 100.0
-        else:
-            ph = pred.p_home or 0.5
-            confidence = abs(ph - 0.5) * 2.0  # same formula as all sport predictors
-        if confidence < conf_gate:
-            continue
-
         p_home = pred.p_home or 0.0
         p_away = pred.p_away or 0.0
         p_draw = pred.p_draw or 0.0
+        confidence = (pred.confidence or 0) / 100.0
 
         # Determine the best outcome and pass ITS odds to the backtester.
         # Previously we always passed home odds, which broke draw/away P/L.
@@ -275,7 +257,9 @@ def _run_for_sport(
             real_odds = match.odds_home
             fair_odds = 1.0 / p_home if p_home > 0.05 else None
 
-        bet_odds = (real_odds if real_odds and real_odds > 1.0 else fair_odds)
+        # Use real market odds when available; fall back to fair odds for
+        # sports that use model-only fair odds (soccer via SGO gap coverage).
+        bet_odds = real_odds if (real_odds and real_odds > 1.0) else fair_odds
 
         predictions.append(PredictionResult(
             match_id=match.id,
@@ -292,20 +276,7 @@ def _run_for_sport(
         log.warning("  No valid predictions for %s after filtering.", sport)
         return None
 
-    # Soccer uses fair odds (edge ≈ 0) — drop edge gate and min_odds filter so
-    # confident picks aren't filtered out. Backfill also bypasses MIN_ODDS for
-    # fair odds, so we match that behaviour here for an accurate track record.
-    # Other sports keep the 2% edge gate with normal odds bounds.
-    if sport == "soccer":
-        config = StakingConfig(
-            method=staking,
-            kelly_fraction=kelly_fraction,
-            min_edge=0.0,
-            min_odds=1.0,
-            max_odds=20.0,
-        )
-    else:
-        config = StakingConfig(method=staking, kelly_fraction=kelly_fraction, min_edge=min_edge)
+    config = StakingConfig(method=staking, kelly_fraction=kelly_fraction, min_edge=min_edge)
     result = Backtester(config).run(predictions, actuals, odds_list)
 
     date_from = rows[0][0].kickoff_utc
