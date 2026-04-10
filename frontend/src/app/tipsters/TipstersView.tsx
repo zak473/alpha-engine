@@ -248,16 +248,18 @@ function SpotlightCard({
   const sport = detectTipsterSport(tipster);
   const days = period === "7d" ? 7 : period === "30d" ? 30 : undefined;
 
-  // Sparkline shape from live tips (period-filtered)
+  // Period-filtered stats from actual settled tips (matches history tab)
   const pl = useMemo(() => computePLCurve(tips, days), [tips, period]);
 
-  // Stats always from backtest — consistent with modal and correct scale
-  const accuracy = backtest ? Math.round((backtest.accuracy ?? 0) * 100) : 0;
-  const unitsVal = backtest?.pnl_units ?? 0;
+  // Show period-specific stats when tips are loaded, else fall back to server-side totals
+  const hasTips = tips.length > 0;
+  const winRate = hasTips ? pl.pct : Math.round((tipster.overall_win_rate ?? 0) * 100);
+  const unitsVal = hasTips ? pl.units : (tipster.profit_loss ?? 0);
+  const sampleSize = hasTips ? pl.total : (tipster.settled_picks ?? 0);
+  // Sharpe from backtest only (model quality metric, no alternative source)
   const sharpe = backtest?.sharpe_ratio ?? 0;
-  const sampleSize = backtest?.n_predictions ?? tipster.settled_picks ?? 0;
   const isPositive = unitsVal >= 0;
-  const accColor = accuracy >= 58 ? "var(--positive)" : accuracy >= 52 ? "var(--warning)" : "var(--text1)";
+  const accColor = winRate >= 58 ? "var(--positive)" : winRate >= 50 ? "var(--warning)" : "var(--negative)";
 
   return (
     <article
@@ -294,12 +296,12 @@ function SpotlightCard({
         {/* Main stat pair */}
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-[14px] px-3 py-2.5" style={{ background: "rgba(255,255,255,0.05)" }}>
-            <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-text-subtle">Accuracy</div>
+            <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-text-subtle">Win rate</div>
             <div
               className="mt-1 text-[22px] font-black tracking-[-0.04em] tabular-nums"
               style={{ color: accColor }}
             >
-              {loading ? <span className="text-text-muted text-sm">…</span> : accuracy > 0 ? `${accuracy}%` : "—"}
+              {loading ? <span className="text-text-muted text-sm">…</span> : sampleSize > 0 ? `${winRate}%` : "—"}
             </div>
           </div>
           <div className="rounded-[14px] px-3 py-2.5" style={{ background: "rgba(255,255,255,0.05)" }}>
@@ -308,7 +310,7 @@ function SpotlightCard({
               className="mt-1 text-[22px] font-black tracking-[-0.04em] tabular-nums"
               style={{ color: isPositive ? "var(--positive)" : "var(--negative)" }}
             >
-              {loading ? <span className="text-text-muted text-sm">…</span> : `${unitsVal >= 0 ? "+" : ""}${unitsVal.toFixed(1)}u`}
+              {loading ? <span className="text-text-muted text-sm">…</span> : sampleSize > 0 ? `${unitsVal >= 0 ? "+" : ""}${unitsVal.toFixed(1)}u` : "—"}
             </div>
           </div>
         </div>
@@ -388,31 +390,26 @@ function SpotlightBoards({
   const days = period === "7d" ? 7 : period === "30d" ? 30 : undefined;
 
   const agg = useMemo(() => {
-    // Accuracy and units always from backtest (correct scale, matches modal)
-    let totalPredictions = 0;
-    let weightedAccSum = 0;
-    let totalUnits = 0;
+    // Aggregate from actual settled tips (same source as cards and history tabs)
+    let totalWins = 0, totalLosses = 0, totalUnits = 0;
     aiTipsters.forEach((t) => {
-      const sport = detectTipsterSport(t);
-      const bt = backtestSummary[sport.slug ?? ""];
-      if (!bt) return;
-      const n = bt.n_predictions ?? 0;
-      totalPredictions += n;
-      weightedAccSum += (bt.accuracy ?? 0) * n;
-      totalUnits += bt.pnl_units ?? 0;
+      const { wins, losses, units } = computePLCurve(tipHistory[t.id] ?? [], days);
+      totalWins += wins;
+      totalLosses += losses;
+      totalUnits += units;
     });
-    // Period-filtered pick count from live tips (just for context)
-    let periodPicks = 0;
-    aiTipsters.forEach((t) => {
-      const { total } = computePLCurve(tipHistory[t.id] ?? [], days);
-      periodPicks += total;
-    });
+    const total = totalWins + totalLosses;
+    // While tips are loading, fall back to server-side totals
+    const fallbackPicks = aiTipsters.reduce((s, t) => s + (t.settled_picks ?? 0), 0);
+    const fallbackWinRate = aiTipsters.reduce((s, t) => s + (t.overall_win_rate ?? 0), 0) / (aiTipsters.length || 1);
+    const fallbackUnits = aiTipsters.reduce((s, t) => s + (t.profit_loss ?? 0), 0);
+    const hasTipsLoaded = aiTipsters.some((t) => (tipHistory[t.id]?.length ?? 0) > 0);
     return {
-      picks: period === "all" ? totalPredictions : periodPicks,
-      accuracy: totalPredictions > 0 ? Math.round((weightedAccSum / totalPredictions) * 100) : 0,
-      units: Number(totalUnits.toFixed(1)),
+      picks: hasTipsLoaded ? total : (period === "all" ? fallbackPicks : 0),
+      winRate: hasTipsLoaded ? (total > 0 ? Math.round((totalWins / total) * 100) : 0) : Math.round(fallbackWinRate * 100),
+      units: hasTipsLoaded ? Number(totalUnits.toFixed(1)) : Number(fallbackUnits.toFixed(1)),
     };
-  }, [backtestSummary, tipHistory, period, aiTipsters]);
+  }, [tipHistory, period, aiTipsters]);
 
   if (aiTipsters.length === 0) return null;
 
@@ -454,9 +451,9 @@ function SpotlightBoards({
             color: "var(--text0)",
           },
           {
-            label: "Combined accuracy",
-            value: loading ? "…" : agg.accuracy > 0 ? `${agg.accuracy}%` : "—",
-            color: agg.accuracy >= 55 ? "var(--positive)" : agg.accuracy >= 50 ? "var(--warning)" : "var(--text1)",
+            label: "Combined win rate",
+            value: loading ? "…" : agg.winRate > 0 ? `${agg.winRate}%` : "—",
+            color: agg.winRate >= 55 ? "var(--positive)" : agg.winRate >= 50 ? "var(--warning)" : "var(--text1)",
           },
           {
             label: "Combined units",
@@ -679,20 +676,16 @@ function TipsterModal({
   const voidPicks = tipster.void_picks ?? 0;
   const recordStr = `${tipster.won_picks}W - ${tipster.lost_picks}L${voidPicks > 0 ? ` - ${voidPicks}V` : ""}`;
 
-  const useBacktest = tipster.is_ai && backtest;
-  const summary = useBacktest
-    ? [
-        { label: "Accuracy", value: `${((backtest!.accuracy ?? 0) * 100).toFixed(1)}%`, tone: (backtest!.accuracy ?? 0) >= 0.55 ? "var(--positive)" : "var(--warning)" },
-        { label: "Units", value: `${(backtest!.pnl_units ?? 0) >= 0 ? "+" : ""}${(backtest!.pnl_units ?? 0).toFixed(1)}u`, tone: (backtest!.pnl_units ?? 0) >= 0 ? "var(--positive)" : "var(--negative)" },
-        { label: "Sharpe", value: (backtest!.sharpe_ratio ?? 0).toFixed(2), tone: (backtest!.sharpe_ratio ?? 0) >= 2 ? "var(--positive)" : "var(--warning)" },
-        { label: "Predictions", value: (backtest!.n_predictions ?? 0).toLocaleString(), tone: "var(--text0)" },
-      ]
-    : [
-        { label: "Win rate", value: `${overallWinPct}%`, tone: overallWinPct >= 55 ? "var(--positive)" : overallWinPct >= 50 ? "var(--warning)" : "var(--text0)" },
-        { label: "Units", value: tipster.settled_picks > 0 ? plStr : "—", tone: profitLoss >= 0 ? "var(--positive)" : "var(--negative)" },
-        { label: "Record", value: tipster.settled_picks > 0 ? recordStr : "—", tone: "var(--text0)" },
-        { label: "Avg odds", value: (tipster.avg_odds ?? 0) > 0 ? (tipster.avg_odds ?? 0).toFixed(2) : "—", tone: "var(--text0)" },
-      ];
+  // All tipsters (AI and community) use the same live settled stats so card and modal always match
+  const sharpeVal = tipster.is_ai && backtest ? backtest.sharpe_ratio ?? 0 : null;
+  const summary = [
+    { label: "Win rate", value: tipster.settled_picks > 0 ? `${overallWinPct}%` : "—", tone: overallWinPct >= 55 ? "var(--positive)" : overallWinPct >= 50 ? "var(--warning)" : "var(--text0)" },
+    { label: "Units", value: tipster.settled_picks > 0 ? plStr : "—", tone: profitLoss >= 0 ? "var(--positive)" : "var(--negative)" },
+    { label: "Record", value: tipster.settled_picks > 0 ? recordStr : "—", tone: "var(--text0)" },
+    sharpeVal !== null
+      ? { label: "Sharpe", value: sharpeVal.toFixed(2), tone: sharpeVal >= 2 ? "var(--positive)" : "var(--warning)" }
+      : { label: "Avg odds", value: (tipster.avg_odds ?? 0) > 0 ? (tipster.avg_odds ?? 0).toFixed(2) : "—", tone: "var(--text0)" },
+  ];
 
   const displayedTips = activeTab === "active" ? activeTips : settledHistory;
   const emptyCopy = activeTab === "active" ? "No active tips right now" : "No settled tips yet";
