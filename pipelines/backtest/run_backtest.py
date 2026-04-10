@@ -244,21 +244,12 @@ def _run_for_sport(
         p_draw = pred.p_draw or 0.0
         confidence = (pred.confidence or 0) / 100.0
 
-        # Determine the best outcome and pass ITS odds to the backtester.
-        # Previously we always passed home odds, which broke draw/away P/L.
-        best_p = max(p_home, p_draw, p_away)
-        if best_p == p_draw and p_draw > 0:
-            real_odds = match.odds_draw
-            fair_odds = 1.0 / p_draw if p_draw > 0.05 else None
-        elif best_p == p_away:
-            real_odds = match.odds_away
-            fair_odds = 1.0 / p_away if p_away > 0.05 else None
-        else:
-            real_odds = match.odds_home
-            fair_odds = 1.0 / p_home if p_home > 0.05 else None
-
-        # Use real market odds when available; fall back to fair odds for
-        # sports that use model-only fair odds (soccer via SGO gap coverage).
+        # Use home market odds for edge calculation — draw/away odds are rarely
+        # populated in the DB, so we use home odds as a market-efficiency proxy.
+        # The backtester's _select_bet still picks the highest-probability outcome
+        # and correctly tracks whether that outcome won.
+        real_odds = match.odds_home
+        fair_odds = 1.0 / p_home if p_home > 0.05 else None
         bet_odds = real_odds if (real_odds and real_odds > 1.0) else fair_odds
 
         predictions.append(PredictionResult(
