@@ -135,23 +135,20 @@ def _already_tipped(db: Session, user_id: str, match_label: str, market: str, se
 
 
 # ── Per-sport thresholds ───────────────────────────────────────────────────────
-# Baseball: model picks heavy favourites with no real edge → require much higher
-# bar before auto-betting. Raise min_edge to 8% and min_confidence to 65%.
-# Soccer (soccer_lgb_v18): validated at 60.1% accuracy only at ≥50% confidence
-# (covers 48% of matches). Picks below 50% confidence drag the track record down,
-# so we gate the auto-picks bot at the same threshold the model was evaluated on.
+# Target: ~15 tips/day across all 6 sports (~3 per sport).
+# Global AUTO_PICK_MIN_CONFIDENCE is 0.70 — only the most confident picks.
+# Soccer uses 0.65 since lgb_v18 was evaluated at ≥50% (still selective).
+# Basketball edge floor is low because NBA books are efficient and real edge is rare.
 SPORT_MIN_EDGE: dict[str, float] = {
-    "baseball":    0.08,  # raised from 0.05 — model picks too many low-edge games
-    "basketball":  0.01,  # NBA books are efficient; accept any genuine edge ≥1%
+    "baseball":    0.08,
+    "basketball":  0.01,
 }
 SPORT_MIN_CONFIDENCE: dict[str, float] = {
-    "baseball": 0.65,  # raised from 0.50 — was generating ~50 tips/day, target ~10
-    "soccer":   0.50,  # lgb_v18 validated at 60.1% acc only at ≥50% confidence
+    "soccer": 0.65,  # slightly lower — lgb_v18 confidence distribution skews lower
 }
-# When using fair odds (no market odds available), use a higher confidence bar
-# since there's no market edge to measure — pure model conviction only.
+# Fair-odds soccer (no SGO market odds): require 75% to compensate for no market edge signal.
 FAIR_ODDS_MIN_CONFIDENCE: dict[str, float] = {
-    "soccer": 0.65,
+    "soccer": 0.75,
 }
 
 # Sports where we fall back to model fair odds (1/p) when real market odds are
