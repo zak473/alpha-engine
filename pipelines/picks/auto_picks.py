@@ -135,20 +135,23 @@ def _already_tipped(db: Session, user_id: str, match_label: str, market: str, se
 
 
 # ── Per-sport thresholds ───────────────────────────────────────────────────────
-# Target: ~15 tips/day across all 6 sports (~3 per sport).
-# Global AUTO_PICK_MIN_CONFIDENCE is 0.70 — only the most confident picks.
-# Soccer uses 0.65 since lgb_v18 was evaluated at ≥50% (still selective).
-# Basketball edge floor is low because NBA books are efficient and real edge is rare.
+# Esports: model stores confidence as abs(p - 0.5) * 2 so a 60% prediction = 20%
+# confidence. Global 70% gate kills ALL esports picks. Use edge-only gating instead.
+# Baseball/hockey: keep high confidence since sample is thin and model less proven.
+# Soccer: 65% works well for lgb_v18 given its confidence distribution.
 SPORT_MIN_EDGE: dict[str, float] = {
+    "esports":     0.03,  # PandaScore market odds make edge the right gate
     "baseball":    0.08,
     "basketball":  0.01,
 }
 SPORT_MIN_CONFIDENCE: dict[str, float] = {
-    "soccer": 0.65,  # slightly lower — lgb_v18 confidence distribution skews lower
+    "esports": 0.0,   # edge gate only — confidence formula incompatible with global threshold
+    "soccer":  0.65,  # lgb_v18 confidence distribution skews lower than other models
 }
-# Fair-odds soccer (no SGO market odds): require 75% to compensate for no market edge signal.
+# Fair-odds soccer (no SGO market odds): require higher confidence since there's no
+# external edge signal to validate against.
 FAIR_ODDS_MIN_CONFIDENCE: dict[str, float] = {
-    "soccer": 0.75,
+    "soccer": 0.72,
 }
 
 # Sports where we fall back to model fair odds (1/p) when real market odds are
@@ -240,14 +243,10 @@ def run(
                 candidates.append(("Draw", pred.p_draw, d_odds, ml_market))
 
             # Tennis set handicap — add fair-odds -1.5 set candidates derived from
-            # the model's match-win probability. These have edge≈0 vs fair odds but
-            # convert low-odds ML favourites (< MIN_ODDS) into higher-odds handicap
-            # bets that pass the MIN_ODDS filter and improve unit gain per pick.
+            # Tennis set handicap (-1.5 sets) disabled: backtest showed -22% ROI over
+            # 89 bets. The formula bets at fair odds with no external edge signal —
+            # structurally break-even at best. Using ML outright with market odds instead.
             hc_candidates: list[tuple[str, float, float, str]] = []
-            if sport == "tennis" and pred.p_home and pred.p_away:
-                hc_candidates = _tennis_handicap_candidates(
-                    home_name, away_name, pred.p_home
-                )
 
             effective_min_edge = 0.0 if using_fair_odds else SPORT_MIN_EDGE.get(sport, min_edge)
             if using_fair_odds:

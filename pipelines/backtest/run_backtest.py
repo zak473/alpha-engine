@@ -29,8 +29,23 @@ SPORTS = ["soccer", "tennis", "esports", "basketball", "baseball", "hockey"]
 
 HC_MIN_ODDS: float = 1.4
 HC_MAX_ODDS: float = 4.0
-# AH0 (Draw No Bet) markets naturally produce shorter odds than 1X2 — lower floor.
-AH0_MIN_ODDS: float = 1.1
+# AH0 (Draw No Bet): raise floor to 1.50 — below that the odds are too short to
+# overcome even a small model error (at 1.263 avg you need 79% hit rate to break even).
+AH0_MIN_ODDS: float = 1.50
+
+# Per-sport optimal confidence thresholds for the backtest.
+# These differ from live-pick thresholds: the backtest should show the model's
+# realistic achievable P&L, not the most-selective live-pick filter.
+# Esports: model stores confidence = abs(p - 0.5) * 2, so a 60% prediction = 20%
+# confidence. Any global threshold > 0.30 kills all esports bets.
+BACKTEST_MIN_CONFIDENCE: dict[str, float] = {
+    "esports":    0.0,   # edge gate only — was +19u/week at this setting
+    "soccer":     0.55,  # lgb_v18 validated at ≥50% confidence
+    "tennis":     0.55,
+    "basketball": 0.0,   # binary model, edge gate is the filter
+    "baseball":   0.60,
+    "hockey":     0.60,
+}
 
 
 def _outcome_to_float(outcome: str | None) -> float | None:
@@ -337,9 +352,13 @@ def _run_for_sport(
     staking: str = "flat",
     kelly_fraction: float = 0.25,
     min_edge: float = 0.02,
-    min_confidence: float = 0.0,
+    min_confidence: float = -1.0,   # -1 = use BACKTEST_MIN_CONFIDENCE per-sport default
 ) -> dict | None:
     """Run backtester for one sport using all historical predictions."""
+    # Apply per-sport default if no explicit threshold was passed
+    if min_confidence < 0:
+        min_confidence = BACKTEST_MIN_CONFIDENCE.get(sport, 0.0)
+
     registry = (
         session.query(ModelRegistry)
         .filter_by(sport=sport, is_live=True)
@@ -472,7 +491,7 @@ def _run_for_sport(
     return summary
 
 
-def run(sport: str | None = None, staking: str = "flat", kelly_fraction: float = 0.25, min_edge: float = 0.02, min_confidence: float = 0.0) -> None:
+def run(sport: str | None = None, staking: str = "flat", kelly_fraction: float = 0.25, min_edge: float = 0.02, min_confidence: float = -1.0) -> None:
     session: Session = SessionLocal()
     try:
         target_sports = [sport] if sport and sport != "all" else SPORTS

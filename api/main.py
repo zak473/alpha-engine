@@ -1070,7 +1070,7 @@ def admin_fetch_tennis(secret: str):
 
 
 @app.post("/api/v1/admin/run-backtest", tags=["Admin"])
-def admin_run_backtest(secret: str, sport: str = "all", min_confidence: float = 0.0):
+def admin_run_backtest(secret: str, sport: str = "all", min_confidence: float = -1.0):
     """
     Run the backtest pipeline for all (or one) sport and save results to
     model_registry.metrics['backtest'] so the /backtest/summary endpoint
