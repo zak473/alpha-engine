@@ -216,7 +216,7 @@ SPORT_MIN_CONFIDENCE: dict[str, float] = {
     # Combined with these floors: basketball p=0.65-0.71, baseball p=0.60-0.71.
     "esports":    1.0,   # DISABLED: all esports thresholds showed negative ROI
     "soccer":     0.30,  # real SGO odds only; MIN_ODDS=1.40 still applies as lower bound
-    "tennis":     0.40,  # set handicap: conf≥0.40 → ~5-7/day (p_home > 0.70)
+    "tennis":     0.40,  # match winner OR set handicap (whichever best), conf≥0.40
     "basketball": 0.30,
     "baseball":   0.20,
     "hockey":     0.35,
@@ -225,7 +225,12 @@ FAIR_ODDS_MIN_CONFIDENCE: dict[str, float] = {
     # soccer removed — uses real SGO odds only (no fair-odds fallback)
     "basketball": 0.30,
     "baseball":   0.20,
-    "tennis":     0.40,  # match winner: conf≥0.40 → p_home>0.70 → ~65-70% win rate
+    "tennis":     0.40,
+}
+# Per-sport minimum odds override. Tennis: 1.20 allows short-priced match winners
+# (p_home up to 0.83). Picks where odds < 1.20 fall through to set handicap.
+SPORT_MIN_ODDS: dict[str, float] = {
+    "tennis": 1.20,
 }
 
 # Sports where we fall back to model fair odds (1/p) when real market odds are
@@ -326,17 +331,15 @@ def run(
             if d_odds and pred.p_draw and pred.p_draw > 0.01:
                 candidates.append(("Draw", pred.p_draw, d_odds, ml_market))
 
-            # Tennis set handicap (-1.5 sets): pick the match favourite only.
-            # Re-enabled after model fix (label bias → 62.9% acc): +35% ROI, 3333 bets.
-            # Uses fair odds (1 / p_2_0) derived from match win prob via per-set formula.
-            hc_candidates: list[tuple[str, float, float, str]] = []
+            # Tennis: add set handicap (-1.5) to the candidate pool so we can
+            # pick whichever market has higher confidence (match winner wins unless
+            # its odds fall below sport_min_odds, in which case handicap is chosen).
             if sport == "tennis" and pred.p_home and pred.p_away:
-                all_hc = _tennis_handicap_candidates(
-                    home_name, away_name, pred.p_home,
-                )
+                all_hc = _tennis_handicap_candidates(home_name, away_name, pred.p_home)
                 if all_hc:
-                    # Favourite only — highest 2-0 prob
-                    hc_candidates = [max(all_hc, key=lambda c: c[1])]
+                    candidates.append(max(all_hc, key=lambda c: c[1]))
+
+            sport_min_odds = SPORT_MIN_ODDS.get(sport, settings.MIN_ODDS)
 
             effective_min_edge = 0.0 if using_fair_odds else SPORT_MIN_EDGE.get(sport, min_edge)
             if using_fair_odds:
@@ -344,60 +347,12 @@ def run(
             else:
                 effective_min_conf = SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
 
-            # Process handicap candidates (fair odds — skip edge gate, keep conf + odds gates)
-            hc_conf_threshold = SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
-            for selection_label, model_prob, book_odds, market_name in hc_candidates:
-                confidence = pred.confidence / 100.0 if pred.confidence else model_prob
-                if confidence < hc_conf_threshold:
-                    continue
-                if book_odds < settings.MIN_ODDS or book_odds > settings.MAX_ODDS:
-                    continue
-                if _already_picked(db, user_id, match.id, market_name, selection_label):
-                    log.debug("  Skip (already picked): %s %s", match_label, selection_label)
-                    continue
-
-                k = kelly_fraction(model_prob, book_odds)
-                stake = round(k * settings.AUTO_PICK_KELLY_FRACTION, 4)
-                log.info(
-                    "  [%s] %s | %s @ %.2f (fair hc) | kelly=%.1f%% | stake=%.2fu",
-                    sport, match_label, selection_label, book_odds, k * 100, stake,
-                )
-                if not dry_run:
-                    pick = TrackedPick(
-                        id=str(uuid.uuid4()),
-                        user_id=user_id,
-                        match_id=match.id,
-                        match_label=match_label,
-                        sport=sport,
-                        league=league_name,
-                        start_time=match.kickoff_utc,
-                        market_name=market_name,
-                        selection_label=selection_label,
-                        odds=book_odds,
-                        edge=0.0,
-                        kelly_fraction=round(k, 4),
-                        stake_fraction=stake,
-                        auto_generated=True,
-                    )
-                    db.add(pick)
-                    created += 1
-
-                    ai_tipster_id = AI_TIPSTER_IDS.get(sport)
-                    if ai_tipster_id and not _already_tipped(
-                        db, ai_tipster_id, match_label, market_name, selection_label
-                    ):
-                        tip = TipsterTip(
-                            user_id=ai_tipster_id,
-                            sport=sport,
-                            match_label=match_label,
-                            market_name=market_name,
-                            selection_label=selection_label,
-                            odds=book_odds,
-                            start_time=match.kickoff_utc,
-                            match_id=match.id,
-                            note=f"Set handicap (fair) | Kelly: {round(k * 100, 1)}%",
-                        )
-                        db.add(tip)
+            # For fair odds: pick single best candidate (highest model_prob) that meets
+            # the odds threshold — naturally prefers match winner, falls through to
+            # set handicap when match winner odds are too short (p_home > 0.83).
+            if using_fair_odds and candidates:
+                valid_cands = [c for c in candidates if c[2] >= sport_min_odds]
+                candidates = [max(valid_cands, key=lambda c: c[1])] if valid_cands else []
 
             # ── Soccer Asian Handicap (real SGO spread odds) ───────────────────
             # Backtest: 72% hit rate, +36.8% ROI at 1.90 (≥55% conf, n=50).
@@ -512,7 +467,7 @@ def run(
                     continue
                 if confidence < effective_min_conf:
                     continue
-                if book_odds < settings.MIN_ODDS or book_odds > settings.MAX_ODDS:
+                if book_odds < sport_min_odds or book_odds > settings.MAX_ODDS:
                     continue
 
                 # Dedup

@@ -114,11 +114,18 @@ BACKFILL_SPORT_MIN_EDGE: dict[str, float] = {
 }
 BACKFILL_SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "esports":    1.0,   # DISABLED: negative ROI at all thresholds
-    "tennis":     0.40,  # set handicap only; conf≥0.40 → ~5-7/day (p_home > 0.70)
+    "tennis":     0.40,  # match winner OR set handicap, whichever has better odds; ML only
     "soccer":     0.30,  # real SGO odds only; fair-odds fallback disabled for soccer
     "basketball": 0.30,  # MIN_ODDS=1.40 floor caps fair-odds at p<0.714; combined gives p=0.65-0.71
     "baseball":   0.20,  # MIN_ODDS=1.40 floor caps fair-odds at p<0.714; combined gives p=0.60-0.71
     "hockey":     0.35,
+}
+
+# Per-sport minimum odds overrides (default: settings.MIN_ODDS = 1.40)
+# Tennis: allow down to 1.20 to capture short-priced match winner picks;
+#         very confident picks (p>0.83) fall through to set handicap automatically.
+BACKFILL_SPORT_MIN_ODDS: dict[str, float] = {
+    "tennis": 1.20,
 }
 
 
@@ -333,10 +340,23 @@ def run(
             if d_odds and p_draw and p_draw > 0.01:
                 candidates.append(("Draw", p_draw, d_odds, ml_market))
 
+            # Tennis ML: add set handicap (-1.5) to the candidate pool so we can
+            # pick whichever market has higher confidence (match winner wins unless
+            # its odds fall below sport_min_odds, in which case handicap is chosen).
+            if sport == "tennis" and p_home and p_away and source == "ml":
+                hc_cands = _tennis_handicap_candidates(home_name, away_name, p_home)
+                if hc_cands:
+                    candidates.append(max(hc_cands, key=lambda c: c[1]))
+
+            # Per-sport minimum odds (tennis: 1.20 to allow short-priced match winners)
+            sport_min_odds = BACKFILL_SPORT_MIN_ODDS.get(sport, settings.MIN_ODDS)
+
             # With fair odds: only keep the single best candidate (highest model_prob)
-            # to avoid picking both sides of every match
+            # that meets the minimum odds threshold — this naturally prefers match winner
+            # unless it's too short, in which case set handicap is chosen.
             if using_fair_odds and candidates:
-                candidates = [max(candidates, key=lambda c: c[1])]
+                valid_cands = [c for c in candidates if c[2] >= sport_min_odds]
+                candidates = [max(valid_cands, key=lambda c: c[1])] if valid_cands else []
 
             # With fair odds use confidence-only gate
             effective_min_edge = BACKFILL_SPORT_MIN_EDGE.get(sport, min_edge)
@@ -349,9 +369,8 @@ def run(
                     continue
                 if confidence < effective_min_conf:
                     continue
-                # Apply odds range to ALL picks — fair or real — to avoid heavy
-                # favorites at 1.1-1.3 odds where Kelly is negligible and ROI is poor.
-                if book_odds < settings.MIN_ODDS or book_odds > settings.MAX_ODDS:
+                # Apply odds range to ALL picks — fair or real.
+                if book_odds < sport_min_odds or book_odds > settings.MAX_ODDS:
                     continue
 
                 # Dedup — don't create if already exists
@@ -360,15 +379,36 @@ def run(
                     continue
 
                 # Resolve settled outcome immediately from match result
-                pick_outcome = _resolve_outcome(
-                    selection_label, match_label, match.outcome, home_name, away_name
-                )
-                if pick_outcome is None:
-                    log.debug(
-                        "  Skip (can't resolve outcome): %s %s vs match outcome=%s",
-                        match_label, selection_label, match.outcome,
+                if market_name == "Set Handicap":
+                    h_sets = match.home_score
+                    a_sets = match.away_score
+                    if h_sets is None or a_sets is None:
+                        log.debug("  Skip (no set scores): %s %s", match_label, selection_label)
+                        continue
+                    try:
+                        h_int, a_int = int(h_sets), int(a_sets)
+                    except (ValueError, TypeError):
+                        continue
+                    sel_lower = selection_label.lower()
+                    home_lower = home_name.lower()
+                    away_lower = away_name.lower()
+                    if home_lower in sel_lower or sel_lower in home_lower:
+                        diff = (h_int - 1.5) - a_int
+                    elif away_lower in sel_lower or sel_lower in away_lower:
+                        diff = (a_int - 1.5) - h_int
+                    else:
+                        continue
+                    pick_outcome = "won" if diff > 0 else "lost"
+                else:
+                    pick_outcome = _resolve_outcome(
+                        selection_label, match_label, match.outcome, home_name, away_name
                     )
-                    continue
+                    if pick_outcome is None:
+                        log.debug(
+                            "  Skip (can't resolve outcome): %s %s vs match outcome=%s",
+                            match_label, selection_label, match.outcome,
+                        )
+                        continue
 
                 k = kelly_fraction(model_prob, book_odds)
                 stake = round(k * kelly_frac, 4)
@@ -430,102 +470,6 @@ def run(
                         )
                         db.add(tip)
 
-            # ── Tennis set handicap (-1.5 sets) ──────────────────────────────
-            # Re-enabled after model label-bias fix (62.9% acc): +35% ROI on 3333 bets.
-            # Favourite only — picks the player with the higher match win probability.
-            # ML predictions only — ELO fallback confidence = max(p_home,p_away) ≥ 0.5
-            # bypasses the confidence gate and generates too many low-quality picks.
-            if sport == "tennis" and p_home and p_away and source == "ml":
-                hc_cands = _tennis_handicap_candidates(home_name, away_name, p_home)
-                # Favourite only — matches backtest methodology (side="favourite_only")
-                if hc_cands:
-                    hc_cands = [max(hc_cands, key=lambda c: c[1])]
-                for sel, prob, hc_odds, hc_market in hc_cands:
-                    if confidence < effective_min_conf:
-                        continue
-                    if hc_odds < settings.MIN_ODDS or hc_odds > settings.MAX_ODDS:
-                        continue
-                    if _already_picked(db, user_id, match.id, hc_market, sel):
-                        continue
-
-                    # Resolve outcome from set scores
-                    h_sets = match.home_score
-                    a_sets = match.away_score
-                    if h_sets is None or a_sets is None:
-                        continue
-                    try:
-                        h_int, a_int = int(h_sets), int(a_sets)
-                    except (ValueError, TypeError):
-                        continue
-
-                    sel_lower = sel.lower()
-                    home_lower = home_name.lower()
-                    away_lower = away_name.lower()
-                    if home_lower in sel_lower or sel_lower in home_lower:
-                        # home -1.5: wins if home_sets - 1.5 > away_sets → 2-0
-                        diff = (h_int - 1.5) - a_int
-                    elif away_lower in sel_lower or sel_lower in away_lower:
-                        # away -1.5: wins if away_sets - 1.5 > home_sets → 2-0
-                        diff = (a_int - 1.5) - h_int
-                    else:
-                        continue
-
-                    hc_outcome = "won" if diff > 0 else "lost"
-
-                    kickoff = match.kickoff_utc
-                    if kickoff.tzinfo is None:
-                        kickoff = kickoff.replace(tzinfo=timezone.utc)
-                    settled_at = kickoff + timedelta(hours=2)
-                    if settled_at > now:
-                        settled_at = now
-
-                    k = kelly_fraction(prob, hc_odds)
-                    stake = round(k * kelly_frac, 4)
-
-                    log.info(
-                        "  [%s] %s | %s @ %.2f | set-hc | kelly=%.1f%% | outcome=%s",
-                        sport, match_label, sel, hc_odds, k * 100, hc_outcome,
-                    )
-                    created += 1
-                    if not dry_run:
-                        pick = TrackedPick(
-                            id=str(uuid.uuid4()),
-                            user_id=user_id,
-                            match_id=match.id,
-                            match_label=match_label,
-                            sport=sport,
-                            league=league_name,
-                            start_time=kickoff,
-                            market_name=hc_market,
-                            selection_label=sel,
-                            odds=hc_odds,
-                            edge=0.0,
-                            kelly_fraction=round(k, 4),
-                            stake_fraction=stake,
-                            auto_generated=True,
-                            outcome=hc_outcome,
-                            settled_at=settled_at,
-                        )
-                        db.add(pick)
-
-                        ai_tipster_id = AI_TIPSTER_IDS.get(sport)
-                        if ai_tipster_id and not _already_tipped(
-                            db, ai_tipster_id, match_label, hc_market, sel
-                        ):
-                            tip = TipsterTip(
-                                user_id=ai_tipster_id,
-                                sport=sport,
-                                match_label=match_label,
-                                market_name=hc_market,
-                                selection_label=sel,
-                                odds=hc_odds,
-                                outcome=hc_outcome,
-                                start_time=kickoff,
-                                settled_at=settled_at,
-                                match_id=match.id,
-                                note=f"[{source}] Set handicap (fair) | Kelly: {round(k * 100, 1)}% [backfill]",
-                            )
-                            db.add(tip)
 
         if not dry_run:
             db.commit()
