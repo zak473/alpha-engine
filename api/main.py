@@ -653,8 +653,8 @@ def admin_purge_ai_history(secret: str, db: Session = Depends(get_db)):
 
 
 @app.delete("/api/v1/admin/purge-sport-tips", tags=["Admin"])
-def admin_purge_sport_tips(secret: str, sport: str, db: Session = Depends(get_db)):
-    """Wipe pending (unsettled) AI tipster tips + auto-picks for one sport."""
+def admin_purge_sport_tips(secret: str, sport: str, include_settled: bool = False, db: Session = Depends(get_db)):
+    """Wipe AI tipster tips + auto-picks for one sport. By default only unsettled; pass include_settled=true to wipe all."""
     if secret != settings.ADMIN_SECRET:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
@@ -662,18 +662,15 @@ def admin_purge_sport_tips(secret: str, sport: str, db: Session = Depends(get_db
     from db.models.picks import TrackedPick
     from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
     ai_ids = list(AI_TIPSTER_IDS.values())
-    deleted_tips = (
-        db.query(TipsterTip)
-        .filter(TipsterTip.user_id.in_(ai_ids), TipsterTip.sport == sport, TipsterTip.outcome.is_(None))
-        .delete(synchronize_session=False)
-    )
-    deleted_picks = (
-        db.query(TrackedPick)
-        .filter(TrackedPick.sport == sport, TrackedPick.auto_generated.is_(True), TrackedPick.outcome.is_(None))
-        .delete(synchronize_session=False)
-    )
+    tips_q = db.query(TipsterTip).filter(TipsterTip.user_id.in_(ai_ids), TipsterTip.sport == sport)
+    picks_q = db.query(TrackedPick).filter(TrackedPick.sport == sport, TrackedPick.auto_generated.is_(True))
+    if not include_settled:
+        tips_q = tips_q.filter(TipsterTip.outcome.is_(None))
+        picks_q = picks_q.filter(TrackedPick.outcome.is_(None))
+    deleted_tips = tips_q.delete(synchronize_session=False)
+    deleted_picks = picks_q.delete(synchronize_session=False)
     db.commit()
-    return {"sport": sport, "deleted_tips": int(deleted_tips), "deleted_picks": int(deleted_picks)}
+    return {"sport": sport, "include_settled": include_settled, "deleted_tips": int(deleted_tips), "deleted_picks": int(deleted_picks)}
 
 
 @app.delete("/api/v1/admin/purge-handball-tips", tags=["Admin"])

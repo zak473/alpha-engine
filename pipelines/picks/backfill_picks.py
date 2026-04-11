@@ -316,11 +316,14 @@ def run(
             else:
                 ml_market = "1X2"
 
-            # Prefer real market odds; fall back to fair odds
-            using_fair_odds = not match.odds_home
-            h_odds = match.odds_home or (round(1 / p_home, 3) if p_home > 0 else None)
-            a_odds = match.odds_away or (round(1 / p_away, 3) if p_away > 0 else None)
-            d_odds = match.odds_draw or (round(1 / p_draw, 3) if p_draw and p_draw > 0.01 else None)
+            # Prefer real market odds; fall back to fair odds for basketball/baseball only.
+            # Soccer uses SGO real odds — if none stored, skip (no fair-odds soccer picks).
+            FAIR_ODDS_SPORTS = {"basketball", "baseball"}
+            can_use_fair_odds = sport in FAIR_ODDS_SPORTS
+            using_fair_odds = not match.odds_home and can_use_fair_odds
+            h_odds = match.odds_home or (round(1 / p_home, 3) if p_home > 0 and can_use_fair_odds else None)
+            a_odds = match.odds_away or (round(1 / p_away, 3) if p_away > 0 and can_use_fair_odds else None)
+            d_odds = match.odds_draw or (round(1 / p_draw, 3) if p_draw and p_draw > 0.01 and can_use_fair_odds else None)
 
             candidates: list[tuple[str, float, float, str]] = []
             if h_odds and p_home:

@@ -233,7 +233,7 @@ FAIR_ODDS_MIN_CONFIDENCE: dict[str, float] = {
 # with confidence-only gating (model is well-calibrated at these confidence levels).
 # Tennis/esports are DISABLED: tennis model is less accurate than the market at real
 # odds (-5.1% ROI); esports is negative ROI at all thresholds.
-FAIR_ODDS_SPORTS: set[str] = {"soccer", "basketball", "baseball"}
+FAIR_ODDS_SPORTS: set[str] = {"basketball", "baseball"}  # soccer uses SGO real odds only
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
