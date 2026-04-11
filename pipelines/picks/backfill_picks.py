@@ -275,10 +275,19 @@ def run(
             match_label = f"{home_name} vs {away_name}"
             sport = match.sport
 
-            # Skip handball leagues that Highlightly tags as sport="basketball"
-            if sport == "basketball" and "handball" in league_name.lower():
-                log.debug("  Skip (handball tagged as basketball): %s [%s]", match_label, league_name)
-                continue
+            # Skip handball leagues and women's/junior basketball tagged as sport="basketball"
+            if sport == "basketball":
+                league_lower = league_name.lower()
+                if "handball" in league_lower:
+                    log.debug("  Skip (handball): %s [%s]", match_label, league_name)
+                    continue
+                if "women" in league_lower or " w " in f" {league_lower} " or league_lower.endswith(" w"):
+                    log.debug("  Skip (women's basketball): %s [%s]", match_label, league_name)
+                    continue
+                # Also skip if team names contain Women (Highlightly sometimes omits it from league)
+                if "women" in home_name.lower() or "women" in away_name.lower():
+                    log.debug("  Skip (women's team): %s", match_label)
+                    continue
 
             # Try ML prediction first, fall back to ELO
             pred = db.query(PredMatch).filter(PredMatch.match_id == match.id).first()
