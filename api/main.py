@@ -885,6 +885,17 @@ def admin_clear_tennis_odds(secret: str):
         db.close()
 
 
+@app.post("/api/v1/admin/fetch-odds", tags=["Admin"])
+def admin_fetch_odds(secret: str):
+    """Manually trigger the SGO odds fetch (spread + 1X2) for all upcoming matches."""
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from pipelines.odds.fetch_odds_sgo import fetch_all as fetch_sgo
+    updated = fetch_sgo()
+    return {"sgo_updated": updated}
+
+
 @app.post("/api/v1/admin/run-auto-picks", tags=["Admin"])
 def admin_run_auto_picks(secret: str):
     """Manually trigger the auto-picks bot to regenerate tips."""
