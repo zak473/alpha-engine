@@ -652,6 +652,30 @@ def admin_purge_ai_history(secret: str, db: Session = Depends(get_db)):
     }
 
 
+@app.delete("/api/v1/admin/purge-sport-tips", tags=["Admin"])
+def admin_purge_sport_tips(secret: str, sport: str, db: Session = Depends(get_db)):
+    """Wipe pending (unsettled) AI tipster tips + auto-picks for one sport."""
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from db.models.tipsters import TipsterTip
+    from db.models.picks import TrackedPick
+    from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
+    ai_ids = list(AI_TIPSTER_IDS.values())
+    deleted_tips = (
+        db.query(TipsterTip)
+        .filter(TipsterTip.user_id.in_(ai_ids), TipsterTip.sport == sport, TipsterTip.outcome.is_(None))
+        .delete(synchronize_session=False)
+    )
+    deleted_picks = (
+        db.query(TrackedPick)
+        .filter(TrackedPick.sport == sport, TrackedPick.auto_generated.is_(True), TrackedPick.outcome.is_(None))
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"sport": sport, "deleted_tips": int(deleted_tips), "deleted_picks": int(deleted_picks)}
+
+
 @app.delete("/api/v1/admin/clear-backtest-results", tags=["Admin"])
 def admin_clear_backtest_results(secret: str, sport: str = "all", db: Session = Depends(get_db)):
     """
