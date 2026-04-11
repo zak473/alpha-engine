@@ -286,11 +286,16 @@ def run(
             league_name = league.name if league else "Unknown"
             match_label = f"{home_team.name} vs {away_team.name}"
 
-            # Build candidate selections: (label, model_prob, book_odds, market_name)
-            candidates: list[tuple[str, float, float, str]] = []
-
             # Determine correct market name based on sport
             sport = match.sport
+
+            # Skip handball leagues that Highlightly tags as sport="basketball"
+            if sport == "basketball" and "handball" in league_name.lower():
+                log.debug("  Skip (handball tagged as basketball): %s [%s]", match_label, league_name)
+                continue
+
+            # Build candidate selections: (label, model_prob, book_odds, market_name)
+            candidates: list[tuple[str, float, float, str]] = []
             ml_market = "Moneyline" if sport in ("basketball", "baseball") else "Match Winner" if sport in ("tennis", "esports") else "1X2"
 
             home_name = home_team.name

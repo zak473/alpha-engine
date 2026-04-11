@@ -101,13 +101,14 @@ def _bulk_stats(db: Session, user_ids: list[str]) -> dict:
             func.sum(case((TipsterTip.outcome == "void", 1), else_=0)).label("void"),
             func.sum(case((TipsterTip.outcome.in_(["won", "lost"]), 1), else_=0)).label("settled"),
             func.sum(case((TipsterTip.outcome == "won", TipsterTip.odds - 1), else_=0)).label("gross_return"),
+            func.avg(TipsterTip.odds).label("avg_odds"),
         )
         .filter(TipsterTip.user_id.in_(user_ids))
         .group_by(TipsterTip.user_id)
         .all()
     )
 
-    stats: dict = {uid: {"total": 0, "won": 0, "active": 0, "weekly_settled": 0, "weekly_won": 0, "lost": 0, "void": 0, "settled": 0, "gross_return": 0.0, "recent": []} for uid in user_ids}
+    stats: dict = {uid: {"total": 0, "won": 0, "active": 0, "weekly_settled": 0, "weekly_won": 0, "lost": 0, "void": 0, "settled": 0, "gross_return": 0.0, "avg_odds": 0.0, "recent": []} for uid in user_ids}
     for r in rows:
         stats[r.user_id] = {
             "total": r.total or 0,
@@ -119,6 +120,7 @@ def _bulk_stats(db: Session, user_ids: list[str]) -> dict:
             "void": r.void or 0,
             "settled": r.settled or 0,
             "gross_return": float(r.gross_return or 0),
+            "avg_odds": float(r.avg_odds or 0),
             "recent": [],
         }
 
@@ -167,6 +169,7 @@ def _build_profile(
         won_count = db.query(func.count(TipsterTip.id)).filter(TipsterTip.user_id == user.id, TipsterTip.outcome == "won").scalar() or 0
         lost_count = db.query(func.count(TipsterTip.id)).filter(TipsterTip.user_id == user.id, TipsterTip.outcome == "lost").scalar() or 0
         gross_return_val = db.query(func.sum(TipsterTip.odds - 1)).filter(TipsterTip.user_id == user.id, TipsterTip.outcome == "won").scalar() or 0.0
+        avg_odds_val = db.query(func.avg(TipsterTip.odds)).filter(TipsterTip.user_id == user.id).scalar() or 0.0
         s = {
             "total": db.query(func.count(TipsterTip.id)).filter(TipsterTip.user_id == user.id).scalar() or 0,
             "won": won_count,
@@ -177,6 +180,7 @@ def _build_profile(
             "void": db.query(func.count(TipsterTip.id)).filter(TipsterTip.user_id == user.id, TipsterTip.outcome == "void").scalar() or 0,
             "settled": won_count + lost_count,
             "gross_return": float(gross_return_val),
+            "avg_odds": float(avg_odds_val),
             "recent": ["W" if t.outcome == "won" else "L" for t in db.query(TipsterTip).filter(TipsterTip.user_id == user.id, TipsterTip.outcome.in_(["won", "lost"])).order_by(TipsterTip.settled_at.desc()).limit(8).all()],
         }
         followers = db.query(func.count(TipsterFollow.id)).filter(TipsterFollow.tipster_id == user.id).scalar() or 0
@@ -196,7 +200,7 @@ def _build_profile(
 
     overall_win_rate = round(won / (won + lost), 4) if (won + lost) > 0 else 0.0
     roi = round((gross_return - lost) / settled, 4) if settled > 0 else 0.0
-    avg_odds = 0.0  # Not computed in bulk yet
+    avg_odds = round(s.get("avg_odds", 0.0), 2)
     profit_loss = round(gross_return - lost, 2)
 
     return TipsterProfile(

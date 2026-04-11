@@ -676,6 +676,55 @@ def admin_purge_sport_tips(secret: str, sport: str, db: Session = Depends(get_db
     return {"sport": sport, "deleted_tips": int(deleted_tips), "deleted_picks": int(deleted_picks)}
 
 
+@app.delete("/api/v1/admin/purge-handball-tips", tags=["Admin"])
+def admin_purge_handball_tips(secret: str, db: Session = Depends(get_db)):
+    """
+    Delete TipsterTip + TrackedPick rows for handball leagues that Highlightly
+    incorrectly tags as sport='basketball'. Matches on league name containing 'handball'.
+    """
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from db.models.tipsters import TipsterTip
+    from db.models.picks import TrackedPick
+    from db.models.mvp import CoreMatch, CoreLeague
+    from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
+
+    # Find all match IDs that are basketball-sport but handball leagues
+    handball_match_ids = (
+        db.query(CoreMatch.id)
+        .join(CoreLeague, CoreLeague.id == CoreMatch.league_id)
+        .filter(
+            CoreMatch.sport == "basketball",
+            CoreLeague.name.ilike("%handball%"),
+        )
+        .all()
+    )
+    handball_ids = [r[0] for r in handball_match_ids]
+
+    deleted_tips = deleted_picks = 0
+    if handball_ids:
+        ai_ids = list(AI_TIPSTER_IDS.values())
+        deleted_tips = (
+            db.query(TipsterTip)
+            .filter(TipsterTip.user_id.in_(ai_ids), TipsterTip.match_id.in_(handball_ids))
+            .delete(synchronize_session=False)
+        )
+        deleted_picks = (
+            db.query(TrackedPick)
+            .filter(TrackedPick.match_id.in_(handball_ids), TrackedPick.auto_generated.is_(True))
+            .delete(synchronize_session=False)
+        )
+        db.commit()
+
+    return {
+        "handball_matches_found": len(handball_ids),
+        "deleted_tips": int(deleted_tips),
+        "deleted_picks": int(deleted_picks),
+    }
+
+
 @app.delete("/api/v1/admin/clear-backtest-results", tags=["Admin"])
 def admin_clear_backtest_results(secret: str, sport: str = "all", db: Session = Depends(get_db)):
     """
