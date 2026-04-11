@@ -40,12 +40,13 @@ AH0_MIN_ODDS: float = 1.10
 # Esports: model stores confidence = abs(p - 0.5) * 2, so a 60% prediction = 20%
 # confidence. Any global threshold > 0.30 kills all esports bets.
 BACKTEST_MIN_CONFIDENCE: dict[str, float] = {
-    "esports":    0.0,   # edge gate only
-    "soccer":     0.65,  # lgb_v18 — matches live pick threshold
-    "tennis":     0.0,   # min_conf=0.55 gives only heavy-fav picks (odds<1.4) → all filtered by min_odds
-    "basketball": 0.60,  # ~80% model probability threshold for meaningful sample
-    "baseball":   0.55,
-    "hockey":     0.55,
+    # Tuned from 90-day sweep (2026-04-11): targets 3-4 bets/day per sport at positive ROI.
+    "esports":    1.0,   # DISABLED: negative ROI at all confidence thresholds
+    "soccer":     0.65,  # lgb_v18 — used for AH/DNB only (moneyline has no real odds)
+    "tennis":     0.0,   # higher confidence = heavy fav at short odds = negative ROI; conf=0 best (+2.3%)
+    "basketball": 0.40,  # 5.4 bets/day, 81.8% acc, +10.2% ROI (was 0.60 → too few bets + negative ROI)
+    "baseball":   0.20,  # 3.8 bets/day, 59.2% acc, +3.2% ROI (was 0.55 → tiny sample)
+    "hockey":     0.30,  # 3.4 bets/day, 72.1% acc, +11.1% ROI (was 0.55 → too few bets)
 }
 
 # Per-sport min_odds overrides for the Backtester.

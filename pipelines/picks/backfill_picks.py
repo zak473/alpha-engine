@@ -101,16 +101,22 @@ def _resolve_handicap_outcome(
     return None  # handled inline in run()
 
 
-# Lower thresholds for backfill — we want volume for track record
+# Backfill thresholds — match the live auto_picks formula from 90-day sweep (2026-04-11)
 BACKFILL_MIN_EDGE: float = 0.0
-BACKFILL_MIN_CONFIDENCE: float = 0.25  # ~62.5% model probability
+BACKFILL_MIN_CONFIDENCE: float = 0.30  # default fallback; sports override below
 
-# Per-sport overrides
-BACKFILL_SPORT_MIN_EDGE: dict[str, float] = {}
+# Per-sport overrides — mirror SPORT_MIN_CONFIDENCE in auto_picks.py
+BACKFILL_SPORT_MIN_EDGE: dict[str, float] = {
+    "baseball": 0.02,
+    "basketball": 0.01,
+}
 BACKFILL_SPORT_MIN_CONFIDENCE: dict[str, float] = {
-    # Esports confidence = abs(p - 0.5) * 2 — a 55% prediction = 10% confidence.
-    # Global 25% gate kills all esports picks. Use edge gate only (min_edge=0 for backfill).
-    "esports": 0.0,
+    "esports":    1.0,   # DISABLED: negative ROI at all thresholds
+    "soccer":     0.65,
+    "tennis":     0.0,   # low-conf picks are most profitable for tennis
+    "basketball": 0.40,
+    "baseball":   0.20,
+    "hockey":     0.30,
     # Tennis: api-tennis.com odds are stored so edge > 0 is guaranteed; use edge gate only.
     "tennis": 0.0,
 }

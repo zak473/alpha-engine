@@ -207,13 +207,18 @@ def _already_tipped(db: Session, user_id: str, match_label: str, market: str, se
 # Baseball/hockey: keep high confidence since sample is thin and model less proven.
 # Soccer: 65% works well for lgb_v18 given its confidence distribution.
 SPORT_MIN_EDGE: dict[str, float] = {
-    "esports":     0.03,  # PandaScore market odds make edge the right gate
-    "baseball":    0.08,
+    "esports":     1.0,   # effectively disabled (negative ROI at all thresholds)
+    "baseball":    0.02,  # was 0.08 — too high; lowered to match 90-day backtest formula
     "basketball":  0.01,
 }
 SPORT_MIN_CONFIDENCE: dict[str, float] = {
-    "esports": 0.0,   # edge gate only — confidence formula incompatible with global threshold
-    "soccer":  0.65,  # lgb_v18 confidence distribution skews lower than other models
+    # Tuned from 90-day backtest sweep (2026-04-11): 3-4 bets/day per sport at positive ROI.
+    "esports":    1.0,   # DISABLED: all esports thresholds showed negative ROI
+    "soccer":     0.65,  # for AH/DNB (fair-odds moneyline uses FAIR_ODDS_MIN_CONFIDENCE instead)
+    "tennis":     0.0,   # higher conf = heavy fav at short odds = negative ROI; low conf best (+2.3%)
+    "basketball": 0.40,  # 5.4 bets/day, 81.8% acc, +10.2% ROI
+    "baseball":   0.20,  # 3.8 bets/day, 59.2% acc, +3.2% ROI
+    "hockey":     0.30,  # 3.4 bets/day, 72.1% acc, +11.1% ROI
 }
 # Fair-odds soccer (no SGO market odds): require higher confidence since there's no
 # external edge signal to validate against.
