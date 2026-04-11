@@ -216,7 +216,7 @@ SPORT_MIN_CONFIDENCE: dict[str, float] = {
     # Combined with these floors: basketball p=0.65-0.71, baseball p=0.60-0.71.
     "esports":    1.0,   # DISABLED: all esports thresholds showed negative ROI
     "soccer":     0.30,  # real SGO odds only; MIN_ODDS=1.40 still applies as lower bound
-    "tennis":     0.65,  # match winner OR set handicap; MIN_ODDS=1.20 opens wider range → need higher gate
+    "tennis":     0.50,  # match winner OR set handicap; p_home≥0.75, odds 1.33 match winner
     "basketball": 0.30,
     "baseball":   0.20,
     "hockey":     0.35,
@@ -225,7 +225,7 @@ FAIR_ODDS_MIN_CONFIDENCE: dict[str, float] = {
     # soccer removed — uses real SGO odds only (no fair-odds fallback)
     "basketball": 0.30,
     "baseball":   0.20,
-    "tennis":     0.65,
+    "tennis":     0.50,
 }
 # Per-sport minimum odds override. Tennis: 1.20 allows short-priced match winners
 # (p_home up to 0.83). Picks where odds < 1.20 fall through to set handicap.
