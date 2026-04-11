@@ -116,9 +116,9 @@ BACKFILL_SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "esports":    1.0,   # DISABLED: negative ROI at all thresholds
     "tennis":     1.0,   # DISABLED: model -5.1% ROI at real market odds (less accurate than market)
     "soccer":     0.65,
-    "basketball": 0.40,
-    "baseball":   0.20,
-    "hockey":     0.30,
+    "basketball": 0.60,  # raised from 0.40 — recent data too dense; target 3-4/day
+    "baseball":   0.50,  # raised from 0.20 — recent data too dense; target 3-4/day
+    "hockey":     0.48,  # raised from 0.30 — recent data too dense; target 3-4/day
 }
 
 
