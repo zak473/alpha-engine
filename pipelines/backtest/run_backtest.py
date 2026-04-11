@@ -40,12 +40,21 @@ AH0_MIN_ODDS: float = 1.10
 # Esports: model stores confidence = abs(p - 0.5) * 2, so a 60% prediction = 20%
 # confidence. Any global threshold > 0.30 kills all esports bets.
 BACKTEST_MIN_CONFIDENCE: dict[str, float] = {
-    "esports":    0.0,   # edge gate only — was +19u/week at this setting
-    "soccer":     0.65,  # lgb_v18 — raised from 0.55; matches live pick threshold
-    "tennis":     0.55,
+    "esports":    0.0,   # edge gate only
+    "soccer":     0.65,  # lgb_v18 — matches live pick threshold
+    "tennis":     0.0,   # min_conf=0.55 gives only heavy-fav picks (odds<1.4) → all filtered by min_odds
     "basketball": 0.60,  # ~80% model probability threshold for meaningful sample
     "baseball":   0.55,
     "hockey":     0.55,
+}
+
+# Per-sport min_odds overrides for the Backtester.
+# Default StakingConfig has min_odds=1.4 which cuts out short-priced favourites.
+# For models that frequently pick heavy favourites, lower this floor.
+BACKTEST_MIN_ODDS: dict[str, float] = {
+    "tennis":     1.1,   # tennis heavy favs can be 1.15-1.35; keep them in
+    "hockey":     1.1,   # puck-line model sometimes backs strong teams at short prices
+    "basketball": 1.1,
 }
 
 # Per-sport min_edge for the main backtest.
@@ -848,7 +857,8 @@ def _run_for_sport(
         log.warning("  No valid predictions for %s after filtering.", sport)
         return None
 
-    config = StakingConfig(method=staking, kelly_fraction=kelly_fraction, min_edge=effective_min_edge)
+    effective_min_odds = BACKTEST_MIN_ODDS.get(sport, 1.4)
+    config = StakingConfig(method=staking, kelly_fraction=kelly_fraction, min_edge=effective_min_edge, min_odds=effective_min_odds)
     result = Backtester(config).run(predictions, actuals, odds_list)
 
     date_from = rows[0][0].kickoff_utc
