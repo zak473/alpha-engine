@@ -107,7 +107,13 @@ BACKFILL_MIN_CONFIDENCE: float = 0.25  # ~62.5% model probability
 
 # Per-sport overrides
 BACKFILL_SPORT_MIN_EDGE: dict[str, float] = {}
-BACKFILL_SPORT_MIN_CONFIDENCE: dict[str, float] = {}
+BACKFILL_SPORT_MIN_CONFIDENCE: dict[str, float] = {
+    # Esports confidence = abs(p - 0.5) * 2 — a 55% prediction = 10% confidence.
+    # Global 25% gate kills all esports picks. Use edge gate only (min_edge=0 for backfill).
+    "esports": 0.0,
+    # Tennis: api-tennis.com odds are stored so edge > 0 is guaranteed; use edge gate only.
+    "tennis": 0.0,
+}
 
 
 def _already_picked(
@@ -391,11 +397,10 @@ def run(
                         db.add(tip)
 
             # ── Tennis set handicap (-1.5 sets) ──────────────────────────────
-            # Generates handicap picks from the model's match-win probability.
-            # Uses fair set odds (no market odds needed). Settlement uses stored
-            # set scores (match.home_score / match.away_score) which for tennis
-            # hold the number of sets won by each player.
-            if sport == "tennis" and p_home and p_away:
+            # DISABLED: backtest showed -22% ROI over 89 bets. Structurally breaks
+            # even at best since it bets at fair odds with no external edge signal.
+            # Tennis strategy: outright match winner only (with real api-tennis.com odds).
+            if False and sport == "tennis" and p_home and p_away:
                 hc_cands = _tennis_handicap_candidates(home_name, away_name, p_home)
                 for sel, prob, hc_odds, hc_market in hc_cands:
                     if confidence < effective_min_conf:

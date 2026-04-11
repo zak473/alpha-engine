@@ -43,9 +43,23 @@ BACKTEST_MIN_CONFIDENCE: dict[str, float] = {
     "esports":    0.0,   # edge gate only — was +19u/week at this setting
     "soccer":     0.65,  # lgb_v18 — raised from 0.55; matches live pick threshold
     "tennis":     0.55,
-    "basketball": 0.0,   # binary model, edge gate is the filter
-    "baseball":   0.60,
-    "hockey":     0.60,
+    "basketball": 0.60,  # ~80% model probability threshold for meaningful sample
+    "baseball":   0.55,
+    "hockey":     0.55,
+}
+
+# Per-sport min_edge for the main backtest.
+# Binary sports (basketball/hockey/etc.) often have no real market odds stored
+# (most bets fall back to fair_odds → edge ≈ 0). Using 0.0 here lets confidence
+# gate do the filtering so we still see accuracy/ROI from the sample.
+# Soccer uses the AH simulation with real SGO odds → keep edge gate meaningful.
+BACKTEST_MIN_EDGE: dict[str, float] = {
+    "soccer":     0.02,  # real SGO AH + Poisson → edge is meaningful
+    "tennis":     0.005, # api-tennis.com real odds, market is efficient
+    "basketball": 0.0,   # most bets use fair odds → edge ≈ 0; confidence gate only
+    "baseball":   0.0,   # tiny sample, show all
+    "hockey":     0.0,   # small sample, show all
+    "esports":    0.005, # PandaScore real odds, fairly priced
 }
 
 
@@ -585,6 +599,147 @@ def _run_soccer_asian_handicap(session: Session, min_confidence: float = 0.55) -
     return result
 
 
+def _run_sgo_spread_sim(
+    session: Session,
+    sport: str,
+    market_key: str,
+    min_edge: float = 0.02,
+) -> dict | None:
+    """
+    Generic spread-line backtest using SGO fair_odds vs book_odds.
+
+    Works for basketball (Point Spread), hockey (Puck Line), baseball (Run Line).
+    Does NOT use the ML model — instead trusts SGO's own fair probability and
+    checks whether the book offers a better price.
+
+    Settlement uses CoreMatch.home_score / away_score.
+    Returns a summary dict or None if no data.
+    """
+    import numpy as np
+    from db.models.odds import SpreadOdds
+    from pipelines.picks.auto_picks import edge_pct
+
+    MARKET_NAMES = {
+        "basketball": "Point Spread",
+        "hockey":     "Puck Line",
+        "baseball":   "Run Line",
+    }
+    market_display = MARKET_NAMES.get(sport, "Spread")
+
+    rows = (
+        session.query(SpreadOdds, CoreMatch)
+        .join(CoreMatch, CoreMatch.id == SpreadOdds.match_id)
+        .filter(
+            CoreMatch.sport == sport,
+            CoreMatch.status == "finished",
+            CoreMatch.home_score.isnot(None),
+            CoreMatch.away_score.isnot(None),
+            SpreadOdds.market_type == "spread",
+            SpreadOdds.book_available == True,
+            SpreadOdds.book_odds_decimal.isnot(None),
+            SpreadOdds.fair_odds_decimal.isnot(None),
+        )
+        .order_by(CoreMatch.kickoff_utc.asc())
+        .all()
+    )
+
+    if not rows:
+        log.warning("  %s spread sim: no finished matches with SGO spread data.", sport)
+        return None
+
+    # One bet per match — pick the spread side with highest edge
+    best_by_match: dict[str, dict] = {}
+    for sp, match in rows:
+        fair_prob = 1.0 / sp.fair_odds_decimal
+        e = edge_pct(fair_prob, sp.book_odds_decimal)
+        if e < min_edge:
+            continue
+
+        existing = best_by_match.get(match.id)
+        if existing is None or e > existing["edge"]:
+            try:
+                home_score = float(match.home_score)
+                away_score = float(match.away_score)
+            except (TypeError, ValueError):
+                continue
+
+            diff = home_score - away_score
+            line = sp.line  # home perspective (e.g. -4.5 means home gives 4.5)
+            threshold = -line
+
+            if sp.side == "home":
+                won = diff > threshold
+                push = abs(diff - threshold) < 1e-9
+            else:
+                # Away side: home must NOT cover
+                won = diff < threshold
+                push = abs(diff - threshold) < 1e-9
+
+            pnl = 0.0 if push else ((sp.book_odds_decimal - 1.0) if won else -1.0)
+
+            best_by_match[match.id] = {
+                "match_id": match.id,
+                "side": sp.side,
+                "line": sp.line,
+                "fair_prob": fair_prob,
+                "book_odds": sp.book_odds_decimal,
+                "edge": e,
+                "pnl": pnl,
+                "won": won and not push,
+                "push": push,
+                "date": match.kickoff_utc,
+            }
+
+    bets = sorted(best_by_match.values(), key=lambda b: b["date"])
+    if not bets:
+        log.warning("  %s spread sim: no bets survived edge filter (min_edge=%.3f).", sport, min_edge)
+        return None
+
+    pnl_arr = np.array([b["pnl"] for b in bets])
+    n_bets = len(bets)
+    n_won = sum(1 for b in bets if b["won"])
+    n_push = sum(1 for b in bets if b["push"])
+    total_pnl = float(pnl_arr.sum())
+    roi = total_pnl / n_bets
+
+    ret_std = float(pnl_arr.std())
+    sharpe = float(pnl_arr.mean() / ret_std * (n_bets ** 0.5)) if ret_std > 0 else 0.0
+
+    cum = np.cumsum(pnl_arr)
+    running_max = np.maximum.accumulate(cum)
+    max_dd = float((cum - running_max).min())
+
+    avg_odds = float(np.array([b["book_odds"] for b in bets]).mean())
+    avg_edge = float(np.array([b["edge"] for b in bets]).mean())
+
+    result = {
+        "n_bets": n_bets,
+        "n_won": n_won,
+        "n_push": n_push,
+        "hit_rate": round(n_won / n_bets, 4),
+        "pnl_units": round(total_pnl, 2),
+        "roi": round(roi, 4),
+        "sharpe_ratio": round(sharpe, 3),
+        "max_drawdown_units": round(max_dd, 2),
+        "avg_odds": round(avg_odds, 3),
+        "avg_edge": round(avg_edge, 4),
+        "min_edge": min_edge,
+        "staking": "flat_1u",
+        "market": market_display,
+        "side": "best_edge_per_match",
+        "signal": "SGO fair odds",
+        "date_from": bets[0]["date"].isoformat() if bets[0]["date"] else None,
+        "date_to": bets[-1]["date"].isoformat() if bets[-1]["date"] else None,
+        "run_at": datetime.now(tz=timezone.utc).isoformat(),
+    }
+
+    log.info(
+        "  %s-spread  n=%d  hit=%.1f%%  pnl=%+.1fu  roi=%+.1f%%  sharpe=%.2f  avg_odds=%.2f",
+        sport, n_bets, n_won / n_bets * 100, total_pnl, roi * 100, sharpe, avg_odds,
+    )
+    return result
+
+
 def _run_for_sport(
     session: Session,
     sport: str,
@@ -594,9 +749,12 @@ def _run_for_sport(
     min_confidence: float = -1.0,   # -1 = use BACKTEST_MIN_CONFIDENCE per-sport default
 ) -> dict | None:
     """Run backtester for one sport using all historical predictions."""
-    # Apply per-sport default if no explicit threshold was passed
+    # Apply per-sport defaults if no explicit threshold was passed
     if min_confidence < 0:
         min_confidence = BACKTEST_MIN_CONFIDENCE.get(sport, 0.0)
+
+    # Per-sport edge override (binary sports often lack stored market odds → edge ≈ 0)
+    effective_min_edge = BACKTEST_MIN_EDGE.get(sport, min_edge)
 
     registry = (
         session.query(ModelRegistry)
@@ -690,7 +848,7 @@ def _run_for_sport(
         log.warning("  No valid predictions for %s after filtering.", sport)
         return None
 
-    config = StakingConfig(method=staking, kelly_fraction=kelly_fraction, min_edge=min_edge)
+    config = StakingConfig(method=staking, kelly_fraction=kelly_fraction, min_edge=effective_min_edge)
     result = Backtester(config).run(predictions, actuals, odds_list)
 
     date_from = rows[0][0].kickoff_utc
@@ -733,7 +891,7 @@ def _run_for_sport(
     metrics = dict(registry.metrics or {})
     metrics["backtest"] = summary
 
-    # Sport-specific handicap simulations
+    # Sport-specific handicap / spread simulations
     if sport == "tennis":
         hc_result = _run_tennis_handicap(session, min_confidence=min_confidence)
         if hc_result:
@@ -745,6 +903,18 @@ def _run_for_sport(
         ah_result = _run_soccer_asian_handicap(session, min_confidence=min_confidence)
         if ah_result:
             metrics["backtest"]["asian_handicap"] = ah_result
+    elif sport == "basketball":
+        spread_result = _run_sgo_spread_sim(session, "basketball", "point_spread", min_edge=0.02)
+        if spread_result:
+            metrics["backtest"]["point_spread"] = spread_result
+    elif sport == "hockey":
+        spread_result = _run_sgo_spread_sim(session, "hockey", "puck_line", min_edge=0.02)
+        if spread_result:
+            metrics["backtest"]["puck_line"] = spread_result
+    elif sport == "baseball":
+        spread_result = _run_sgo_spread_sim(session, "baseball", "run_line", min_edge=0.02)
+        if spread_result:
+            metrics["backtest"]["run_line"] = spread_result
 
     registry.metrics = metrics
 
