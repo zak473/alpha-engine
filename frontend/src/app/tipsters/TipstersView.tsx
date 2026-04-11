@@ -258,9 +258,22 @@ function TipsterModal({
   backtest?: BacktestRunResult | null;
 }) {
   const color = avatarColor(tipster.username);
-  const [activeTab, setActiveTab] = useState<"active" | "history">("active");
+  // AI tipsters with settled picks default to History tab so results are immediately visible
+  const defaultTab = tipster.is_ai && tipster.settled_picks > 0 ? "history" : "active";
+  const [activeTab, setActiveTab] = useState<"active" | "history">(defaultTab);
   const [historyTips, setHistoryTips] = useState<TipsterTip[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Auto-load history for AI tipsters with settled picks
+  useEffect(() => {
+    if (defaultTab === "history") {
+      setLoadingHistory(true);
+      getTipsterTips(tipster.id, true)
+        .then(setHistoryTips)
+        .catch(() => {})
+        .finally(() => setLoadingHistory(false));
+    }
+  }, [tipster.id, defaultTab]);
 
   function handleHistoryTab() {
     setActiveTab("history");
@@ -284,7 +297,8 @@ function TipsterModal({
   const voidPicks = tipster.void_picks ?? 0;
   const recordStr = `${tipster.won_picks}W - ${tipster.lost_picks}L${voidPicks > 0 ? ` - ${voidPicks}V` : ""}`;
 
-  const useBacktest = tipster.is_ai && backtest;
+  // Prefer live settled-pick stats; only use backtest when no real picks exist yet
+  const useBacktest = tipster.is_ai && backtest && tipster.settled_picks === 0;
   const summary = useBacktest
     ? [
         { label: "Accuracy", value: `${((backtest!.accuracy ?? 0) * 100).toFixed(1)}%`, tone: (backtest!.accuracy ?? 0) >= 0.55 ? "var(--positive)" : "var(--warning)" },
@@ -293,7 +307,7 @@ function TipsterModal({
         { label: "Predictions", value: (backtest!.n_predictions ?? 0).toLocaleString(), tone: "var(--text0)" },
       ]
     : [
-        { label: "Win rate", value: `${overallWinPct}%`, tone: overallWinPct >= 55 ? "var(--positive)" : overallWinPct >= 50 ? "var(--warning)" : "var(--text0)" },
+        { label: "Win rate", value: overallWinPct > 0 ? `${overallWinPct}%` : "—", tone: overallWinPct >= 55 ? "var(--positive)" : overallWinPct >= 50 ? "var(--warning)" : "var(--text0)" },
         { label: "Units", value: tipster.settled_picks > 0 ? plStr : "—", tone: profitLoss >= 0 ? "var(--positive)" : "var(--negative)" },
         { label: "Record", value: tipster.settled_picks > 0 ? recordStr : "—", tone: "var(--text0)" },
         { label: "Avg odds", value: (tipster.avg_odds ?? 0) > 0 ? (tipster.avg_odds ?? 0).toFixed(2) : "—", tone: "var(--text0)" },
@@ -592,12 +606,10 @@ function TipsterCard({
   const followers = tipster.followers ?? 0;
   const openTips = tipster.active_tips_count ?? 0;
   const supportLabel = followers > 0 ? `${followers.toLocaleString()} follower${followers === 1 ? "" : "s"}` : "Fresh profile";
-  const profileMeta = tipster.is_ai && backtest
-    ? `${supportLabel} · ${(backtest.n_predictions ?? 0).toLocaleString()} predictions`
-    : settled > 0 ? `${supportLabel} · ${settled} graded` : supportLabel;
+  const profileMeta = settled > 0 ? `${supportLabel} · ${settled} graded` : supportLabel;
 
-  // For AI tipsters use backtest stats; fall back to live settled stats
-  const useBacktest = tipster.is_ai && backtest;
+  // Prefer live settled-pick stats when we have real data; only use backtest when no picks yet
+  const useBacktest = tipster.is_ai && backtest && settled === 0;
   const stat1 = useBacktest
     ? { label: "Accuracy", value: `${((backtest!.accuracy ?? 0) * 100).toFixed(1)}%`, color: (backtest!.accuracy ?? 0) >= 0.55 ? "var(--positive)" : "var(--warning)" }
     : { label: "Win rate", value: settled > 0 ? `${winPct}%` : "Building", color: settled > 0 ? (winPct >= 60 ? "var(--positive)" : winPct >= 50 ? "var(--warning)" : "var(--negative)") : "var(--text1)" };
@@ -606,7 +618,7 @@ function TipsterCard({
     : { label: "Units", value: settled > 0 ? plStr : "—", color: settled > 0 ? (pl >= 0 ? "var(--positive)" : "var(--negative)") : "var(--text1)" };
   const stat3 = useBacktest
     ? { label: "Sharpe", value: (backtest!.sharpe_ratio ?? 0).toFixed(2), color: (backtest!.sharpe_ratio ?? 0) >= 2 ? "var(--positive)" : "var(--warning)" }
-    : { label: "Open tips", value: String(openTips || "—"), color: "var(--text0)" };
+    : { label: "Record", value: settled > 0 ? `${tipster.won_picks}W–${tipster.lost_picks}L` : "—", color: "var(--text0)" };
 
   const toneStyles = {
     accent: { background: "rgba(0,255,132,0.10)", borderColor: "rgba(0,255,132,0.16)", color: "var(--accent)" },

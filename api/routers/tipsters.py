@@ -291,7 +291,12 @@ def get_tipster_tips(
     query = db.query(TipsterTip).filter(TipsterTip.user_id == tipster_id)
     if not include_settled:
         query = query.filter(TipsterTip.outcome.is_(None))
-    tips = query.order_by(TipsterTip.start_time.asc()).all()
+        tips = query.order_by(TipsterTip.start_time.asc()).all()
+    else:
+        # History: settled tips newest-first, capped at 200 for performance
+        tips = query.filter(
+            TipsterTip.outcome.in_(["won", "lost", "void"])
+        ).order_by(TipsterTip.start_time.desc()).limit(200).all()
 
     return [
         TipsterTipSchema(
