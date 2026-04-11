@@ -114,7 +114,7 @@ BACKFILL_SPORT_MIN_EDGE: dict[str, float] = {
 }
 BACKFILL_SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "esports":    1.0,   # DISABLED: negative ROI at all thresholds
-    "tennis":     1.0,   # DISABLED: model -5.1% ROI at real market odds (less accurate than market)
+    "tennis":     0.0,   # set handicap only; all conf levels profitable (+35% ROI post label-bias fix)
     "soccer":     0.30,  # real SGO odds only; fair-odds fallback disabled for soccer
     "basketball": 0.30,  # MIN_ODDS=1.40 floor caps fair-odds at p<0.714; combined gives p=0.65-0.71
     "baseball":   0.20,  # MIN_ODDS=1.40 floor caps fair-odds at p<0.714; combined gives p=0.60-0.71
@@ -430,11 +430,13 @@ def run(
                         db.add(tip)
 
             # ── Tennis set handicap (-1.5 sets) ──────────────────────────────
-            # DISABLED: backtest showed -22% ROI over 89 bets. Structurally breaks
-            # even at best since it bets at fair odds with no external edge signal.
-            # Tennis strategy: outright match winner only (with real api-tennis.com odds).
-            if False and sport == "tennis" and p_home and p_away:
+            # Re-enabled after model label-bias fix (62.9% acc): +35% ROI on 3333 bets.
+            # Favourite only — picks the player with the higher match win probability.
+            if sport == "tennis" and p_home and p_away:
                 hc_cands = _tennis_handicap_candidates(home_name, away_name, p_home)
+                # Favourite only — matches backtest methodology (side="favourite_only")
+                if hc_cands:
+                    hc_cands = [max(hc_cands, key=lambda c: c[1])]
                 for sel, prob, hc_odds, hc_market in hc_cands:
                     if confidence < effective_min_conf:
                         continue

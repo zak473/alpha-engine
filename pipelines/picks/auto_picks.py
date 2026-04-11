@@ -216,7 +216,7 @@ SPORT_MIN_CONFIDENCE: dict[str, float] = {
     # Combined with these floors: basketball p=0.65-0.71, baseball p=0.60-0.71.
     "esports":    1.0,   # DISABLED: all esports thresholds showed negative ROI
     "soccer":     0.30,  # real SGO odds only; MIN_ODDS=1.40 still applies as lower bound
-    "tennis":     0.0,   # higher conf = heavy fav at short odds = negative ROI; low conf best (+2.3%)
+    "tennis":     0.0,   # set handicap: all confidence levels profitable (+35% ROI); low conf = best odds
     "basketball": 0.30,
     "baseball":   0.20,
     "hockey":     0.35,
@@ -325,11 +325,17 @@ def run(
             if d_odds and pred.p_draw and pred.p_draw > 0.01:
                 candidates.append(("Draw", pred.p_draw, d_odds, ml_market))
 
-            # Tennis set handicap — add fair-odds -1.5 set candidates derived from
-            # Tennis set handicap (-1.5 sets) disabled: backtest showed -22% ROI over
-            # 89 bets. The formula bets at fair odds with no external edge signal —
-            # structurally break-even at best. Using ML outright with market odds instead.
+            # Tennis set handicap (-1.5 sets): pick the match favourite only.
+            # Re-enabled after model fix (label bias → 62.9% acc): +35% ROI, 3333 bets.
+            # Uses fair odds (1 / p_2_0) derived from match win prob via per-set formula.
             hc_candidates: list[tuple[str, float, float, str]] = []
+            if sport == "tennis" and pred.p_home and pred.p_away:
+                all_hc = _tennis_handicap_candidates(
+                    home_name, away_name, pred.p_home,
+                )
+                if all_hc:
+                    # Favourite only — highest 2-0 prob
+                    hc_candidates = [max(all_hc, key=lambda c: c[1])]
 
             effective_min_edge = 0.0 if using_fair_odds else SPORT_MIN_EDGE.get(sport, min_edge)
             if using_fair_odds:
