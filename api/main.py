@@ -896,6 +896,24 @@ def admin_fetch_odds(secret: str):
     return {"sgo_updated": updated}
 
 
+@app.post("/api/v1/admin/trigger-auto-picks", tags=["Admin"])
+def admin_trigger_auto_picks(secret: str):
+    """Secret-key trigger for auto-picks (bypasses JWT — for CLI use)."""
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    import threading
+    def _run():
+        try:
+            from pipelines.picks.auto_picks import run
+            n = run()
+            log.info("[admin] trigger-auto-picks: created %d picks", n)
+        except Exception as exc:
+            log.error("[admin] trigger-auto-picks failed: %s", exc, exc_info=True)
+    threading.Thread(target=_run, daemon=True, name="auto-picks-trigger").start()
+    return {"status": "started", "message": "Auto-picks running in background."}
+
+
 @app.post("/api/v1/admin/run-auto-picks", tags=["Admin"])
 def admin_run_auto_picks(secret: str):
     """Manually trigger the auto-picks bot to regenerate tips."""
