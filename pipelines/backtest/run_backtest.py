@@ -41,7 +41,7 @@ AH0_MIN_ODDS: float = 1.10
 # confidence. Any global threshold > 0.30 kills all esports bets.
 BACKTEST_MIN_CONFIDENCE: dict[str, float] = {
     "esports":    0.0,   # edge gate only — was +19u/week at this setting
-    "soccer":     0.55,  # lgb_v18 validated at ≥50% confidence
+    "soccer":     0.65,  # lgb_v18 — raised from 0.55; matches live pick threshold
     "tennis":     0.55,
     "basketball": 0.0,   # binary model, edge gate is the filter
     "baseball":   0.60,

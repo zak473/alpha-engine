@@ -389,7 +389,7 @@ def run(
                 _p_away = pred.p_away or 0.0
                 ah_conf = (pred.confidence or 0) / 100.0
 
-                if _p_home > 0 and _p_away > 0 and ah_conf >= 0.55:
+                if _p_home > 0 and _p_away > 0 and ah_conf >= 0.65:
                     # Fetch the home and away spread rows for this match
                     _spreads = (
                         db.query(_SpreadOdds)

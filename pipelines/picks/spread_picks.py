@@ -93,6 +93,12 @@ def run(
 
         for spread, match in rows:
             sport = match.sport
+
+            # Soccer AH + totals are handled by auto_picks.py (Poisson model + confidence gate).
+            # spread_picks.py only uses SGO's own fair odds with no model signal — skip soccer.
+            if sport == "soccer":
+                continue
+
             market_name = (
                 SPREAD_MARKET.get(sport) if spread.market_type == "spread"
                 else TOTAL_MARKET.get(sport)
