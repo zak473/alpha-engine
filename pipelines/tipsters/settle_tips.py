@@ -93,9 +93,18 @@ def run(dry_run: bool = False, all_users: bool = False, recheck: bool = False) -
                 away_name = (away_team.name or "").lower() if away_team else ""
 
                 if home_name and (home_name in label or label in home_name):
-                    outcome = "won" if is_home_win else "lost"
+                    if "-0.5" in label:
+                        # AH -0.5 home: win only if home wins outright (draw = loss)
+                        outcome = "won" if is_home_win else "lost"
+                    else:
+                        outcome = "won" if is_home_win else "lost"
                 elif away_name and (away_name in label or label in away_name):
-                    outcome = "won" if is_away_win else "lost"
+                    if "+0.5" in label:
+                        # AH +0.5 away: win if away wins OR draws (draw is a cover)
+                        is_draw = match.outcome == "draw"
+                        outcome = "won" if (is_away_win or is_draw) else "lost"
+                    else:
+                        outcome = "won" if is_away_win else "lost"
                 else:
                     log.debug(
                         "  can't match label '%s' to home='%s' away='%s' (tip=%s)",
