@@ -1019,20 +1019,21 @@ def admin_backfill_all_picks(secret: str, days: int = 60):
 
 
 @app.get("/api/v1/admin/backfill-picks-diag", tags=["Admin"])
-def admin_backfill_picks_diag(secret: str, days: int = 3, offset_days: int = 0, dry_run: bool = True):
+def admin_backfill_picks_diag(secret: str, days: int = 3, offset_days: int = 0, dry_run: bool = True, sport: str = ""):
     """
     Synchronous backfill for a specific date window. Runs within Railway's HTTP timeout.
     days: how far back to process (e.g. days=30 → process last 30 days).
     offset_days: skip the most recent N days (e.g. offset_days=15, days=30 → process 15-30 days ago).
     dry_run: if True, count picks without inserting.
+    sport: optional filter (e.g. soccer, basketball, baseball, hockey).
     """
     if secret != settings.ADMIN_SECRET:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
     try:
         from pipelines.picks.backfill_picks import run as backfill
-        n = backfill(days=days, offset_days=offset_days or None, dry_run=dry_run)
-        return {"status": "ok", "dry_run": dry_run, "days": days, "offset_days": offset_days, "created": n}
+        n = backfill(days=days, offset_days=offset_days or None, dry_run=dry_run, sport_filter=sport or None)
+        return {"status": "ok", "dry_run": dry_run, "days": days, "offset_days": offset_days, "sport": sport or "all", "created": n}
     except Exception as exc:
         import traceback
         return {"status": "error", "error": str(exc), "trace": traceback.format_exc()[-3000:]}

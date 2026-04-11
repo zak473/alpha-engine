@@ -229,6 +229,7 @@ def run(
     kelly_frac: float = settings.AUTO_PICK_KELLY_FRACTION,
     user_id: str = settings.AUTO_PICK_USER_ID,
     dry_run: bool = False,
+    sport_filter: Optional[str] = None,
 ) -> int:
     """
     Backfill TrackedPick + TipsterTip rows for finished historical matches.
@@ -257,6 +258,8 @@ def run(
         )
         if upper_cutoff is not None:
             matches = matches.filter(CoreMatch.kickoff_utc < upper_cutoff)
+        if sport_filter:
+            matches = matches.filter(CoreMatch.sport == sport_filter)
         matches = matches.order_by(CoreMatch.kickoff_utc.asc()).all()
 
         log.info("Backfill: evaluating %d finished matches (days=%d, offset_days=%s) ...",
