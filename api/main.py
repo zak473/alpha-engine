@@ -658,17 +658,20 @@ def admin_purge_sport_tips(secret: str, sport: str, include_settled: bool = Fals
     if secret != settings.ADMIN_SECRET:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
-    from db.models.tipsters import TipsterTip
-    from db.models.picks import TrackedPick
+    from sqlalchemy import text
     from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
     ai_ids = list(AI_TIPSTER_IDS.values())
-    tips_q = db.query(TipsterTip).filter(TipsterTip.user_id.in_(ai_ids), TipsterTip.sport == sport)
-    picks_q = db.query(TrackedPick).filter(TrackedPick.sport == sport, TrackedPick.auto_generated.is_(True))
-    if not include_settled:
-        tips_q = tips_q.filter(TipsterTip.outcome.is_(None))
-        picks_q = picks_q.filter(TrackedPick.outcome.is_(None))
-    deleted_tips = tips_q.delete(synchronize_session=False)
-    deleted_picks = picks_q.delete(synchronize_session=False)
+    placeholders = ",".join(f"'{uid}'" for uid in ai_ids)
+
+    if include_settled:
+        tips_sql = f"DELETE FROM tipster_tips WHERE sport = :sport AND user_id IN ({placeholders})"
+        picks_sql = "DELETE FROM tracked_picks WHERE sport = :sport AND auto_generated = true"
+    else:
+        tips_sql = f"DELETE FROM tipster_tips WHERE sport = :sport AND outcome IS NULL AND user_id IN ({placeholders})"
+        picks_sql = "DELETE FROM tracked_picks WHERE sport = :sport AND auto_generated = true AND outcome IS NULL"
+
+    deleted_tips = db.execute(text(tips_sql), {"sport": sport}).rowcount
+    deleted_picks = db.execute(text(picks_sql), {"sport": sport}).rowcount
     db.commit()
     return {"sport": sport, "include_settled": include_settled, "deleted_tips": int(deleted_tips), "deleted_picks": int(deleted_picks)}
 
