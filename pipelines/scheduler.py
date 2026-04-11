@@ -202,6 +202,14 @@ def _job_fetch_odds() -> None:
     except Exception as exc:
         log.error("[scheduler] bdl_odds failed: %s", exc, exc_info=True)
 
+    # Football-Data.co.uk: free historical CSV odds for soccer (current + last season)
+    try:
+        from pipelines.odds.fetch_odds_football_data import fetch_all as fetch_fd_odds
+        result = fetch_fd_odds(seasons=["2425", "2324"])
+        log.info("[scheduler] football_data_odds: %d soccer matches updated.", result["updated"])
+    except Exception as exc:
+        log.error("[scheduler] football_data_odds failed: %s", exc, exc_info=True)
+
     # Fallback: The Odds API (only runs if ODDS_API_KEY set)
     try:
         from config.settings import settings as _s

@@ -69,8 +69,8 @@ SPORT_MAP: dict[str, str] = {
     "soccer_australia_aleague":           "soccer",
     "soccer_japan_j_league":              "soccer",
     "soccer_usa_mls":                     "soccer",
-    # Basketball — NBA odds come from BallDontLie GOAT (nba/v2/odds); skip here
-    # "basketball_nba":                  "basketball",
+    # Basketball
+    "basketball_nba":                   "basketball",
     "basketball_euroleague":              "basketball",
     "basketball_nbl":                     "basketball",
     "basketball_ncaab":                   "basketball",

@@ -1054,6 +1054,27 @@ def admin_backfill_spread_picks(secret: str, days: int = 60, dry_run: bool = Fal
     return {"created": created, "dry_run": dry_run}
 
 
+@app.get("/api/v1/admin/import-football-data-odds", tags=["Admin"])
+def admin_import_football_data_odds(
+    secret: str,
+    seasons: str = "2425,2324,2223,2122",
+    dry_run: bool = True,
+):
+    """
+    Import historical soccer odds from football-data.co.uk (free, no key required).
+    Matches CSV records against CoreMatch by date + fuzzy team names and updates
+    CoreMatch.odds_home/away/draw with real Pinnacle/Bet365 odds.
+    seasons: comma-separated season codes e.g. '2425,2324'
+    """
+    if secret != settings.ADMIN_SECRET:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    from pipelines.odds.fetch_odds_football_data import fetch_all
+    season_list = [s.strip() for s in seasons.split(",") if s.strip()]
+    result = fetch_all(seasons=season_list, dry_run=dry_run)
+    return {"status": "ok", "dry_run": dry_run, "seasons": season_list, **result}
+
+
 @app.get("/api/v1/admin/pick-outcome-stats", tags=["Admin"])
 def admin_pick_outcome_stats(secret: str, db: Session = Depends(get_db)):
     """Outcome distribution for all auto-generated picks."""
