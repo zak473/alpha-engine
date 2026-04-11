@@ -29,9 +29,10 @@ SPORTS = ["soccer", "tennis", "esports", "basketball", "baseball", "hockey"]
 
 HC_MIN_ODDS: float = 1.4
 HC_MAX_ODDS: float = 4.0
-# AH0 (Draw No Bet): raise floor to 1.50 — below that the odds are too short to
-# overcome even a small model error (at 1.263 avg you need 79% hit rate to break even).
-AH0_MIN_ODDS: float = 1.50
+# AH0 (Draw No Bet): allow from 1.10 — confident favourites in 3-way markets have
+# short AH0 odds (e.g. p_home=0.55, p_away=0.20 → AH0=1.36) which was being blocked
+# by the old 1.50 floor, killing nearly all soccer DNB bets.
+AH0_MIN_ODDS: float = 1.10
 
 # Per-sport optimal confidence thresholds for the backtest.
 # These differ from live-pick thresholds: the backtest should show the model's

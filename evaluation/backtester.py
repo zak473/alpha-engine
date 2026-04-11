@@ -171,17 +171,30 @@ class Backtester:
     ) -> BacktestResult:
         """Compute full evaluation metrics from simulation records and raw predictions."""
         if records.empty:
+            # No bets placed — still compute accuracy/calibration on all predictions
+            p_home = np.array([p.p_home for p in predictions])
+            actual_arr = np.array(actuals)
+            actual_binary = (actual_arr == 1.0).astype(float)
+            predicted = (p_home >= 0.5).astype(int)
+            n_correct = int((predicted == actual_binary).sum())
+            eps = 1e-7
+            p_clipped = np.clip(p_home, eps, 1 - eps)
+            ll = float(-np.mean(
+                actual_binary * np.log(p_clipped) + (1 - actual_binary) * np.log(1 - p_clipped)
+            )) if len(predictions) > 0 else 0.0
+            brier = float(np.mean((p_home - actual_binary) ** 2)) if len(predictions) > 0 else 0.0
+            ece = self._compute_ece(p_home, actual_binary) if len(predictions) > 0 else 0.0
             return BacktestResult(
                 strategy_id=self.config.method,
                 n_predictions=len(predictions),
-                n_correct=0,
-                accuracy=0.0,
+                n_correct=n_correct,
+                accuracy=n_correct / len(predictions) if predictions else 0.0,
                 roi=0.0,
                 sharpe_ratio=0.0,
                 max_drawdown=0.0,
-                log_loss=0.0,
-                brier_score=0.0,
-                calibration_error=0.0,
+                log_loss=round(ll, 4),
+                brier_score=round(brier, 4),
+                calibration_error=round(ece, 4),
                 pnl_units=0.0,
             )
 
