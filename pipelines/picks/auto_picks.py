@@ -215,14 +215,14 @@ SPORT_MIN_CONFIDENCE: dict[str, float] = {
     # MIN_ODDS=1.40 applied to ALL picks (fair + real) caps model_prob < 0.714.
     # Combined with these floors: basketball p=0.65-0.71, baseball p=0.60-0.71.
     "esports":    1.0,   # DISABLED: all esports thresholds showed negative ROI
-    "soccer":     0.40,  # for AH/DNB (fair-odds moneyline uses FAIR_ODDS_MIN_CONFIDENCE instead)
+    "soccer":     0.30,  # real SGO odds only; MIN_ODDS=1.40 still applies as lower bound
     "tennis":     0.0,   # higher conf = heavy fav at short odds = negative ROI; low conf best (+2.3%)
     "basketball": 0.30,
     "baseball":   0.20,
     "hockey":     0.35,
 }
 FAIR_ODDS_MIN_CONFIDENCE: dict[str, float] = {
-    "soccer":     0.40,  # was 0.72; MIN_ODDS=1.40 caps at p<0.714; combined gives p=0.65-0.71
+    # soccer removed — uses real SGO odds only (no fair-odds fallback)
     "basketball": 0.30,
     "baseball":   0.20,
 }

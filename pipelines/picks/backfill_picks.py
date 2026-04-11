@@ -109,14 +109,13 @@ BACKFILL_MIN_CONFIDENCE: float = 0.30  # default fallback; sports override below
 # Edge=0.0 for basketball/baseball: these often lack real market odds so we fall back
 # to fair odds (1/p) in the backfill. Fair-odds edge = 0 so min_edge must be 0.
 BACKFILL_SPORT_MIN_EDGE: dict[str, float] = {
-    "basketball": 0.0,
-    "baseball":   0.0,
-    "soccer":     0.0,   # fair-odds soccer: edge = 0 by definition, gate only by confidence
+    "basketball": 0.0,  # fair-odds: edge = 0 by definition, gate by confidence only
+    "baseball":   0.0,  # fair-odds: edge = 0 by definition, gate by confidence only
 }
 BACKFILL_SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "esports":    1.0,   # DISABLED: negative ROI at all thresholds
     "tennis":     1.0,   # DISABLED: model -5.1% ROI at real market odds (less accurate than market)
-    "soccer":     0.40,  # MIN_ODDS=1.40 floor caps fair-odds at p<0.714; combined gives p=0.65-0.71
+    "soccer":     0.30,  # real SGO odds only; fair-odds fallback disabled for soccer
     "basketball": 0.30,  # MIN_ODDS=1.40 floor caps fair-odds at p<0.714; combined gives p=0.65-0.71
     "baseball":   0.20,  # MIN_ODDS=1.40 floor caps fair-odds at p<0.714; combined gives p=0.60-0.71
     "hockey":     0.35,
