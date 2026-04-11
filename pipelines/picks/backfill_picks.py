@@ -114,7 +114,7 @@ BACKFILL_SPORT_MIN_EDGE: dict[str, float] = {
 }
 BACKFILL_SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "esports":    1.0,   # DISABLED: negative ROI at all thresholds
-    "tennis":     0.46,  # match winner OR set handicap; target ≤5/day; p_home≥0.73
+    "tennis":     0.40,  # model confidence caps at ~0.44; daily cap enforced instead
     "soccer":     0.30,  # real SGO odds only; fair-odds fallback disabled for soccer
     "basketball": 0.30,  # MIN_ODDS=1.40 floor caps fair-odds at p<0.714; combined gives p=0.65-0.71
     "baseball":   0.20,  # MIN_ODDS=1.40 floor caps fair-odds at p<0.714; combined gives p=0.60-0.71
@@ -123,9 +123,16 @@ BACKFILL_SPORT_MIN_CONFIDENCE: dict[str, float] = {
 
 # Per-sport minimum odds overrides (default: settings.MIN_ODDS = 1.40)
 # Tennis: allow down to 1.20 to capture short-priced match winner picks;
-#         very confident picks (p>0.83) fall through to set handicap automatically.
+#         very confident picks fall through to set handicap automatically.
 BACKFILL_SPORT_MIN_ODDS: dict[str, float] = {
     "tennis": 1.20,
+}
+
+# Hard cap on picks created per calendar day per sport.
+# Tennis: model outputs ~33 qualifying matches/day at conf=0.40 but we only want top 5.
+# Picks are sorted by kickoff ASC so earliest matches are picked first.
+BACKFILL_MAX_PICKS_PER_DAY: dict[str, int] = {
+    "tennis": 5,
 }
 
 
@@ -247,6 +254,7 @@ def run(
     """
     db = SessionLocal()
     created = 0
+    picks_by_sport_date: dict[str, int] = {}  # "sport:YYYY-MM-DD" → picks created
 
     try:
         now = datetime.utcnow()
@@ -284,6 +292,13 @@ def run(
             away_name = away_team.name
             match_label = f"{home_name} vs {away_name}"
             sport = match.sport
+
+            # Daily cap: skip if we've already hit the per-sport limit for this date
+            max_daily = BACKFILL_MAX_PICKS_PER_DAY.get(sport)
+            if max_daily is not None:
+                day_key = f"{sport}:{match.kickoff_utc.date().isoformat()}"
+                if picks_by_sport_date.get(day_key, 0) >= max_daily:
+                    continue
 
             # Skip handball leagues and women's/junior basketball tagged as sport="basketball"
             if sport == "basketball":
@@ -429,6 +444,8 @@ def run(
                 )
 
                 created += 1
+                if max_daily is not None:
+                    picks_by_sport_date[day_key] = picks_by_sport_date.get(day_key, 0) + 1
                 if not dry_run:
                     pick = TrackedPick(
                         id=str(uuid.uuid4()),

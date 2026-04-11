@@ -216,7 +216,7 @@ SPORT_MIN_CONFIDENCE: dict[str, float] = {
     # Combined with these floors: basketball p=0.65-0.71, baseball p=0.60-0.71.
     "esports":    1.0,   # DISABLED: all esports thresholds showed negative ROI
     "soccer":     0.30,  # real SGO odds only; MIN_ODDS=1.40 still applies as lower bound
-    "tennis":     0.46,  # match winner OR set handicap; target ≤5/day; p_home≥0.73
+    "tennis":     0.40,  # model confidence caps at ~0.44; daily cap enforced instead
     "basketball": 0.30,
     "baseball":   0.20,
     "hockey":     0.35,
@@ -225,12 +225,17 @@ FAIR_ODDS_MIN_CONFIDENCE: dict[str, float] = {
     # soccer removed — uses real SGO odds only (no fair-odds fallback)
     "basketball": 0.30,
     "baseball":   0.20,
-    "tennis":     0.46,
+    "tennis":     0.40,
 }
 # Per-sport minimum odds override. Tennis: 1.20 allows short-priced match winners
 # (p_home up to 0.83). Picks where odds < 1.20 fall through to set handicap.
 SPORT_MIN_ODDS: dict[str, float] = {
     "tennis": 1.20,
+}
+# Hard daily cap on picks created per sport. The live auto_picks bot checks how many
+# tennis picks already exist for today before creating new ones.
+SPORT_MAX_PICKS_PER_DAY: dict[str, int] = {
+    "tennis": 5,
 }
 
 # Sports where we fall back to model fair odds (1/p) when real market odds are
@@ -293,6 +298,24 @@ def run(
 
             # Determine correct market name based on sport
             sport = match.sport
+
+            # Daily cap: skip if we've already created the max picks for this sport today
+            max_daily = SPORT_MAX_PICKS_PER_DAY.get(sport)
+            if max_daily is not None:
+                today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+                today_count = (
+                    db.query(TrackedPick)
+                    .filter(
+                        TrackedPick.user_id == user_id,
+                        TrackedPick.sport == sport,
+                        TrackedPick.auto_generated.is_(True),
+                        TrackedPick.start_time >= today_start,
+                    )
+                    .count()
+                )
+                if today_count >= max_daily:
+                    log.debug("  Daily cap reached (%d/%d) for %s — skipping %s", today_count, max_daily, sport, match_label)
+                    continue
 
             # Skip handball, women's, and junior basketball tagged as sport="basketball"
             if sport == "basketball":
