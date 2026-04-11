@@ -432,7 +432,9 @@ def run(
             # ── Tennis set handicap (-1.5 sets) ──────────────────────────────
             # Re-enabled after model label-bias fix (62.9% acc): +35% ROI on 3333 bets.
             # Favourite only — picks the player with the higher match win probability.
-            if sport == "tennis" and p_home and p_away:
+            # ML predictions only — ELO fallback confidence = max(p_home,p_away) ≥ 0.5
+            # bypasses the confidence gate and generates too many low-quality picks.
+            if sport == "tennis" and p_home and p_away and source == "ml":
                 hc_cands = _tennis_handicap_candidates(home_name, away_name, p_home)
                 # Favourite only — matches backtest methodology (side="favourite_only")
                 if hc_cands:
