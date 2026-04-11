@@ -119,8 +119,6 @@ BACKFILL_SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "basketball": 0.40,
     "baseball":   0.20,
     "hockey":     0.30,
-    # Tennis: api-tennis.com odds are stored so edge > 0 is guaranteed; use edge gate only.
-    "tennis": 0.0,
 }
 
 
