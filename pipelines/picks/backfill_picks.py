@@ -224,6 +224,7 @@ def _elo_probs(db: Session, match: CoreMatch) -> tuple[float, float, float]:
 
 def run(
     days: int = 14,
+    offset_days: Optional[int] = None,
     min_edge: float = BACKFILL_MIN_EDGE,
     min_confidence: float = BACKFILL_MIN_CONFIDENCE,
     kelly_frac: float = settings.AUTO_PICK_KELLY_FRACTION,
@@ -234,12 +235,17 @@ def run(
     Backfill TrackedPick + TipsterTip rows for finished historical matches.
     Uses PredMatch (ML) when available, falls back to ELO probabilities.
     Returns number of picks created.
+
+    offset_days: if set, skip the most recent N days (process days [offset_days, days] ago).
+                 Useful for chunked processing: days=30, offset_days=15 → processes 15-30 days ago.
     """
     db = SessionLocal()
     created = 0
 
     try:
-        cutoff = datetime.utcnow() - timedelta(days=days)
+        now = datetime.utcnow()
+        cutoff = now - timedelta(days=days)
+        upper_cutoff = now - timedelta(days=offset_days) if offset_days else None
 
         # All finished matches in the window with a known outcome
         matches = (
@@ -249,11 +255,13 @@ def run(
                 CoreMatch.outcome.isnot(None),
                 CoreMatch.kickoff_utc >= cutoff,
             )
-            .order_by(CoreMatch.kickoff_utc.asc())
-            .all()
         )
+        if upper_cutoff is not None:
+            matches = matches.filter(CoreMatch.kickoff_utc < upper_cutoff)
+        matches = matches.order_by(CoreMatch.kickoff_utc.asc()).all()
 
-        log.info("Backfill: evaluating %d finished matches (last %d days) ...", len(matches), days)
+        log.info("Backfill: evaluating %d finished matches (days=%d, offset_days=%s) ...",
+                 len(matches), days, offset_days)
         now = datetime.now(timezone.utc)
 
         for match in matches:
