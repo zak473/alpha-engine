@@ -212,22 +212,19 @@ SPORT_MIN_EDGE: dict[str, float] = {
     "basketball":  0.01,
 }
 SPORT_MIN_CONFIDENCE: dict[str, float] = {
-    # Tuned from 90-day backtest sweep + density calibration (2026-04-11).
-    # Target: 3-4 bets/day per sport = 10-12 total. Raised after backfill showed 21/day.
+    # MIN_ODDS=1.40 applied to ALL picks (fair + real) caps model_prob < 0.714.
+    # Combined with these floors: basketball p=0.65-0.71, baseball p=0.60-0.71.
     "esports":    1.0,   # DISABLED: all esports thresholds showed negative ROI
     "soccer":     0.65,  # for AH/DNB (fair-odds moneyline uses FAIR_ODDS_MIN_CONFIDENCE instead)
     "tennis":     0.0,   # higher conf = heavy fav at short odds = negative ROI; low conf best (+2.3%)
-    "basketball": 0.60,  # raised from 0.40; target 3-4/day
-    "baseball":   0.50,  # raised from 0.20; target 3-4/day
-    "hockey":     0.48,  # raised from 0.30; target 3-4/day
+    "basketball": 0.30,
+    "baseball":   0.20,
+    "hockey":     0.35,
 }
-# Fair-odds sports (no real market odds stored): require same gate as SPORT_MIN_CONFIDENCE.
-# Fair-odds picks have no external edge signal so confidence is the only filter —
-# must be strict enough to prevent volume dilution.
 FAIR_ODDS_MIN_CONFIDENCE: dict[str, float] = {
     "soccer":     0.72,
-    "basketball": 0.60,  # matches SPORT_MIN_CONFIDENCE
-    "baseball":   0.50,  # matches SPORT_MIN_CONFIDENCE
+    "basketball": 0.30,
+    "baseball":   0.20,
 }
 
 # Sports where we fall back to model fair odds (1/p) when real market odds are

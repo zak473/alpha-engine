@@ -116,9 +116,9 @@ BACKFILL_SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "esports":    1.0,   # DISABLED: negative ROI at all thresholds
     "tennis":     1.0,   # DISABLED: model -5.1% ROI at real market odds (less accurate than market)
     "soccer":     0.65,
-    "basketball": 0.60,  # raised from 0.40 — recent data too dense; target 3-4/day
-    "baseball":   0.50,  # raised from 0.20 — recent data too dense; target 3-4/day
-    "hockey":     0.48,  # raised from 0.30 — recent data too dense; target 3-4/day
+    "basketball": 0.30,  # MIN_ODDS=1.40 floor caps fair-odds at p<0.714; combined gives p=0.65-0.71
+    "baseball":   0.20,  # MIN_ODDS=1.40 floor caps fair-odds at p<0.714; combined gives p=0.60-0.71
+    "hockey":     0.35,
 }
 
 
@@ -342,10 +342,9 @@ def run(
                     continue
                 if confidence < effective_min_conf:
                     continue
-                # Skip odds range check for fair odds — the MIN_ODDS bound is
-                # for real bookmaker markets (to avoid heavy vig on short prices).
-                # Fair odds are mathematically clean so no range filtering needed.
-                if not using_fair_odds and (book_odds < settings.MIN_ODDS or book_odds > settings.MAX_ODDS):
+                # Apply odds range to ALL picks — fair or real — to avoid heavy
+                # favorites at 1.1-1.3 odds where Kelly is negligible and ROI is poor.
+                if book_odds < settings.MIN_ODDS or book_odds > settings.MAX_ODDS:
                     continue
 
                 # Dedup — don't create if already exists
