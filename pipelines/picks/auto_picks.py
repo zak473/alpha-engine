@@ -216,7 +216,7 @@ SPORT_MIN_CONFIDENCE: dict[str, float] = {
     # Combined with these floors: basketball p=0.65-0.71, baseball p=0.60-0.71.
     "esports":    1.0,   # DISABLED: all esports thresholds showed negative ROI
     "soccer":     0.30,  # real SGO odds only; MIN_ODDS=1.40 still applies as lower bound
-    "tennis":     0.30,  # set handicap: conf≥0.30 → ~8-9 picks/day (p_home > 0.65)
+    "tennis":     0.50,  # set handicap: conf≥0.50 → ~5/day (p_home > 0.75)
     "basketball": 0.30,
     "baseball":   0.20,
     "hockey":     0.35,
