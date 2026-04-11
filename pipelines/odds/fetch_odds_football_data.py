@@ -265,6 +265,7 @@ def fetch_all(
 ) -> dict[str, int]:
     """
     Download all league/season CSVs and update CoreMatch odds.
+    Opens a fresh DB session per league/season to avoid holding connections too long.
     Returns summary dict with total matched/updated counts.
     """
     if seasons is None:
@@ -272,42 +273,38 @@ def fetch_all(
     if leagues is None:
         leagues = list(LEAGUES.keys())
 
-    db = SessionLocal()
-    total_matched = total_updated = total_rows = 0
+    total_matched = total_updated = 0
 
-    try:
-        for season in seasons:
-            for code in leagues:
-                league_name = LEAGUES.get(code, code)
-                log.info("  Fetching %s %s ...", season, league_name)
+    for season in seasons:
+        for code in leagues:
+            league_name = LEAGUES.get(code, code)
+            log.info("  Fetching %s %s ...", season, league_name)
+            # Fresh session per file — avoids holding connections for minutes
+            db = SessionLocal()
+            try:
                 matched, updated = fetch_season(code, season, db, dry_run=dry_run)
-                total_matched += matched
-                total_updated += updated
-                total_rows += matched
-                if matched:
-                    log.info(
-                        "    %s %s: %d matched, %d odds updated",
-                        season, league_name, matched, updated,
-                    )
+                if not dry_run:
+                    db.commit()
+            except Exception as exc:
+                db.rollback()
+                log.error("  Error on %s/%s: %s", season, code, exc)
+                matched = updated = 0
+            finally:
+                db.close()
 
-        if not dry_run:
-            db.commit()
-            log.info(
-                "football-data import complete: %d matches linked, %d odds updated.",
-                total_matched, total_updated,
-            )
-        else:
-            log.info(
-                "DRY RUN: %d matches would be linked, %d odds would be updated.",
-                total_matched, total_updated,
-            )
+            total_matched += matched
+            total_updated += updated
+            if matched:
+                log.info(
+                    "    %s %s: %d matched, %d odds updated",
+                    season, league_name, matched, updated,
+                )
 
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
-
+    log.info(
+        "%s: %d matches linked, %d odds updated.",
+        "DRY RUN" if dry_run else "football-data import complete",
+        total_matched, total_updated,
+    )
     return {"matched": total_matched, "updated": total_updated}
 
 
