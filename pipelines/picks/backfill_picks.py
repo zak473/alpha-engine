@@ -317,8 +317,9 @@ def run(
 
             # Prefer real market odds; fall back to fair odds for basketball/baseball only.
             # Soccer uses SGO real odds — if none stored, skip (no fair-odds soccer picks).
-            FAIR_ODDS_SPORTS = {"basketball", "baseball"}
-            can_use_fair_odds = sport in FAIR_ODDS_SPORTS
+            # Tennis uses fair odds for moneyline (ML predictions only, not ELO fallback).
+            FAIR_ODDS_SPORTS = {"basketball", "baseball", "tennis"}
+            can_use_fair_odds = sport in FAIR_ODDS_SPORTS and (sport != "tennis" or source == "ml")
             using_fair_odds = not match.odds_home and can_use_fair_odds
             h_odds = match.odds_home or (round(1 / p_home, 3) if p_home > 0 and can_use_fair_odds else None)
             a_odds = match.odds_away or (round(1 / p_away, 3) if p_away > 0 and can_use_fair_odds else None)

@@ -225,15 +225,16 @@ FAIR_ODDS_MIN_CONFIDENCE: dict[str, float] = {
     # soccer removed — uses real SGO odds only (no fair-odds fallback)
     "basketball": 0.30,
     "baseball":   0.20,
+    "tennis":     0.40,  # match winner: conf≥0.40 → p_home>0.70 → ~65-70% win rate
 }
 
 # Sports where we fall back to model fair odds (1/p) when real market odds are
 # unavailable. SGO covers top-tier soccer leagues only. Basketball (NBA) and
 # baseball (MLB) often lack stored market odds — we fall back to model fair odds
 # with confidence-only gating (model is well-calibrated at these confidence levels).
-# Tennis/esports are DISABLED: tennis model is less accurate than the market at real
-# odds (-5.1% ROI); esports is negative ROI at all thresholds.
-FAIR_ODDS_SPORTS: set[str] = {"basketball", "baseball"}  # soccer uses SGO real odds only
+# Tennis uses fair odds for moneyline (model 62.9% acc post label-bias fix).
+# Esports: DISABLED — negative ROI at all thresholds.
+FAIR_ODDS_SPORTS: set[str] = {"basketball", "baseball", "tennis"}  # soccer uses SGO real odds only
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
