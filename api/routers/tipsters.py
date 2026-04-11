@@ -293,10 +293,10 @@ def get_tipster_tips(
         query = query.filter(TipsterTip.outcome.is_(None))
         tips = query.order_by(TipsterTip.start_time.asc()).all()
     else:
-        # History: settled tips newest-first, capped at 200 for performance
+        # History: all settled tips, newest-first
         tips = query.filter(
             TipsterTip.outcome.in_(["won", "lost", "void"])
-        ).order_by(TipsterTip.start_time.desc()).limit(200).all()
+        ).order_by(TipsterTip.start_time.desc()).all()
 
     return [
         TipsterTipSchema(
