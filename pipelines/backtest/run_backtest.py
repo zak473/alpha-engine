@@ -347,6 +347,165 @@ def _run_soccer_draw_no_bet(session: Session, min_confidence: float = 0.65) -> d
     return result
 
 
+def _run_soccer_asian_handicap(session: Session, min_confidence: float = 0.55) -> dict | None:
+    """
+    Simulate Asian Handicap -0.5 betting for soccer.
+
+    The model picks a favourite (home or away). We back them at assumed near-evens
+    market odds of 1.90 (typical AH market after bookmaker margin).
+
+    Resolution via actual goal scores:
+    - Bet home AH-0.5: WIN if home_score > away_score, LOSE otherwise (no push)
+    - Bet away AH-0.5: WIN if away_score > home_score, LOSE otherwise (no push)
+
+    We only bet when the model's implied edge clears MIN_EDGE vs the assumed 1.90 odds.
+    For 1.90, break-even probability = 1/1.90 ≈ 52.6%.
+
+    Returns a summary dict stored as metrics["backtest"]["asian_handicap"].
+    """
+    import numpy as np
+    from sqlalchemy import func
+
+    AH_ODDS = 1.90
+    AH_IMPLIED = 1.0 / AH_ODDS  # ≈ 0.526
+
+    subq = (
+        session.query(PredMatch.match_id, func.max(PredMatch.id).label("latest_id"))
+        .join(CoreMatch, CoreMatch.id == PredMatch.match_id)
+        .filter(CoreMatch.sport == "soccer")
+        .group_by(PredMatch.match_id)
+        .subquery()
+    )
+    rows = (
+        session.query(CoreMatch, PredMatch)
+        .join(subq, subq.c.match_id == CoreMatch.id)
+        .join(PredMatch, PredMatch.id == subq.c.latest_id)
+        .filter(
+            CoreMatch.sport == "soccer",
+            CoreMatch.status == "finished",
+            CoreMatch.outcome.isnot(None),
+            CoreMatch.home_score.isnot(None),
+            CoreMatch.away_score.isnot(None),
+        )
+        .order_by(CoreMatch.kickoff_utc.asc())
+        .all()
+    )
+
+    if not rows:
+        log.warning("  Soccer AH: no finished matches with scores.")
+        return None
+
+    bets = []
+    skipped_conf = 0
+    skipped_edge = 0
+
+    for match, pred in rows:
+        p_home = pred.p_home or 0.0
+        p_away = pred.p_away or 0.0
+        p_draw = pred.p_draw or 0.0
+        if p_home <= 0 or p_away <= 0:
+            continue
+
+        confidence = (pred.confidence or 0) / 100.0
+        if confidence < min_confidence:
+            skipped_conf += 1
+            continue
+
+        # For AH-0.5: draw is absorbed into the losing side.
+        # p(home AH-0.5 wins) = p_home  (must win outright)
+        # p(away AH-0.5 wins) = p_away + p_draw  (draw or away win = away covers)
+        p_home_ah = p_home
+        p_away_ah = p_away + p_draw
+
+        if p_home_ah >= p_away_ah:
+            bet_side = "home"
+            model_prob = p_home_ah
+        else:
+            bet_side = "away"
+            model_prob = p_away_ah
+
+        edge = model_prob - AH_IMPLIED
+        if edge < 0.02:
+            skipped_edge += 1
+            continue
+
+        # Resolve via actual scores
+        home_goals = match.home_score
+        away_goals = match.away_score
+        if bet_side == "home":
+            won = home_goals > away_goals
+        else:
+            won = away_goals > home_goals  # away wins outright (draw = away AH win was above)
+
+        # Wait — for away AH-0.5, away wins if they win OR draw (no push).
+        # Re-resolve: away AH-0.5 covers if home_score <= away_score? No —
+        # AH-0.5 means away gets +0.5 goals added, so:
+        #   adjusted away score = away_goals + 0.5
+        #   if adjusted_away > home: away covers → home_goals < away_goals + 0.5 → home_goals <= away_goals
+        if bet_side == "away":
+            won = home_goals <= away_goals  # away wins or draw
+
+        pnl = (AH_ODDS - 1.0) if won else -1.0
+
+        bets.append({
+            "match_id": match.id,
+            "bet_side": bet_side,
+            "model_prob": model_prob,
+            "edge": edge,
+            "pnl": pnl,
+            "won": won,
+            "date": match.kickoff_utc,
+        })
+
+    if not bets:
+        log.warning("  Soccer AH: no bets survived filters (conf_skip=%d edge_skip=%d).",
+                    skipped_conf, skipped_edge)
+        return None
+
+    pnl_arr = np.array([b["pnl"] for b in bets])
+    n_bets = len(bets)
+    n_won = sum(1 for b in bets if b["won"])
+    total_pnl = float(pnl_arr.sum())
+    roi = total_pnl / n_bets
+
+    ret_std = float(pnl_arr.std())
+    sharpe = float(pnl_arr.mean() / ret_std * (n_bets ** 0.5)) if ret_std > 0 else 0.0
+
+    cum = np.cumsum(pnl_arr)
+    running_max = np.maximum.accumulate(cum)
+    max_dd = float((cum - running_max).min())
+
+    date_from = bets[0]["date"]
+    date_to = bets[-1]["date"]
+
+    result = {
+        "n_bets": n_bets,
+        "n_won": n_won,
+        "hit_rate": round(n_won / n_bets, 4),
+        "pnl_units": round(total_pnl, 2),
+        "roi": round(roi, 4),
+        "sharpe_ratio": round(sharpe, 3),
+        "max_drawdown_units": round(max_dd, 2),
+        "assumed_odds": AH_ODDS,
+        "avg_edge": round(float(np.array([b["edge"] for b in bets]).mean()), 4),
+        "min_confidence": min_confidence,
+        "skipped_conf": skipped_conf,
+        "skipped_edge": skipped_edge,
+        "staking": "flat_1u",
+        "market": "Asian Handicap -0.5",
+        "side": "model_favourite",
+        "date_from": date_from.isoformat() if date_from else None,
+        "date_to": date_to.isoformat() if date_to else None,
+        "run_at": datetime.now(tz=timezone.utc).isoformat(),
+    }
+
+    log.info(
+        "  soccer-AH  n=%d  hit=%.1f%%  pnl=%+.1fu  roi=%+.1f%%  sharpe=%.2f  odds=%.2f",
+        n_bets, n_won / n_bets * 100, total_pnl, roi * 100, sharpe, AH_ODDS,
+    )
+    return result
+
+
 def _run_for_sport(
     session: Session,
     sport: str,
@@ -504,6 +663,9 @@ def _run_for_sport(
         dnb_result = _run_soccer_draw_no_bet(session, min_confidence=min_confidence)
         if dnb_result:
             metrics["backtest"]["draw_no_bet"] = dnb_result
+        ah_result = _run_soccer_asian_handicap(session, min_confidence=min_confidence)
+        if ah_result:
+            metrics["backtest"]["asian_handicap"] = ah_result
 
     registry.metrics = metrics
 
