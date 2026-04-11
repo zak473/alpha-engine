@@ -212,8 +212,8 @@ def fetch_season(
         log.warning("  Skip %s/%s — %s", season, league_code, exc)
         return 0, 0
 
-    # football-data CSVs sometimes have trailing blank rows
-    content = resp.text.strip()
+    # football-data CSVs are Latin-1 encoded (not UTF-8)
+    content = resp.content.decode("latin-1").strip()
     reader = csv.DictReader(io.StringIO(content))
     rows = [r for r in reader if r.get("HomeTeam") and r.get("AwayTeam")]
 

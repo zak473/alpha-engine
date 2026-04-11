@@ -1062,17 +1062,25 @@ def admin_import_football_data_odds(
 ):
     """
     Import historical soccer odds from football-data.co.uk (free, no key required).
-    Matches CSV records against CoreMatch by date + fuzzy team names and updates
-    CoreMatch.odds_home/away/draw with real Pinnacle/Bet365 odds.
+    Runs in background (52 CSV downloads takes >60s). Check logs for results.
     seasons: comma-separated season codes e.g. '2425,2324'
     """
     if secret != settings.ADMIN_SECRET:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
-    from pipelines.odds.fetch_odds_football_data import fetch_all
     season_list = [s.strip() for s in seasons.split(",") if s.strip()]
-    result = fetch_all(seasons=season_list, dry_run=dry_run)
-    return {"status": "ok", "dry_run": dry_run, "seasons": season_list, **result}
+
+    import threading
+    def _run():
+        try:
+            from pipelines.odds.fetch_odds_football_data import fetch_all
+            result = fetch_all(seasons=season_list, dry_run=dry_run)
+            log.info("[football-data] Done: matched=%d updated=%d dry_run=%s", result["matched"], result["updated"], dry_run)
+        except Exception as exc:
+            log.error("[football-data] Failed: %s", exc, exc_info=True)
+
+    threading.Thread(target=_run, daemon=True, name="football-data-odds").start()
+    return {"status": "started", "dry_run": dry_run, "seasons": season_list, "message": "Running in background — check Railway logs for results"}
 
 
 @app.get("/api/v1/admin/pick-outcome-stats", tags=["Admin"])
