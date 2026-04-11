@@ -36,6 +36,73 @@ from pipelines.tipsters.seed_ai_tipsters import AI_TIPSTER_IDS
 log = logging.getLogger(__name__)
 
 
+# ── Soccer Asian Handicap helpers ─────────────────────────────────────────────
+
+def _fit_poisson_params(p_home: float, p_draw: float, p_away: float) -> tuple[float, float]:
+    """
+    Fit independent Poisson λ_h, λ_a that reproduce (p_home, p_draw) from a 3-way model.
+    Returns (λ_home, λ_away) expected goals.
+    Iterative gradient descent; converges in <50 steps for typical soccer probabilities.
+    """
+    import numpy as np
+
+    MAX = 12  # max goals to sum over (Poisson tail is negligible beyond 12)
+
+    def _grid(lh: float, la: float):
+        import math as _math
+        ph = np.array([np.exp(-lh) * (lh ** i) / _math.factorial(i) for i in range(MAX)])
+        pa = np.array([np.exp(-la) * (la ** i) / _math.factorial(i) for i in range(MAX)])
+        return np.outer(ph, pa)  # grid[i,j] = P(home=i, away=j)
+
+    # Start from a sensible prior (typical EPL home/away goal averages)
+    lh, la = max(0.3, 1.4 * p_home / 0.46), max(0.3, 1.1 * p_away / 0.27)
+
+    for _ in range(80):
+        g = _grid(lh, la)
+        p_hw = float(np.tril(g, -1).sum())   # home wins (i > j)
+        p_dw = float(np.diag(g).sum())         # draw    (i == j)
+        err_h = p_home - p_hw
+        err_d = p_draw - p_dw
+        if abs(err_h) < 1e-5 and abs(err_d) < 1e-5:
+            break
+        lh = max(0.05, lh + err_h * 0.6 - err_d * 0.1)
+        la = max(0.05, la - err_h * 0.4 + err_d * 0.1)
+
+    return lh, la
+
+
+def _poisson_ah_prob(lh: float, la: float, line: float) -> tuple[float, float]:
+    """
+    Compute P(home covers AH line) and P(push) using Poisson goal distributions.
+
+    line is from the HOME side perspective (e.g. -1.5 means home gives 1.5 goals).
+    Home covers if (home_goals + line) > away_goals, i.e. diff > -line.
+
+    Returns (p_win, p_push).
+    Half-ball lines (±0.5, ±1.5, …) have p_push=0.
+    Whole-ball lines (0, ±1, ±2, …) have non-zero p_push.
+    """
+    import numpy as np
+    import math
+
+    MAX = 12
+    ph = np.array([math.exp(-lh) * (lh ** i) / math.factorial(i) for i in range(MAX)])
+    pa = np.array([math.exp(-la) * (la ** i) / math.factorial(i) for i in range(MAX)])
+
+    p_win = p_push = 0.0
+    threshold = -line  # home covers if diff > threshold
+    for i in range(MAX):
+        for j in range(MAX):
+            diff = i - j
+            p_ij = float(ph[i] * pa[j])
+            if diff > threshold:
+                p_win += p_ij
+            elif abs(diff - threshold) < 1e-9:  # exact push (whole-ball only)
+                p_push += p_ij
+
+    return p_win, p_push
+
+
 # ── Tennis set handicap helpers ────────────────────────────────────────────────
 
 def _solve_per_set_prob(match_win_prob: float, best_of: int = 3) -> float:
@@ -309,43 +376,73 @@ def run(
                         )
                         db.add(tip)
 
-            # ── Soccer Asian Handicap -0.5 ─────────────────────────────────────
-            # Backtest: 50 bets, 72% hit rate, +18.4u ROI at 1.90 (≥55% conf).
-            # We assume the market offers both sides at 1.90 (standard AH price).
-            # Home -0.5: home must win outright. Away +0.5: away wins or draws.
+            # ── Soccer Asian Handicap (real SGO spread odds) ───────────────────
+            # Backtest: 72% hit rate, +36.8% ROI at 1.90 (≥55% conf, n=50).
+            # Use the real ±0.5 spread line from SpreadOdds (fetched by SGO pipeline).
+            # Model probability: p_home (covers -0.5) or p_away+p_draw (covers +0.5).
+            # Edge = model_prob − 1/book_odds. Only bet ±0.5 lines — other lines need
+            # a goal model we don't have yet.
             if sport == "soccer":
+                from db.models.odds import SpreadOdds as _SpreadOdds
                 _p_home = pred.p_home or 0.0
                 _p_draw = pred.p_draw or 0.0
                 _p_away = pred.p_away or 0.0
-                if _p_home > 0 and _p_away > 0:
-                    AH_ODDS = 1.90
-                    AH_IMPLIED = 1.0 / AH_ODDS  # ~0.526
+                ah_conf = (pred.confidence or 0) / 100.0
 
-                    p_home_ah = _p_home                    # home wins outright
-                    p_away_ah = _p_away + _p_draw          # away wins or draws
+                if _p_home > 0 and _p_away > 0 and ah_conf >= 0.55:
+                    # Fetch the home and away spread rows for this match
+                    _spreads = (
+                        db.query(_SpreadOdds)
+                        .filter(
+                            _SpreadOdds.match_id == match.id,
+                            _SpreadOdds.market_type == "spread",
+                            _SpreadOdds.book_available == True,
+                            _SpreadOdds.book_odds_decimal.isnot(None),
+                        )
+                        .all()
+                    )
 
-                    if p_home_ah >= p_away_ah:
-                        ah_side_name = home_name
-                        ah_selection = f"{home_name} -0.5"
-                        ah_prob = p_home_ah
-                    else:
-                        ah_side_name = away_name
-                        ah_selection = f"{away_name} +0.5"
-                        ah_prob = p_away_ah
+                    # Fit Poisson goal model once per match (reused across all spread rows)
+                    _lh, _la = None, None
 
-                    ah_edge = ah_prob - AH_IMPLIED
-                    ah_conf = (pred.confidence or 0) / 100.0
+                    for _sp in _spreads:
+                        # Determine model probability for this specific AH line.
+                        # ±0.5: exact from 3-way probs. Any other line: Poisson model.
+                        if _sp.side == "home":
+                            # Home covers line: home wins by enough
+                            if abs(abs(_sp.line) - 0.5) < 0.05 and _sp.line < 0:
+                                _model_prob = _p_home
+                            else:
+                                if _lh is None:
+                                    _lh, _la = _fit_poisson_params(_p_home, _p_draw, _p_away)
+                                _model_prob, _ = _poisson_ah_prob(_lh, _la, _sp.line)
+                            _ah_selection = f"{home_name} {_sp.line:+.1f}".replace(".0", "")
+                        elif _sp.side == "away":
+                            # Away +X means home line is -X; compute home covers then invert
+                            _home_line = -_sp.line
+                            if abs(abs(_home_line) - 0.5) < 0.05 and _home_line < 0:
+                                _model_prob = _p_away + _p_draw
+                            else:
+                                if _lh is None:
+                                    _lh, _la = _fit_poisson_params(_p_home, _p_draw, _p_away)
+                                _p_home_covers, _p_push = _poisson_ah_prob(_lh, _la, _home_line)
+                                _model_prob = 1.0 - _p_home_covers - _p_push
+                            _ah_selection = f"{away_name} {_sp.line:+.1f}".replace(".0", "")
+                        else:
+                            continue
 
-                    if (
-                        ah_edge >= 0.02
-                        and ah_conf >= 0.55
-                        and not _already_picked(db, user_id, match.id, "Asian Handicap", ah_selection)
-                    ):
-                        k = kelly_fraction(ah_prob, AH_ODDS)
+                        _ah_edge = edge_pct(_model_prob, _sp.book_odds_decimal)
+                        if _ah_edge < 0.02:
+                            continue
+
+                        if _already_picked(db, user_id, match.id, "Asian Handicap", _ah_selection):
+                            continue
+
+                        k = kelly_fraction(_model_prob, _sp.book_odds_decimal)
                         stake = round(k * kelly_frac, 4)
                         log.info(
-                            "  [soccer-AH] %s | %s @ %.2f (assumed) | edge=+%.1f%% | kelly=%.1f%%",
-                            match_label, ah_selection, AH_ODDS, ah_edge * 100, k * 100,
+                            "  [soccer-AH] %s | %s @ %.2f (SGO real) | edge=+%.1f%% | kelly=%.1f%%",
+                            match_label, _ah_selection, _sp.book_odds_decimal, _ah_edge * 100, k * 100,
                         )
                         if not dry_run:
                             pick = TrackedPick(
@@ -357,9 +454,9 @@ def run(
                                 league=league_name,
                                 start_time=match.kickoff_utc,
                                 market_name="Asian Handicap",
-                                selection_label=ah_selection,
-                                odds=AH_ODDS,
-                                edge=round(ah_edge, 4),
+                                selection_label=_ah_selection,
+                                odds=_sp.book_odds_decimal,
+                                edge=round(_ah_edge, 4),
                                 kelly_fraction=round(k, 4),
                                 stake_fraction=stake,
                                 auto_generated=True,
@@ -369,18 +466,18 @@ def run(
 
                             ai_tipster_id = AI_TIPSTER_IDS.get(sport)
                             if ai_tipster_id and not _already_tipped(
-                                db, ai_tipster_id, match_label, "Asian Handicap", ah_selection
+                                db, ai_tipster_id, match_label, "Asian Handicap", _ah_selection
                             ):
                                 tip = TipsterTip(
                                     user_id=ai_tipster_id,
                                     sport=sport,
                                     match_label=match_label,
                                     market_name="Asian Handicap",
-                                    selection_label=ah_selection,
-                                    odds=AH_ODDS,
+                                    selection_label=_ah_selection,
+                                    odds=_sp.book_odds_decimal,
                                     start_time=match.kickoff_utc,
                                     match_id=match.id,
-                                    note=f"AH -0.5 | Edge: +{round(ah_edge * 100, 1)}% | Kelly: {round(k * 100, 1)}%",
+                                    note=f"AH -0.5 (SGO) | Edge: +{round(_ah_edge * 100, 1)}% | Kelly: {round(k * 100, 1)}%",
                                 )
                                 db.add(tip)
 

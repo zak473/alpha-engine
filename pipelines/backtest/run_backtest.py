@@ -349,25 +349,27 @@ def _run_soccer_draw_no_bet(session: Session, min_confidence: float = 0.65) -> d
 
 def _run_soccer_asian_handicap(session: Session, min_confidence: float = 0.55) -> dict | None:
     """
-    Simulate Asian Handicap -0.5 betting for soccer.
+    Simulate Asian Handicap betting for soccer using REAL SGO spread lines + odds.
 
-    The model picks a favourite (home or away). We back them at assumed near-evens
-    market odds of 1.90 (typical AH market after bookmaker margin).
+    For each finished soccer match with a prediction and SpreadOdds:
+    - Look up the real SGO spread line (e.g. home -1.5, away +1.5)
+    - Use a Poisson goal model fitted from (p_home, p_draw, p_away) to compute
+      P(home/away covers that specific line)
+    - Edge = model_prob − 1/book_odds (real SGO book price, not assumed)
+    - Resolve using actual goal scores
 
-    Resolution via actual goal scores:
-    - Bet home AH-0.5: WIN if home_score > away_score, LOSE otherwise (no push)
-    - Bet away AH-0.5: WIN if away_score > home_score, LOSE otherwise (no push)
-
-    We only bet when the model's implied edge clears MIN_EDGE vs the assumed 1.90 odds.
-    For 1.90, break-even probability = 1/1.90 ≈ 52.6%.
+    Fallback for matches without SpreadOdds: use AH-0.5 at assumed 1.90
+    (so the backtest still shows something for the full history).
 
     Returns a summary dict stored as metrics["backtest"]["asian_handicap"].
     """
     import numpy as np
     from sqlalchemy import func
+    from db.models.odds import SpreadOdds
+    from pipelines.picks.auto_picks import _fit_poisson_params, _poisson_ah_prob
 
-    AH_ODDS = 1.90
-    AH_IMPLIED = 1.0 / AH_ODDS  # ≈ 0.526
+    FALLBACK_ODDS = 1.90  # used when no real SGO odds stored
+    FALLBACK_IMPLIED = 1.0 / FALLBACK_ODDS
 
     subq = (
         session.query(PredMatch.match_id, func.max(PredMatch.id).label("latest_id"))
@@ -395,9 +397,20 @@ def _run_soccer_asian_handicap(session: Session, min_confidence: float = 0.55) -
         log.warning("  Soccer AH: no finished matches with scores.")
         return None
 
+    # Pre-load all spread odds for finished soccer matches
+    match_ids = [m.id for m, _ in rows]
+    spread_by_match: dict[str, list] = {}
+    for sp in session.query(SpreadOdds).filter(
+        SpreadOdds.match_id.in_(match_ids),
+        SpreadOdds.market_type == "spread",
+    ).all():
+        spread_by_match.setdefault(sp.match_id, []).append(sp)
+
     bets = []
     skipped_conf = 0
     skipped_edge = 0
+    n_real_odds = 0
+    n_fallback = 0
 
     for match, pred in rows:
         p_home = pred.p_home or 0.0
@@ -411,51 +424,114 @@ def _run_soccer_asian_handicap(session: Session, min_confidence: float = 0.55) -
             skipped_conf += 1
             continue
 
-        # For AH-0.5: draw is absorbed into the losing side.
-        # p(home AH-0.5 wins) = p_home  (must win outright)
-        # p(away AH-0.5 wins) = p_away + p_draw  (draw or away win = away covers)
+        home_goals = match.home_score
+        away_goals = match.away_score
+        spreads = spread_by_match.get(match.id, [])
+
+        # Try to find a real SGO spread line with book odds
+        bet_placed = False
+        lh = la = None  # lazy-init Poisson params
+
+        for sp in spreads:
+            if not sp.book_available or not sp.book_odds_decimal:
+                continue
+
+            if sp.side == "home":
+                line = sp.line  # e.g. -1.5 (home gives 1.5 goals)
+                if abs(abs(line) - 0.5) < 0.05 and line < 0:
+                    model_prob = p_home
+                else:
+                    if lh is None:
+                        lh, la = _fit_poisson_params(p_home, p_draw, p_away)
+                    model_prob, _ = _poisson_ah_prob(lh, la, line)
+                # Resolve: home covers if home_goals - away_goals > -line
+                diff = home_goals - away_goals
+                threshold = -line
+                won = diff > threshold
+                push = abs(diff - threshold) < 1e-9
+
+            elif sp.side == "away":
+                home_line = -sp.line  # convert away line to home-perspective
+                if abs(abs(home_line) - 0.5) < 0.05 and home_line < 0:
+                    model_prob = p_away + p_draw
+                else:
+                    if lh is None:
+                        lh, la = _fit_poisson_params(p_home, p_draw, p_away)
+                    p_home_covers, p_push = _poisson_ah_prob(lh, la, home_line)
+                    model_prob = 1.0 - p_home_covers - p_push
+                diff = home_goals - away_goals
+                threshold = -home_line
+                won = diff < threshold
+                push = abs(diff - threshold) < 1e-9
+            else:
+                continue
+
+            if push:
+                # Push — stake returned; count as neutral (pnl=0), still a bet
+                book_odds = sp.book_odds_decimal
+                edge = model_prob - 1.0 / book_odds
+                if edge < 0.02:
+                    skipped_edge += 1
+                    continue
+                pnl = 0.0
+            else:
+                book_odds = sp.book_odds_decimal
+                edge = model_prob - 1.0 / book_odds
+                if edge < 0.02:
+                    skipped_edge += 1
+                    continue
+                pnl = (book_odds - 1.0) if won else -1.0
+
+            bets.append({
+                "match_id": match.id,
+                "bet_side": sp.side,
+                "line": sp.line,
+                "model_prob": model_prob,
+                "book_odds": book_odds,
+                "edge": edge,
+                "pnl": pnl,
+                "won": won and not push,
+                "date": match.kickoff_utc,
+                "real_odds": True,
+            })
+            n_real_odds += 1
+            bet_placed = True
+            break  # one bet per match (take the first qualifying spread)
+
+        if bet_placed:
+            continue
+
+        # Fallback: no real SGO odds — use AH-0.5 at assumed 1.90
         p_home_ah = p_home
         p_away_ah = p_away + p_draw
 
         if p_home_ah >= p_away_ah:
-            bet_side = "home"
-            model_prob = p_home_ah
+            bet_side, model_prob = "home", p_home_ah
         else:
-            bet_side = "away"
-            model_prob = p_away_ah
+            bet_side, model_prob = "away", p_away_ah
 
-        edge = model_prob - AH_IMPLIED
+        edge = model_prob - FALLBACK_IMPLIED
         if edge < 0.02:
             skipped_edge += 1
             continue
 
-        # Resolve via actual scores
-        home_goals = match.home_score
-        away_goals = match.away_score
-        if bet_side == "home":
-            won = home_goals > away_goals
-        else:
-            won = away_goals > home_goals  # away wins outright (draw = away AH win was above)
-
-        # Wait — for away AH-0.5, away wins if they win OR draw (no push).
-        # Re-resolve: away AH-0.5 covers if home_score <= away_score? No —
-        # AH-0.5 means away gets +0.5 goals added, so:
-        #   adjusted away score = away_goals + 0.5
-        #   if adjusted_away > home: away covers → home_goals < away_goals + 0.5 → home_goals <= away_goals
-        if bet_side == "away":
-            won = home_goals <= away_goals  # away wins or draw
-
-        pnl = (AH_ODDS - 1.0) if won else -1.0
+        diff = home_goals - away_goals
+        won = diff > 0 if bet_side == "home" else diff <= 0
+        pnl = (FALLBACK_ODDS - 1.0) if won else -1.0
 
         bets.append({
             "match_id": match.id,
             "bet_side": bet_side,
+            "line": -0.5 if bet_side == "home" else 0.5,
             "model_prob": model_prob,
+            "book_odds": FALLBACK_ODDS,
             "edge": edge,
             "pnl": pnl,
             "won": won,
             "date": match.kickoff_utc,
+            "real_odds": False,
         })
+        n_fallback += 1
 
     if not bets:
         log.warning("  Soccer AH: no bets survived filters (conf_skip=%d edge_skip=%d).",
@@ -478,21 +554,24 @@ def _run_soccer_asian_handicap(session: Session, min_confidence: float = 0.55) -
     date_from = bets[0]["date"]
     date_to = bets[-1]["date"]
 
+    avg_odds = float(np.array([b["book_odds"] for b in bets]).mean())
     result = {
         "n_bets": n_bets,
+        "n_bets_real_odds": n_real_odds,
+        "n_bets_fallback": n_fallback,
         "n_won": n_won,
         "hit_rate": round(n_won / n_bets, 4),
         "pnl_units": round(total_pnl, 2),
         "roi": round(roi, 4),
         "sharpe_ratio": round(sharpe, 3),
         "max_drawdown_units": round(max_dd, 2),
-        "assumed_odds": AH_ODDS,
+        "avg_odds": round(avg_odds, 3),
         "avg_edge": round(float(np.array([b["edge"] for b in bets]).mean()), 4),
         "min_confidence": min_confidence,
         "skipped_conf": skipped_conf,
         "skipped_edge": skipped_edge,
         "staking": "flat_1u",
-        "market": "Asian Handicap -0.5",
+        "market": "Asian Handicap (SGO real lines + Poisson model)",
         "side": "model_favourite",
         "date_from": date_from.isoformat() if date_from else None,
         "date_to": date_to.isoformat() if date_to else None,
@@ -500,8 +579,8 @@ def _run_soccer_asian_handicap(session: Session, min_confidence: float = 0.55) -
     }
 
     log.info(
-        "  soccer-AH  n=%d  hit=%.1f%%  pnl=%+.1fu  roi=%+.1f%%  sharpe=%.2f  odds=%.2f",
-        n_bets, n_won / n_bets * 100, total_pnl, roi * 100, sharpe, AH_ODDS,
+        "  soccer-AH  n=%d (real=%d fb=%d)  hit=%.1f%%  pnl=%+.1fu  roi=%+.1f%%  sharpe=%.2f  avg_odds=%.2f",
+        n_bets, n_real_odds, n_fallback, n_won / n_bets * 100, total_pnl, roi * 100, sharpe, avg_odds,
     )
     return result
 
