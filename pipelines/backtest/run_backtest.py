@@ -55,11 +55,11 @@ BACKTEST_MIN_CONFIDENCE: dict[str, float] = {
 # Soccer uses the AH simulation with real SGO odds → keep edge gate meaningful.
 BACKTEST_MIN_EDGE: dict[str, float] = {
     "soccer":     0.02,  # real SGO AH + Poisson → edge is meaningful
-    "tennis":     0.005, # api-tennis.com real odds, market is efficient
+    "tennis":     0.0,   # many historical matches lack odds_away → edge=0 for away picks
     "basketball": 0.0,   # most bets use fair odds → edge ≈ 0; confidence gate only
     "baseball":   0.0,   # tiny sample, show all
     "hockey":     0.0,   # small sample, show all
-    "esports":    0.005, # PandaScore real odds, fairly priced
+    "esports":    0.0,   # match.odds_away often missing → away picks silently use fair odds
 }
 
 
