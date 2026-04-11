@@ -223,19 +223,18 @@ SPORT_MIN_CONFIDENCE: dict[str, float] = {
 # Fair-odds soccer (no SGO market odds): require higher confidence since there's no
 # external edge signal to validate against.
 FAIR_ODDS_MIN_CONFIDENCE: dict[str, float] = {
-    "soccer": 0.72,
+    "soccer":     0.72,
+    "basketball": 0.40,  # fair-odds fallback: require same gate as SPORT_MIN_CONFIDENCE
+    "baseball":   0.20,
 }
 
 # Sports where we fall back to model fair odds (1/p) when real market odds are
-# unavailable. SGO only covers top-tier soccer leagues (EPL/La Liga/etc.) so the
-# majority of Highlightly soccer fixtures never get market odds populated.
-# For these sports we generate picks against the model's own no-vig line; this
-# means we're betting on model confidence rather than market edge, so we drop the
-# min_edge requirement to 0 for fair-odds-derived picks.
-# Only soccer falls back to fair odds — SGO covers only 7 top leagues out of
-# 950+ Highlightly leagues. Tennis and esports have their own real-odds APIs
-# (api-tennis.com and PandaScore) so they must have market odds or no pick.
-FAIR_ODDS_SPORTS: set[str] = {"soccer"}
+# unavailable. SGO covers top-tier soccer leagues only. Basketball (NBA) and
+# baseball (MLB) often lack stored market odds — we fall back to model fair odds
+# with confidence-only gating (model is well-calibrated at these confidence levels).
+# Tennis/esports are DISABLED: tennis model is less accurate than the market at real
+# odds (-5.1% ROI); esports is negative ROI at all thresholds.
+FAIR_ODDS_SPORTS: set[str] = {"soccer", "basketball", "baseball"}
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────

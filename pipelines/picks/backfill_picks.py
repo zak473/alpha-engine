@@ -106,14 +106,16 @@ BACKFILL_MIN_EDGE: float = 0.0
 BACKFILL_MIN_CONFIDENCE: float = 0.30  # default fallback; sports override below
 
 # Per-sport overrides — mirror SPORT_MIN_CONFIDENCE in auto_picks.py
+# Edge=0.0 for basketball/baseball: these often lack real market odds so we fall back
+# to fair odds (1/p) in the backfill. Fair-odds edge = 0 so min_edge must be 0.
 BACKFILL_SPORT_MIN_EDGE: dict[str, float] = {
-    "baseball": 0.02,
-    "basketball": 0.01,
+    "basketball": 0.0,
+    "baseball":   0.0,
 }
 BACKFILL_SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "esports":    1.0,   # DISABLED: negative ROI at all thresholds
+    "tennis":     1.0,   # DISABLED: model -5.1% ROI at real market odds (less accurate than market)
     "soccer":     0.65,
-    "tennis":     0.0,   # low-conf picks are most profitable for tennis
     "basketball": 0.40,
     "baseball":   0.20,
     "hockey":     0.30,
