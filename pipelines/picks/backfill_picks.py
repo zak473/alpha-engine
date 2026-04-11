@@ -114,7 +114,7 @@ BACKFILL_SPORT_MIN_EDGE: dict[str, float] = {
 }
 BACKFILL_SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "esports":    1.0,   # DISABLED: negative ROI at all thresholds
-    "tennis":     0.58,  # match winner OR set handicap; target ≤5/day; p_home≥0.79
+    "tennis":     0.46,  # match winner OR set handicap; target ≤5/day; p_home≥0.73
     "soccer":     0.30,  # real SGO odds only; fair-odds fallback disabled for soccer
     "basketball": 0.30,  # MIN_ODDS=1.40 floor caps fair-odds at p<0.714; combined gives p=0.65-0.71
     "baseball":   0.20,  # MIN_ODDS=1.40 floor caps fair-odds at p<0.714; combined gives p=0.60-0.71
