@@ -297,21 +297,12 @@ function TipsterModal({
   const voidPicks = tipster.void_picks ?? 0;
   const recordStr = `${tipster.won_picks}W - ${tipster.lost_picks}L${voidPicks > 0 ? ` - ${voidPicks}V` : ""}`;
 
-  // Prefer live settled-pick stats; only use backtest when no real picks exist yet
-  const useBacktest = tipster.is_ai && backtest && tipster.settled_picks === 0;
-  const summary = useBacktest
-    ? [
-        { label: "Accuracy", value: `${((backtest!.accuracy ?? 0) * 100).toFixed(1)}%`, tone: (backtest!.accuracy ?? 0) >= 0.55 ? "var(--positive)" : "var(--warning)" },
-        { label: "Units", value: `${(backtest!.pnl_units ?? 0) >= 0 ? "+" : ""}${(backtest!.pnl_units ?? 0).toFixed(1)}u`, tone: (backtest!.pnl_units ?? 0) >= 0 ? "var(--positive)" : "var(--negative)" },
-        { label: "Sharpe", value: (backtest!.sharpe_ratio ?? 0).toFixed(2), tone: (backtest!.sharpe_ratio ?? 0) >= 2 ? "var(--positive)" : "var(--warning)" },
-        { label: "Predictions", value: (backtest!.n_predictions ?? 0).toLocaleString(), tone: "var(--text0)" },
-      ]
-    : [
-        { label: "Win rate", value: overallWinPct > 0 ? `${overallWinPct}%` : "—", tone: overallWinPct >= 55 ? "var(--positive)" : overallWinPct >= 50 ? "var(--warning)" : "var(--text0)" },
-        { label: "Units", value: tipster.settled_picks > 0 ? plStr : "—", tone: profitLoss >= 0 ? "var(--positive)" : "var(--negative)" },
-        { label: "Record", value: tipster.settled_picks > 0 ? recordStr : "—", tone: "var(--text0)" },
-        { label: "Avg odds", value: (tipster.avg_odds ?? 0) > 0 ? (tipster.avg_odds ?? 0).toFixed(2) : "—", tone: "var(--text0)" },
-      ];
+  const summary = [
+    { label: "Win rate", value: overallWinPct > 0 ? `${overallWinPct}%` : "—", tone: overallWinPct >= 55 ? "var(--positive)" : overallWinPct >= 50 ? "var(--warning)" : "var(--text0)" },
+    { label: "Units", value: tipster.settled_picks > 0 ? plStr : "—", tone: profitLoss >= 0 ? "var(--positive)" : "var(--negative)" },
+    { label: "Record", value: tipster.settled_picks > 0 ? recordStr : "—", tone: "var(--text0)" },
+    { label: "Avg odds", value: (tipster.avg_odds ?? 0) > 0 ? (tipster.avg_odds ?? 0).toFixed(2) : "—", tone: "var(--text0)" },
+  ];
 
   const displayedTips = activeTab === "active" ? activeTips : settledHistory;
   const emptyCopy = activeTab === "active" ? "No active tips right now" : "No settled tips yet";
@@ -608,17 +599,9 @@ function TipsterCard({
   const supportLabel = followers > 0 ? `${followers.toLocaleString()} follower${followers === 1 ? "" : "s"}` : "Fresh profile";
   const profileMeta = settled > 0 ? `${supportLabel} · ${settled} graded` : supportLabel;
 
-  // Prefer live settled-pick stats when we have real data; only use backtest when no picks yet
-  const useBacktest = tipster.is_ai && backtest && settled === 0;
-  const stat1 = useBacktest
-    ? { label: "Accuracy", value: `${((backtest!.accuracy ?? 0) * 100).toFixed(1)}%`, color: (backtest!.accuracy ?? 0) >= 0.55 ? "var(--positive)" : "var(--warning)" }
-    : { label: "Win rate", value: settled > 0 ? `${winPct}%` : "Building", color: settled > 0 ? (winPct >= 60 ? "var(--positive)" : winPct >= 50 ? "var(--warning)" : "var(--negative)") : "var(--text1)" };
-  const stat2 = useBacktest
-    ? { label: "Units", value: `${(backtest!.pnl_units ?? 0) >= 0 ? "+" : ""}${(backtest!.pnl_units ?? 0).toFixed(1)}u`, color: (backtest!.pnl_units ?? 0) >= 0 ? "var(--positive)" : "var(--negative)" }
-    : { label: "Units", value: settled > 0 ? plStr : "—", color: settled > 0 ? (pl >= 0 ? "var(--positive)" : "var(--negative)") : "var(--text1)" };
-  const stat3 = useBacktest
-    ? { label: "Sharpe", value: (backtest!.sharpe_ratio ?? 0).toFixed(2), color: (backtest!.sharpe_ratio ?? 0) >= 2 ? "var(--positive)" : "var(--warning)" }
-    : { label: "Record", value: settled > 0 ? `${tipster.won_picks}W–${tipster.lost_picks}L` : "—", color: "var(--text0)" };
+  const stat1 = { label: "Win rate", value: settled > 0 ? `${winPct}%` : "Building", color: settled > 0 ? (winPct >= 60 ? "var(--positive)" : winPct >= 50 ? "var(--warning)" : "var(--negative)") : "var(--text1)" };
+  const stat2 = { label: "Units", value: settled > 0 ? plStr : "—", color: settled > 0 ? (pl >= 0 ? "var(--positive)" : "var(--negative)") : "var(--text1)" };
+  const stat3 = { label: "Record", value: settled > 0 ? `${tipster.won_picks}W–${tipster.lost_picks}L` : "—", color: "var(--text0)" };
 
   const toneStyles = {
     accent: { background: "rgba(0,255,132,0.10)", borderColor: "rgba(0,255,132,0.16)", color: "var(--accent)" },
