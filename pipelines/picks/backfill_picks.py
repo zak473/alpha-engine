@@ -128,12 +128,9 @@ BACKFILL_SPORT_MIN_ODDS: dict[str, float] = {
     "tennis": 1.20,
 }
 
-# Hard cap on picks created per calendar day per sport.
-# Tennis: model outputs ~33 qualifying matches/day at conf=0.40 but we only want top 5.
-# Picks are sorted by kickoff ASC so earliest matches are picked first.
-BACKFILL_MAX_PICKS_PER_DAY: dict[str, int] = {
-    "tennis": 5,
-}
+# Hard cap on picks created per calendar day per sport (all sports).
+# Candidates are sorted by confidence DESC so we always take the highest-conviction bets.
+BACKFILL_MAX_PICKS_PER_DAY: int = 4
 
 
 def _already_picked(
@@ -254,14 +251,12 @@ def run(
     """
     db = SessionLocal()
     created = 0
-    picks_by_sport_date: dict[str, int] = {}  # "sport:YYYY-MM-DD" → picks created
 
     try:
         now = datetime.utcnow()
         cutoff = now - timedelta(days=days)
         upper_cutoff = now - timedelta(days=offset_days) if offset_days else None
 
-        # All finished matches in the window with a known outcome
         matches = (
             db.query(CoreMatch)
             .filter(
@@ -280,6 +275,11 @@ def run(
                  len(matches), days, offset_days)
         now = datetime.now(timezone.utc)
 
+        # ── Phase 1: collect all qualifying pick candidates ─────────────────────
+        # We do NOT apply the daily cap here — we collect everything, then sort by
+        # confidence DESC so Phase 2 always picks the highest-conviction bets first.
+        pending: list[dict] = []
+
         for match in matches:
             league = db.get(CoreLeague, match.league_id)
             home_team = db.get(CoreTeam, match.home_team_id)
@@ -293,25 +293,14 @@ def run(
             match_label = f"{home_name} vs {away_name}"
             sport = match.sport
 
-            # Daily cap: skip if we've already hit the per-sport limit for this date
-            max_daily = BACKFILL_MAX_PICKS_PER_DAY.get(sport)
-            if max_daily is not None:
-                day_key = f"{sport}:{match.kickoff_utc.date().isoformat()}"
-                if picks_by_sport_date.get(day_key, 0) >= max_daily:
-                    continue
-
             # Skip handball leagues and women's/junior basketball tagged as sport="basketball"
             if sport == "basketball":
                 league_lower = league_name.lower()
                 if "handball" in league_lower:
-                    log.debug("  Skip (handball): %s [%s]", match_label, league_name)
                     continue
                 if "women" in league_lower or " w " in f" {league_lower} " or league_lower.endswith(" w"):
-                    log.debug("  Skip (women's basketball): %s [%s]", match_label, league_name)
                     continue
-                # Also skip if team names contain Women (Highlightly sometimes omits it from league)
                 if "women" in home_name.lower() or "women" in away_name.lower():
-                    log.debug("  Skip (women's team): %s", match_label)
                     continue
 
             # Try ML prediction first, fall back to ELO
@@ -329,7 +318,6 @@ def run(
             if confidence == 0.0:
                 continue
 
-            # Market name
             if sport in ("basketball", "baseball"):
                 ml_market = "Moneyline"
             elif sport in ("tennis", "esports"):
@@ -337,9 +325,6 @@ def run(
             else:
                 ml_market = "1X2"
 
-            # Prefer real market odds; fall back to fair odds for basketball/baseball only.
-            # Soccer uses SGO real odds — if none stored, skip (no fair-odds soccer picks).
-            # Tennis uses fair odds for moneyline (ML predictions only, not ELO fallback).
             FAIR_ODDS_SPORTS = {"basketball", "baseball", "tennis"}
             can_use_fair_odds = sport in FAIR_ODDS_SPORTS and (sport != "tennis" or source == "ml")
             using_fair_odds = not match.odds_home and can_use_fair_odds
@@ -355,25 +340,18 @@ def run(
             if d_odds and p_draw and p_draw > 0.01:
                 candidates.append(("Draw", p_draw, d_odds, ml_market))
 
-            # Tennis ML: add set handicap (-1.5) to the candidate pool so we can
-            # pick whichever market has higher confidence (match winner wins unless
-            # its odds fall below sport_min_odds, in which case handicap is chosen).
+            # Tennis + all sports with ML: add set/spread handicap to candidate pool
             if sport == "tennis" and p_home and p_away and source == "ml":
                 hc_cands = _tennis_handicap_candidates(home_name, away_name, p_home)
                 if hc_cands:
                     candidates.append(max(hc_cands, key=lambda c: c[1]))
 
-            # Per-sport minimum odds (tennis: 1.20 to allow short-priced match winners)
             sport_min_odds = BACKFILL_SPORT_MIN_ODDS.get(sport, settings.MIN_ODDS)
 
-            # With fair odds: only keep the single best candidate (highest model_prob)
-            # that meets the minimum odds threshold — this naturally prefers match winner
-            # unless it's too short, in which case set handicap is chosen.
             if using_fair_odds and candidates:
                 valid_cands = [c for c in candidates if c[2] >= sport_min_odds]
                 candidates = [max(valid_cands, key=lambda c: c[1])] if valid_cands else []
 
-            # With fair odds use confidence-only gate
             effective_min_edge = BACKFILL_SPORT_MIN_EDGE.get(sport, min_edge)
             effective_min_conf = BACKFILL_SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
 
@@ -384,32 +362,25 @@ def run(
                     continue
                 if confidence < effective_min_conf:
                     continue
-                # Apply odds range to ALL picks — fair or real.
                 if book_odds < sport_min_odds or book_odds > settings.MAX_ODDS:
                     continue
-
-                # Dedup — don't create if already exists
                 if _already_picked(db, user_id, match.id, market_name, selection_label):
-                    log.debug("  Skip (already picked): %s %s", match_label, selection_label)
                     continue
 
-                # Resolve settled outcome immediately from match result
+                # Resolve outcome
                 if market_name == "Set Handicap":
                     h_sets = match.home_score
                     a_sets = match.away_score
                     if h_sets is None or a_sets is None:
-                        log.debug("  Skip (no set scores): %s %s", match_label, selection_label)
                         continue
                     try:
                         h_int, a_int = int(h_sets), int(a_sets)
                     except (ValueError, TypeError):
                         continue
                     sel_lower = selection_label.lower()
-                    home_lower = home_name.lower()
-                    away_lower = away_name.lower()
-                    if home_lower in sel_lower or sel_lower in home_lower:
+                    if home_name.lower() in sel_lower or sel_lower in home_name.lower():
                         diff = (h_int - 1.5) - a_int
-                    elif away_lower in sel_lower or sel_lower in away_lower:
+                    elif away_name.lower() in sel_lower or sel_lower in away_name.lower():
                         diff = (a_int - 1.5) - h_int
                     else:
                         continue
@@ -419,74 +390,98 @@ def run(
                         selection_label, match_label, match.outcome, home_name, away_name
                     )
                     if pick_outcome is None:
-                        log.debug(
-                            "  Skip (can't resolve outcome): %s %s vs match outcome=%s",
-                            match_label, selection_label, match.outcome,
-                        )
                         continue
 
-                k = kelly_fraction(model_prob, book_odds)
-                stake = round(k * kelly_frac, 4)
-
-                # Approximate settlement time = kickoff + 2 hours
                 kickoff = match.kickoff_utc
                 if kickoff.tzinfo is None:
                     kickoff = kickoff.replace(tzinfo=timezone.utc)
                 settled_at = kickoff + timedelta(hours=2)
-                # Don't use a future settled_at
                 if settled_at > now:
                     settled_at = now
 
-                log.info(
-                    "  [%s] %s | %s @ %.2f | edge=+%.1f%% | kelly=%.1f%% | outcome=%s",
-                    sport, match_label, selection_label, book_odds,
-                    e * 100, k * 100, pick_outcome,
+                k = kelly_fraction(model_prob, book_odds)
+                stake = round(k * kelly_frac, 4)
+
+                pending.append({
+                    "confidence": confidence,
+                    "day_key": f"{sport}:{match.kickoff_utc.date().isoformat()}",
+                    "sport": sport,
+                    "match_id": match.id,
+                    "match_label": match_label,
+                    "league_name": league_name,
+                    "kickoff": kickoff,
+                    "settled_at": settled_at,
+                    "market_name": market_name,
+                    "selection_label": selection_label,
+                    "model_prob": model_prob,
+                    "book_odds": book_odds,
+                    "edge": e,
+                    "kelly": k,
+                    "stake": stake,
+                    "pick_outcome": pick_outcome,
+                    "using_fair_odds": using_fair_odds,
+                    "source": source,
+                })
+
+        # ── Phase 2: sort by confidence DESC, apply 4/sport/day cap ────────────
+        pending.sort(key=lambda x: x["confidence"], reverse=True)
+        counts: dict[str, int] = {}
+
+        for p in pending:
+            day_key = p["day_key"]
+            if counts.get(day_key, 0) >= BACKFILL_MAX_PICKS_PER_DAY:
+                continue
+
+            log.info(
+                "  [%s] %s | %s @ %.2f | conf=%.2f | edge=+%.1f%% | outcome=%s",
+                p["sport"], p["match_label"], p["selection_label"], p["book_odds"],
+                p["confidence"], p["edge"] * 100, p["pick_outcome"],
+            )
+
+            counts[day_key] = counts.get(day_key, 0) + 1
+            created += 1
+
+            if not dry_run:
+                pick = TrackedPick(
+                    id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    match_id=p["match_id"],
+                    match_label=p["match_label"],
+                    sport=p["sport"],
+                    league=p["league_name"],
+                    start_time=p["kickoff"],
+                    market_name=p["market_name"],
+                    selection_label=p["selection_label"],
+                    odds=p["book_odds"],
+                    edge=round(p["edge"], 4),
+                    kelly_fraction=round(p["kelly"], 4),
+                    stake_fraction=p["stake"],
+                    auto_generated=True,
+                    outcome=p["pick_outcome"],
+                    settled_at=p["settled_at"],
                 )
+                db.add(pick)
 
-                created += 1
-                if max_daily is not None:
-                    picks_by_sport_date[day_key] = picks_by_sport_date.get(day_key, 0) + 1
-                if not dry_run:
-                    pick = TrackedPick(
-                        id=str(uuid.uuid4()),
-                        user_id=user_id,
-                        match_id=match.id,
-                        match_label=match_label,
-                        sport=sport,
-                        league=league_name,
-                        start_time=kickoff,
-                        market_name=market_name,
-                        selection_label=selection_label,
-                        odds=book_odds,
-                        edge=round(e, 4),
-                        kelly_fraction=round(k, 4),
-                        stake_fraction=stake,
-                        auto_generated=True,
-                        outcome=pick_outcome,
-                        settled_at=settled_at,
+                ai_tipster_id = AI_TIPSTER_IDS.get(p["sport"])
+                if ai_tipster_id and not _already_tipped(
+                    db, ai_tipster_id, p["match_label"], p["market_name"], p["selection_label"]
+                ):
+                    src = p["source"]
+                    fair = p["using_fair_odds"]
+                    tip = TipsterTip(
+                        user_id=ai_tipster_id,
+                        sport=p["sport"],
+                        match_label=p["match_label"],
+                        market_name=p["market_name"],
+                        selection_label=p["selection_label"],
+                        odds=p["book_odds"],
+                        outcome=p["pick_outcome"],
+                        start_time=p["kickoff"],
+                        settled_at=p["settled_at"],
+                        match_id=p["match_id"],
+                        note=f"[{src}] {'Fair odds' if fair else 'Edge: +' + str(round(p['edge'] * 100, 1)) + '%'} | Kelly: {round(p['kelly'] * 100, 1)}% [backfill]",
                     )
-                    db.add(pick)
-
-                    # Also create TipsterTip under the sport-specific AI tipster account
-                    ai_tipster_id = AI_TIPSTER_IDS.get(sport)
-                    if ai_tipster_id and not _already_tipped(
-                        db, ai_tipster_id, match_label, market_name, selection_label
-                    ):
-                        tip = TipsterTip(
-                            user_id=ai_tipster_id,
-                            sport=sport,
-                            match_label=match_label,
-                            market_name=market_name,
-                            selection_label=selection_label,
-                            odds=book_odds,
-                            outcome=pick_outcome,
-                            start_time=kickoff,
-                            settled_at=settled_at,
-                            match_id=match.id,
-                            note=f"[{source}] {'Fair odds' if using_fair_odds else 'Edge: +' + str(round(e * 100, 1)) + '%'} | Kelly: {round(k * 100, 1)}% [backfill]",
-                        )
-                        db.add(tip)
-
+                    db.add(tip)
 
         if not dry_run:
             db.commit()

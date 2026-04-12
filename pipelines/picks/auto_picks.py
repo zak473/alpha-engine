@@ -232,11 +232,9 @@ FAIR_ODDS_MIN_CONFIDENCE: dict[str, float] = {
 SPORT_MIN_ODDS: dict[str, float] = {
     "tennis": 1.20,
 }
-# Hard daily cap on picks created per sport. The live auto_picks bot checks how many
-# tennis picks already exist for today before creating new ones.
-SPORT_MAX_PICKS_PER_DAY: dict[str, int] = {
-    "tennis": 5,
-}
+# Hard daily cap on picks per sport per kickoff-date. Bot picks the highest-confidence
+# qualifying bets first, so the top 4 per sport per day are always the best available.
+SPORT_MAX_PICKS_PER_DAY: int = 4
 
 # Sports where we fall back to model fair odds (1/p) when real market odds are
 # unavailable. SGO covers top-tier soccer leagues only. Basketball (NBA) and
@@ -286,6 +284,11 @@ def run(
 
         log.info("Auto-pick bot: evaluating %d match-prediction pairs ...", len(rows))
 
+        # ── Phase 1: collect all qualifying candidates ──────────────────────────
+        # No daily cap here — gather everything, then sort by confidence DESC so
+        # Phase 2 always selects the highest-conviction bets within the cap.
+        pending: list[dict] = []
+
         for match, pred in rows:
             league = db.get(CoreLeague, match.league_id)
             home_team = db.get(CoreTeam, match.home_team_id)
@@ -294,59 +297,30 @@ def run(
                 continue
 
             league_name = league.name if league else "Unknown"
-            match_label = f"{home_team.name} vs {away_team.name}"
-
-            # Determine correct market name based on sport
             sport = match.sport
-
-            # Daily cap: skip if we've already created the max picks for this sport today
-            max_daily = SPORT_MAX_PICKS_PER_DAY.get(sport)
-            if max_daily is not None:
-                today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-                today_count = (
-                    db.query(TrackedPick)
-                    .filter(
-                        TrackedPick.user_id == user_id,
-                        TrackedPick.sport == sport,
-                        TrackedPick.auto_generated.is_(True),
-                        TrackedPick.start_time >= today_start,
-                    )
-                    .count()
-                )
-                if today_count >= max_daily:
-                    log.debug("  Daily cap reached (%d/%d) for %s — skipping %s", today_count, max_daily, sport, match_label)
-                    continue
+            home_name = home_team.name
+            away_name = away_team.name
+            match_label = f"{home_name} vs {away_name}"
+            kickoff_date = match.kickoff_utc.date().isoformat()
 
             # Skip handball, women's, and junior basketball tagged as sport="basketball"
             if sport == "basketball":
                 league_lower = league_name.lower()
                 if "handball" in league_lower:
-                    log.debug("  Skip (handball): %s [%s]", match_label, league_name)
                     continue
                 if "women" in league_lower or " w " in f" {league_lower} " or league_lower.endswith(" w"):
-                    log.debug("  Skip (women's basketball): %s [%s]", match_label, league_name)
                     continue
-                if "women" in home_team.name.lower() or "women" in away_team.name.lower():
-                    log.debug("  Skip (women's team): %s", match_label)
+                if "women" in home_name.lower() or "women" in away_name.lower():
                     continue
 
-            # Build candidate selections: (label, model_prob, book_odds, market_name)
-            candidates: list[tuple[str, float, float, str]] = []
             ml_market = "Moneyline" if sport in ("basketball", "baseball") else "Match Winner" if sport in ("tennis", "esports") else "1X2"
-
-            home_name = home_team.name
-            away_name = away_team.name
-
-            # Determine odds source: prefer real market odds, fall back to fair odds
-            # for sports in FAIR_ODDS_SPORTS. Fair odds = model's own no-vig line
-            # (1/p), so edge vs fair odds is always ~0; we lower the edge bar to 0
-            # for these picks and rely purely on the confidence gate.
             using_fair_odds = (sport in FAIR_ODDS_SPORTS) and not match.odds_home
 
             h_odds = match.odds_home or (pred.fair_odds_home if using_fair_odds else None)
             a_odds = match.odds_away or (pred.fair_odds_away if using_fair_odds else None)
             d_odds = match.odds_draw or (pred.fair_odds_draw if using_fair_odds else None)
 
+            candidates: list[tuple[str, float, float, str]] = []
             if h_odds and pred.p_home:
                 candidates.append((home_name, pred.p_home, h_odds, ml_market))
             if a_odds and pred.p_away:
@@ -354,44 +328,31 @@ def run(
             if d_odds and pred.p_draw and pred.p_draw > 0.01:
                 candidates.append(("Draw", pred.p_draw, d_odds, ml_market))
 
-            # Tennis: add set handicap (-1.5) to the candidate pool so we can
-            # pick whichever market has higher confidence (match winner wins unless
-            # its odds fall below sport_min_odds, in which case handicap is chosen).
+            # Tennis + mixed-market: add set handicap to candidate pool
             if sport == "tennis" and pred.p_home and pred.p_away:
                 all_hc = _tennis_handicap_candidates(home_name, away_name, pred.p_home)
                 if all_hc:
                     candidates.append(max(all_hc, key=lambda c: c[1]))
 
             sport_min_odds = SPORT_MIN_ODDS.get(sport, settings.MIN_ODDS)
-
             effective_min_edge = 0.0 if using_fair_odds else SPORT_MIN_EDGE.get(sport, min_edge)
-            if using_fair_odds:
-                effective_min_conf = FAIR_ODDS_MIN_CONFIDENCE.get(sport, 0.65)
-            else:
-                effective_min_conf = SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
+            effective_min_conf = FAIR_ODDS_MIN_CONFIDENCE.get(sport, 0.65) if using_fair_odds else SPORT_MIN_CONFIDENCE.get(sport, min_confidence)
 
-            # For fair odds: pick single best candidate (highest model_prob) that meets
-            # the odds threshold — naturally prefers match winner, falls through to
-            # set handicap when match winner odds are too short (p_home > 0.83).
             if using_fair_odds and candidates:
                 valid_cands = [c for c in candidates if c[2] >= sport_min_odds]
                 candidates = [max(valid_cands, key=lambda c: c[1])] if valid_cands else []
 
+            confidence = pred.confidence / 100.0 if pred.confidence else 0.0
+
             # ── Soccer Asian Handicap (real SGO spread odds) ───────────────────
-            # Backtest: 72% hit rate, +36.8% ROI at 1.90 (≥55% conf, n=50).
-            # Use the real ±0.5 spread line from SpreadOdds (fetched by SGO pipeline).
-            # Model probability: p_home (covers -0.5) or p_away+p_draw (covers +0.5).
-            # Edge = model_prob − 1/book_odds. Only bet ±0.5 lines — other lines need
-            # a goal model we don't have yet.
             if sport == "soccer":
                 from db.models.odds import SpreadOdds as _SpreadOdds
                 _p_home = pred.p_home or 0.0
                 _p_draw = pred.p_draw or 0.0
                 _p_away = pred.p_away or 0.0
-                ah_conf = (pred.confidence or 0) / 100.0
+                ah_conf = confidence
 
                 if _p_home > 0 and _p_away > 0 and ah_conf >= 0.65:
-                    # Fetch the home and away spread rows for this match
                     _spreads = (
                         db.query(_SpreadOdds)
                         .filter(
@@ -402,15 +363,9 @@ def run(
                         )
                         .all()
                     )
-
-                    # Fit Poisson goal model once per match (reused across all spread rows)
                     _lh, _la = None, None
-
                     for _sp in _spreads:
-                        # Determine model probability for this specific AH line.
-                        # ±0.5: exact from 3-way probs. Any other line: Poisson model.
                         if _sp.side == "home":
-                            # Home covers line: home wins by enough
                             if abs(abs(_sp.line) - 0.5) < 0.05 and _sp.line < 0:
                                 _model_prob = _p_home
                             else:
@@ -419,7 +374,6 @@ def run(
                                 _model_prob, _ = _poisson_ah_prob(_lh, _la, _sp.line)
                             _ah_selection = f"{home_name} {_sp.line:+.1f}".replace(".0", "")
                         elif _sp.side == "away":
-                            # Away +X means home line is -X; compute home covers then invert
                             _home_line = -_sp.line
                             if abs(abs(_home_line) - 0.5) < 0.05 and _home_line < 0:
                                 _model_prob = _p_away + _p_draw
@@ -435,56 +389,24 @@ def run(
                         _ah_edge = edge_pct(_model_prob, _sp.book_odds_decimal)
                         if _ah_edge < 0.02:
                             continue
-
                         if _already_picked(db, user_id, match.id, "Asian Handicap", _ah_selection):
                             continue
 
-                        k = kelly_fraction(_model_prob, _sp.book_odds_decimal)
-                        stake = round(k * kelly_frac, 4)
-                        log.info(
-                            "  [soccer-AH] %s | %s @ %.2f (SGO real) | edge=+%.1f%% | kelly=%.1f%%",
-                            match_label, _ah_selection, _sp.book_odds_decimal, _ah_edge * 100, k * 100,
-                        )
-                        if not dry_run:
-                            pick = TrackedPick(
-                                id=str(uuid.uuid4()),
-                                user_id=user_id,
-                                match_id=match.id,
-                                match_label=match_label,
-                                sport=sport,
-                                league=league_name,
-                                start_time=match.kickoff_utc,
-                                market_name="Asian Handicap",
-                                selection_label=_ah_selection,
-                                odds=_sp.book_odds_decimal,
-                                edge=round(_ah_edge, 4),
-                                kelly_fraction=round(k, 4),
-                                stake_fraction=stake,
-                                auto_generated=True,
-                            )
-                            db.add(pick)
-                            created += 1
-
-                            ai_tipster_id = AI_TIPSTER_IDS.get(sport)
-                            if ai_tipster_id and not _already_tipped(
-                                db, ai_tipster_id, match_label, "Asian Handicap", _ah_selection
-                            ):
-                                tip = TipsterTip(
-                                    user_id=ai_tipster_id,
-                                    sport=sport,
-                                    match_label=match_label,
-                                    market_name="Asian Handicap",
-                                    selection_label=_ah_selection,
-                                    odds=_sp.book_odds_decimal,
-                                    start_time=match.kickoff_utc,
-                                    match_id=match.id,
-                                    note=f"AH -0.5 (SGO) | Edge: +{round(_ah_edge * 100, 1)}% | Kelly: {round(k * 100, 1)}%",
-                                )
-                                db.add(tip)
+                        pending.append({
+                            "confidence": ah_conf,
+                            "day_key": f"{sport}:{kickoff_date}",
+                            "sport": sport, "match_id": match.id, "match_label": match_label,
+                            "league_name": league_name, "kickoff": match.kickoff_utc,
+                            "market_name": "Asian Handicap", "selection_label": _ah_selection,
+                            "model_prob": _model_prob, "book_odds": _sp.book_odds_decimal,
+                            "edge": _ah_edge, "kelly": kelly_fraction(_model_prob, _sp.book_odds_decimal),
+                            "stake": round(kelly_fraction(_model_prob, _sp.book_odds_decimal) * kelly_frac, 4),
+                            "using_fair_odds": False,
+                            "note": f"AH (SGO) | Edge: +{round(_ah_edge * 100, 1)}% | Kelly: {round(kelly_fraction(_model_prob, _sp.book_odds_decimal) * 100, 1)}%",
+                        })
 
             for selection_label, model_prob, book_odds, market_name in candidates:
                 e = edge_pct(model_prob, book_odds)
-                confidence = pred.confidence / 100.0 if pred.confidence else model_prob
 
                 if e < effective_min_edge:
                     continue
@@ -492,59 +414,103 @@ def run(
                     continue
                 if book_odds < sport_min_odds or book_odds > settings.MAX_ODDS:
                     continue
-
-                # Dedup
                 if _already_picked(db, user_id, match.id, market_name, selection_label):
-                    log.debug("  Skip (already picked): %s %s", match_label, selection_label)
                     continue
 
                 k = kelly_fraction(model_prob, book_odds)
-                stake = round(k * kelly_frac, 4)
-
                 odds_source = "fair" if using_fair_odds else "market"
-                log.info(
-                    "  [%s] %s | %s @ %.2f (%s) | edge=+%.1f%% | kelly=%.1f%% | stake=%.2fu",
-                    sport, match_label, selection_label, book_odds, odds_source,
-                    e * 100, k * 100, stake,
+                pending.append({
+                    "confidence": confidence,
+                    "day_key": f"{sport}:{kickoff_date}",
+                    "sport": sport, "match_id": match.id, "match_label": match_label,
+                    "league_name": league_name, "kickoff": match.kickoff_utc,
+                    "market_name": market_name, "selection_label": selection_label,
+                    "model_prob": model_prob, "book_odds": book_odds,
+                    "edge": e, "kelly": k,
+                    "stake": round(k * kelly_frac, 4),
+                    "using_fair_odds": using_fair_odds,
+                    "note": f"Edge: +{round(e * 100, 1)}% | Kelly: {round(k * 100, 1)}% ({odds_source})",
+                })
+
+        # ── Phase 2: sort by confidence DESC, check existing DB picks, apply cap ─
+        pending.sort(key=lambda x: x["confidence"], reverse=True)
+
+        # Pre-count already-existing picks per sport+kickoff-date to honour the cap
+        # across multiple bot runs (dedup via _already_picked catches exact dupes,
+        # but the cap needs the total count including previously created picks).
+        existing_counts: dict[str, int] = {}
+        for p in pending:
+            dk = p["day_key"]
+            if dk not in existing_counts:
+                sport_val, date_val = dk.split(":", 1)
+                from datetime import date as _date
+                kickoff_dt = datetime.fromisoformat(date_val)
+                day_start = datetime(kickoff_dt.year, kickoff_dt.month, kickoff_dt.day, tzinfo=timezone.utc)
+                day_end = day_start + timedelta(days=1)
+                existing_counts[dk] = (
+                    db.query(TrackedPick)
+                    .filter(
+                        TrackedPick.user_id == user_id,
+                        TrackedPick.sport == sport_val,
+                        TrackedPick.auto_generated.is_(True),
+                        TrackedPick.start_time >= day_start,
+                        TrackedPick.start_time < day_end,
+                    )
+                    .count()
                 )
 
-                if not dry_run:
-                    pick = TrackedPick(
-                        id=str(uuid.uuid4()),
-                        user_id=user_id,
-                        match_id=match.id,
-                        match_label=match_label,
-                        sport=sport,
-                        league=league_name,
-                        start_time=match.kickoff_utc,
-                        market_name=market_name,
-                        selection_label=selection_label,
-                        odds=book_odds,
-                        edge=round(e, 4),
-                        kelly_fraction=round(k, 4),
-                        stake_fraction=stake,
-                        auto_generated=True,
-                    )
-                    db.add(pick)
-                    created += 1
+        new_counts: dict[str, int] = {}
 
-                    # Also post under the sport-specific AI tipster account
-                    ai_tipster_id = AI_TIPSTER_IDS.get(sport)
-                    if ai_tipster_id and not _already_tipped(
-                        db, ai_tipster_id, match_label, market_name, selection_label
-                    ):
-                        tip = TipsterTip(
-                            user_id=ai_tipster_id,
-                            sport=sport,
-                            match_label=match_label,
-                            market_name=market_name,
-                            selection_label=selection_label,
-                            odds=book_odds,
-                            start_time=match.kickoff_utc,
-                            match_id=match.id,
-                            note=f"Edge: +{round(e * 100, 1)}% | Kelly: {round(k * 100, 1)}%",
-                        )
-                        db.add(tip)
+        for p in pending:
+            day_key = p["day_key"]
+            total = existing_counts.get(day_key, 0) + new_counts.get(day_key, 0)
+            if total >= SPORT_MAX_PICKS_PER_DAY:
+                log.debug("  Daily cap (%d) reached for %s", SPORT_MAX_PICKS_PER_DAY, day_key)
+                continue
+
+            log.info(
+                "  [%s] %s | %s @ %.2f | conf=%.2f | edge=+%.1f%%",
+                p["sport"], p["match_label"], p["selection_label"], p["book_odds"],
+                p["confidence"], p["edge"] * 100,
+            )
+            new_counts[day_key] = new_counts.get(day_key, 0) + 1
+
+            if not dry_run:
+                pick = TrackedPick(
+                    id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    match_id=p["match_id"],
+                    match_label=p["match_label"],
+                    sport=p["sport"],
+                    league=p["league_name"],
+                    start_time=p["kickoff"],
+                    market_name=p["market_name"],
+                    selection_label=p["selection_label"],
+                    odds=p["book_odds"],
+                    edge=round(p["edge"], 4),
+                    kelly_fraction=round(p["kelly"], 4),
+                    stake_fraction=p["stake"],
+                    auto_generated=True,
+                )
+                db.add(pick)
+                created += 1
+
+                ai_tipster_id = AI_TIPSTER_IDS.get(p["sport"])
+                if ai_tipster_id and not _already_tipped(
+                    db, ai_tipster_id, p["match_label"], p["market_name"], p["selection_label"]
+                ):
+                    tip = TipsterTip(
+                        user_id=ai_tipster_id,
+                        sport=p["sport"],
+                        match_label=p["match_label"],
+                        market_name=p["market_name"],
+                        selection_label=p["selection_label"],
+                        odds=p["book_odds"],
+                        start_time=p["kickoff"],
+                        match_id=p["match_id"],
+                        note=p["note"],
+                    )
+                    db.add(tip)
 
         if not dry_run:
             db.commit()
