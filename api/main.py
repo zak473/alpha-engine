@@ -999,8 +999,8 @@ def admin_run_auto_picks(secret: str):
 
 
 @app.post("/api/v1/admin/backfill-all-picks", tags=["Admin"])
-def admin_backfill_all_picks(secret: str, days: int = 60):
-    """Backfill TrackedPick + TipsterTip rows for all sports, running in background."""
+def admin_backfill_all_picks(secret: str, days: int = 60, sport: str = ""):
+    """Backfill TrackedPick + TipsterTip rows for all sports (or one sport), running in background."""
     if secret != settings.ADMIN_SECRET:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Forbidden")
@@ -1009,13 +1009,13 @@ def admin_backfill_all_picks(secret: str, days: int = 60):
     def _run():
         try:
             from pipelines.picks.backfill_picks import run as backfill
-            n = backfill(days=days)
-            log.info("[admin] backfill-all-picks: created %d picks (last %d days)", n, days)
+            n = backfill(days=days, sport_filter=sport or None)
+            log.info("[admin] backfill-all-picks: created %d picks (last %d days, sport=%s)", n, days, sport or "all")
         except Exception as exc:
             log.error("[admin] backfill-all-picks failed: %s", exc, exc_info=True)
 
     threading.Thread(target=_run, daemon=True, name="backfill-all-picks").start()
-    return {"status": "started", "days": days, "message": f"Backfilling last {days} days for all sports in background."}
+    return {"status": "started", "days": days, "sport": sport or "all", "message": f"Backfilling last {days} days for {sport or 'all sports'} in background."}
 
 
 @app.get("/api/v1/admin/backfill-picks-diag", tags=["Admin"])
