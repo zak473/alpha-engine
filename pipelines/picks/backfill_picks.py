@@ -325,8 +325,10 @@ def run(
             else:
                 ml_market = "1X2"
 
-            FAIR_ODDS_SPORTS = {"basketball", "baseball", "tennis"}
-            can_use_fair_odds = sport in FAIR_ODDS_SPORTS and (sport != "tennis" or source == "ml")
+            # Tennis removed from fair odds — only real market odds give genuine edge.
+            # Fair odds (1/p) with imperfect calibration → structural negative ROI.
+            FAIR_ODDS_SPORTS = {"basketball", "baseball"}
+            can_use_fair_odds = sport in FAIR_ODDS_SPORTS
             using_fair_odds = not match.odds_home and can_use_fair_odds
             h_odds = match.odds_home or (round(1 / p_home, 3) if p_home > 0 and can_use_fair_odds else None)
             a_odds = match.odds_away or (round(1 / p_away, 3) if p_away > 0 and can_use_fair_odds else None)

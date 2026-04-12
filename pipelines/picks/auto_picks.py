@@ -222,10 +222,9 @@ SPORT_MIN_CONFIDENCE: dict[str, float] = {
     "hockey":     0.35,
 }
 FAIR_ODDS_MIN_CONFIDENCE: dict[str, float] = {
-    # soccer removed — uses real SGO odds only (no fair-odds fallback)
+    # soccer + tennis removed — both use real market odds only (no fair-odds fallback)
     "basketball": 0.30,
     "baseball":   0.20,
-    "tennis":     0.40,
 }
 # Per-sport minimum odds override. Tennis: 1.20 allows short-priced match winners
 # (p_home up to 0.83). Picks where odds < 1.20 fall through to set handicap.
@@ -240,9 +239,11 @@ SPORT_MAX_PICKS_PER_DAY: int = 4
 # unavailable. SGO covers top-tier soccer leagues only. Basketball (NBA) and
 # baseball (MLB) often lack stored market odds — we fall back to model fair odds
 # with confidence-only gating (model is well-calibrated at these confidence levels).
-# Tennis uses fair odds for moneyline (model 62.9% acc post label-bias fix).
+# Tennis: REMOVED from fair odds — fair odds (1/p) with imperfect calibration gives
+# structural negative ROI (~-10%). Tennis picks now only fire when real market odds
+# are stored (from SGO), ensuring genuine model-vs-market edge.
 # Esports: DISABLED — negative ROI at all thresholds.
-FAIR_ODDS_SPORTS: set[str] = {"basketball", "baseball", "tennis"}  # soccer uses SGO real odds only
+FAIR_ODDS_SPORTS: set[str] = {"basketball", "baseball"}  # soccer + tennis use real odds only
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
